@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v4.0.3
+        id: filter
+        with:
+          filters: |
+            api:
+              - 'api/**'
+            web:
+              - 'web/**'
+
+  api:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "api ok"
+
+  web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "web ok"
+
+  gate:
+    needs: [api, web]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: falha se api ou web falharam ou foram cancelados
+        run: |
+          if [[ "${{ needs.api.result }}" == "failure" || \
+                "${{ needs.api.result }}" == "cancelled" || \
+                "${{ needs.web.result }}" == "failure" || \
+                "${{ needs.web.result }}" == "cancelled" ]]; then
+            exit 1
+          fi
