@@ -28,7 +28,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "api ok"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          working-directory: api
+      - run: uv sync --frozen
+        working-directory: api
+      - run: uv run ruff check .
+        working-directory: api
+      - run: uv run ruff format --check .
+        working-directory: api
+      - run: uv run mypy app
+        working-directory: api
+      - run: uv run pytest
+        working-directory: api
 
   web:
     needs: changes
