@@ -9,6 +9,7 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "alembic>=1.14",
     "pydantic-settings>=2.7",
+    "cryptography>=43.0",
 ]
 
 [dependency-groups]

@@ -4,6 +4,7 @@ from agno.agent.protocol import AgentProtocol
 from agno.agent.remote import RemoteAgent
 from agno.db.postgres import PostgresDb
 from agno.os import AgentOS
+from agno.os.config import AuthorizationConfig
 from fastapi import FastAPI
 
 from app.routers.linter import router as linter_router
@@ -11,13 +12,24 @@ from app.routers.models import router as models_router
 from app.settings import get_settings
 
 
-def create_app(auto_provision_dbs: bool = True) -> FastAPI:
+def create_app(
+    auto_provision_dbs: bool = True,
+    enable_auth: bool = True,
+) -> FastAPI:
     settings = get_settings()
     db = PostgresDb(db_url=settings.database_url)
 
     base = FastAPI(title="automata")
     base.include_router(models_router)
     base.include_router(linter_router)
+
+    auth_config: AuthorizationConfig | None = None
+    if enable_auth:
+        auth_config = AuthorizationConfig(
+            verification_keys=[settings.jwt_public_key],
+            algorithm="RS256",
+            user_isolation=True,
+        )
 
     # Factories são carregadas dinamicamente aqui a partir dos configs ativos.
     # Exemplo de registro manual para desenvolvimento/testes:
@@ -36,6 +48,8 @@ def create_app(auto_provision_dbs: bool = True) -> FastAPI:
         agents=factories or None,
         base_app=base,
         auto_provision_dbs=auto_provision_dbs,
+        authorization=enable_auth,
+        authorization_config=auth_config,
     ).get_app()
 
 

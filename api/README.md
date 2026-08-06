@@ -23,4 +23,29 @@ uv run uvicorn app.main:app --reload
 
 ## Scopes JWT
 
-Documentados quando o PR de autorização for mergeado (PR 11).
+Autenticação por JWT assimétrico RS256. O backend emite o token (via `app.auth.issue_token`), o AgentOS verifica usando a chave pública de `JWT_PUBLIC_KEY`. `user_isolation=True` ativo — cada usuário só enxerga suas próprias sessões e memórias.
+
+| Scope | Descrição |
+|---|---|
+| `agent_os:admin` | Acesso total — todos os endpoints |
+| `agents:read` | Listar e ler agentes |
+| `agents:write` | Criar e editar agentes |
+| `agents:*:run` | Executar qualquer agente |
+| `agents:<id>:run` | Executar agente específico |
+| `sessions:read` | Ver sessões |
+| `sessions:write` | Criar e atualizar sessões |
+| `sessions:delete` | Apagar sessões |
+| `memories:read` | Ver memórias |
+| `memories:write` | Criar e atualizar memórias |
+| `memories:delete` | Apagar memórias |
+| `traces:read` | Ver traces |
+| `config:read` | Ler configuração da OS |
+| `config:write` | Operações administrativas (ex: migrations) |
+| `evals:read` | Ver execuções de evals |
+| `evals:write` | Criar e atualizar evals |
+| `service_accounts:read` | Listar service accounts |
+| `service_accounts:write` | Emitir tokens de service account |
+
+Rotas próprias (`/api/v1/*`) não estão no mapa de scopes do AgentOS — acessíveis com qualquer JWT válido, independente de escopo.
+
+Chave privada (`JWT_PRIVATE_KEY`) usada apenas pelo BFF do painel (Next.js Route Handler) e pelos testes de integração. Nunca chega ao browser (ADR-0005).
