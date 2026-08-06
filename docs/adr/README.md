@@ -34,4 +34,4 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0006](0006-instructions-agnosticas-de-provider.md) | Instructions agnósticas de provider | Aceito |
 | [0007](0007-licenciamento.md) | Código aberto sob AGPL-3.0 com licença comercial paralela | Proposto |
 | [0008](0008-demo-com-respostas-gravadas.md) | Demo pública com respostas gravadas | Proposto |
-
+| [0009](0009-superficie-de-integracao.md) | MCP server mode e REST como superfície de integração | Proposto |

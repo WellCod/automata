@@ -36,3 +36,6 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "nightly: testes que chamam LLM real — só rodam na suite noturna",
+]

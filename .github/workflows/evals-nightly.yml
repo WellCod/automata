@@ -1,0 +1,22 @@
+name: Evals Noturnas
+
+on:
+  schedule:
+    - cron: "0 3 * * *"  # 03:00 UTC
+  workflow_dispatch:
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          working-directory: api
+      - run: uv sync --frozen
+        working-directory: api
+      - run: uv run pytest -m nightly -v
+        working-directory: api
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
