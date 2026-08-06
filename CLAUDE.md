@@ -56,3 +56,26 @@ Evite: "vamos", "vale notar que", "em resumo", comentário que repete o código,
 - [x] PR 11 — `feat(api): autorização jwt e scopes`
 - [x] PR 12 — `feat(metering): rollup de consumo por período`
 - [x] PR 13 — `test(api): evals de confiabilidade no ci`
+
+## Fase 2 — Painel
+
+Stack: Next.js App Router, TypeScript strict, Tailwind, shadcn/ui, TanStack Query, react-hook-form + zod, openapi-typescript, Vitest + Testing Library, Playwright, ESLint, Prettier.
+
+Regras críticas:
+- Nunca `NEXT_PUBLIC_*` para token, chave ou segredo
+- Todo acesso ao AgentOS via Route Handlers server-side (BFF)
+- Tipos do client são gerados, nunca escritos à mão
+- Sem `any`, sem `@ts-ignore` sem comentário justificando
+
+## Sequência de PRs — Fase 2
+
+- [x] PR 14 — `chore(web): scaffolding do painel`
+- [ ] PR 15 — `feat(web): bff e tipos gerados do openapi`
+- [ ] PR 16 — `feat(web): lista de agentes`
+- [ ] PR 17 — `feat(web): formulário de edição, campos base`
+- [ ] PR 18 — `feat(web): seletor de modelo com capabilities condicionais`
+- [ ] PR 19 — `feat(web): painel do linter`
+- [ ] PR 20 — `feat(web): estimador de custo`
+- [ ] PR 21 — `feat(web): versões, diff e rollback`
+- [ ] PR 22 — `feat(web): modo teste a partir do agent-ui`
+- [ ] PR 23 — `test(web): e2e do fluxo crítico`

@@ -48,7 +48,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "web ok"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: web
+      - run: pnpm exec tsc --noEmit
+        working-directory: web
+      - run: pnpm lint
+        working-directory: web
+      - run: pnpm format:check
+        working-directory: web
+      - run: pnpm test
+        working-directory: web
 
   gate:
     needs: [api, web]
