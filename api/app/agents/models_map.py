@@ -22,10 +22,7 @@ def resolve_model(model_id: str) -> Model:
     """
     cls = _SUPPORTED.get(model_id)
     if cls is None:
-        raise ValueError(
-            f"model_id '{model_id}' não suportado. "
-            f"Suportados: {sorted(_SUPPORTED)}"
-        )
+        raise ValueError(f"model_id '{model_id}' não suportado. Suportados: {sorted(_SUPPORTED)}")
     return cls(id=model_id)
 
 

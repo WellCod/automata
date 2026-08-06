@@ -15,9 +15,7 @@ target_metadata = Base.metadata
 _our_tables = set(target_metadata.tables.keys())
 
 
-def include_object(
-    object: Any, name: str, type_: str, reflected: bool, compare_to: Any
-) -> bool:
+def include_object(object: Any, name: str, type_: str, reflected: bool, compare_to: Any) -> bool:
     """Restringe o autogenerate às nossas tabelas.
 
     Tabelas do AgentOS são geridas por ele via auto_provision_dbs; se o
