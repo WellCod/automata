@@ -129,7 +129,7 @@ def test_payload_vazio_sem_avisos() -> None:
 def test_endpoint_linter_sem_avisos() -> None:
     from app.main import create_app
 
-    client = TestClient(create_app(auto_provision_dbs=False))
+    client = TestClient(create_app(auto_provision_dbs=False, enable_auth=False))
     response = client.post(
         "/api/v1/linter",
         json={"model_id": "gpt-4o", "schema_version": 1},
@@ -141,7 +141,7 @@ def test_endpoint_linter_sem_avisos() -> None:
 def test_endpoint_linter_com_avisos() -> None:
     from app.main import create_app
 
-    client = TestClient(create_app(auto_provision_dbs=False))
+    client = TestClient(create_app(auto_provision_dbs=False, enable_auth=False))
     response = client.post(
         "/api/v1/linter",
         json={
@@ -160,7 +160,7 @@ def test_endpoint_linter_capabilities_invalidas_rejeitadas() -> None:
     """Payload com capability inválida deve ser rejeitado com 422 antes do linter."""
     from app.main import create_app
 
-    client = TestClient(create_app(auto_provision_dbs=False))
+    client = TestClient(create_app(auto_provision_dbs=False, enable_auth=False))
     # extended_thinking não é suportado por gpt-4o, mas o endpoint apenas linta
     # sem validar capabilities — essa responsabilidade fica em save_draft
     response = client.post(

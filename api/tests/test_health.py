@@ -19,7 +19,7 @@ def set_env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
 def test_health() -> None:
     from app.main import create_app
 
-    client = TestClient(create_app(auto_provision_dbs=False))
+    client = TestClient(create_app(auto_provision_dbs=False, enable_auth=False))
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"

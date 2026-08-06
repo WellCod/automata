@@ -76,7 +76,7 @@ def test_validate_flags_desativadas_sao_sempre_validas() -> None:
 def test_endpoint_capabilities() -> None:
     from app.main import create_app
 
-    client = TestClient(create_app(auto_provision_dbs=False))
+    client = TestClient(create_app(auto_provision_dbs=False, enable_auth=False))
     response = client.get("/api/v1/models/capabilities")
     assert response.status_code == 200
     data = response.json()
@@ -89,7 +89,7 @@ def test_endpoint_capabilities_contem_todos_modelos() -> None:
     from app.agents.capabilities import all_capabilities
     from app.main import create_app
 
-    client = TestClient(create_app(auto_provision_dbs=False))
+    client = TestClient(create_app(auto_provision_dbs=False, enable_auth=False))
     response = client.get("/api/v1/models/capabilities")
     assert response.status_code == 200
     assert set(response.json().keys()) == set(all_capabilities().keys())
