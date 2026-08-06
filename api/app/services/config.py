@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from app.agents.capabilities import validate_capabilities
 from app.models.config import AgentConfig, AgentConfigVersion
 from app.repositories.config import ConfigRepository
 from app.schemas.config import ConfigPayload, ConfigPayloadStatus
@@ -15,6 +16,10 @@ class ConfigService:
     def save_draft(
         self, config_id: UUID, payload: ConfigPayload, author: str
     ) -> AgentConfigVersion:
+        errors = validate_capabilities(payload.model_id, payload.capabilities)
+        if errors:
+            raise ValueError("; ".join(errors))
+
         config = self._get_or_raise(config_id)
         version = self._repo.create_version(
             config_id=config_id,

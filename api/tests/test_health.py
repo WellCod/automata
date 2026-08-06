@@ -1,3 +1,5 @@
+from collections.abc import Generator
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -5,7 +7,7 @@ from app.settings import get_settings
 
 
 @pytest.fixture(autouse=True)
-def set_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def set_env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@localhost/db")
     monkeypatch.setenv("JWT_PRIVATE_KEY", "pk")
     monkeypatch.setenv("JWT_PUBLIC_KEY", "pub")

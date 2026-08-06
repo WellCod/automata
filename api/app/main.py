@@ -6,6 +6,7 @@ from agno.db.postgres import PostgresDb
 from agno.os import AgentOS
 from fastapi import FastAPI
 
+from app.routers.models import router as models_router
 from app.settings import get_settings
 
 
@@ -14,6 +15,7 @@ def create_app(auto_provision_dbs: bool = True) -> FastAPI:
     db = PostgresDb(db_url=settings.database_url)
 
     base = FastAPI(title="automata")
+    base.include_router(models_router)
 
     # Factories são carregadas dinamicamente aqui a partir dos configs ativos.
     # Exemplo de registro manual para desenvolvimento/testes:
