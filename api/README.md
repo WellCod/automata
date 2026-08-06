@@ -17,9 +17,25 @@ A licença do Agno na versão 2.8.7 é **Apache 2.0**, confirmada em `github.com
 
 ```bash
 uv sync
-uv run pytest
+uv run pytest -m "not nightly"   # suite completa sem LLM real
 uv run uvicorn app.main:app --reload
 ```
+
+## Evals de confiabilidade
+
+Dois níveis de cobertura:
+
+| Suite | Quando roda | Como rodar |
+|---|---|---|
+| Smoke | Todo PR (CI) | `pytest -m "not nightly"` |
+| Noturna | Diariamente às 03:00 UTC | `pytest -m nightly` |
+
+A suite smoke testa a lógica do `ReliabilityEval` com `RunOutput` construído manualmente — sem custo e sem dependência de credencial. A suite noturna chama LLM real (Claude Haiku) e verifica que o agente chama as tools esperadas. Requer `ANTHROPIC_API_KEY` no ambiente.
+
+Arquivos:
+- `tests/test_evals_smoke.py` — fixtures gravadas, sem LLM
+- `tests/test_evals_nightly.py` — evals com LLM real, marcados `@pytest.mark.nightly`
+- `.github/workflows/evals-nightly.yml` — workflow agendado
 
 ## Metering
 

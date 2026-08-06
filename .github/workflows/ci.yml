@@ -39,7 +39,7 @@ jobs:
         working-directory: api
       - run: uv run mypy app
         working-directory: api
-      - run: uv run pytest
+      - run: uv run pytest -m "not nightly"
         working-directory: api
 
   web:
