@@ -9,6 +9,7 @@ from fastapi import FastAPI
 
 from app.routers.linter import router as linter_router
 from app.routers.models import router as models_router
+from app.routers.usage import router as usage_router
 from app.settings import get_settings
 
 
@@ -22,6 +23,7 @@ def create_app(
     base = FastAPI(title="automata")
     base.include_router(models_router)
     base.include_router(linter_router)
+    base.include_router(usage_router)
 
     auth_config: AuthorizationConfig | None = None
     if enable_auth:

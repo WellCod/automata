@@ -52,7 +52,7 @@ Evite: "vamos", "vale notar que", "em resumo", comentário que repete o código,
 - [x] PR 7 — `feat(config): rascunho, publicação e rollback`
 - [x] PR 8 — `feat(agents): factory e resolução de modelo`
 - [x] PR 9 — `feat(agents): matriz de capabilities e validação na escrita`
-- [ ] PR 10 — `feat(linter): linter de prompt`
-- [ ] PR 11 — `feat(api): autorização jwt e scopes`
+- [x] PR 10 — `feat(linter): linter de prompt`
+- [x] PR 11 — `feat(api): autorização jwt e scopes`
 - [ ] PR 12 — `feat(metering): rollup de consumo por período`
 - [ ] PR 13 — `test(api): evals de confiabilidade no ci`
