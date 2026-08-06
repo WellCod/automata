@@ -86,7 +86,7 @@ def test_rollback_so_move_ponteiro(session: Session, payload: ConfigPayload) -> 
     v1_payload_antes = dict(v1.payload)
     v1_number_antes = v1.version_number
 
-    svc.save_draft(config.id, ConfigPayload(model_id="claude-3-5-sonnet"), "autor")
+    svc.save_draft(config.id, ConfigPayload(model_id="claude-sonnet-4-6"), "autor")
     v2 = svc.publish(config.id, "autor")
 
     config_mid = repo.get_config(config.id)
