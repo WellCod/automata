@@ -21,6 +21,12 @@ uv run pytest
 uv run uvicorn app.main:app --reload
 ```
 
+## Metering
+
+`GET /api/v1/usage/rollup?period=YYYYMM&agent_id=<uuid>` — retorna consumo agregado por agente no período.
+
+Cada execução registra um `UsageEvent` via post_hook injetado pelo `AgentFactory`. O rollup agrega tokens e custo por `(agent_config_id, period)`. Campos: `run_count`, `input_tokens`, `output_tokens`, `total_tokens`, `cost`.
+
 ## Scopes JWT
 
 Autenticação por JWT assimétrico RS256. O backend emite o token (via `app.auth.issue_token`), o AgentOS verifica usando a chave pública de `JWT_PUBLIC_KEY`. `user_isolation=True` ativo — cada usuário só enxerga suas próprias sessões e memórias.

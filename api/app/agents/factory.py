@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from agno.agent import Agent
@@ -10,12 +12,36 @@ from sqlalchemy.orm import Session
 
 from app.agents.models_map import resolve_model
 from app.repositories.config import ConfigRepository
+from app.repositories.usage import UsageRepository
 from app.schemas.config import ConfigPayload
 from app.settings import get_settings
 
 
 class FactoryInput(BaseModel):
     version_id: UUID | None = None
+
+
+def _make_usage_hook(config_id: UUID, model_id: str) -> Any:
+    def record_usage(run_output: Any, user_id: str | None = None) -> None:
+        metrics = getattr(run_output, "metrics", None)
+        if metrics is None:
+            return
+        engine = create_engine(get_settings().database_url)
+        with Session(engine) as session:
+            repo = UsageRepository(session)
+            repo.record_event(
+                agent_config_id=config_id,
+                user_id=user_id or "anonymous",
+                run_id=getattr(run_output, "run_id", None),
+                model_id=model_id,
+                input_tokens=int(getattr(metrics, "input_tokens", None) or 0),
+                output_tokens=int(getattr(metrics, "output_tokens", None) or 0),
+                total_tokens=int(getattr(metrics, "total_tokens", None) or 0),
+                cost=getattr(metrics, "cost", None),
+                period=datetime.now(UTC).strftime("%Y%m"),
+            )
+
+    return record_usage
 
 
 def make_agent_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> AgentFactory:
@@ -62,6 +88,7 @@ def make_agent_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> AgentFactor
                 id=str(config_id),
                 model=model,
                 instructions=instructions,
+                post_hooks=[_make_usage_hook(config_id, payload.model_id)],
             )
 
     return AgentFactory(
