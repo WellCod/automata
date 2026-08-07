@@ -47,31 +47,34 @@ export function CostPanel({ agentId }: Props) {
   });
 
   return (
-    <div className="rounded-lg border border-zinc-200 p-4">
-      <h2 className="text-sm font-medium text-zinc-700">
+    <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
+      <h2 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
         Uso no mês ({period.slice(0, 4)}/{period.slice(4)})
       </h2>
 
-      {isPending && <p className="mt-3 text-xs text-zinc-400">Carregando…</p>}
+      {isPending && <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-600">Carregando…</p>}
 
-      {isError && <p className="mt-3 text-xs text-red-500">Erro ao carregar uso.</p>}
+      {isError && (
+        <p className="mt-3 text-xs text-red-500 dark:text-red-400">Erro ao carregar uso.</p>
+      )}
 
       {!isPending && !isError && (
-        <dl className="mt-3 grid grid-cols-3 gap-4">
-          <div className="flex flex-col gap-0.5">
-            <dt className="text-xs text-zinc-400">Execuções</dt>
-            <dd className="text-sm font-medium text-zinc-900">{data?.run_count ?? 0}</dd>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <dt className="text-xs text-zinc-400">Tokens</dt>
-            <dd className="text-sm font-medium text-zinc-900">
-              {formatTokens(data?.total_tokens ?? 0)}
-            </dd>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <dt className="text-xs text-zinc-400">Custo</dt>
-            <dd className="text-sm font-medium text-zinc-900">{formatCost(data?.cost ?? null)}</dd>
-          </div>
+        <dl className="mt-4 grid grid-cols-3 gap-3">
+          {[
+            { label: "Execuções", value: data?.run_count ?? 0 },
+            { label: "Tokens", value: formatTokens(data?.total_tokens ?? 0) },
+            { label: "Custo", value: formatCost(data?.cost ?? null) },
+          ].map(({ label, value }) => (
+            <div
+              key={label}
+              className="flex flex-col gap-1 rounded-lg bg-zinc-50 px-3 py-2.5 dark:bg-zinc-900"
+            >
+              <dt className="text-xs text-zinc-400 dark:text-zinc-600">{label}</dt>
+              <dd className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                {String(value)}
+              </dd>
+            </div>
+          ))}
         </dl>
       )}
     </div>
