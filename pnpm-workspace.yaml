@@ -1,0 +1,7 @@
+packages:
+  - "web"
+
+allowBuilds:
+  sharp: false
+  unrs-resolver: true
+  ws: true
