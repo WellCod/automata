@@ -85,8 +85,8 @@ class ConfigRepository:
 
         rows = self._session.scalars(
             base.options(
-                selectinload(AgentConfig.current_version),  # type: ignore[arg-type]
-                selectinload(AgentConfig.draft_version),  # type: ignore[arg-type]
+                selectinload(AgentConfig.current_version),
+                selectinload(AgentConfig.draft_version),
             )
             .order_by(AgentConfig.updated_at.desc())
             .offset((page - 1) * page_size)
