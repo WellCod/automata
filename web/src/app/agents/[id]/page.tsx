@@ -6,8 +6,9 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { ModelSelector } from "@/components/model-selector";
 import client from "@/lib/api/client";
 
 const instructionSchema = z.object({
@@ -22,6 +23,11 @@ const schema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
   description: z.string().optional(),
   model_id: z.string().min(1, "Modelo obrigatório"),
+  capabilities: z.object({
+    extended_thinking: z.boolean(),
+    structured_output: z.boolean(),
+    vision: z.boolean(),
+  }),
   instructions: instructionSchema,
 });
 
@@ -34,6 +40,8 @@ const INSTRUCTION_LABELS: Record<keyof z.infer<typeof instructionSchema>, string
   objective: "Objetivo",
   guardrails: "Guardrails",
 };
+
+const EMPTY_CAPS = { extended_thinking: false, structured_output: false, vision: false };
 
 function Field({
   label,
@@ -83,6 +91,7 @@ export default function AgentEditPage() {
       name: "",
       description: "",
       model_id: "",
+      capabilities: EMPTY_CAPS,
       instructions: { persona: "", situation: "", tone: "", objective: "", guardrails: "" },
     },
   });
@@ -94,6 +103,7 @@ export default function AgentEditPage() {
       name: data.name,
       description: data.description ?? "",
       model_id: data.payload?.model_id ?? "",
+      capabilities: data.payload?.capabilities ?? EMPTY_CAPS,
       instructions: {
         persona: data.payload?.instructions?.persona ?? "",
         situation: data.payload?.instructions?.situation ?? "",
@@ -116,11 +126,7 @@ export default function AgentEditPage() {
             model_id: values.model_id,
             instructions: values.instructions,
             tools: data?.payload?.tools ?? [],
-            capabilities: data?.payload?.capabilities ?? {
-              extended_thinking: false,
-              structured_output: false,
-              vision: false,
-            },
+            capabilities: values.capabilities,
             metadata: data?.payload?.metadata ?? {},
           },
         },
@@ -163,13 +169,21 @@ export default function AgentEditPage() {
           <textarea {...form.register("description")} className={textareaCls} rows={2} />
         </Field>
 
-        <Field label="Modelo" required error={form.formState.errors.model_id?.message}>
-          <input
-            {...form.register("model_id")}
-            className={inputCls}
-            placeholder="ex: claude-sonnet-4-6"
-          />
-        </Field>
+        <Controller
+          name="model_id"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <ModelSelector
+              value={field.value}
+              capabilities={form.watch("capabilities")}
+              onChange={(modelId, caps) => {
+                field.onChange(modelId);
+                form.setValue("capabilities", caps, { shouldValidate: true });
+              }}
+              error={fieldState.error?.message}
+            />
+          )}
+        />
 
         <fieldset className="flex flex-col gap-4 rounded-lg border border-zinc-200 px-4 pt-3 pb-4">
           <legend className="px-1 text-sm font-medium text-zinc-700">Instruções</legend>
