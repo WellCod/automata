@@ -8,6 +8,7 @@ import { useParams } from "next/navigation";
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { CostPanel } from "@/components/cost-panel";
 import { LintPanel } from "@/components/lint-panel";
 import { ModelSelector } from "@/components/model-selector";
 import client from "@/lib/api/client";
@@ -216,7 +217,8 @@ export default function AgentEditPage() {
         </div>
       </form>
 
-      <div className="mt-6">
+      <div className="mt-6 flex flex-col gap-4">
+        <CostPanel agentId={id} />
         <LintPanel
           getPayload={() => {
             const values = form.getValues();
