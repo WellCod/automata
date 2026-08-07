@@ -3,6 +3,7 @@
 Usado pelo pnpm gen:api no painel para gerar tipos TypeScript.
 Não inicia o AgentOS nem conecta ao banco.
 """
+
 import json
 import os
 import sys
