@@ -13,7 +13,7 @@ RUN useradd --create-home --shell /bin/bash app
 
 WORKDIR /app
 
-COPY --from=builder /app/.venv .venv
+COPY --from=builder /app/.venv /app/.venv
 COPY app/ app/
 
 ENV PATH="/app/.venv/bin:$PATH"

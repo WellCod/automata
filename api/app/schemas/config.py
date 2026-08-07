@@ -65,3 +65,26 @@ class AgentConfigPage(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class AgentConfigDetail(AgentConfigResponse):
+    payload: ConfigPayload | None
+
+
+class DraftInput(BaseModel):
+    name: str
+    description: str | None = None
+    payload: ConfigPayload
+
+
+class AgentConfigVersionDetail(AgentConfigVersionSummary):
+    payload: ConfigPayload
+
+
+class RollbackInput(BaseModel):
+    version_id: UUID
+
+
+class CreateConfigInput(BaseModel):
+    name: str
+    description: str | None = None
