@@ -6,7 +6,7 @@
  * Requer: venv da api já criado (uv sync em api/).
  */
 import { execSync } from "node:child_process";
-import { writeFileSync, readFileSync, unlinkSync, existsSync } from "node:fs";
+import { writeFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { platform } from "node:process";

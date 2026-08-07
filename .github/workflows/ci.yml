@@ -61,6 +61,7 @@ jobs:
         working-directory: api
       - run: pnpm install --frozen-lockfile
       - run: node web/scripts/gen-api.mjs
+      - run: pnpm --filter web exec prettier --write src/lib/api/schema.d.ts
       - run: pnpm --filter web exec tsc --noEmit
       - run: pnpm --filter web lint
       - run: pnpm --filter web format:check
