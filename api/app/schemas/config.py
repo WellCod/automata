@@ -1,5 +1,7 @@
 import enum
+from datetime import datetime
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -37,3 +39,29 @@ class ConfigPayload(BaseModel):
     tools: list[str] = Field(default_factory=list)
     capabilities: CapabilityFlags = Field(default_factory=CapabilityFlags)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentConfigVersionSummary(BaseModel):
+    id: UUID
+    version_number: int
+    label: str | None
+    status: ConfigPayloadStatus
+    author: str
+    created_at: datetime
+
+
+class AgentConfigResponse(BaseModel):
+    id: UUID
+    name: str
+    description: str | None
+    created_at: datetime
+    updated_at: datetime
+    current_version: AgentConfigVersionSummary | None
+    draft_version: AgentConfigVersionSummary | None
+
+
+class AgentConfigPage(BaseModel):
+    items: list[AgentConfigResponse]
+    total: int
+    page: int
+    page_size: int

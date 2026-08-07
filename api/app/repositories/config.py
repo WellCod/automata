@@ -1,7 +1,7 @@
 from uuid import UUID
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.config import AgentConfig, AgentConfigVersion
 from app.schemas.config import ConfigPayload, ConfigPayloadStatus
@@ -57,3 +57,39 @@ class ConfigRepository:
     def set_draft_version(self, config: AgentConfig, version_id: UUID | None) -> None:
         config.draft_version_id = version_id
         self._session.flush()
+
+    def list_configs(
+        self,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        q: str | None = None,
+        status: ConfigPayloadStatus | None = None,
+    ) -> tuple[list[AgentConfig], int]:
+        base = select(AgentConfig)
+
+        if q is not None:
+            try:
+                uid = UUID(q)
+                base = base.where(AgentConfig.id == uid)
+            except ValueError:
+                base = base.where(AgentConfig.name.ilike(f"%{q}%"))
+
+        if status == ConfigPayloadStatus.published:
+            base = base.where(AgentConfig.current_version_id.is_not(None))
+        elif status == ConfigPayloadStatus.draft:
+            base = base.where(AgentConfig.draft_version_id.is_not(None))
+
+        count_result = self._session.scalar(select(func.count()).select_from(base.subquery()))
+        total = int(count_result) if count_result is not None else 0
+
+        rows = self._session.scalars(
+            base.options(
+                selectinload(AgentConfig.current_version),
+                selectinload(AgentConfig.draft_version),
+            )
+            .order_by(AgentConfig.updated_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        return list(rows), total

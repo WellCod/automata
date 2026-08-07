@@ -75,6 +75,16 @@ class ConfigService:
         self._repo.set_current_version(config, version_id)
         return config
 
+    def list_configs(
+        self,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        q: str | None = None,
+        status: ConfigPayloadStatus | None = None,
+    ) -> tuple[list[AgentConfig], int]:
+        return self._repo.list_configs(page=page, page_size=page_size, q=q, status=status)
+
     def _get_or_raise(self, config_id: UUID) -> AgentConfig:
         config = self._repo.get_config(config_id)
         if config is None:
