@@ -80,9 +80,7 @@ class ConfigRepository:
         elif status == ConfigPayloadStatus.draft:
             base = base.where(AgentConfig.draft_version_id.is_not(None))
 
-        count_result = self._session.scalar(
-            select(func.count()).select_from(base.subquery())
-        )
+        count_result = self._session.scalar(select(func.count()).select_from(base.subquery()))
         total = int(count_result) if count_result is not None else 0
 
         rows = self._session.scalars(
