@@ -16,11 +16,6 @@ const STATUS_LABELS: Record<string, string> = {
   published: "Publicado",
 };
 
-const STATUS_CLS: Record<string, string> = {
-  draft: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
-  published: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400",
-};
-
 function diffPayload(a: ConfigPayload, b: ConfigPayload): string[] {
   const diffs: string[] = [];
   if (a.model_id !== b.model_id) diffs.push(`modelo: ${a.model_id} → ${b.model_id}`);
@@ -91,43 +86,36 @@ export function VersionsPanel({ agentId }: Props) {
   const current = published[0];
 
   return (
-    <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Versões</h2>
+        <span className="text-muted-foreground text-[11px] font-medium tracking-[0.05em] uppercase">
+          Versões
+        </span>
         {draft && (
           <button
             type="button"
             onClick={() => publishMutation.mutate()}
             disabled={publishMutation.isPending}
-            className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="border-accent text-accent hover:border-accent/70 hover:text-accent/70 rounded border px-2 py-1 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
           >
-            {publishMutation.isPending ? "Publicando…" : "Publicar rascunho"}
+            {publishMutation.isPending ? "Publicando…" : "Publicar"}
           </button>
         )}
       </div>
 
-      {publishMutation.isError && (
-        <p className="mt-2 text-xs text-red-500 dark:text-red-400">
-          Erro ao publicar. Tente novamente.
-        </p>
-      )}
+      {publishMutation.isError && <p className="text-destructive text-[11px]">Erro ao publicar.</p>}
       {rollbackMutation.isError && (
-        <p className="mt-2 text-xs text-red-500 dark:text-red-400">
-          Erro ao reverter. Tente novamente.
-        </p>
+        <p className="text-destructive text-[11px]">Erro ao reverter.</p>
       )}
 
-      {isPending && <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-600">Carregando…</p>}
-      {isError && (
-        <p className="mt-3 text-xs text-red-500 dark:text-red-400">Erro ao carregar versões.</p>
-      )}
-
-      {!isPending && !isError && versions && versions.length === 0 && (
-        <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-600">Nenhuma versão salva.</p>
+      {isPending && <p className="text-muted-foreground text-[13px]">Carregando…</p>}
+      {isError && <p className="text-destructive text-[13px]">Erro ao carregar versões.</p>}
+      {!isPending && !isError && versions?.length === 0 && (
+        <p className="text-muted-foreground text-[13px]">Nenhuma versão salva.</p>
       )}
 
       {!isPending && !isError && versions && versions.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-2">
+        <ul className="flex flex-col gap-1">
           {versions.map((v) => {
             const diffs =
               v.status === "draft" && current ? diffPayload(current.payload, v.payload) : [];
@@ -135,22 +123,24 @@ export function VersionsPanel({ agentId }: Props) {
             return (
               <li
                 key={v.id}
-                className="flex flex-col gap-1 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 transition-colors dark:border-zinc-800 dark:bg-zinc-900"
+                className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                    <span className="text-foreground text-[13px] font-medium">
                       v{v.version_number}
                     </span>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLS[v.status] ?? ""}`}
+                      className={`text-[11px] tracking-[0.05em] uppercase ${
+                        v.status === "published" ? "text-accent" : "text-amber-400"
+                      }`}
                     >
                       {STATUS_LABELS[v.status] ?? v.status}
                     </span>
-                    <span className="text-xs text-zinc-400 dark:text-zinc-600">{v.author}</span>
+                    <span className="text-muted-foreground text-[11px]">{v.author}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-zinc-400 dark:text-zinc-600">
+                    <span className="text-muted-foreground text-[11px]">
                       {new Date(v.created_at).toLocaleDateString("pt-BR")}
                     </span>
                     {v.status === "published" && v.id !== current?.id && (
@@ -158,7 +148,7 @@ export function VersionsPanel({ agentId }: Props) {
                         type="button"
                         onClick={() => rollbackMutation.mutate(v.id)}
                         disabled={rollbackMutation.isPending}
-                        className="rounded-md border border-zinc-200 px-2 py-0.5 text-xs text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                        className="border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground rounded border px-2 py-0.5 text-[11px] tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
                       >
                         Reverter
                       </button>
@@ -166,9 +156,7 @@ export function VersionsPanel({ agentId }: Props) {
                   </div>
                 </div>
                 {diffs.length > 0 && (
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Alterado: {diffs.join(", ")}
-                  </p>
+                  <p className="text-muted-foreground text-[11px]">Alterado: {diffs.join(", ")}</p>
                 )}
               </li>
             );

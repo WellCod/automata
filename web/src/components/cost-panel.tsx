@@ -46,36 +46,35 @@ export function CostPanel({ agentId }: Props) {
     },
   });
 
+  const stats = [
+    { label: "Execuções", value: String(data?.run_count ?? 0) },
+    { label: "Tokens", value: formatTokens(data?.total_tokens ?? 0) },
+    { label: "Custo", value: formatCost(data?.cost ?? null) },
+  ];
+
   return (
-    <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
-      <h2 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-        Uso no mês ({period.slice(0, 4)}/{period.slice(4)})
-      </h2>
+    <div className="flex flex-col gap-3">
+      <span className="text-muted-foreground text-[11px] font-medium tracking-[0.05em] uppercase">
+        Uso · {period.slice(0, 4)}/{period.slice(4)}
+      </span>
 
-      {isPending && <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-600">Carregando…</p>}
-
-      {isError && (
-        <p className="mt-3 text-xs text-red-500 dark:text-red-400">Erro ao carregar uso.</p>
-      )}
+      {isPending && <p className="text-muted-foreground text-[13px]">Carregando…</p>}
+      {isError && <p className="text-destructive text-[13px]">Erro ao carregar uso.</p>}
 
       {!isPending && !isError && (
-        <dl className="mt-4 grid grid-cols-3 gap-3">
-          {[
-            { label: "Execuções", value: data?.run_count ?? 0 },
-            { label: "Tokens", value: formatTokens(data?.total_tokens ?? 0) },
-            { label: "Custo", value: formatCost(data?.cost ?? null) },
-          ].map(({ label, value }) => (
+        <div className="grid grid-cols-3 gap-2">
+          {stats.map(({ label, value }) => (
             <div
               key={label}
-              className="flex flex-col gap-1 rounded-lg bg-zinc-50 px-3 py-2.5 dark:bg-zinc-900"
+              className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2"
             >
-              <dt className="text-xs text-zinc-400 dark:text-zinc-600">{label}</dt>
-              <dd className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                {String(value)}
-              </dd>
+              <span className="text-muted-foreground text-[11px] tracking-[0.05em] uppercase">
+                {label}
+              </span>
+              <span className="text-foreground text-[13px] font-medium">{value}</span>
             </div>
           ))}
-        </dl>
+        </div>
       )}
     </div>
   );

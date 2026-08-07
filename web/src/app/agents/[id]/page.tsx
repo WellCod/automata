@@ -64,6 +64,15 @@ const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors focus:border-accent focus:outline-none";
 const textareaCls = `${inputCls} min-h-24 resize-y`;
 
+function FieldLabel({ label, required }: { label: string; required?: boolean }) {
+  return (
+    <label className="text-muted-foreground text-[11px] font-medium tracking-[0.05em] uppercase">
+      {label}
+      {required && <span className="text-destructive ml-0.5">*</span>}
+    </label>
+  );
+}
+
 function Field({
   label,
   error,
@@ -76,45 +85,39 @@ function Field({
   required?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-        {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
-      </label>
+    <div className="flex flex-col gap-1">
+      <FieldLabel label={label} required={required} />
       {children}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-destructive text-[11px]">{error}</p>}
     </div>
   );
 }
 
-function StatusBadge({ data }: { data: AgentConfigDetail | undefined }) {
+function AgentStatusBadge({ data }: { data: AgentConfigDetail | undefined }) {
   if (!data) return null;
   if (data.current_version && data.draft_version) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:ring-amber-800">
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-        rascunho pendente
+      <span className="text-[11px] tracking-[0.05em] text-amber-400 uppercase">
+        v{data.current_version.version_number} · rascunho pendente
       </span>
     );
   }
   if (data.current_version) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-green-200 dark:bg-green-950/40 dark:text-green-400 dark:ring-green-800">
-        <span className="h-1.5 w-1.5 rounded-full bg-green-500" />v
-        {data.current_version.version_number} ativo
+      <span className="text-accent text-[11px] tracking-[0.05em] uppercase">
+        v{data.current_version.version_number} · ativo
       </span>
     );
   }
   if (data.draft_version) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:ring-amber-800">
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+      <span className="text-muted-foreground text-[11px] tracking-[0.05em] uppercase">
         rascunho
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-400 ring-1 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-600 dark:ring-zinc-700">
+    <span className="text-muted-foreground text-[11px] tracking-[0.05em] uppercase">
       sem versão
     </span>
   );
@@ -193,9 +196,9 @@ export default function AgentEditPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-14 items-center border-b border-zinc-200 bg-white px-6 dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="border-border flex h-11 items-center border-b px-6">
         <span className="sr-only">Carregando…</span>
-        <div className="h-4 w-48 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
+        <div className="bg-muted h-3 w-40 animate-pulse rounded" />
       </div>
     );
   }
@@ -215,33 +218,33 @@ export default function AgentEditPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Sticky header */}
-      <header className="sticky top-0 z-10 flex h-14 flex-none items-center justify-between border-b border-zinc-200 bg-white/95 px-6 backdrop-blur-sm transition-colors dark:border-zinc-800 dark:bg-zinc-950/95">
+      {/* Header */}
+      <header className="border-border bg-background sticky top-0 z-10 flex h-11 flex-none items-center justify-between border-b px-6">
         <div className="flex items-center gap-3">
           <Link
             href="/"
-            className="rounded-lg p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+            className="text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Voltar"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
-          <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            {data?.name ?? "Agente"}
-          </span>
-          <StatusBadge data={data} />
+          <span className="text-foreground text-sm font-medium">{data?.name ?? "Agente"}</span>
+          <AgentStatusBadge data={data} />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {mutation.isSuccess && (
-            <span className="text-xs text-green-600 dark:text-green-500">Salvo</span>
+            <span className="text-accent text-[11px] tracking-[0.05em] uppercase">Salvo</span>
           )}
           {mutation.isError && (
-            <span className="text-xs text-red-500 dark:text-red-400">Erro ao salvar</span>
+            <span className="text-destructive text-[11px] tracking-[0.05em] uppercase">
+              Erro ao salvar
+            </span>
           )}
           <button
             type="submit"
             form="agent-form"
             disabled={mutation.isPending}
-            className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="border-foreground text-foreground hover:border-accent hover:text-accent rounded border px-3 py-1 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
           >
             {mutation.isPending ? "Salvando…" : "Salvar rascunho"}
           </button>
@@ -251,11 +254,11 @@ export default function AgentEditPage() {
       {/* Two-column body */}
       <div className="flex flex-1">
         {/* Left: form */}
-        <div className="min-w-0 flex-1 px-8 py-6">
+        <div className="min-w-0 flex-1 px-6 py-4">
           <form
             id="agent-form"
             onSubmit={form.handleSubmit((v) => mutation.mutate(v))}
-            className="mx-auto flex max-w-2xl flex-col gap-5"
+            className="flex max-w-2xl flex-col gap-4"
           >
             <Field label="Nome" required error={form.formState.errors.name?.message}>
               <input {...form.register("name")} className={inputCls} />
@@ -281,8 +284,8 @@ export default function AgentEditPage() {
               )}
             />
 
-            <fieldset className="flex flex-col gap-4 rounded-xl border border-zinc-200 px-4 pt-3 pb-4 transition-colors dark:border-zinc-700">
-              <legend className="px-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <fieldset className="border-border flex flex-col gap-3 rounded border px-4 pt-3 pb-4">
+              <legend className="text-muted-foreground px-1 text-[11px] font-medium tracking-[0.05em] uppercase">
                 Instruções
               </legend>
               {(Object.keys(INSTRUCTION_LABELS) as (keyof typeof INSTRUCTION_LABELS)[]).map(
@@ -301,19 +304,19 @@ export default function AgentEditPage() {
         </div>
 
         {/* Right: tabbed panels */}
-        <div className="w-[400px] flex-none border-l border-zinc-200 bg-white transition-colors lg:sticky lg:top-14 lg:max-h-[calc(100vh-3.5rem)] lg:overflow-y-auto dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="border-border bg-background w-[360px] flex-none border-l lg:sticky lg:top-11 lg:max-h-[calc(100vh-2.75rem)] lg:overflow-y-auto">
           {/* Tab nav */}
-          <div className="flex border-b border-zinc-200 dark:border-zinc-800">
+          <div className="border-border flex border-b">
             {PANEL_TABS.map(({ id: pid, label, icon: Icon }) => (
               <button
                 key={pid}
                 type="button"
                 onClick={() => setActivePanel(pid)}
                 className={cn(
-                  "flex flex-1 flex-col items-center gap-1 px-1 py-2.5 text-xs font-medium transition-colors",
+                  "flex flex-1 flex-col items-center gap-1 px-1 py-2 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors",
                   activePanel === pid
-                    ? "border-b-2 border-zinc-900 text-zinc-900 dark:border-zinc-100 dark:text-zinc-100"
-                    : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-600 dark:hover:text-zinc-400",
+                    ? "border-accent text-accent border-b"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />

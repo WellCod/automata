@@ -115,49 +115,51 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
   }
 
   return (
-    <div className="rounded-xl border border-zinc-200 dark:border-zinc-700">
-      <div className="flex items-center justify-between px-4 py-3">
-        <h2 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Modo teste</h2>
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <span className="text-muted-foreground text-[11px] font-medium tracking-[0.05em] uppercase">
+          Modo Teste
+        </span>
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground rounded border px-2 py-1 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors"
         >
           {open ? "Fechar" : "Abrir chat"}
         </button>
       </div>
 
       {open && (
-        <div className="flex flex-col gap-3 border-t border-zinc-100 px-4 pt-3 pb-4 dark:border-zinc-800">
+        <div className="flex flex-col gap-2">
           {draftVersionId && (
-            <label className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+            <label className="text-muted-foreground flex items-center gap-2 text-[13px]">
               <input
                 type="checkbox"
                 checked={useDraft}
                 onChange={(e) => setUseDraft(e.target.checked)}
-                className="h-3.5 w-3.5"
+                className="h-3.5 w-3.5 accent-[var(--accent)]"
               />
               Testar rascunho
             </label>
           )}
 
-          <div className="flex max-h-72 min-h-24 flex-col gap-2 overflow-y-auto rounded-lg border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="border-border bg-card flex max-h-72 min-h-24 flex-col gap-2 overflow-y-auto rounded border p-3">
             {messages.length === 0 && (
-              <p className="text-xs text-zinc-400 dark:text-zinc-600">Nenhuma mensagem ainda.</p>
+              <p className="text-muted-foreground text-[13px]">Nenhuma mensagem ainda.</p>
             )}
             {messages.map((m, i) => (
               <div
                 key={i}
                 className={`flex flex-col gap-0.5 ${m.role === "user" ? "items-end" : "items-start"}`}
               >
-                <span className="text-xs text-zinc-400 dark:text-zinc-600">
+                <span className="text-muted-foreground text-[11px] tracking-[0.05em] uppercase">
                   {m.role === "user" ? "Você" : "Agente"}
                 </span>
                 <div
-                  className={`max-w-xs rounded-lg px-3 py-1.5 text-xs ${
+                  className={`max-w-[240px] rounded border px-3 py-1.5 text-[13px] ${
                     m.role === "user"
-                      ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                      : "bg-white text-zinc-800 shadow-sm ring-1 ring-zinc-100 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700"
+                      ? "border-foreground/20 bg-muted text-foreground"
+                      : "border-border bg-background text-foreground"
                   }`}
                 >
                   {m.content || (isRunning && m.role === "assistant" ? "▍" : "")}
@@ -166,7 +168,7 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
             ))}
           </div>
 
-          {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
+          {error && <p className="text-destructive text-[11px]">{error}</p>}
 
           <div className="flex gap-2">
             <input
@@ -182,7 +184,7 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
               type="button"
               onClick={() => void sendMessage()}
               disabled={isRunning || !input.trim()}
-              className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="border-foreground text-foreground hover:border-accent hover:text-accent rounded border px-3 py-1.5 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
             >
               {isRunning ? "…" : "Enviar"}
             </button>
@@ -191,7 +193,7 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
                 type="button"
                 onClick={clearSession}
                 disabled={isRunning}
-                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                className="border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground rounded border px-3 py-1.5 text-[11px] tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
               >
                 Limpar
               </button>
