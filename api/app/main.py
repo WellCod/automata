@@ -7,6 +7,7 @@ from agno.os import AgentOS
 from agno.os.config import AuthorizationConfig
 from fastapi import FastAPI
 
+from app.routers.configs import router as configs_router
 from app.routers.linter import router as linter_router
 from app.routers.models import router as models_router
 from app.routers.usage import router as usage_router
@@ -21,6 +22,7 @@ def create_app(
     db = PostgresDb(db_url=settings.database_url)
 
     base = FastAPI(title="automata")
+    base.include_router(configs_router)
     base.include_router(models_router)
     base.include_router(linter_router)
     base.include_router(usage_router)

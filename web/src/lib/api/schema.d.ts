@@ -1,4 +1,21 @@
 export interface paths {
+  "/api/v1/configs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Configs */
+    get: operations["list_configs_api_v1_configs_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/models/capabilities": {
     parameters: {
       query?: never;
@@ -54,6 +71,61 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /** AgentConfigPage */
+    AgentConfigPage: {
+      /** Items */
+      items: components["schemas"]["AgentConfigResponse"][];
+      /** Total */
+      total: number;
+      /** Page */
+      page: number;
+      /** Page Size */
+      page_size: number;
+    };
+    /** AgentConfigResponse */
+    AgentConfigResponse: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Name */
+      name: string;
+      /** Description */
+      description: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+      current_version: components["schemas"]["AgentConfigVersionSummary"] | null;
+      draft_version: components["schemas"]["AgentConfigVersionSummary"] | null;
+    };
+    /** AgentConfigVersionSummary */
+    AgentConfigVersionSummary: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Version Number */
+      version_number: number;
+      /** Label */
+      label: string | null;
+      status: components["schemas"]["ConfigPayloadStatus"];
+      /** Author */
+      author: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
     /** CapabilityFlags */
     CapabilityFlags: {
       /**
@@ -98,6 +170,11 @@ export interface components {
         [key: string]: unknown;
       };
     };
+    /**
+     * ConfigPayloadStatus
+     * @enum {string}
+     */
+    ConfigPayloadStatus: "draft" | "published";
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -182,6 +259,41 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  list_configs_api_v1_configs_get: {
+    parameters: {
+      query?: {
+        page?: number;
+        page_size?: number;
+        /** @description Busca por nome (substring) ou ID exato */
+        q?: string | null;
+        status?: components["schemas"]["ConfigPayloadStatus"] | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AgentConfigPage"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   list_capabilities_api_v1_models_capabilities_get: {
     parameters: {
       query?: never;

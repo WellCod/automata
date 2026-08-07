@@ -17,11 +17,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from fastapi import FastAPI  # noqa: E402
 
+from app.routers.configs import router as configs_router  # noqa: E402
 from app.routers.linter import router as linter_router  # noqa: E402
 from app.routers.models import router as models_router  # noqa: E402
 from app.routers.usage import router as usage_router  # noqa: E402
 
 app = FastAPI(title="automata", version="0.1.0")
+app.include_router(configs_router)
 app.include_router(models_router)
 app.include_router(linter_router)
 app.include_router(usage_router)

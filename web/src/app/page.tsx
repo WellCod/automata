@@ -1,69 +1,177 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useQuery } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { useState } from "react";
+import client from "@/lib/api/client";
+import type { components } from "@/lib/api/schema.d.ts";
+
+type AgentConfig = components["schemas"]["AgentConfigResponse"];
+type StatusFilter = components["schemas"]["ConfigPayloadStatus"] | "";
+
+const PAGE_SIZE = 20;
+
+async function fetchConfigs(page: number, q: string, status: StatusFilter) {
+  const res = await client.GET("/api/v1/configs", {
+    params: {
+      query: {
+        page,
+        page_size: PAGE_SIZE,
+        q: q || undefined,
+        status: status || undefined,
+      },
+    },
+  });
+  if (res.error) throw new Error("Falha ao carregar agentes");
+  return res.data!;
+}
+
+function VersionBadge({ label, variant }: { label: string; variant: "green" | "amber" | "zinc" }) {
+  const colors = {
+    green: "bg-green-100 text-green-800",
+    amber: "bg-amber-100 text-amber-800",
+    zinc: "bg-zinc-100 text-zinc-500",
+  };
   return (
-    <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex w-full max-w-3xl flex-1 flex-col items-center justify-between bg-white px-16 py-32 sm:items-start dark:bg-black">
-        <Image
-          className="h-5 w-[100px] dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl leading-10 font-semibold tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <span
+      className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${colors[variant]}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function AgentRow({ agent }: { agent: AgentConfig }) {
+  const { current_version, draft_version } = agent;
+  return (
+    <tr className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50">
+      <td className="py-3 pr-4">
+        <p className="text-sm font-medium text-zinc-900">{agent.name}</p>
+        {agent.description && (
+          <p className="mt-0.5 max-w-xs truncate text-xs text-zinc-400">{agent.description}</p>
+        )}
+      </td>
+      <td className="py-3 pr-4">
+        <div className="flex flex-wrap gap-1">
+          {current_version ? (
+            <VersionBadge label={`v${current_version.version_number}`} variant="green" />
+          ) : (
+            <VersionBadge label="sem versão" variant="zinc" />
+          )}
+          {draft_version && <VersionBadge label="rascunho" variant="amber" />}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="bg-foreground text-background flex h-12 w-full items-center justify-center gap-2 rounded-full px-5 transition-colors hover:bg-[#383838] md:w-[158px] dark:hover:bg-[#ccc]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="h-[14px] w-4 dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] md:w-[158px] dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </td>
+      <td className="hidden py-3 pr-4 text-xs text-zinc-400 sm:table-cell">
+        {new Date(agent.updated_at).toLocaleDateString("pt-BR")}
+      </td>
+    </tr>
+  );
+}
+
+export default function AgentsPage() {
+  const [page, setPage] = useState(1);
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("");
+
+  const { data, isPending, isError } = useQuery({
+    queryKey: ["configs", page, q, status],
+    queryFn: () => fetchConfigs(page, q, status),
+  });
+
+  const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;
+
+  return (
+    <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+      <h1 className="mb-6 text-2xl font-semibold text-zinc-900">Agentes</h1>
+
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+        <div className="relative flex-1">
+          <Search
+            className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400"
+            aria-hidden
+          />
+          <input
+            type="text"
+            placeholder="Buscar por nome ou ID…"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+            className="w-full rounded-md border border-zinc-200 py-2 pr-3 pl-9 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none"
+          />
         </div>
-      </main>
+        <select
+          value={status}
+          onChange={(e) => {
+            setStatus(e.target.value as StatusFilter);
+            setPage(1);
+          }}
+          className="rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-700 focus:border-zinc-400 focus:outline-none"
+        >
+          <option value="">Todos</option>
+          <option value="published">Com versão ativa</option>
+          <option value="draft">Com rascunho</option>
+        </select>
+      </div>
+
+      <div className="rounded-lg border border-zinc-200 bg-white">
+        {isPending ? (
+          <div className="py-12 text-center text-sm text-zinc-400">Carregando…</div>
+        ) : isError ? (
+          <div className="py-12 text-center text-sm text-red-500">Erro ao carregar agentes.</div>
+        ) : data.items.length === 0 ? (
+          <div className="py-12 text-center text-sm text-zinc-400">Nenhum agente encontrado.</div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-zinc-100">
+                <th className="pt-3 pr-4 pb-2 text-left text-xs font-medium text-zinc-500">Nome</th>
+                <th className="pt-3 pr-4 pb-2 text-left text-xs font-medium text-zinc-500">
+                  Versão
+                </th>
+                <th className="hidden pt-3 pr-4 pb-2 text-left text-xs font-medium text-zinc-500 sm:table-cell">
+                  Atualizado
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.items.map((agent) => (
+                <AgentRow key={agent.id} agent={agent} />
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between text-sm text-zinc-500">
+          <span>
+            {data?.total} agente{data?.total !== 1 ? "s" : ""}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="rounded p-1 hover:bg-zinc-100 disabled:opacity-40"
+              aria-label="Página anterior"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span>
+              {page} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="rounded p-1 hover:bg-zinc-100 disabled:opacity-40"
+              aria-label="Próxima página"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
