@@ -55,17 +55,18 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
+      - uses: astral-sh/setup-uv@v6
+        with:
+          working-directory: api
+      - run: uv sync --frozen
+        working-directory: api
       - run: pnpm install --frozen-lockfile
-        working-directory: web
-      - run: pnpm exec tsc --noEmit
-        working-directory: web
-      - run: pnpm lint
-        working-directory: web
-      - run: pnpm format:check
-        working-directory: web
-      - run: pnpm test
-        working-directory: web
+      - run: node web/scripts/gen-api.mjs
+      - run: pnpm --filter web exec tsc --noEmit
+      - run: pnpm --filter web lint
+      - run: pnpm --filter web format:check
+      - run: pnpm --filter web test
 
   gate:
     needs: [api, web]
