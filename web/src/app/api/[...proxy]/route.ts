@@ -9,7 +9,10 @@ async function forward(req: NextRequest, segments: string[]): Promise<NextRespon
   const token = await issueToken(PANEL_USER_ID, PANEL_SCOPES);
   const path = segments.join("/");
   const search = req.nextUrl.search;
-  const target = `${API_URL}/api/${path}${search}`;
+  // Rotas v1/* são da nossa API; demais são endpoints nativos do AgentOS
+  const target = path.startsWith("v1/")
+    ? `${API_URL}/api/${path}${search}`
+    : `${API_URL}/${path}${search}`;
 
   const headers = new Headers(req.headers);
   headers.set("Authorization", `Bearer ${token}`);

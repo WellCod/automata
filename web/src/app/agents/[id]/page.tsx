@@ -11,6 +11,7 @@ import { z } from "zod";
 import { CostPanel } from "@/components/cost-panel";
 import { LintPanel } from "@/components/lint-panel";
 import { ModelSelector } from "@/components/model-selector";
+import { TestPanel } from "@/components/test-panel";
 import { VersionsPanel } from "@/components/versions-panel";
 import client from "@/lib/api/client";
 
@@ -219,6 +220,7 @@ export default function AgentEditPage() {
       </form>
 
       <div className="mt-6 flex flex-col gap-4">
+        <TestPanel agentId={id} draftVersionId={data?.draft_version?.id} />
         <VersionsPanel agentId={id} />
         <CostPanel agentId={id} />
         <LintPanel
