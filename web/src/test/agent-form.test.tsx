@@ -47,9 +47,18 @@ const mockDetail = {
   },
 };
 
+const mockCapabilities = {
+  "claude-sonnet-4-6": { extended_thinking: false, structured_output: true, vision: true },
+};
+
 describe("AgentEditPage", () => {
   beforeEach(() => {
-    vi.mocked(client.GET).mockResolvedValue({ data: mockDetail, error: undefined } as never);
+    vi.mocked(client.GET).mockImplementation(async (path: string) => {
+      if ((path as string).includes("models/capabilities")) {
+        return { data: mockCapabilities, error: undefined } as never;
+      }
+      return { data: mockDetail, error: undefined } as never;
+    });
     vi.mocked(client.PUT).mockResolvedValue({
       data: {
         id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
@@ -73,7 +82,10 @@ describe("AgentEditPage", () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue("Agente Teste")).toBeInTheDocument();
     });
-    expect(screen.getByDisplayValue("claude-sonnet-4-6")).toBeInTheDocument();
+    // model_id agora é um <select> — aguarda a opção estar presente e selecionada
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "claude-sonnet-4-6" })).toBeInTheDocument();
+    });
     expect(screen.getByDisplayValue("Sou um assistente")).toBeInTheDocument();
   });
 
