@@ -84,7 +84,7 @@ describe("AgentsPage", () => {
     render(<AgentsPage />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText("v3")).toBeInTheDocument();
+      expect(screen.getByText(/v3/)).toBeInTheDocument();
     });
   });
 
@@ -101,7 +101,7 @@ describe("AgentsPage", () => {
     render(<AgentsPage />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText("Nenhum agente encontrado.")).toBeInTheDocument();
+      expect(screen.getByText("Nenhum agente encontrado")).toBeInTheDocument();
     });
   });
 

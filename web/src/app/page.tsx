@@ -1,9 +1,10 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
 
@@ -27,49 +28,113 @@ async function fetchConfigs(page: number, q: string, status: StatusFilter) {
   return res.data!;
 }
 
-function VersionBadge({ label, variant }: { label: string; variant: "green" | "amber" | "zinc" }) {
-  const colors = {
-    green: "bg-green-100 text-green-800",
-    amber: "bg-amber-100 text-amber-800",
-    zinc: "bg-zinc-100 text-zinc-500",
-  };
+function StatusBadge({ agent }: { agent: AgentConfig }) {
+  if (agent.current_version && agent.draft_version) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+        rascunho pendente
+      </span>
+    );
+  }
+  if (agent.current_version) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-green-200">
+        <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+        v{agent.current_version.version_number} ativo
+      </span>
+    );
+  }
+  if (agent.draft_version) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500 ring-1 ring-zinc-200">
+        <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
+        rascunho
+      </span>
+    );
+  }
   return (
-    <span
-      className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${colors[variant]}`}
-    >
-      {label}
+    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-400 ring-1 ring-zinc-200">
+      sem versão
     </span>
   );
 }
 
-function AgentRow({ agent }: { agent: AgentConfig }) {
-  const { current_version, draft_version } = agent;
+function AgentCard({ agent }: { agent: AgentConfig }) {
   return (
-    <tr className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50">
-      <td className="py-3 pr-4">
-        <Link href={`/agents/${agent.id}`} className="group">
-          <p className="text-sm font-medium text-zinc-900 group-hover:text-zinc-600">
+    <Link
+      href={`/agents/${agent.id}`}
+      className="group flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-4 transition-shadow hover:shadow-sm"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-zinc-900 group-hover:text-zinc-600">
             {agent.name}
           </p>
           {agent.description && (
-            <p className="mt-0.5 max-w-xs truncate text-xs text-zinc-400">{agent.description}</p>
+            <p className="mt-0.5 line-clamp-2 text-xs text-zinc-400">{agent.description}</p>
           )}
-        </Link>
-      </td>
-      <td className="py-3 pr-4">
-        <div className="flex flex-wrap gap-1">
-          {current_version ? (
-            <VersionBadge label={`v${current_version.version_number}`} variant="green" />
-          ) : (
-            <VersionBadge label="sem versão" variant="zinc" />
-          )}
-          {draft_version && <VersionBadge label="rascunho" variant="amber" />}
         </div>
-      </td>
-      <td className="hidden py-3 pr-4 text-xs text-zinc-400 sm:table-cell">
-        {new Date(agent.updated_at).toLocaleDateString("pt-BR")}
-      </td>
-    </tr>
+        <StatusBadge agent={agent} />
+      </div>
+      <p className="text-xs text-zinc-400">
+        atualizado {new Date(agent.updated_at).toLocaleDateString("pt-BR")}
+      </p>
+    </Link>
+  );
+}
+
+function NewAgentInline({ onCancel }: { onCancel: () => void }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const mutation = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await client.POST("/api/v1/configs", { body: { name } });
+      if (res.error) throw new Error("Falha ao criar agente");
+      return res.data!;
+    },
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: ["configs"] });
+      router.push(`/agents/${data.id}`);
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const name = inputRef.current?.value.trim();
+    if (name) mutation.mutate(name);
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2.5 shadow-sm"
+    >
+      <input
+        ref={inputRef}
+        autoFocus
+        placeholder="Nome do agente"
+        className="min-w-0 flex-1 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none"
+        disabled={mutation.isPending}
+      />
+      <button
+        type="submit"
+        disabled={mutation.isPending}
+        className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+      >
+        {mutation.isPending ? "Criando…" : "Criar"}
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="text-xs text-zinc-400 hover:text-zinc-600"
+      >
+        Cancelar
+      </button>
+      {mutation.isError && <span className="text-xs text-red-500">Erro ao criar</span>}
+    </form>
   );
 }
 
@@ -77,6 +142,7 @@ export default function AgentsPage() {
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<StatusFilter>("");
+  const [showNew, setShowNew] = useState(false);
 
   const { data, isPending, isError } = useQuery({
     queryKey: ["configs", page, q, status],
@@ -87,7 +153,29 @@ export default function AgentsPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
-      <h1 className="mb-6 text-2xl font-semibold text-zinc-900">Agentes</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-900">Agentes</h1>
+          {data && (
+            <p className="mt-0.5 text-sm text-zinc-500">
+              {data.total} agente{data.total !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={() => setShowNew(true)}
+          className="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+        >
+          <Plus className="h-4 w-4" />
+          Novo agente
+        </button>
+      </div>
+
+      {showNew && (
+        <div className="mb-4">
+          <NewAgentInline onCancel={() => setShowNew(false)} />
+        </div>
+      )}
 
       <div className="mb-4 flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
@@ -120,61 +208,53 @@ export default function AgentsPage() {
         </select>
       </div>
 
-      <div className="rounded-lg border border-zinc-200 bg-white">
-        {isPending ? (
-          <div className="py-12 text-center text-sm text-zinc-400">Carregando…</div>
-        ) : isError ? (
-          <div className="py-12 text-center text-sm text-red-500">Erro ao carregar agentes.</div>
-        ) : data.items.length === 0 ? (
-          <div className="py-12 text-center text-sm text-zinc-400">Nenhum agente encontrado.</div>
-        ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-zinc-100">
-                <th className="pt-3 pr-4 pb-2 text-left text-xs font-medium text-zinc-500">Nome</th>
-                <th className="pt-3 pr-4 pb-2 text-left text-xs font-medium text-zinc-500">
-                  Versão
-                </th>
-                <th className="hidden pt-3 pr-4 pb-2 text-left text-xs font-medium text-zinc-500 sm:table-cell">
-                  Atualizado
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((agent) => (
-                <AgentRow key={agent.id} agent={agent} />
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {isPending ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <span className="sr-only">Carregando…</span>
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-20 animate-pulse rounded-lg bg-zinc-100" />
+          ))}
+        </div>
+      ) : isError ? (
+        <div className="rounded-lg border border-red-100 bg-red-50 py-8 text-center text-sm text-red-500">
+          Erro ao carregar agentes.
+        </div>
+      ) : data.items.length === 0 ? (
+        <div className="rounded-lg border border-zinc-200 bg-white py-16 text-center">
+          <p className="text-sm font-medium text-zinc-500">Nenhum agente encontrado</p>
+          <p className="mt-1 text-xs text-zinc-400">
+            {q || status ? "Tente outros filtros" : 'Clique em "Novo agente" para começar'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {data.items.map((agent) => (
+            <AgentCard key={agent.id} agent={agent} />
+          ))}
+        </div>
+      )}
 
       {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between text-sm text-zinc-500">
+        <div className="mt-4 flex items-center justify-end gap-2 text-sm text-zinc-500">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="rounded p-1 hover:bg-zinc-100 disabled:opacity-40"
+            aria-label="Página anterior"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
           <span>
-            {data?.total} agente{data?.total !== 1 ? "s" : ""}
+            {page} / {totalPages}
           </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="rounded p-1 hover:bg-zinc-100 disabled:opacity-40"
-              aria-label="Página anterior"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span>
-              {page} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="rounded p-1 hover:bg-zinc-100 disabled:opacity-40"
-              aria-label="Próxima página"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="rounded p-1 hover:bg-zinc-100 disabled:opacity-40"
+            aria-label="Próxima página"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
       )}
     </div>

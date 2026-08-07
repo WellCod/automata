@@ -119,7 +119,7 @@ describe("AgentEditPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /salvar rascunho/i }));
 
     await waitFor(() => {
-      expect(screen.getByText("Salvo como rascunho")).toBeInTheDocument();
+      expect(screen.getByText("Salvo")).toBeInTheDocument();
     });
     expect(client.PUT).toHaveBeenCalledOnce();
   });
@@ -138,7 +138,7 @@ describe("AgentEditPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /salvar rascunho/i }));
 
     await waitFor(() => {
-      expect(screen.getByText("Erro ao salvar. Tente novamente.")).toBeInTheDocument();
+      expect(screen.getByText("Erro ao salvar")).toBeInTheDocument();
     });
   });
 });

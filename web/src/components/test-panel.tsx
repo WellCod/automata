@@ -10,10 +10,11 @@ interface ChatMessage {
 interface Props {
   agentId: string;
   draftVersionId?: string;
+  defaultOpen?: boolean;
 }
 
-export function TestPanel({ agentId, draftVersionId }: Props) {
-  const [open, setOpen] = useState(false);
+export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Props) {
+  const [open, setOpen] = useState(defaultOpen);
   const [useDraft, setUseDraft] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");

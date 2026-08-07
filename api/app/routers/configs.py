@@ -14,6 +14,7 @@ from app.schemas.config import (
     AgentConfigVersionSummary,
     ConfigPayload,
     ConfigPayloadStatus,
+    CreateConfigInput,
     DraftInput,
     RollbackInput,
 )
@@ -59,6 +60,18 @@ def _to_response(c: AgentConfig) -> AgentConfigResponse:
         current_version=_to_version_summary(c.current_version),
         draft_version=_to_version_summary(c.draft_version),
     )
+
+
+@router.post("", response_model=AgentConfigResponse, status_code=201)
+def create_config(body: CreateConfigInput) -> AgentConfigResponse:
+    engine = create_engine(get_settings().database_url)
+    with Session(engine) as session:
+        repo = ConfigRepository(session)
+        service = ConfigService(repo)
+        config = service.create_config(name=body.name, description=body.description)
+        result = _to_response(config)
+        session.commit()
+    return result
 
 
 @router.get("", response_model=AgentConfigPage)

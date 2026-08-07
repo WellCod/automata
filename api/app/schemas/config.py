@@ -83,3 +83,8 @@ class AgentConfigVersionDetail(AgentConfigVersionSummary):
 
 class RollbackInput(BaseModel):
     version_id: UUID
+
+
+class CreateConfigInput(BaseModel):
+    name: str
+    description: str | None = None

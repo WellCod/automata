@@ -15,9 +15,10 @@ services:
 
   api:
     build: ./api
-    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./api:/app
+      - /app/.venv
     environment:
       DATABASE_URL: ${DATABASE_URL}
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
@@ -35,7 +36,8 @@ services:
       - ./web:/app
       - /app/node_modules
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      AUTOMATA_API_URL: ${AUTOMATA_API_URL}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
     ports:
       - "3000:3000"
     depends_on:
