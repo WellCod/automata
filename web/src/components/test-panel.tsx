@@ -176,7 +176,7 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
               onKeyDown={(e) => e.key === "Enter" && void sendMessage()}
               placeholder="Digite uma mensagem…"
               disabled={isRunning}
-              className="flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-900 transition-colors focus:border-zinc-400 focus:outline-none disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:border-zinc-500"
+              className="border-border text-foreground placeholder:text-muted-foreground focus:border-accent flex-1 rounded border bg-[var(--input)] px-3 py-1.5 text-[13px] transition-colors focus:outline-none disabled:opacity-40"
             />
             <button
               type="button"

@@ -110,32 +110,29 @@ function NewAgentInline({ onCancel }: { onCancel: () => void }) {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-3 py-2.5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
-    >
+    <form onSubmit={handleSubmit} className="flex items-center gap-2">
       <input
         ref={inputRef}
         autoFocus
         placeholder="Nome do agente"
-        className="min-w-0 flex-1 bg-transparent text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-100 dark:placeholder:text-zinc-600"
+        className="border-border text-foreground placeholder:text-muted-foreground focus:border-accent min-w-0 flex-1 rounded border bg-[var(--input)] px-3 py-1.5 text-[13px] transition-colors focus:outline-none"
         disabled={mutation.isPending}
       />
       <button
         type="submit"
         disabled={mutation.isPending}
-        className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+        className="border-foreground text-foreground hover:border-accent hover:text-accent rounded border px-3 py-1.5 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
       >
         {mutation.isPending ? "Criando…" : "Criar"}
       </button>
       <button
         type="button"
         onClick={onCancel}
-        className="text-xs text-zinc-400 transition-colors hover:text-zinc-600 dark:text-zinc-600 dark:hover:text-zinc-400"
+        className="text-muted-foreground hover:text-foreground text-[11px] tracking-[0.05em] uppercase transition-colors"
       >
         Cancelar
       </button>
-      {mutation.isError && <span className="text-xs text-red-500">Erro ao criar</span>}
+      {mutation.isError && <span className="text-destructive text-[11px]">Erro ao criar</span>}
     </form>
   );
 }
@@ -167,9 +164,9 @@ export default function AgentsPage() {
         <button
           type="button"
           onClick={() => setShowNew(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          className="border-accent text-accent hover:border-accent/70 hover:text-accent/70 inline-flex items-center gap-1.5 rounded border px-3 py-1.5 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-3.5 w-3.5" />
           Novo agente
         </button>
       </div>
@@ -183,7 +180,7 @@ export default function AgentsPage() {
       <div className="mb-4 flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
           <Search
-            className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400 dark:text-zinc-600"
+            className="text-muted-foreground absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2"
             aria-hidden
           />
           <input
@@ -194,7 +191,7 @@ export default function AgentsPage() {
               setQ(e.target.value);
               setPage(1);
             }}
-            className="w-full rounded-lg border border-zinc-200 bg-white py-2 pr-3 pl-9 text-sm text-zinc-900 transition-colors placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-600 dark:focus:border-zinc-500"
+            className="border-border text-foreground placeholder:text-muted-foreground focus:border-accent w-full rounded border bg-[var(--input)] py-1.5 pr-3 pl-9 text-[13px] transition-colors focus:outline-none"
           />
         </div>
         <select
@@ -203,7 +200,7 @@ export default function AgentsPage() {
             setStatus(e.target.value as StatusFilter);
             setPage(1);
           }}
-          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 transition-colors focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:focus:border-zinc-500"
+          className="border-border text-foreground focus:border-accent rounded border bg-[var(--input)] px-3 py-1.5 text-[13px] transition-colors focus:outline-none"
         >
           <option value="">Todos</option>
           <option value="published">Com versão ativa</option>

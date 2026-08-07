@@ -61,7 +61,7 @@ const PANEL_TABS = [
 type PanelId = (typeof PANEL_TABS)[number]["id"];
 
 const inputCls =
-  "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 transition-colors focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-500";
+  "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors focus:border-accent focus:outline-none";
 const textareaCls = `${inputCls} min-h-24 resize-y`;
 
 function Field({

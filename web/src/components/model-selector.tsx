@@ -29,7 +29,7 @@ const EMPTY_CAPS: CapabilityFlags = {
 };
 
 const selectCls =
-  "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 transition-colors focus:border-zinc-400 focus:outline-none disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-500";
+  "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground transition-colors focus:border-accent focus:outline-none disabled:opacity-40";
 
 export function ModelSelector({ value, capabilities, onChange, error }: Props) {
   const { data: models, isPending } = useQuery({
@@ -59,8 +59,8 @@ export function ModelSelector({ value, capabilities, onChange, error }: Props) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Modelo<span className="ml-0.5 text-red-500">*</span>
+        <label className="text-muted-foreground text-[13px] font-medium tracking-[0.05em] uppercase">
+          Modelo<span className="text-destructive ml-0.5">*</span>
         </label>
         <select
           value={value}
@@ -75,22 +75,22 @@ export function ModelSelector({ value, capabilities, onChange, error }: Props) {
             </option>
           ))}
         </select>
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {error && <p className="text-destructive text-[12px]">{error}</p>}
       </div>
 
       {supported && (
-        <fieldset className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-800/50">
-          <legend className="px-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+        <fieldset className="border-border bg-muted rounded border px-3 py-2.5">
+          <legend className="text-muted-foreground px-1 text-[11px] font-medium tracking-[0.05em] uppercase">
             Capabilities
           </legend>
           <div className="mt-2 flex flex-col gap-2">
             {(Object.keys(CAP_LABELS) as (keyof CapabilityFlags)[]).map((key) => (
               <label
                 key={key}
-                className={`flex items-center gap-2 text-sm transition-colors ${
+                className={`flex items-center gap-2 text-[13px] transition-colors ${
                   supported[key]
-                    ? "cursor-pointer text-zinc-700 dark:text-zinc-300"
-                    : "cursor-not-allowed text-zinc-400 dark:text-zinc-600"
+                    ? "text-foreground cursor-pointer"
+                    : "text-muted-foreground cursor-not-allowed"
                 }`}
               >
                 <input
@@ -98,11 +98,11 @@ export function ModelSelector({ value, capabilities, onChange, error }: Props) {
                   checked={supported[key] ? capabilities[key] : false}
                   onChange={(e) => handleCapabilityChange(key, e.target.checked)}
                   disabled={!supported[key]}
-                  className="h-4 w-4"
+                  className="h-3.5 w-3.5 accent-[var(--accent)]"
                 />
                 {CAP_LABELS[key]}
                 {!supported[key] && (
-                  <span className="text-xs text-zinc-400 dark:text-zinc-600">(não suportado)</span>
+                  <span className="text-muted-foreground text-[11px]">(não suportado)</span>
                 )}
               </label>
             ))}
