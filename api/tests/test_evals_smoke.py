@@ -73,9 +73,7 @@ def test_tool_extra_com_allow_additional_passa() -> None:
 
 
 def test_argumentos_corretos_passam() -> None:
-    output = RunOutput(
-        tools=[ToolExecution(tool_name="add", tool_args={"a": 2, "b": 3})]
-    )
+    output = RunOutput(tools=[ToolExecution(tool_name="add", tool_args={"a": 2, "b": 3})])
     result = _eval(output, ["add"], expected_args={"add": {"a": 2, "b": 3}})
     assert result.eval_status == "PASSED"
     assert "add" in result.passed_argument_checks
@@ -99,9 +97,7 @@ def test_tool_inesperada_em_modo_estrito_reprova() -> None:
 
 
 def test_argumentos_errados_reprovam() -> None:
-    output = RunOutput(
-        tools=[ToolExecution(tool_name="multiply", tool_args={"a": 1, "b": 1})]
-    )
+    output = RunOutput(tools=[ToolExecution(tool_name="multiply", tool_args={"a": 1, "b": 1})])
     result = _eval(output, ["multiply"], expected_args={"multiply": {"a": 10, "b": 5}})
     assert result.eval_status == "FAILED"
     assert "multiply" in result.failed_argument_checks
