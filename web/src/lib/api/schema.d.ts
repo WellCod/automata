@@ -16,6 +16,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/configs/{config_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Config */
+    get: operations["get_config_api_v1_configs__config_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/configs/{config_id}/draft": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Save Draft */
+    put: operations["save_draft_api_v1_configs__config_id__draft_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/models/capabilities": {
     parameters: {
       query?: never;
@@ -71,6 +105,31 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /** AgentConfigDetail */
+    AgentConfigDetail: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Name */
+      name: string;
+      /** Description */
+      description: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+      current_version: components["schemas"]["AgentConfigVersionSummary"] | null;
+      draft_version: components["schemas"]["AgentConfigVersionSummary"] | null;
+      payload: components["schemas"]["ConfigPayload"] | null;
+    };
     /** AgentConfigPage */
     AgentConfigPage: {
       /** Items */
@@ -175,6 +234,14 @@ export interface components {
      * @enum {string}
      */
     ConfigPayloadStatus: "draft" | "published";
+    /** DraftInput */
+    DraftInput: {
+      /** Name */
+      name: string;
+      /** Description */
+      description?: string | null;
+      payload: components["schemas"]["ConfigPayload"];
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -281,6 +348,72 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["AgentConfigPage"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_config_api_v1_configs__config_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AgentConfigDetail"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  save_draft_api_v1_configs__config_id__draft_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DraftInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AgentConfigVersionSummary"];
         };
       };
       /** @description Validation Error */

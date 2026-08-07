@@ -75,6 +75,39 @@ class ConfigService:
         self._repo.set_current_version(config, version_id)
         return config
 
+    def get_detail(self, config_id: UUID) -> tuple[AgentConfig, ConfigPayload | None]:
+        config = self._get_or_raise(config_id)
+        version_id = config.draft_version_id or config.current_version_id
+        if version_id is None:
+            return config, None
+        version = self._repo.get_version(version_id)
+        if version is None:
+            return config, None
+        return config, ConfigPayload.model_validate(version.payload)
+
+    def update_draft(
+        self,
+        config_id: UUID,
+        name: str,
+        description: str | None,
+        payload: ConfigPayload,
+        author: str,
+    ) -> AgentConfigVersion:
+        errors = validate_capabilities(payload.model_id, payload.capabilities)
+        if errors:
+            raise ValueError("; ".join(errors))
+
+        config = self._get_or_raise(config_id)
+        self._repo.update_config(config, name=name, description=description)
+        version = self._repo.create_version(
+            config_id=config_id,
+            payload=payload,
+            author=author,
+            status=ConfigPayloadStatus.draft,
+        )
+        self._repo.set_draft_version(config, version.id)
+        return version
+
     def list_configs(
         self,
         *,

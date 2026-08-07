@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
@@ -46,10 +47,14 @@ function AgentRow({ agent }: { agent: AgentConfig }) {
   return (
     <tr className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50">
       <td className="py-3 pr-4">
-        <p className="text-sm font-medium text-zinc-900">{agent.name}</p>
-        {agent.description && (
-          <p className="mt-0.5 max-w-xs truncate text-xs text-zinc-400">{agent.description}</p>
-        )}
+        <Link href={`/agents/${agent.id}`} className="group">
+          <p className="text-sm font-medium text-zinc-900 group-hover:text-zinc-600">
+            {agent.name}
+          </p>
+          {agent.description && (
+            <p className="mt-0.5 max-w-xs truncate text-xs text-zinc-400">{agent.description}</p>
+          )}
+        </Link>
       </td>
       <td className="py-3 pr-4">
         <div className="flex flex-wrap gap-1">
