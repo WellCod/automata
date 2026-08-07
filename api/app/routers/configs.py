@@ -10,10 +10,12 @@ from app.schemas.config import (
     AgentConfigDetail,
     AgentConfigPage,
     AgentConfigResponse,
+    AgentConfigVersionDetail,
     AgentConfigVersionSummary,
     ConfigPayload,
     ConfigPayloadStatus,
     DraftInput,
+    RollbackInput,
 )
 from app.services.config import ConfigService
 from app.settings import get_settings
@@ -92,6 +94,62 @@ def get_config(config_id: UUID) -> AgentConfigDetail:
             raise HTTPException(status_code=404, detail=str(e)) from e
         result = _to_detail(config, payload)
     return result
+
+
+@router.get("/{config_id}/versions", response_model=list[AgentConfigVersionDetail])
+def list_versions(config_id: UUID) -> list[AgentConfigVersionDetail]:
+    engine = create_engine(get_settings().database_url)
+    with Session(engine) as session:
+        repo = ConfigRepository(session)
+        service = ConfigService(repo)
+        try:
+            versions = service.list_versions(config_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        return [
+            AgentConfigVersionDetail(
+                id=v.id,
+                version_number=v.version_number,
+                label=v.label,
+                status=v.status,
+                author=v.author,
+                created_at=v.created_at,
+                payload=ConfigPayload.model_validate(v.payload),
+            )
+            for v in versions
+        ]
+
+
+@router.post("/{config_id}/publish", response_model=AgentConfigVersionSummary, status_code=201)
+def publish_draft(config_id: UUID) -> AgentConfigVersionSummary:
+    engine = create_engine(get_settings().database_url)
+    with Session(engine) as session:
+        repo = ConfigRepository(session)
+        service = ConfigService(repo)
+        try:
+            version = service.publish(config_id=config_id, author="panel")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        result = _to_version_summary(version)
+        session.commit()
+    return result  # type: ignore[return-value]
+
+
+@router.post("/{config_id}/rollback", response_model=AgentConfigVersionSummary)
+def rollback(config_id: UUID, body: RollbackInput) -> AgentConfigVersionSummary:
+    engine = create_engine(get_settings().database_url)
+    with Session(engine) as session:
+        repo = ConfigRepository(session)
+        service = ConfigService(repo)
+        try:
+            config = service.rollback(config_id=config_id, version_id=body.version_id)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        if config.current_version is None:
+            raise HTTPException(status_code=500, detail="Estado inválido após rollback")
+        result = _to_version_summary(config.current_version)
+        session.commit()
+    return result  # type: ignore[return-value]
 
 
 @router.put("/{config_id}/draft", response_model=AgentConfigVersionSummary, status_code=201)

@@ -63,6 +63,14 @@ class ConfigRepository:
         config.description = description
         self._session.flush()
 
+    def list_versions(self, config_id: UUID) -> list[AgentConfigVersion]:
+        stmt = (
+            select(AgentConfigVersion)
+            .where(AgentConfigVersion.config_id == config_id)
+            .order_by(AgentConfigVersion.version_number.desc())
+        )
+        return list(self._session.scalars(stmt))
+
     def list_configs(
         self,
         *,

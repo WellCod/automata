@@ -75,3 +75,11 @@ class DraftInput(BaseModel):
     name: str
     description: str | None = None
     payload: ConfigPayload
+
+
+class AgentConfigVersionDetail(AgentConfigVersionSummary):
+    payload: ConfigPayload
+
+
+class RollbackInput(BaseModel):
+    version_id: UUID

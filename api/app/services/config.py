@@ -108,6 +108,10 @@ class ConfigService:
         self._repo.set_draft_version(config, version.id)
         return version
 
+    def list_versions(self, config_id: UUID) -> list[AgentConfigVersion]:
+        self._get_or_raise(config_id)
+        return self._repo.list_versions(config_id)
+
     def list_configs(
         self,
         *,
