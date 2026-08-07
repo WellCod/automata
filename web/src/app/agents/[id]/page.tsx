@@ -8,6 +8,7 @@ import { useParams } from "next/navigation";
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { LintPanel } from "@/components/lint-panel";
 import { ModelSelector } from "@/components/model-selector";
 import client from "@/lib/api/client";
 
@@ -214,6 +215,23 @@ export default function AgentEditPage() {
           )}
         </div>
       </form>
+
+      <div className="mt-6">
+        <LintPanel
+          getPayload={() => {
+            const values = form.getValues();
+            if (!values.model_id) return null;
+            return {
+              schema_version: 1,
+              model_id: values.model_id,
+              instructions: values.instructions,
+              tools: data?.payload?.tools ?? [],
+              capabilities: values.capabilities,
+              metadata: data?.payload?.metadata ?? {},
+            };
+          }}
+        />
+      </div>
     </div>
   );
 }
