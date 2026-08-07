@@ -58,6 +58,11 @@ class ConfigRepository:
         config.draft_version_id = version_id
         self._session.flush()
 
+    def update_config(self, config: AgentConfig, *, name: str, description: str | None) -> None:
+        config.name = name
+        config.description = description
+        self._session.flush()
+
     def list_configs(
         self,
         *,

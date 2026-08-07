@@ -1,14 +1,19 @@
-from fastapi import APIRouter, Query
+from uuid import UUID
+
+from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.models.config import AgentConfig, AgentConfigVersion
 from app.repositories.config import ConfigRepository
 from app.schemas.config import (
+    AgentConfigDetail,
     AgentConfigPage,
     AgentConfigResponse,
     AgentConfigVersionSummary,
+    ConfigPayload,
     ConfigPayloadStatus,
+    DraftInput,
 )
 from app.services.config import ConfigService
 from app.settings import get_settings
@@ -26,6 +31,19 @@ def _to_version_summary(v: AgentConfigVersion | None) -> AgentConfigVersionSumma
         status=v.status,
         author=v.author,
         created_at=v.created_at,
+    )
+
+
+def _to_detail(c: AgentConfig, payload: ConfigPayload | None) -> AgentConfigDetail:
+    return AgentConfigDetail(
+        id=c.id,
+        name=c.name,
+        description=c.description,
+        created_at=c.created_at,
+        updated_at=c.updated_at,
+        current_version=_to_version_summary(c.current_version),
+        draft_version=_to_version_summary(c.draft_version),
+        payload=payload,
     )
 
 
@@ -60,3 +78,45 @@ def list_configs(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/{config_id}", response_model=AgentConfigDetail)
+def get_config(config_id: UUID) -> AgentConfigDetail:
+    engine = create_engine(get_settings().database_url)
+    with Session(engine) as session:
+        repo = ConfigRepository(session)
+        service = ConfigService(repo)
+        try:
+            config, payload = service.get_detail(config_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        result = _to_detail(config, payload)
+    return result
+
+
+@router.put("/{config_id}/draft", response_model=AgentConfigVersionSummary, status_code=201)
+def save_draft(config_id: UUID, body: DraftInput) -> AgentConfigVersionSummary:
+    engine = create_engine(get_settings().database_url)
+    with Session(engine) as session:
+        repo = ConfigRepository(session)
+        service = ConfigService(repo)
+        try:
+            version = service.update_draft(
+                config_id=config_id,
+                name=body.name,
+                description=body.description,
+                payload=body.payload,
+                author="panel",
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        result = AgentConfigVersionSummary(
+            id=version.id,
+            version_number=version.version_number,
+            label=version.label,
+            status=version.status,
+            author=version.author,
+            created_at=version.created_at,
+        )
+        session.commit()
+    return result
