@@ -6,8 +6,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+
 from app.models.user import UserRole
 from app.repositories.user import UserRepository
 from app.services.user import UserService
