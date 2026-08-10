@@ -2,6 +2,8 @@
 
 Invariante 1: publish cria uma nova linha, nunca atualiza versão publicada.
 Invariante 2: rollback só move o ponteiro, não altera dados de versão.
+Invariante 3: descrição é obrigatória e com conteúdo (min_length=1).
+Invariante 4: alterar descrição de agente publicado cria novo rascunho.
 """
 
 import os
@@ -9,13 +11,14 @@ from collections.abc import Generator
 
 import pytest
 from alembic.config import Config
+from pydantic import ValidationError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from testcontainers.postgres import PostgresContainer
 
 from alembic import command
 from app.repositories.config import ConfigRepository
-from app.schemas.config import ConfigPayload, ConfigPayloadStatus
+from app.schemas.config import ConfigPayload, ConfigPayloadStatus, CreateConfigInput, DraftInput
 from app.services.config import ConfigService
 
 
@@ -52,7 +55,7 @@ def test_publish_cria_nova_versao_nao_atualiza_rascunho(
     repo = ConfigRepository(session)
     svc = ConfigService(repo)
 
-    config = svc.create_config("agente-teste")
+    config = svc.create_config("agente-teste", description="Agente de teste")
     draft = svc.save_draft(config.id, payload, "autor")
     draft_id = draft.id
 
@@ -79,7 +82,7 @@ def test_rollback_so_move_ponteiro(session: Session, payload: ConfigPayload) -> 
     repo = ConfigRepository(session)
     svc = ConfigService(repo)
 
-    config = svc.create_config("agente-rollback")
+    config = svc.create_config("agente-rollback", description="Agente de rollback")
 
     svc.save_draft(config.id, payload, "autor")
     v1 = svc.publish(config.id, "autor")
@@ -110,3 +113,43 @@ def test_rollback_so_move_ponteiro(session: Session, payload: ConfigPayload) -> 
     v2_after = repo.get_version(v2.id)
     assert v2_after is not None
     assert v2_after.status == ConfigPayloadStatus.published
+
+
+def test_descricao_em_branco_invalida() -> None:
+    with pytest.raises(ValidationError):
+        CreateConfigInput(name="x", description="")
+
+
+def test_descricao_ausente_invalida() -> None:
+    with pytest.raises(ValidationError):
+        CreateConfigInput(name="x")  # type: ignore[call-arg]
+
+
+def test_draft_input_descricao_em_branco_invalida() -> None:
+    with pytest.raises(ValidationError):
+        DraftInput(name="x", description="", payload=ConfigPayload(model_id="gpt-4o"))
+
+
+def test_alterar_descricao_de_publicado_cria_rascunho(
+    session: Session, payload: ConfigPayload
+) -> None:
+    repo = ConfigRepository(session)
+    svc = ConfigService(repo)
+
+    config = svc.create_config("agente-desc", description="Descrição inicial")
+    svc.save_draft(config.id, payload, "autor")
+    svc.publish(config.id, "autor")
+
+    config_pub = repo.get_config(config.id)
+    assert config_pub is not None
+    assert config_pub.draft_version_id is None
+
+    nova_desc = "Descrição atualizada"
+    svc.update_draft(
+        config.id, name="agente-desc", description=nova_desc, payload=payload, author="autor"
+    )
+
+    config_apos = repo.get_config(config.id)
+    assert config_apos is not None
+    assert config_apos.description == nova_desc
+    assert config_apos.draft_version_id is not None
