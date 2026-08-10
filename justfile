@@ -14,3 +14,9 @@ migrate:
 gen-api:
     cd api && uv run python scripts/gen_openapi.py
     cd web && pnpm openapi-ts
+
+seed set="minimal":
+    docker exec \
+      -e SEED_OWNER_EMAIL="${SEED_OWNER_EMAIL}" \
+      -e SEED_OWNER_PASSWORD="${SEED_OWNER_PASSWORD}" \
+      automata-api-1 python scripts/seed.py {{set}}
