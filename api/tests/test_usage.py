@@ -54,7 +54,7 @@ def session(db_url: str) -> Generator[Session, None, None]:
 def agent_id(session: Session) -> uuid.UUID:
     repo = ConfigRepository(session)
     svc = ConfigService(repo)
-    config = svc.create_config("agente-metering")
+    config = svc.create_config("agente-metering", description="Agente de metering")
     svc.save_draft(config.id, ConfigPayload(model_id="gpt-4o"), "tester")
     svc.publish(config.id, "tester")
     return config.id
