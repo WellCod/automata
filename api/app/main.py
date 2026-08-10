@@ -7,6 +7,7 @@ from agno.os import AgentOS
 from agno.os.config import AuthorizationConfig
 from fastapi import FastAPI
 
+from app.routers.auth import router as auth_router
 from app.routers.configs import router as configs_router
 from app.routers.linter import router as linter_router
 from app.routers.models import router as models_router
@@ -47,7 +48,7 @@ def create_app(
     # junto com a camada de API REST de gerenciamento de configs.
     factories: list[Agent | RemoteAgent | AgentProtocol | AgentFactory] = []
 
-    return AgentOS(
+    protected = AgentOS(
         id="automata",
         db=db,
         agents=factories or None,
@@ -57,6 +58,14 @@ def create_app(
         authorization_config=auth_config,
         mcp_server=enable_mcp_server,
     ).get_app()
+
+    # auth_router fica fora do middleware do Agno: /login precisa ser público
+    # (não tem como exigir JWT para obter JWT). O /users tem proteção própria
+    # via _require_admin que verifica JWT + scope agent_os:admin.
+    outer: FastAPI = FastAPI(title="automata")
+    outer.include_router(auth_router)
+    outer.mount("/", protected)
+    return outer
 
 
 app = create_app()
