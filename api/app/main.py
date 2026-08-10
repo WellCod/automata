@@ -17,6 +17,7 @@ from app.settings import get_settings
 def create_app(
     auto_provision_dbs: bool = True,
     enable_auth: bool = True,
+    enable_mcp_server: bool = False,
 ) -> FastAPI:
     settings = get_settings()
     db = PostgresDb(db_url=settings.database_url)
@@ -54,6 +55,7 @@ def create_app(
         auto_provision_dbs=auto_provision_dbs,
         authorization=enable_auth,
         authorization_config=auth_config,
+        mcp_server=enable_mcp_server,
     ).get_app()
 
 

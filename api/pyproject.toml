@@ -10,6 +10,7 @@ dependencies = [
     "alembic>=1.14",
     "pydantic-settings>=2.7",
     "cryptography>=43.0",
+    "fastmcp>=3.4.6",
 ]
 
 [dependency-groups]
