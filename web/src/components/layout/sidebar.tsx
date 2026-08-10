@@ -1,24 +1,37 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Bot, LayoutGrid } from "lucide-react";
+import { LayoutGrid, Moon, Sun } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTheme } from "./theme-provider";
 
 const navItems = [{ href: "/", label: "Agentes", icon: LayoutGrid, exact: true }];
 
+function LogoMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+      <rect width="18" height="18" rx="2" fill="#25E0C8" />
+      <rect x="4" y="4" width="4" height="4" fill="#0B0B0B" />
+      <rect x="10" y="4" width="4" height="4" fill="#0B0B0B" />
+      <rect x="4" y="10" width="4" height="4" fill="#0B0B0B" />
+      <rect x="10" y="10" width="2" height="2" fill="#0B0B0B" />
+    </svg>
+  );
+}
+
 export function Sidebar() {
   const pathname = usePathname();
+  const { theme, toggle } = useTheme();
+
   return (
-    <aside className="fixed inset-y-0 left-0 z-20 flex w-52 flex-col border-r border-zinc-200 bg-white">
-      <div className="flex h-14 items-center gap-2.5 border-b border-zinc-100 px-4">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900">
-          <Bot className="h-4 w-4 text-white" />
-        </div>
-        <span className="text-sm font-semibold tracking-tight text-zinc-900">automata</span>
+    <aside className="border-sidebar-border bg-sidebar fixed inset-y-0 left-0 z-20 flex w-[200px] flex-col border-r">
+      <div className="border-sidebar-border flex h-11 items-center gap-2 border-b px-3">
+        <LogoMark />
+        <span className="text-foreground text-[13px] font-medium tracking-tight">automata</span>
       </div>
 
-      <nav className="flex-1 px-2 py-3">
+      <nav className="flex-1 px-3 py-2">
         {navItems.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
@@ -26,10 +39,8 @@ export function Sidebar() {
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                active
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900",
+                "flex h-8 items-center gap-2 px-0 text-[13px] transition-colors",
+                active ? "text-accent" : "text-muted-foreground hover:text-foreground",
               )}
             >
               <Icon className="h-4 w-4" />
@@ -39,8 +50,18 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="border-t border-zinc-100 px-4 py-3">
-        <p className="text-xs text-zinc-400">v0.1</p>
+      <div className="border-sidebar-border flex items-center justify-between border-t px-3 py-2">
+        <span className="text-muted-foreground text-[11px] font-medium tracking-[0.05em] uppercase">
+          v0.1
+        </span>
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
+          className="text-muted-foreground hover:border-border hover:text-foreground focus-visible:ring-ring/50 flex h-6 w-6 items-center justify-center rounded border border-transparent transition-colors focus-visible:ring-2 focus-visible:outline-none"
+        >
+          {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+        </button>
       </div>
     </aside>
   );
