@@ -1,9 +1,9 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { LayoutGrid, Moon, Sun } from "lucide-react";
+import { LayoutGrid, LogOut, Moon, Sun } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "./theme-provider";
 
 const navItems = [{ href: "/", label: "Agentes", icon: LayoutGrid, exact: true }];
@@ -23,6 +23,12 @@ function LogoMark() {
 export function Sidebar() {
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
+  const router = useRouter();
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+  }
 
   return (
     <aside className="border-sidebar-border bg-sidebar fixed inset-y-0 left-0 z-20 flex w-[200px] flex-col border-r">
@@ -54,14 +60,24 @@ export function Sidebar() {
         <span className="text-muted-foreground text-[11px] font-medium tracking-[0.05em] uppercase">
           v0.1
         </span>
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
-          className="text-muted-foreground hover:border-border hover:text-foreground focus-visible:ring-ring/50 flex h-6 w-6 items-center justify-center rounded border border-transparent transition-colors focus-visible:ring-2 focus-visible:outline-none"
-        >
-          {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
+            className="text-muted-foreground hover:border-border hover:text-foreground focus-visible:ring-ring/50 flex h-6 w-6 items-center justify-center rounded border border-transparent transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleLogout()}
+            aria-label="Sair"
+            className="text-muted-foreground hover:border-border hover:text-foreground focus-visible:ring-ring/50 flex h-6 w-6 items-center justify-center rounded border border-transparent transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
     </aside>
   );
