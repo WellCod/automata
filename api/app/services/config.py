@@ -10,7 +10,7 @@ class ConfigService:
     def __init__(self, repo: ConfigRepository) -> None:
         self._repo = repo
 
-    def create_config(self, name: str, description: str | None = None) -> AgentConfig:
+    def create_config(self, name: str, description: str) -> AgentConfig:
         return self._repo.create_config(name=name, description=description)
 
     def save_draft(
@@ -89,7 +89,7 @@ class ConfigService:
         self,
         config_id: UUID,
         name: str,
-        description: str | None,
+        description: str,
         payload: ConfigPayload,
         author: str,
     ) -> AgentConfigVersion:

@@ -53,7 +53,7 @@ class AgentConfigVersionSummary(BaseModel):
 class AgentConfigResponse(BaseModel):
     id: UUID
     name: str
-    description: str | None
+    description: str
     created_at: datetime
     updated_at: datetime
     current_version: AgentConfigVersionSummary | None
@@ -73,7 +73,7 @@ class AgentConfigDetail(AgentConfigResponse):
 
 class DraftInput(BaseModel):
     name: str
-    description: str | None = None
+    description: str = Field(min_length=1)
     payload: ConfigPayload
 
 
@@ -87,4 +87,4 @@ class RollbackInput(BaseModel):
 
 class CreateConfigInput(BaseModel):
     name: str
-    description: str | None = None
+    description: str = Field(min_length=1)

@@ -14,7 +14,7 @@ class ConfigRepository:
     def get_config(self, config_id: UUID) -> AgentConfig | None:
         return self._session.get(AgentConfig, config_id)
 
-    def create_config(self, name: str, description: str | None = None) -> AgentConfig:
+    def create_config(self, name: str, description: str) -> AgentConfig:
         config = AgentConfig(name=name, description=description)
         self._session.add(config)
         self._session.flush()
@@ -58,7 +58,7 @@ class ConfigRepository:
         config.draft_version_id = version_id
         self._session.flush()
 
-    def update_config(self, config: AgentConfig, *, name: str, description: str | None) -> None:
+    def update_config(self, config: AgentConfig, *, name: str, description: str) -> None:
         config.name = name
         config.description = description
         self._session.flush()
