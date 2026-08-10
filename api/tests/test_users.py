@@ -145,14 +145,15 @@ def test_viewer_tem_scope_read() -> None:
 # --- endpoints ---
 
 
-def test_login_sucesso(client: TestClient, session: Session) -> None:
-    svc = UserService(UserRepository(session))
-    svc.create_user("endpoint@example.com", "senha1234", UserRole.editor)
-    session.flush()
-
+def test_login_sucesso(client: TestClient) -> None:
+    client.post(
+        "/api/v1/auth/users",
+        json={"email": "login_endpoint@example.com", "password": "senha1234", "role": "editor"},
+        headers={"Authorization": f"Bearer {_admin_token()}"},
+    )
     resp = client.post(
         "/api/v1/auth/login",
-        json={"email": "endpoint@example.com", "password": "senha1234"},
+        json={"email": "login_endpoint@example.com", "password": "senha1234"},
     )
     assert resp.status_code == 200
     data = resp.json()
