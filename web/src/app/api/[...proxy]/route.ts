@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { issueToken } from "@/lib/bff/token";
 
 const API_URL = process.env.AUTOMATA_API_URL ?? "http://localhost:8000";
-const PANEL_USER_ID = process.env.PANEL_USER_ID ?? "panel";
-const PANEL_SCOPES = ["agent_os:admin"];
 
 async function forward(req: NextRequest, segments: string[]): Promise<NextResponse> {
-  const token = await issueToken(PANEL_USER_ID, PANEL_SCOPES);
+  const token = req.cookies.get("automata_token")?.value;
+  if (!token) {
+    return new NextResponse("Não autorizado", { status: 401 });
+  }
+
   const path = segments.join("/");
   const search = req.nextUrl.search;
-  // Rotas v1/* são da nossa API; demais são endpoints nativos do AgentOS
   const target = path.startsWith("v1/")
     ? `${API_URL}/api/${path}${search}`
     : `${API_URL}/${path}${search}`;

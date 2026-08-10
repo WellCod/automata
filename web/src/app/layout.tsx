@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import React from "react";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Sidebar } from "@/components/layout/sidebar";
+import { AppShell } from "@/components/layout/app-shell";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -29,8 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className="bg-background flex min-h-full">
         <Providers>
-          <Sidebar />
-          <div className="min-h-full flex-1 pl-[200px]">{children}</div>
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>
