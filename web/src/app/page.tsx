@@ -2,13 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { AgentCard } from "@/components/agent-card";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
 
-type AgentConfig = components["schemas"]["AgentConfigResponse"];
 type StatusFilter = components["schemas"]["ConfigPayloadStatus"] | "";
 
 const PAGE_SIZE = 20;
@@ -26,62 +25,6 @@ async function fetchConfigs(page: number, q: string, status: StatusFilter) {
   });
   if (res.error) throw new Error("Falha ao carregar agentes");
   return res.data!;
-}
-
-function StatusBadge({ agent }: { agent: AgentConfig }) {
-  if (agent.current_version && agent.draft_version) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-        rascunho pendente
-      </span>
-    );
-  }
-  if (agent.current_version) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-green-200">
-        <span className="h-1.5 w-1.5 rounded-full bg-green-500" />v
-        {agent.current_version.version_number} ativo
-      </span>
-    );
-  }
-  if (agent.draft_version) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500 ring-1 ring-zinc-200">
-        <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
-        rascunho
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-400 ring-1 ring-zinc-200">
-      sem versão
-    </span>
-  );
-}
-
-function AgentCard({ agent }: { agent: AgentConfig }) {
-  return (
-    <Link
-      href={`/agents/${agent.id}`}
-      className="group flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-4 transition-shadow hover:shadow-sm"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-zinc-900 group-hover:text-zinc-600">
-            {agent.name}
-          </p>
-          {agent.description && (
-            <p className="mt-0.5 line-clamp-2 text-xs text-zinc-400">{agent.description}</p>
-          )}
-        </div>
-        <StatusBadge agent={agent} />
-      </div>
-      <p className="text-xs text-zinc-400">
-        atualizado {new Date(agent.updated_at).toLocaleDateString("pt-BR")}
-      </p>
-    </Link>
-  );
 }
 
 function NewAgentInline({ onCancel }: { onCancel: () => void }) {
@@ -110,30 +53,30 @@ function NewAgentInline({ onCancel }: { onCancel: () => void }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2.5 shadow-sm"
+      className="border-border bg-card flex items-center gap-2 rounded border px-3 py-2"
     >
       <input
         ref={inputRef}
         autoFocus
         placeholder="Nome do agente"
-        className="min-w-0 flex-1 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none"
+        className="text-foreground placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[13px] focus:outline-none"
         disabled={mutation.isPending}
       />
       <button
         type="submit"
         disabled={mutation.isPending}
-        className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+        className="border-accent text-accent hover:border-accent/70 hover:text-accent/70 inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
       >
         {mutation.isPending ? "Criando…" : "Criar"}
       </button>
       <button
         type="button"
         onClick={onCancel}
-        className="text-xs text-zinc-400 hover:text-zinc-600"
+        className="text-muted-foreground hover:text-foreground text-[10px] tracking-[0.05em] uppercase transition-colors"
       >
         Cancelar
       </button>
-      {mutation.isError && <span className="text-xs text-red-500">Erro ao criar</span>}
+      {mutation.isError && <span className="text-destructive text-[10px]">Erro ao criar</span>}
     </form>
   );
 }
@@ -152,21 +95,21 @@ export default function AgentsPage() {
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="w-full px-6 py-6">
+      <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-900">Agentes</h1>
+          <h1 className="text-foreground text-sm font-medium">Agentes</h1>
           {data && (
-            <p className="mt-0.5 text-sm text-zinc-500">
+            <p className="text-muted-foreground mt-0.5 text-[13px]">
               {data.total} agente{data.total !== 1 ? "s" : ""}
             </p>
           )}
         </div>
         <button
           onClick={() => setShowNew(true)}
-          className="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+          className="border-accent text-accent hover:border-accent/70 hover:text-accent/70 inline-flex h-7 items-center gap-1.5 rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-3.5 w-3.5" />
           Novo agente
         </button>
       </div>
@@ -180,7 +123,7 @@ export default function AgentsPage() {
       <div className="mb-4 flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
           <Search
-            className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-zinc-400"
+            className="text-muted-foreground absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2"
             aria-hidden
           />
           <input
@@ -191,7 +134,7 @@ export default function AgentsPage() {
               setQ(e.target.value);
               setPage(1);
             }}
-            className="w-full rounded-md border border-zinc-200 py-2 pr-3 pl-9 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none"
+            className="border-border text-foreground placeholder:text-muted-foreground focus:border-accent w-full rounded border bg-[var(--input)] py-1.5 pr-3 pl-9 text-[13px] focus:outline-none"
           />
         </div>
         <select
@@ -200,7 +143,7 @@ export default function AgentsPage() {
             setStatus(e.target.value as StatusFilter);
             setPage(1);
           }}
-          className="rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-700 focus:border-zinc-400 focus:outline-none"
+          className="border-border text-foreground focus:border-accent rounded border bg-[var(--input)] px-3 py-1.5 text-[13px] focus:outline-none"
         >
           <option value="">Todos</option>
           <option value="published">Com versão ativa</option>
@@ -209,25 +152,25 @@ export default function AgentsPage() {
       </div>
 
       {isPending ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <span className="sr-only">Carregando…</span>
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-20 animate-pulse rounded-lg bg-zinc-100" />
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="border-border bg-card h-28 animate-pulse rounded border" />
           ))}
         </div>
       ) : isError ? (
-        <div className="rounded-lg border border-red-100 bg-red-50 py-8 text-center text-sm text-red-500">
+        <div className="border-destructive/30 bg-destructive/10 text-destructive rounded border py-8 text-center text-[13px]">
           Erro ao carregar agentes.
         </div>
       ) : data.items.length === 0 ? (
-        <div className="rounded-lg border border-zinc-200 bg-white py-16 text-center">
-          <p className="text-sm font-medium text-zinc-500">Nenhum agente encontrado</p>
-          <p className="mt-1 text-xs text-zinc-400">
+        <div className="border-border rounded border py-16 text-center">
+          <p className="text-foreground text-[13px] font-medium">Nenhum agente encontrado</p>
+          <p className="text-muted-foreground mt-1 text-[13px]">
             {q || status ? "Tente outros filtros" : 'Clique em "Novo agente" para começar'}
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {data.items.map((agent) => (
             <AgentCard key={agent.id} agent={agent} />
           ))}
@@ -235,14 +178,14 @@ export default function AgentsPage() {
       )}
 
       {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-end gap-2 text-sm text-zinc-500">
+        <div className="text-muted-foreground mt-4 flex items-center justify-end gap-2 text-[13px]">
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="rounded p-1 hover:bg-zinc-100 disabled:opacity-40"
+            className="hover:border-border hover:text-foreground rounded border border-transparent p-1 transition-colors disabled:opacity-40"
             aria-label="Página anterior"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-3.5 w-3.5" />
           </button>
           <span>
             {page} / {totalPages}
@@ -250,10 +193,10 @@ export default function AgentsPage() {
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
-            className="rounded p-1 hover:bg-zinc-100 disabled:opacity-40"
+            className="hover:border-border hover:text-foreground rounded border border-transparent p-1 transition-colors disabled:opacity-40"
             aria-label="Próxima página"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </div>
       )}
