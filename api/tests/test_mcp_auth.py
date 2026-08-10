@@ -85,5 +85,6 @@ def test_mcp_com_token_valido_passa_pelo_middleware(mcp_client: TestClient) -> N
     token = _token(scopes=["agent_os:admin"])
     response = mcp_client.get("/mcp", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code not in (401, 403), (
-        f"/mcp retornou {response.status_code} com token válido — middleware bloqueando indevidamente"
+        f"/mcp retornou {response.status_code} com token válido"
+        " — middleware bloqueando indevidamente"
     )
