@@ -26,36 +26,39 @@ export function LintPanel({ getPayload }: Props) {
   const warnings: LintWarning[] = mutation.data ?? [];
 
   return (
-    <div className="rounded-lg border border-zinc-200 p-4">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-zinc-700">Linter</h2>
+        <h2 className="text-foreground text-[13px] font-medium">Linter</h2>
         <button
           type="button"
           onClick={() => mutation.mutate()}
           disabled={mutation.isPending}
-          className="rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+          className="border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
         >
           {mutation.isPending ? "Verificando…" : "Verificar"}
         </button>
       </div>
 
       {mutation.isSuccess && (
-        <div className="mt-3">
+        <div>
           {warnings.length === 0 ? (
-            <div className="flex items-center gap-1.5 text-xs text-green-600">
+            <div className="text-accent flex items-center gap-1.5 text-[13px]">
               <CheckCircle className="h-3.5 w-3.5" />
               Sem avisos
             </div>
           ) : (
             <ul className="flex flex-col gap-2">
               {warnings.map((w, i) => (
-                <li key={i} className="flex items-start gap-2 text-xs">
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                <li
+                  key={i}
+                  className="border-border bg-card flex items-start gap-2 rounded border px-3 py-2 text-[13px]"
+                >
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
                   <div>
-                    <span className="font-medium text-zinc-700">{w.section}</span>
-                    <span className="mx-1 text-zinc-400">·</span>
-                    <span className="font-mono text-zinc-500">{w.code}</span>
-                    <p className="mt-0.5 text-zinc-600">{w.message}</p>
+                    <span className="text-foreground font-medium">{w.section}</span>
+                    <span className="text-muted-foreground mx-1">·</span>
+                    <span className="text-muted-foreground font-mono">{w.code}</span>
+                    <p className="text-muted-foreground mt-0.5">{w.message}</p>
                   </div>
                 </li>
               ))}
@@ -64,7 +67,7 @@ export function LintPanel({ getPayload }: Props) {
         </div>
       )}
 
-      {mutation.isError && <p className="mt-3 text-xs text-red-500">Erro ao executar linter.</p>}
+      {mutation.isError && <p className="text-destructive text-[13px]">Erro ao executar linter.</p>}
     </div>
   );
 }

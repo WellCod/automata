@@ -96,7 +96,7 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
         flush(lines);
       }
       if (buf) flush([buf, ""]);
-    } catch (err) {
+    } catch {
       setError("Erro ao executar agente.");
       setMessages((prev) => {
         const copy = [...prev];
@@ -115,49 +115,49 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
   }
 
   return (
-    <div className="rounded-lg border border-zinc-200 p-4">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-zinc-700">Modo teste</h2>
+        <h2 className="text-foreground text-[13px] font-medium">Modo teste</h2>
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          className="border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors"
         >
           {open ? "Fechar" : "Abrir chat"}
         </button>
       </div>
 
       {open && (
-        <div className="mt-3 flex flex-col gap-3">
+        <div className="flex flex-col gap-3">
           {draftVersionId && (
-            <label className="flex items-center gap-2 text-xs text-zinc-600">
+            <label className="text-muted-foreground flex items-center gap-2 text-[13px]">
               <input
                 type="checkbox"
                 checked={useDraft}
                 onChange={(e) => setUseDraft(e.target.checked)}
-                className="h-3.5 w-3.5"
+                className="h-3.5 w-3.5 accent-[var(--accent)]"
               />
               Testar rascunho
             </label>
           )}
 
-          <div className="flex max-h-72 min-h-24 flex-col gap-2 overflow-y-auto rounded-md border border-zinc-100 bg-zinc-50 p-3">
+          <div className="border-border bg-muted flex max-h-72 min-h-24 flex-col gap-2 overflow-y-auto rounded border p-3">
             {messages.length === 0 && (
-              <p className="text-xs text-zinc-400">Nenhuma mensagem ainda.</p>
+              <p className="text-muted-foreground text-[13px]">Nenhuma mensagem ainda.</p>
             )}
             {messages.map((m, i) => (
               <div
                 key={i}
                 className={`flex flex-col gap-0.5 ${m.role === "user" ? "items-end" : "items-start"}`}
               >
-                <span className="text-xs text-zinc-400">
+                <span className="text-muted-foreground text-[11px]">
                   {m.role === "user" ? "Você" : "Agente"}
                 </span>
                 <div
-                  className={`max-w-xs rounded-lg px-3 py-1.5 text-xs ${
+                  className={`max-w-xs rounded border px-3 py-1.5 text-[13px] ${
                     m.role === "user"
-                      ? "bg-zinc-900 text-white"
-                      : "bg-white text-zinc-800 shadow-sm ring-1 ring-zinc-100"
+                      ? "border-foreground/20 bg-muted text-foreground"
+                      : "border-border bg-background text-foreground"
                   }`}
                 >
                   {m.content || (isRunning && m.role === "assistant" ? "▍" : "")}
@@ -166,7 +166,7 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
             ))}
           </div>
 
-          {error && <p className="text-xs text-red-500">{error}</p>}
+          {error && <p className="text-destructive text-[13px]">{error}</p>}
 
           <div className="flex gap-2">
             <input
@@ -176,13 +176,13 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
               onKeyDown={(e) => e.key === "Enter" && void sendMessage()}
               placeholder="Digite uma mensagem…"
               disabled={isRunning}
-              className="flex-1 rounded-md border border-zinc-200 px-3 py-1.5 text-xs text-zinc-900 focus:border-zinc-400 focus:outline-none disabled:opacity-50"
+              className="border-border text-foreground placeholder:text-muted-foreground focus:border-accent flex-1 rounded border bg-[var(--input)] px-3 py-1.5 text-[13px] transition-colors focus:outline-none disabled:opacity-40"
             />
             <button
               type="button"
               onClick={() => void sendMessage()}
               disabled={isRunning || !input.trim()}
-              className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+              className="border-foreground text-foreground hover:border-accent hover:text-accent inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
             >
               {isRunning ? "…" : "Enviar"}
             </button>
@@ -191,7 +191,7 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
                 type="button"
                 onClick={clearSession}
                 disabled={isRunning}
-                className="rounded-md border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
+                className="border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground inline-flex h-7 items-center rounded border px-2 text-[11px] tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
               >
                 Limpar
               </button>

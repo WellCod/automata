@@ -88,7 +88,7 @@ describe("VersionsPanel", () => {
   it("exibe botão publicar quando há rascunho", async () => {
     render(<VersionsPanel agentId={AGENT_ID} />, { wrapper });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /publicar rascunho/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /publicar/i })).toBeInTheDocument();
     });
   });
 
@@ -101,7 +101,7 @@ describe("VersionsPanel", () => {
     await waitFor(() => {
       expect(screen.getByText("v2")).toBeInTheDocument();
     });
-    expect(screen.queryByRole("button", { name: /publicar rascunho/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /publicar/i })).not.toBeInTheDocument();
   });
 
   it("exibe diff de campos alterados no rascunho", async () => {
@@ -121,9 +121,9 @@ describe("VersionsPanel", () => {
   it("chama publish ao clicar em publicar rascunho", async () => {
     render(<VersionsPanel agentId={AGENT_ID} />, { wrapper });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /publicar rascunho/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /publicar/i })).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByRole("button", { name: /publicar rascunho/i }));
+    await userEvent.click(screen.getByRole("button", { name: /publicar/i }));
     await waitFor(() => {
       expect(client.POST).toHaveBeenCalledWith(
         "/api/v1/configs/{config_id}/publish",

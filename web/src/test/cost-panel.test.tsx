@@ -38,7 +38,7 @@ describe("CostPanel", () => {
   it("renderiza o título com o período atual", async () => {
     render(<CostPanel agentId={AGENT_ID} />, { wrapper });
     await waitFor(() => {
-      expect(screen.getByText(/uso no mês/i)).toBeInTheDocument();
+      expect(screen.getByText(/uso/i)).toBeInTheDocument();
     });
   });
 
