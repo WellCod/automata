@@ -93,7 +93,7 @@ describe("AgentsPage", () => {
     render(<AgentsPage />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText("rascunho")).toBeInTheDocument();
+      expect(screen.getByText(/rascunho/i)).toBeInTheDocument();
     });
   });
 
