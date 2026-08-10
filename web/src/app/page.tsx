@@ -34,7 +34,7 @@ function NewAgentInline({ onCancel }: { onCancel: () => void }) {
 
   const mutation = useMutation({
     mutationFn: async (name: string) => {
-      const res = await client.POST("/api/v1/configs", { body: { name } });
+      const res = await client.POST("/api/v1/configs", { body: { name, description: name } });
       if (res.error) throw new Error("Falha ao criar agente");
       return res.data!;
     },

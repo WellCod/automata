@@ -168,7 +168,7 @@ export default function AgentEditPage() {
         params: { path: { config_id: id } },
         body: {
           name: values.name,
-          description: values.description || null,
+          description: values.description ?? "",
           payload: {
             schema_version: 1,
             model_id: values.model_id,
