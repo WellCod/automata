@@ -47,30 +47,37 @@ export function CostPanel({ agentId }: Props) {
   });
 
   return (
-    <div className="rounded-lg border border-zinc-200 p-4">
-      <h2 className="text-sm font-medium text-zinc-700">
-        Uso no mês ({period.slice(0, 4)}/{period.slice(4)})
+    <div className="flex flex-col gap-3">
+      <h2 className="text-foreground text-[13px] font-medium">
+        Uso · {period.slice(0, 4)}/{period.slice(4)}
       </h2>
 
-      {isPending && <p className="mt-3 text-xs text-zinc-400">Carregando…</p>}
-
-      {isError && <p className="mt-3 text-xs text-red-500">Erro ao carregar uso.</p>}
+      {isPending && <p className="text-muted-foreground text-[13px]">Carregando…</p>}
+      {isError && <p className="text-destructive text-[13px]">Erro ao carregar uso.</p>}
 
       {!isPending && !isError && (
-        <dl className="mt-3 grid grid-cols-3 gap-4">
-          <div className="flex flex-col gap-0.5">
-            <dt className="text-xs text-zinc-400">Execuções</dt>
-            <dd className="text-sm font-medium text-zinc-900">{data?.run_count ?? 0}</dd>
+        <dl className="grid grid-cols-3 gap-2">
+          <div className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2">
+            <dt className="text-label text-[11px] font-medium tracking-[0.05em] uppercase">
+              Execuções
+            </dt>
+            <dd className="text-foreground text-[13px] font-medium">{data?.run_count ?? 0}</dd>
           </div>
-          <div className="flex flex-col gap-0.5">
-            <dt className="text-xs text-zinc-400">Tokens</dt>
-            <dd className="text-sm font-medium text-zinc-900">
+          <div className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2">
+            <dt className="text-label text-[11px] font-medium tracking-[0.05em] uppercase">
+              Tokens
+            </dt>
+            <dd className="text-foreground text-[13px] font-medium">
               {formatTokens(data?.total_tokens ?? 0)}
             </dd>
           </div>
-          <div className="flex flex-col gap-0.5">
-            <dt className="text-xs text-zinc-400">Custo</dt>
-            <dd className="text-sm font-medium text-zinc-900">{formatCost(data?.cost ?? null)}</dd>
+          <div className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2">
+            <dt className="text-label text-[11px] font-medium tracking-[0.05em] uppercase">
+              Custo
+            </dt>
+            <dd className="text-foreground text-[13px] font-medium">
+              {formatCost(data?.cost ?? null)}
+            </dd>
           </div>
         </dl>
       )}

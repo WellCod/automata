@@ -73,48 +73,45 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-zinc-700">
+      <label className="text-foreground text-[13px] font-medium">
         {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
+        {required && <span className="text-destructive ml-0.5">*</span>}
       </label>
       {children}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-destructive text-[11px]">{error}</p>}
     </div>
   );
 }
 
 const inputCls =
-  "rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:border-zinc-400 focus:outline-none";
+  "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors focus:border-accent focus:outline-none";
 const textareaCls = `${inputCls} min-h-24 resize-y`;
 
 function StatusBadge({ data }: { data: AgentConfigDetail | undefined }) {
   if (!data) return null;
   if (data.current_version && data.draft_version) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+      <span className="text-[11px] font-medium tracking-[0.05em] text-amber-400 uppercase">
         rascunho pendente
       </span>
     );
   }
   if (data.current_version) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-green-200">
-        <span className="h-1.5 w-1.5 rounded-full bg-green-500" />v
-        {data.current_version.version_number} ativo
+      <span className="text-accent text-[11px] font-medium tracking-[0.05em] uppercase">
+        v{data.current_version.version_number} ativo
       </span>
     );
   }
   if (data.draft_version) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+      <span className="text-[11px] font-medium tracking-[0.05em] text-amber-400 uppercase">
         rascunho
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-400 ring-1 ring-zinc-200">
+    <span className="text-muted-foreground text-[11px] font-medium tracking-[0.05em] uppercase">
       sem versão
     </span>
   );
@@ -193,9 +190,9 @@ export default function AgentEditPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-14 items-center border-b border-zinc-200 bg-white px-6">
+      <div className="border-border bg-background flex h-11 items-center border-b px-6">
         <span className="sr-only">Carregando…</span>
-        <div className="h-4 w-48 animate-pulse rounded bg-zinc-100" />
+        <div className="bg-muted h-3.5 w-48 animate-pulse rounded" />
       </div>
     );
   }
@@ -215,36 +212,35 @@ export default function AgentEditPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Sticky header */}
-      <header className="sticky top-0 z-10 flex h-14 flex-none items-center justify-between border-b border-zinc-200 bg-white px-6">
+      <header className="border-border bg-background sticky top-0 z-10 flex h-11 flex-none items-center justify-between border-b px-6">
         <div className="flex items-center gap-3">
           <Link
             href="/"
-            className="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+            className="text-muted-foreground hover:border-border hover:text-foreground rounded border border-transparent p-1 transition-colors"
             aria-label="Voltar"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-3.5 w-3.5" />
           </Link>
-          <span className="text-sm font-semibold text-zinc-900">{data?.name ?? "Agente"}</span>
+          <span className="text-foreground text-[13px] font-medium">{data?.name ?? "Agente"}</span>
           <StatusBadge data={data} />
         </div>
         <div className="flex items-center gap-3">
-          {mutation.isSuccess && <span className="text-xs text-green-600">Salvo</span>}
-          {mutation.isError && <span className="text-xs text-red-500">Erro ao salvar</span>}
+          {mutation.isSuccess && (
+            <span className="text-accent text-[11px] tracking-[0.05em] uppercase">Salvo</span>
+          )}
+          {mutation.isError && <span className="text-destructive text-[11px]">Erro ao salvar</span>}
           <button
             type="submit"
             form="agent-form"
             disabled={mutation.isPending}
-            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+            className="border-foreground text-foreground hover:border-accent hover:text-accent inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
           >
             {mutation.isPending ? "Salvando…" : "Salvar rascunho"}
           </button>
         </div>
       </header>
 
-      {/* Two-column body */}
       <div className="flex flex-1">
-        {/* Left: form */}
         <div className="min-w-0 flex-1 px-8 py-6">
           <form
             id="agent-form"
@@ -275,8 +271,8 @@ export default function AgentEditPage() {
               )}
             />
 
-            <fieldset className="flex flex-col gap-4 rounded-lg border border-zinc-200 px-4 pt-3 pb-4">
-              <legend className="px-1 text-sm font-medium text-zinc-700">Instruções</legend>
+            <fieldset className="border-border flex flex-col gap-4 rounded border px-4 pt-3 pb-4">
+              <legend className="text-foreground px-1 text-[13px] font-medium">Instruções</legend>
               {(Object.keys(INSTRUCTION_LABELS) as (keyof typeof INSTRUCTION_LABELS)[]).map(
                 (key) => (
                   <Field key={key} label={INSTRUCTION_LABELS[key]}>
@@ -292,20 +288,18 @@ export default function AgentEditPage() {
           </form>
         </div>
 
-        {/* Right: tabbed panels */}
-        <div className="w-[400px] flex-none border-l border-zinc-200 bg-white lg:sticky lg:top-14 lg:max-h-[calc(100vh-3.5rem)] lg:overflow-y-auto">
-          {/* Tab nav */}
-          <div className="flex border-b border-zinc-200">
+        <div className="border-border bg-background w-[400px] flex-none border-l lg:sticky lg:top-11 lg:max-h-[calc(100vh-2.75rem)] lg:overflow-y-auto">
+          <div className="border-border flex border-b">
             {PANEL_TABS.map(({ id: pid, label, icon: Icon }) => (
               <button
                 key={pid}
                 type="button"
                 onClick={() => setActivePanel(pid)}
                 className={cn(
-                  "flex flex-1 flex-col items-center gap-1 px-1 py-2.5 text-xs font-medium transition-colors",
+                  "flex flex-1 flex-col items-center gap-1 px-1 py-2.5 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors",
                   activePanel === pid
-                    ? "border-b-2 border-zinc-900 text-zinc-900"
-                    : "text-zinc-400 hover:text-zinc-700",
+                    ? "border-accent text-accent border-b"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -314,7 +308,6 @@ export default function AgentEditPage() {
             ))}
           </div>
 
-          {/* Panel content */}
           <div className="p-4">
             {activePanel === "teste" && (
               <TestPanel agentId={id} draftVersionId={data?.draft_version?.id} defaultOpen />

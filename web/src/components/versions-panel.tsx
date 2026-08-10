@@ -17,8 +17,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_CLS: Record<string, string> = {
-  draft: "bg-amber-100 text-amber-700",
-  published: "bg-green-100 text-green-700",
+  draft: "text-amber-400",
+  published: "text-accent",
 };
 
 function diffPayload(a: ConfigPayload, b: ConfigPayload): string[] {
@@ -91,37 +91,37 @@ export function VersionsPanel({ agentId }: Props) {
   const current = published[0];
 
   return (
-    <div className="rounded-lg border border-zinc-200 p-4">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-zinc-700">Versões</h2>
+        <h2 className="text-foreground text-[13px] font-medium">Versões</h2>
         {draft && (
           <button
             type="button"
             onClick={() => publishMutation.mutate()}
             disabled={publishMutation.isPending}
-            className="rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+            className="border-accent text-accent hover:border-accent/70 hover:text-accent/70 inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
           >
-            {publishMutation.isPending ? "Publicando…" : "Publicar rascunho"}
+            {publishMutation.isPending ? "Publicando…" : "Publicar"}
           </button>
         )}
       </div>
 
       {publishMutation.isError && (
-        <p className="mt-2 text-xs text-red-500">Erro ao publicar. Tente novamente.</p>
+        <p className="text-destructive text-[11px]">Erro ao publicar. Tente novamente.</p>
       )}
       {rollbackMutation.isError && (
-        <p className="mt-2 text-xs text-red-500">Erro ao reverter. Tente novamente.</p>
+        <p className="text-destructive text-[11px]">Erro ao reverter. Tente novamente.</p>
       )}
 
-      {isPending && <p className="mt-3 text-xs text-zinc-400">Carregando…</p>}
-      {isError && <p className="mt-3 text-xs text-red-500">Erro ao carregar versões.</p>}
+      {isPending && <p className="text-muted-foreground text-[13px]">Carregando…</p>}
+      {isError && <p className="text-destructive text-[13px]">Erro ao carregar versões.</p>}
 
       {!isPending && !isError && versions && versions.length === 0 && (
-        <p className="mt-3 text-xs text-zinc-400">Nenhuma versão salva.</p>
+        <p className="text-muted-foreground text-[13px]">Nenhuma versão salva.</p>
       )}
 
       {!isPending && !isError && versions && versions.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-2">
+        <ul className="flex flex-col gap-1">
           {versions.map((v) => {
             const diffs =
               v.status === "draft" && current ? diffPayload(current.payload, v.payload) : [];
@@ -129,20 +129,22 @@ export function VersionsPanel({ agentId }: Props) {
             return (
               <li
                 key={v.id}
-                className="flex flex-col gap-1 rounded-md border border-zinc-100 bg-zinc-50 px-3 py-2"
+                className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-zinc-700">v{v.version_number}</span>
+                    <span className="text-foreground text-[13px] font-medium">
+                      v{v.version_number}
+                    </span>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLS[v.status] ?? ""}`}
+                      className={`text-[11px] font-medium ${STATUS_CLS[v.status] ?? "text-muted-foreground"}`}
                     >
                       {STATUS_LABELS[v.status] ?? v.status}
                     </span>
-                    <span className="text-xs text-zinc-400">{v.author}</span>
+                    <span className="text-muted-foreground text-[11px]">{v.author}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-zinc-400">
+                    <span className="text-muted-foreground text-[11px]">
                       {new Date(v.created_at).toLocaleDateString("pt-BR")}
                     </span>
                     {v.status === "published" && v.id !== current?.id && (
@@ -150,7 +152,7 @@ export function VersionsPanel({ agentId }: Props) {
                         type="button"
                         onClick={() => rollbackMutation.mutate(v.id)}
                         disabled={rollbackMutation.isPending}
-                        className="rounded border border-zinc-200 px-2 py-0.5 text-xs text-zinc-600 hover:bg-zinc-100 disabled:opacity-50"
+                        className="border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground inline-flex h-5 items-center rounded border px-1.5 text-[10px] transition-colors disabled:opacity-40"
                       >
                         Reverter
                       </button>
@@ -158,7 +160,7 @@ export function VersionsPanel({ agentId }: Props) {
                   </div>
                 </div>
                 {diffs.length > 0 && (
-                  <p className="text-xs text-zinc-500">Alterado: {diffs.join(", ")}</p>
+                  <p className="text-muted-foreground text-[11px]">Alterado: {diffs.join(", ")}</p>
                 )}
               </li>
             );

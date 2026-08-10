@@ -22,12 +22,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="flex min-h-full bg-zinc-50">
-        <Sidebar />
-        <div className="min-h-full flex-1 pl-52">
-          <Providers>{children}</Providers>
-        </div>
+    <html
+      lang="pt-BR"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
+      <body className="bg-background flex min-h-full">
+        <Providers>
+          <Sidebar />
+          <div className="min-h-full flex-1 pl-[200px]">{children}</div>
+        </Providers>
       </body>
     </html>
   );
