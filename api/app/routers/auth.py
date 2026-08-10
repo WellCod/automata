@@ -61,10 +61,12 @@ def login(request: Request, body: LoginInput) -> TokenResponse:
         svc = UserService(UserRepository(session))
         try:
             user = svc.authenticate(body.email, body.password)
+            user_id = str(user.id)
+            user_role = user.role
             session.commit()
         except ValueError as e:
             raise HTTPException(status_code=401, detail="Credenciais inválidas") from e
-    return TokenResponse(access_token=issue_token(str(user.id), ROLE_SCOPES[user.role]))
+    return TokenResponse(access_token=issue_token(user_id, ROLE_SCOPES[user_role]))
 
 
 @router.post("/users", response_model=UserResponse, status_code=201)
