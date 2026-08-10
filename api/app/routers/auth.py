@@ -68,9 +68,7 @@ def login(request: Request, body: LoginInput) -> TokenResponse:
 
 
 @router.post("/users", response_model=UserResponse, status_code=201)
-def create_user(
-    body: CreateUserInput, _: None = Depends(_require_admin)
-) -> UserResponse:
+def create_user(body: CreateUserInput, _: None = Depends(_require_admin)) -> UserResponse:
     engine = create_engine(get_settings().database_url)
     with Session(engine) as session:
         svc = UserService(UserRepository(session))

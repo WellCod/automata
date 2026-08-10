@@ -14,9 +14,7 @@ class UserService:
     def create_user(self, email: str, password: str, role: UserRole) -> User:
         if self._repo.get_by_email(email) is not None:
             raise ValueError("Email já cadastrado")
-        return self._repo.create(
-            email=email, hashed_password=_ph.hash(password), role=role
-        )
+        return self._repo.create(email=email, hashed_password=_ph.hash(password), role=role)
 
     def authenticate(self, email: str, password: str) -> User:
         user = self._repo.get_by_email(email)
