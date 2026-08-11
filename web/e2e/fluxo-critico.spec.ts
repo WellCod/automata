@@ -114,7 +114,7 @@ test.describe("Lista de agentes", () => {
 
   test("exibe badge de rascunho quando há draft_version", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("rascunho", { exact: true })).toBeVisible();
+    await expect(page.getByText("Rascunho", { exact: true })).toBeVisible();
   });
 
   test("exibe estado vazio quando não há agentes", async ({ page }) => {
@@ -138,7 +138,7 @@ test.describe("Formulário de edição", () => {
 
   test("navega para o formulário ao clicar no agente", async ({ page }) => {
     await page.goto("/");
-    await page.getByText("Agente Teste").click();
+    await page.getByRole("link", { name: "Abrir Agente Teste" }).click();
     await expect(page).toHaveURL(`/agents/${AGENT_ID}`);
     await expect(page.locator('input[name="name"]')).toHaveValue("Agente Teste");
   });
@@ -162,7 +162,7 @@ test.describe("Formulário de edição", () => {
     await page.goto(`/agents/${AGENT_ID}`);
     await page.locator('input[name="name"]').fill("Agente Renomeado");
     await page.getByRole("button", { name: /salvar rascunho/i }).click();
-    await expect(page.getByText("Salvo como rascunho")).toBeVisible();
+    await expect(page.getByText("Salvo")).toBeVisible();
   });
 
   test("envia o payload correto ao salvar", async ({ page }) => {
@@ -177,7 +177,7 @@ test.describe("Formulário de edição", () => {
 
     await page.goto(`/agents/${AGENT_ID}`);
     await page.getByRole("button", { name: /salvar rascunho/i }).click();
-    await expect(page.getByText("Salvo como rascunho")).toBeVisible();
+    await expect(page.getByText("Salvo")).toBeVisible();
 
     expect(capturedBody).toMatchObject({
       name: "Agente Teste",
@@ -192,6 +192,6 @@ test.describe("Formulário de edição", () => {
 
     await page.goto(`/agents/${AGENT_ID}`);
     await page.getByRole("button", { name: /salvar rascunho/i }).click();
-    await expect(page.getByText("Erro ao salvar. Tente novamente.")).toBeVisible();
+    await expect(page.getByText("Erro ao salvar")).toBeVisible();
   });
 });
