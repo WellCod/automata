@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils";
 import { LayoutGrid, LogOut, Moon, Sun } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "./theme-provider";
 
@@ -25,9 +25,8 @@ export function Sidebar() {
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
-  const isDark = mounted && theme === "dark";
+  const isClient = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const isDark = isClient && theme === "dark";
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
