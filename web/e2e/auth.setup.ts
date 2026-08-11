@@ -1,10 +1,7 @@
 import { importPKCS8, SignJWT } from "jose";
 import { test as setup } from "@playwright/test";
-import path from "path";
-import { fileURLToPath } from "url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const AUTH_FILE = path.join(__dirname, ".auth/session.json");
+export const AUTH_FILE = "e2e/.auth/session.json";
 
 setup("autenticar", async ({ context }) => {
   const pem = process.env.JWT_PRIVATE_KEY;
