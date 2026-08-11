@@ -21,7 +21,9 @@ def main() -> None:
         sys.exit(1)
 
     email, password = sys.argv[1], sys.argv[2]
-    db_url = os.environ.get("DATABASE_URL", "postgresql+psycopg://automata:automata@localhost:5432/automata")
+    db_url = os.environ.get(
+        "DATABASE_URL", "postgresql+psycopg://automata:automata@localhost:5432/automata"
+    )
 
     engine = create_engine(db_url)
     with Session(engine) as session:
