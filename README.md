@@ -2,7 +2,22 @@
 
 Plataforma de gestão de agentes de IA em produção: catálogo, edição versionada, troca de modelo sem reescrita de prompt e rastreio de custo por agente.
 
-> **Status: em construção.** Este repositório está na fase de fundação — decisões de arquitetura registradas, código em implementação. O que já existe está listado em [Situação atual](#situação-atual). Nada aqui descreve funcionalidade que ainda não roda.
+> **Demo pública disponível.** Veja [Demo](#demo) para acesso.
+
+> **Status: em construção.** Funcionalidades de edição de prompt, estimativa de custo e mode teste ainda não estão disponíveis. O que já existe está listado em [Situação atual](#situação-atual).
+
+---
+
+## Demo
+
+**URL:** _a preencher após deploy_
+
+| Campo | Valor |
+|---|---|
+| Email | `demo@automata.dev` |
+| Senha | ver secret `DEMO_OWNER_PASSWORD` no repositório |
+
+Os dados são resetados a cada 6 horas pelo workflow [demo-reset](.github/workflows/demo-reset.yml). Nenhuma informação real deve ser inserida — a demo não tem credencial de provedor de IA, respostas são pré-gravadas.
 
 ---
 
@@ -86,13 +101,17 @@ Monorepo sem ferramenta de monorepo: são duas aplicações isoladas em linguage
 ## Situação atual
 
 - [x] Decisões de arquitetura registradas
-- [ ] Fundação da API e schema de configuração versionada
-- [ ] Factory de construção de agente por request
-- [ ] Linter de prompt
-- [ ] Painel: lista e edição
+- [x] Fundação da API e schema de configuração versionada
+- [x] Factory de construção de agente por request
+- [x] Linter de prompt
+- [x] Auth JWT com papéis e scopes
+- [x] Metering de consumo por período
+- [x] CI com evals de confiabilidade
+- [x] Painel: login e sessão
+- [x] Imagem Docker versionada e publicação no GHCR
+- [x] Demo pública (replay de inferência, reset periódico)
+- [ ] Painel: lista e edição de agentes
 - [ ] Fork do chat para modo teste
-- [ ] CI com evals de confiabilidade
-- [ ] Demo pública
 
 ## Rodando local
 
