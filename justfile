@@ -20,3 +20,12 @@ seed set="minimal":
       -e SEED_OWNER_EMAIL="${SEED_OWNER_EMAIL}" \
       -e SEED_OWNER_PASSWORD="${SEED_OWNER_PASSWORD}" \
       automata-api-1 python scripts/seed.py {{set}}
+
+demo:
+    docker compose -f docker-compose.demo.yml up -d
+
+demo-reset:
+    docker exec \
+      -e SEED_OWNER_EMAIL="${SEED_OWNER_EMAIL}" \
+      -e SEED_OWNER_PASSWORD="${SEED_OWNER_PASSWORD}" \
+      automata-demo-api python scripts/demo_reset.py

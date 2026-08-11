@@ -1,0 +1,22 @@
+name: Demo reset
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # a cada 6 horas
+  workflow_dispatch:
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reset via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEMO_HOST }}
+          username: ${{ secrets.DEMO_USER }}
+          key: ${{ secrets.DEMO_SSH_KEY }}
+          script: |
+            docker exec \
+              -e SEED_OWNER_EMAIL="${{ secrets.DEMO_OWNER_EMAIL }}" \
+              -e SEED_OWNER_PASSWORD="${{ secrets.DEMO_OWNER_PASSWORD }}" \
+              automata-demo-api python scripts/demo_reset.py

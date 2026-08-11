@@ -1,0 +1,50 @@
+# Implantação da demo. Use diretamente (não é override):
+#   docker compose -f docker-compose.demo.yml up -d
+#
+# Variáveis obrigatórias (.env ou ambiente):
+#   POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
+#   DATABASE_URL, JWT_PRIVATE_KEY, JWT_PUBLIC_KEY
+#   AUTOMATA_API_URL=http://api:8000  (interno ao compose)
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - demo_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: ghcr.io/wellcod/automata-api:latest
+    container_name: automata-demo-api
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+      DEMO_REPLAY: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: ghcr.io/wellcod/automata-web:latest
+    container_name: automata-demo-web
+    environment:
+      AUTOMATA_API_URL: ${AUTOMATA_API_URL:-http://api:8000}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  demo_pg_data:
