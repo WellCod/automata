@@ -25,7 +25,11 @@ export function Sidebar() {
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
   const router = useRouter();
-  const isClient = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const isDark = isClient && theme === "dark";
 
   async function handleLogout() {
