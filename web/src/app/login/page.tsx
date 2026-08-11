@@ -38,19 +38,23 @@ export default function LoginPage() {
 
   async function onSubmit(values: FormValues) {
     setServerError("");
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values),
-    });
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
 
-    if (!res.ok) {
-      setServerError("Credenciais inválidas");
-      return;
+      if (!res.ok) {
+        setServerError("Credenciais inválidas");
+        return;
+      }
+
+      router.push("/");
+      router.refresh();
+    } catch {
+      setServerError("Erro de conexão. Tente novamente.");
     }
-
-    router.push("/");
-    router.refresh();
   }
 
   return (
