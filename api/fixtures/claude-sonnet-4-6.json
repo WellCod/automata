@@ -1,0 +1,7 @@
+[
+  "Analisando o código, identifiquei o problema. A variável não está sendo inicializada antes do uso. Corrija assim:\n\n```python\nvalor = None  # inicialização explícita\nif condicao:\n    valor = calcular()\n```\n\nIsso evita o `UnboundLocalError` em tempo de execução.",
+  "Para essa funcionalidade, recomendo o padrão Repository. Ele separa a lógica de acesso a dados da lógica de negócio, facilitando testes e manutenção:\n\n```python\nclass UserRepository:\n    def get_by_id(self, user_id: int) -> User | None:\n        return self._session.get(User, user_id)\n```",
+  "O problema de performance está na consulta N+1. Substitua o loop por um `JOIN` ou use `selectinload`:\n\n```python\nstmt = select(Order).options(selectinload(Order.items))\n```\n\nIsso reduz as queries de N+1 para apenas 2.",
+  "Essa abordagem tem um risco de race condition. Use um lock ou operação atômica no banco:\n\n```sql\nUPDATE saldo SET valor = valor - 100 WHERE id = 1 AND valor >= 100;\n```\n\nVerifique o `rowcount` para confirmar se a operação foi bem-sucedida.",
+  "Para os testes, use o padrão Arrange-Act-Assert e evite mocks do banco — prefira um banco de teste real com `testcontainers`."
+]
