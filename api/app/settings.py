@@ -9,7 +9,6 @@ class Settings(BaseSettings):
     database_url: str
     jwt_private_key: str
     jwt_public_key: str
-    demo_replay: bool = False
 
 
 @lru_cache

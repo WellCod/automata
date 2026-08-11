@@ -1,8 +1,8 @@
+import os
+
 from agno.models.anthropic import Claude
 from agno.models.base import Model
 from agno.models.openai import OpenAIChat
-
-from app.settings import get_settings
 
 _SUPPORTED: dict[str, type[Model]] = {
     "claude-opus-4-7": Claude,
@@ -24,7 +24,7 @@ def resolve_model(model_id: str) -> Model:
 
     Quando DEMO_REPLAY=true, retorna ReplayModel sem chamar o provedor real.
     """
-    if get_settings().demo_replay:
+    if os.environ.get("DEMO_REPLAY", "").lower() in ("1", "true"):
         from app.agents.replay import ReplayModel
 
         return ReplayModel(id=model_id)
