@@ -67,16 +67,34 @@ jobs:
       - run: pnpm --filter web format:check
       - run: pnpm --filter web test
 
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web exec playwright install --with-deps chromium
+      - run: pnpm --filter web test:e2e
+
   gate:
-    needs: [api, web]
+    needs: [api, web, e2e]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: falha se api ou web falharam ou foram cancelados
+      - name: falha se api, web ou e2e falharam ou foram cancelados
         run: |
           if [[ "${{ needs.api.result }}" == "failure" || \
                 "${{ needs.api.result }}" == "cancelled" || \
                 "${{ needs.web.result }}" == "failure" || \
-                "${{ needs.web.result }}" == "cancelled" ]]; then
+                "${{ needs.web.result }}" == "cancelled" || \
+                "${{ needs.e2e.result }}" == "failure" || \
+                "${{ needs.e2e.result }}" == "cancelled" ]]; then
             exit 1
           fi
