@@ -2,6 +2,8 @@ from agno.models.anthropic import Claude
 from agno.models.base import Model
 from agno.models.openai import OpenAIChat
 
+from app.settings import get_settings
+
 _SUPPORTED: dict[str, type[Model]] = {
     "claude-opus-4-7": Claude,
     "claude-sonnet-4-6": Claude,
@@ -19,7 +21,14 @@ def resolve_model(model_id: str) -> Model:
     Não retorna singleton — cada chamada produz um objeto novo. Isso garante
     que mudanças no model_id da config refletem imediatamente na próxima
     request, sem necessidade de reiniciar a aplicação (ADR-0006).
+
+    Quando DEMO_REPLAY=true, retorna ReplayModel sem chamar o provedor real.
     """
+    if get_settings().demo_replay:
+        from app.agents.replay import ReplayModel
+
+        return ReplayModel(id=model_id)
+
     cls = _SUPPORTED.get(model_id)
     if cls is None:
         raise ValueError(f"model_id '{model_id}' não suportado. Suportados: {sorted(_SUPPORTED)}")
