@@ -4,7 +4,7 @@ Plataforma de gestão de agentes de IA em produção: catálogo, edição versio
 
 > **Demo pública disponível.** Veja [Demo](#demo) para acesso.
 
-> **Status: em construção.** Funcionalidades de edição de prompt, estimativa de custo e mode teste ainda não estão disponíveis. O que já existe está listado em [Situação atual](#situação-atual).
+> **Status: em construção.** O painel e a demo estão no ar. O que já existe está listado em [Situação atual](#situação-atual).
 
 ---
 
@@ -108,10 +108,12 @@ Monorepo sem ferramenta de monorepo: são duas aplicações isoladas em linguage
 - [x] Metering de consumo por período
 - [x] CI com evals de confiabilidade
 - [x] Painel: login e sessão
+- [x] Painel: lista e edição de agentes
+- [x] Painel: seletor de modelo, linter, estimativa de custo
+- [x] Painel: versões, diff e rollback
+- [x] Painel: modo teste com chat integrado
 - [x] Imagem Docker versionada e publicação no GHCR
 - [x] Demo pública (replay de inferência, reset periódico)
-- [ ] Painel: lista e edição de agentes
-- [ ] Fork do chat para modo teste
 
 ## Rodando local
 
