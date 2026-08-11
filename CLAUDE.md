@@ -70,12 +70,22 @@ Regras críticas:
 ## Sequência de PRs — Fase 2
 
 - [x] PR 14 — `chore(web): scaffolding do painel`
-- [ ] PR 15 — `feat(web): bff e tipos gerados do openapi`
-- [ ] PR 16 — `feat(web): lista de agentes`
-- [ ] PR 17 — `feat(web): formulário de edição, campos base`
-- [ ] PR 18 — `feat(web): seletor de modelo com capabilities condicionais`
-- [ ] PR 19 — `feat(web): painel do linter`
-- [ ] PR 20 — `feat(web): estimador de custo`
-- [ ] PR 21 — `feat(web): versões, diff e rollback`
-- [ ] PR 22 — `feat(web): modo teste a partir do agent-ui`
-- [ ] PR 23 — `test(web): e2e do fluxo crítico`
+- [x] PR 15 — `feat(web): bff e tipos gerados do openapi`
+- [x] PR 16 — `feat(web): lista de agentes`
+- [x] PR 17 — `feat(web): formulário de edição, campos base`
+- [x] PR 18 — `feat(web): seletor de modelo com capabilities condicionais`
+- [x] PR 19 — `feat(web): painel do linter`
+- [x] PR 20 — `feat(web): estimador de custo`
+- [x] PR 21 — `feat(web): versões, diff e rollback`
+- [x] PR 22 — `feat(web): modo teste a partir do agent-ui`
+- [x] PR 23 — `test(web): e2e do fluxo crítico`
+
+## Sequência de PRs — Fase 3
+
+- [x] PR 24 — `feat(api): usuários, papéis e emissão de token`
+- [x] PR 25 — `feat(web): login e sessão`
+- [x] PR 26 — `feat(api): seed de instância`
+- [x] PR 27 — `chore: imagem versionada e publicação`
+- [x] PR 28 — `feat(demo): modo replay de inferência`
+- [x] PR 29 — `chore(demo): deploy e reset periódico`
+- [x] PR 30 — `docs: link da demo e credenciais de acesso`
