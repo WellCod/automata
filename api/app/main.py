@@ -1,3 +1,6 @@
+import logging
+import uuid
+
 from agno.agent import Agent
 from agno.agent.factory import AgentFactory
 from agno.agent.protocol import AgentProtocol
@@ -9,12 +12,15 @@ from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.logging_config import configure_logging, request_id_var
 from app.routers.auth import router as auth_router
 from app.routers.configs import router as configs_router
 from app.routers.linter import router as linter_router
 from app.routers.models import router as models_router
 from app.routers.usage import router as usage_router
 from app.settings import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -29,12 +35,29 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: object) -> Response:
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        token = request_id_var.set(request_id)
+        try:
+            response: Response = await call_next(request)  # type: ignore[operator]
+            response.headers["X-Request-ID"] = request_id
+        finally:
+            request_id_var.reset(token)
+        logger.info(
+            "request",
+            extra={"method": request.method, "path": request.url.path, "status": response.status_code},
+        )
+        return response
+
+
 def create_app(
     auto_provision_dbs: bool = True,
     enable_auth: bool = True,
     enable_mcp_server: bool = False,
 ) -> FastAPI:
     settings = get_settings()
+    configure_logging(settings.log_level)
     db = PostgresDb(db_url=settings.database_url)
 
     base = FastAPI(title="automata")
@@ -78,6 +101,7 @@ def create_app(
     # via _require_admin que verifica JWT + scope agent_os:admin.
     outer: FastAPI = FastAPI(title="automata")
     outer.add_middleware(SecurityHeadersMiddleware)
+    outer.add_middleware(RequestIDMiddleware)
     outer.include_router(auth_router)
     outer.mount("/", protected)
     return outer
