@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, Numeric, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -10,6 +10,7 @@ from app.models.config import Base
 
 class UsageEvent(Base):
     __tablename__ = "usage_event"
+    __table_args__ = (Index("ix_usage_event_period_agent_config_id", "period", "agent_config_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     agent_config_id: Mapped[uuid.UUID] = mapped_column(

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -14,6 +14,9 @@ class Base(DeclarativeBase):
 
 class AgentConfigVersion(Base):
     __tablename__ = "agent_config_version"
+    __table_args__ = (
+        Index("ix_agent_config_version_config_id_version_number", "config_id", "version_number"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     config_id: Mapped[uuid.UUID] = mapped_column(
@@ -59,6 +62,7 @@ class AgentConfig(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+        index=True,
     )
 
     versions: Mapped[list[AgentConfigVersion]] = relationship(
