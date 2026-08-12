@@ -89,3 +89,29 @@ Regras críticas:
 - [x] PR 28 — `feat(demo): modo replay de inferência`
 - [x] PR 29 — `chore(demo): deploy e reset periódico`
 - [x] PR 30 — `docs: link da demo e credenciais de acesso`
+
+## Fase 4 — Segurança
+
+Derivada de auditoria técnica em 2026-08-12. Detalhes em `docs/roadmap.md`.
+
+- [ ] PR 41 — `fix(security): remove jwt_private_key do container web`
+- [ ] PR 42 — `fix(security): validação jwt no proxy bff e cookie secure`
+- [ ] PR 43 — `fix(security): headers de segurança http`
+- [ ] PR 44 — `fix(security): política de senha, csrf e ip forwarding`
+
+## Fase 5 — Estabilidade e Performance
+
+- [ ] PR 45 — `fix(api): pool de conexões sqlalchemy compartilhado`
+- [ ] PR 46 — `chore(infra): restart policies, resource limits e health check`
+- [ ] PR 47 — `feat(api): índices de banco e cache http em capabilities`
+
+## Fase 6 — Observabilidade
+
+- [ ] PR 48 — `feat(api): logging estruturado com request-id`
+- [ ] PR 49 — `feat(api): health check com validação de banco`
+
+## Fase 7 — Qualidade e CI/CD
+
+- [ ] PR 50 — `chore(ci): testes de integração, coverage e cache de layers docker`
+- [ ] PR 51 — `feat(infra): redis e rate limiting distribuído`
+- [ ] PR 52 — `chore(dev): script de bootstrap e env de desenvolvimento`
