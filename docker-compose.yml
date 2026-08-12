@@ -39,7 +39,6 @@ services:
       - /app/node_modules
     environment:
       AUTOMATA_API_URL: ${AUTOMATA_API_URL}
-      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
     ports:
       - "3000:3000"
     depends_on:
