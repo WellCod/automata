@@ -148,12 +148,12 @@ def test_viewer_tem_scope_read() -> None:
 def test_login_sucesso(client: TestClient) -> None:
     client.post(
         "/api/v1/auth/users",
-        json={"email": "login_endpoint@example.com", "password": "senha1234", "role": "editor"},
+        json={"email": "login_endpoint@example.com", "password": "Senha12345678", "role": "editor"},
         headers={"Authorization": f"Bearer {_admin_token()}"},
     )
     resp = client.post(
         "/api/v1/auth/login",
-        json={"email": "login_endpoint@example.com", "password": "senha1234"},
+        json={"email": "login_endpoint@example.com", "password": "Senha12345678"},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -172,7 +172,7 @@ def test_login_credenciais_invalidas(client: TestClient) -> None:
 def test_criar_usuario_sem_token_retorna_422(client: TestClient) -> None:
     resp = client.post(
         "/api/v1/auth/users",
-        json={"email": "new@x.com", "password": "senha1234", "role": "viewer"},
+        json={"email": "new@x.com", "password": "Senha12345678", "role": "viewer"},
     )
     assert resp.status_code in (401, 422)
 
@@ -183,7 +183,7 @@ def test_criar_usuario_sem_scope_admin_retorna_403(client: TestClient) -> None:
     token = issue_token("u1", ["agent_os:read"])
     resp = client.post(
         "/api/v1/auth/users",
-        json={"email": "new@x.com", "password": "senha1234", "role": "viewer"},
+        json={"email": "new@x.com", "password": "Senha12345678", "role": "viewer"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 403
@@ -192,7 +192,7 @@ def test_criar_usuario_sem_scope_admin_retorna_403(client: TestClient) -> None:
 def test_criar_usuario_com_admin_retorna_201(client: TestClient) -> None:
     resp = client.post(
         "/api/v1/auth/users",
-        json={"email": "novo@x.com", "password": "senha1234", "role": "editor"},
+        json={"email": "novo@x.com", "password": "Senha12345678", "role": "editor"},
         headers={"Authorization": f"Bearer {_admin_token()}"},
     )
     assert resp.status_code == 201
@@ -204,12 +204,12 @@ def test_criar_usuario_com_admin_retorna_201(client: TestClient) -> None:
 def test_criar_usuario_email_duplicado_retorna_409(client: TestClient) -> None:
     client.post(
         "/api/v1/auth/users",
-        json={"email": "dup2@x.com", "password": "senha1234", "role": "viewer"},
+        json={"email": "dup2@x.com", "password": "Senha12345678", "role": "viewer"},
         headers={"Authorization": f"Bearer {_admin_token()}"},
     )
     resp = client.post(
         "/api/v1/auth/users",
-        json={"email": "dup2@x.com", "password": "outra1234", "role": "viewer"},
+        json={"email": "dup2@x.com", "password": "Outra12345678", "role": "viewer"},
         headers={"Authorization": f"Bearer {_admin_token()}"},
     )
     assert resp.status_code == 409
