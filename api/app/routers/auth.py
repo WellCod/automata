@@ -59,9 +59,7 @@ def _require_admin(authorization: str = Header(...)) -> None:
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(
-    request: Request, body: LoginInput, session: SessionDep
-) -> TokenResponse:
+def login(request: Request, body: LoginInput, session: SessionDep) -> TokenResponse:
     ip = get_client_ip(request)
     _check_rate_limit(ip)
     svc = UserService(UserRepository(session))

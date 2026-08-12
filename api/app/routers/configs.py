@@ -61,9 +61,7 @@ def _to_response(c: AgentConfig) -> AgentConfigResponse:
 
 
 @router.post("", response_model=AgentConfigResponse, status_code=201)
-def create_config(
-    body: CreateConfigInput, session: SessionDep
-) -> AgentConfigResponse:
+def create_config(body: CreateConfigInput, session: SessionDep) -> AgentConfigResponse:
     repo = ConfigRepository(session)
     service = ConfigService(repo)
     config = service.create_config(name=body.name, description=body.description)
