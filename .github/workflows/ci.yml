@@ -31,6 +31,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           working-directory: api
+          enable-cache: true
       - run: uv sync --frozen
         working-directory: api
       - run: uv run ruff check .
@@ -39,8 +40,15 @@ jobs:
         working-directory: api
       - run: uv run mypy app
         working-directory: api
-      - run: uv run pytest -m "not nightly"
+      - name: cache imagem postgres para testcontainers
+        run: docker pull postgres:17
+      - run: uv run pytest -m "not nightly" --cov=app --cov-report=xml
         working-directory: api
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: api/coverage.xml
 
   web:
     needs: changes
