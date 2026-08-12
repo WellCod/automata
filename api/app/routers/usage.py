@@ -1,11 +1,10 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
-from app.db import get_session
+from app.db import SessionDep
 from app.repositories.usage import UsageRepository, UsageRollup
 
 router = APIRouter(prefix="/api/v1/usage", tags=["usage"])
@@ -45,7 +44,7 @@ def get_rollup(
         pattern=r"^\d{6}$|^$",
     ),
     agent_id: UUID | None = Query(default=None),  # noqa: B008
-    session: Session = Depends(get_session),
+    session: SessionDep,
 ) -> list[RollupItem]:
     resolved_period = period or _current_period()
     repo = UsageRepository(session)

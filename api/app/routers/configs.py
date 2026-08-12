@@ -1,9 +1,8 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, Query
 
-from app.db import get_session
+from app.db import SessionDep
 from app.models.config import AgentConfig, AgentConfigVersion
 from app.repositories.config import ConfigRepository
 from app.schemas.config import (
@@ -63,7 +62,7 @@ def _to_response(c: AgentConfig) -> AgentConfigResponse:
 
 @router.post("", response_model=AgentConfigResponse, status_code=201)
 def create_config(
-    body: CreateConfigInput, session: Session = Depends(get_session)
+    body: CreateConfigInput, session: SessionDep
 ) -> AgentConfigResponse:
     repo = ConfigRepository(session)
     service = ConfigService(repo)
@@ -79,7 +78,7 @@ def list_configs(
     page_size: int = Query(default=20, ge=1, le=100),
     q: str | None = Query(default=None, description="Busca por nome (substring) ou ID exato"),
     status: ConfigPayloadStatus | None = Query(default=None),  # noqa: B008
-    session: Session = Depends(get_session),
+    session: SessionDep,
 ) -> AgentConfigPage:
     repo = ConfigRepository(session)
     service = ConfigService(repo)
@@ -93,7 +92,7 @@ def list_configs(
 
 
 @router.get("/{config_id}", response_model=AgentConfigDetail)
-def get_config(config_id: UUID, session: Session = Depends(get_session)) -> AgentConfigDetail:
+def get_config(config_id: UUID, session: SessionDep) -> AgentConfigDetail:
     repo = ConfigRepository(session)
     service = ConfigService(repo)
     try:
@@ -105,7 +104,7 @@ def get_config(config_id: UUID, session: Session = Depends(get_session)) -> Agen
 
 @router.get("/{config_id}/versions", response_model=list[AgentConfigVersionDetail])
 def list_versions(
-    config_id: UUID, session: Session = Depends(get_session)
+    config_id: UUID, session: SessionDep
 ) -> list[AgentConfigVersionDetail]:
     repo = ConfigRepository(session)
     service = ConfigService(repo)
@@ -129,7 +128,7 @@ def list_versions(
 
 @router.post("/{config_id}/publish", response_model=AgentConfigVersionSummary, status_code=201)
 def publish_draft(
-    config_id: UUID, session: Session = Depends(get_session)
+    config_id: UUID, session: SessionDep
 ) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
     service = ConfigService(repo)
@@ -144,7 +143,7 @@ def publish_draft(
 
 @router.post("/{config_id}/rollback", response_model=AgentConfigVersionSummary)
 def rollback(
-    config_id: UUID, body: RollbackInput, session: Session = Depends(get_session)
+    config_id: UUID, body: RollbackInput, session: SessionDep
 ) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
     service = ConfigService(repo)
@@ -161,7 +160,7 @@ def rollback(
 
 @router.put("/{config_id}/draft", response_model=AgentConfigVersionSummary, status_code=201)
 def save_draft(
-    config_id: UUID, body: DraftInput, session: Session = Depends(get_session)
+    config_id: UUID, body: DraftInput, session: SessionDep
 ) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
     service = ConfigService(repo)

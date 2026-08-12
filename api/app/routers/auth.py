@@ -4,10 +4,8 @@ from threading import Lock
 
 import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from sqlalchemy.orm import Session
-
 from app.auth import issue_token
-from app.db import get_session
+from app.db import SessionDep
 from app.repositories.user import UserRepository
 from app.schemas.user import (
     ROLE_SCOPES,
@@ -61,7 +59,7 @@ def _require_admin(authorization: str = Header(...)) -> None:
 
 @router.post("/login", response_model=TokenResponse)
 def login(
-    request: Request, body: LoginInput, session: Session = Depends(get_session)
+    request: Request, body: LoginInput, session: SessionDep
 ) -> TokenResponse:
     ip = get_client_ip(request)
     _check_rate_limit(ip)
@@ -79,7 +77,7 @@ def login(
 @router.post("/users", response_model=UserResponse, status_code=201)
 def create_user(
     body: CreateUserInput,
-    session: Session = Depends(get_session),
+    session: SessionDep,
     _: None = Depends(_require_admin),
 ) -> UserResponse:
     svc = UserService(UserRepository(session))
