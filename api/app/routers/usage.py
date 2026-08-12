@@ -38,13 +38,13 @@ def _to_item(r: UsageRollup) -> RollupItem:
 
 @router.get("/rollup", response_model=list[RollupItem])
 def get_rollup(
+    session: SessionDep,
     period: str = Query(
         default="",
         description="Período no formato YYYYMM. Vazio = mês corrente.",
         pattern=r"^\d{6}$|^$",
     ),
     agent_id: UUID | None = Query(default=None),  # noqa: B008
-    session: SessionDep,
 ) -> list[RollupItem]:
     resolved_period = period or _current_period()
     repo = UsageRepository(session)

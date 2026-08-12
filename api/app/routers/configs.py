@@ -74,11 +74,11 @@ def create_config(
 
 @router.get("", response_model=AgentConfigPage)
 def list_configs(
+    session: SessionDep,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     q: str | None = Query(default=None, description="Busca por nome (substring) ou ID exato"),
     status: ConfigPayloadStatus | None = Query(default=None),  # noqa: B008
-    session: SessionDep,
 ) -> AgentConfigPage:
     repo = ConfigRepository(session)
     service = ConfigService(repo)

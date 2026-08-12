@@ -4,6 +4,7 @@ from threading import Lock
 
 import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+
 from app.auth import issue_token
 from app.db import SessionDep
 from app.repositories.user import UserRepository
