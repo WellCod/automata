@@ -1,7 +1,27 @@
+from collections.abc import Generator
+from functools import lru_cache
+
 from agno.db.postgres import PostgresDb
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import Session
 
 from app.settings import get_settings
 
 
 def get_db() -> PostgresDb:
     return PostgresDb(db_url=get_settings().database_url)
+
+
+@lru_cache(maxsize=1)
+def get_engine() -> Engine:
+    return create_engine(
+        get_settings().database_url,
+        pool_size=5,
+        max_overflow=10,
+        pool_pre_ping=True,
+    )
+
+
+def get_session() -> Generator[Session, None, None]:
+    with Session(get_engine()) as session:
+        yield session

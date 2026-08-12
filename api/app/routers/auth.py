@@ -4,10 +4,10 @@ from threading import Lock
 
 import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.auth import issue_token
+from app.db import get_session
 from app.repositories.user import UserRepository
 from app.schemas.user import (
     ROLE_SCOPES,
@@ -60,37 +60,39 @@ def _require_admin(authorization: str = Header(...)) -> None:
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(request: Request, body: LoginInput) -> TokenResponse:
+def login(
+    request: Request, body: LoginInput, session: Session = Depends(get_session)
+) -> TokenResponse:
     ip = get_client_ip(request)
     _check_rate_limit(ip)
-    engine = create_engine(get_settings().database_url)
-    with Session(engine) as session:
-        svc = UserService(UserRepository(session))
-        try:
-            user = svc.authenticate(body.email, body.password)
-            user_id = str(user.id)
-            user_role = user.role
-            session.commit()
-        except ValueError as e:
-            raise HTTPException(status_code=401, detail="Credenciais inválidas") from e
+    svc = UserService(UserRepository(session))
+    try:
+        user = svc.authenticate(body.email, body.password)
+        user_id = str(user.id)
+        user_role = user.role
+        session.commit()
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail="Credenciais inválidas") from e
     return TokenResponse(access_token=issue_token(user_id, ROLE_SCOPES[user_role]))
 
 
 @router.post("/users", response_model=UserResponse, status_code=201)
-def create_user(body: CreateUserInput, _: None = Depends(_require_admin)) -> UserResponse:
-    engine = create_engine(get_settings().database_url)
-    with Session(engine) as session:
-        svc = UserService(UserRepository(session))
-        try:
-            user = svc.create_user(email=body.email, password=body.password, role=body.role)
-            result = UserResponse(
-                id=user.id,
-                email=user.email,
-                role=user.role,
-                is_active=user.is_active,
-                created_at=user.created_at,
-            )
-            session.commit()
-        except ValueError as e:
-            raise HTTPException(status_code=409, detail=str(e)) from e
+def create_user(
+    body: CreateUserInput,
+    session: Session = Depends(get_session),
+    _: None = Depends(_require_admin),
+) -> UserResponse:
+    svc = UserService(UserRepository(session))
+    try:
+        user = svc.create_user(email=body.email, password=body.password, role=body.role)
+        result = UserResponse(
+            id=user.id,
+            email=user.email,
+            role=user.role,
+            is_active=user.is_active,
+            created_at=user.created_at,
+        )
+        session.commit()
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return result
