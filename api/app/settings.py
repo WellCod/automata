@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     database_url: str
     jwt_private_key: str
     jwt_public_key: str
+    log_level: str = "INFO"
 
 
 @lru_cache
