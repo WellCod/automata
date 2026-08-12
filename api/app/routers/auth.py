@@ -27,6 +27,13 @@ _RATE_WINDOW = 60
 _RATE_LIMIT = 5
 
 
+def get_client_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 def _check_rate_limit(ip: str) -> None:
     now = time.time()
     with _lock:
@@ -54,7 +61,7 @@ def _require_admin(authorization: str = Header(...)) -> None:
 
 @router.post("/login", response_model=TokenResponse)
 def login(request: Request, body: LoginInput) -> TokenResponse:
-    ip = request.client.host if request.client else "unknown"
+    ip = get_client_ip(request)
     _check_rate_limit(ip)
     engine = create_engine(get_settings().database_url)
     with Session(engine) as session:

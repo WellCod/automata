@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.models.user import UserRole
 
@@ -19,8 +19,17 @@ class LoginInput(BaseModel):
 
 class CreateUserInput(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=12)
     role: UserRole = UserRole.viewer
+
+    @field_validator("password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        if not any(c.isupper() for c in v):
+            raise ValueError("a senha deve conter ao menos uma letra maiúscula")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("a senha deve conter ao menos um dígito")
+        return v
 
 
 class TokenResponse(BaseModel):
