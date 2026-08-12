@@ -1,23 +1,22 @@
 # Automata
 
+[![CI](https://github.com/WellCod/automata/actions/workflows/ci.yml/badge.svg)](https://github.com/WellCod/automata/actions/workflows/ci.yml)
+[![Publish](https://github.com/WellCod/automata/actions/workflows/publish.yml/badge.svg)](https://github.com/WellCod/automata/actions/workflows/publish.yml)
+
 Plataforma de gestão de agentes de IA em produção: catálogo, edição versionada, troca de modelo sem reescrita de prompt e rastreio de custo por agente.
-
-> **Demo pública disponível.** Veja [Demo](#demo) para acesso.
-
-> **Status: em construção.** O painel e a demo estão no ar. O que já existe está listado em [Situação atual](#situação-atual).
 
 ---
 
 ## Demo
 
-**URL:** _a preencher após deploy_
+**URL:** _configurar com a URL do deploy_
 
 | Campo | Valor |
 |---|---|
 | Email | `demo@automata.dev` |
-| Senha | ver secret `DEMO_OWNER_PASSWORD` no repositório |
+| Senha | secret `DEMO_OWNER_PASSWORD` |
 
-Os dados são resetados a cada 6 horas pelo workflow [demo-reset](.github/workflows/demo-reset.yml). Nenhuma informação real deve ser inserida — a demo não tem credencial de provedor de IA, respostas são pré-gravadas.
+Os dados são resetados a cada 6 horas pelo workflow [demo-reset](.github/workflows/demo-reset.yml). A demo não tem credencial de provedor de IA — as respostas são pré-gravadas.
 
 ---
 
@@ -25,9 +24,7 @@ Os dados são resetados a cada 6 horas pelo workflow [demo-reset](.github/workfl
 
 Colocar um agente de IA em produção é fácil. Operar quarenta é outro problema.
 
-O que aparece quando a quantidade cresce:
-
-**Prompt em produção não tem histórico.** Alguém ajusta uma instrução às 18h de sexta, a qualidade cai, e não existe caminho de volta. O prompt não está em código, está num campo de texto que foi sobrescrito.
+**Prompt em produção não tem histórico.** Alguém ajusta uma instrução às 18h de sexta, a qualidade cai, e não existe caminho de volta. O prompt não está em código — está num campo de texto que foi sobrescrito.
 
 **Trocar de modelo é reescrever prompt.** Instruções que dizem "responda em JSON sem markdown" ou que mencionam blocos de raciocínio estão acopladas a um provider específico. Trocar o modelo quebra o comportamento de forma silenciosa — a saída degrada, mas não dá erro.
 
@@ -41,7 +38,7 @@ Automata trata esses quatro problemas como requisito de produto, não como disci
 
 **Versionamento imutável.** Publicar cria uma versão nova e move um ponteiro. Versão publicada nunca sofre alteração. Rollback é mover o ponteiro de volta — operação de um clique, não de um deploy.
 
-**Modelo como campo.** O agente referencia um identificador de modelo, resolvido em tempo de execução. As instruções são validadas contra uma lista de termos acoplados a provider, e o build falha se alguma passar. A troca de modelo continua sendo um campo porque existe um teste garantindo isso.
+**Modelo como campo.** O agente referencia um identificador de modelo, resolvido em tempo de execução. As instruções são validadas contra uma lista de termos acoplados a provider antes de publicar. A troca de modelo continua sendo um campo porque existe um teste garantindo isso.
 
 **Capabilities validadas na escrita.** Se a configuração pede raciocínio estendido e o modelo escolhido não suporta, a validação recusa no momento de salvar — não em produção. O painel desabilita a opção e explica o motivo.
 
@@ -49,16 +46,7 @@ Automata trata esses quatro problemas como requisito de produto, não como disci
 
 **Estimativa antes de publicar.** Tokens estimados, custo por mensagem e projeção por volume, visíveis enquanto se edita.
 
-## Decisões de arquitetura
-
-A parte substantiva deste repositório está em [`docs/adr/`](docs/adr/). Cada registro tem contexto, alternativas descartadas com o motivo específico, consequências — incluindo o que ficou pior — e o gatilho concreto que faria reverter.
-
-Os mais relevantes para entender o desenho:
-
-- [ADR-0003 — Deploy single-tenant](docs/adr/0003-single-tenant.md): por que uma instância por cliente, e a assimetria que torna essa a migração difícil de desfazer
-- [ADR-0002 — Config em banco próprio](docs/adr/0002-config-em-banco-proprio.md): por que não usar o editor visual do framework como fonte da verdade
-- [ADR-0006 — Instructions agnósticas de provider](docs/adr/0006-instructions-agnosticas-de-provider.md): a regra que sustenta a promessa de trocar modelo
-- [ADR-0005 — Auth](docs/adr/0005-auth-jwt-proprio.md): por que a chave de assinatura nunca chega ao browser
+---
 
 ## Arquitetura
 
@@ -66,78 +54,134 @@ Três camadas, com fronteira clara de quem escreve o quê:
 
 ```
 ┌─────────────────────────────────────────────┐
-│  web/  — painel                             │
+│  web/  — painel Next.js                     │
 │  lista · edição versionada · modo teste     │
 └────────────────────┬────────────────────────┘
-                     │  BFF: Route Handlers do Next
-                     │  (chave de assinatura fica no servidor)
+                     │  BFF: Route Handlers server-side
+                     │  (JWT nunca chega ao browser)
 ┌────────────────────┴────────────────────────┐
 │  api/  — FastAPI sobre Agno AgentOS         │
 │  config versionada · factory · linter       │
-│  metering · migrations próprias             │
+│  metering · JWT RS256 · migrations próprias │
 └────────────────────┬────────────────────────┘
                      │
 ┌────────────────────┴────────────────────────┐
 │  Agno SDK + AgentOS                         │
-│  REST · JWT com scopes · traces · sessions  │
+│  REST · scopes por endpoint · traces        │
 └─────────────────────────────────────────────┘
 ```
 
-O agente não é um objeto estático em código. Ele é construído por request a partir da versão vigente da configuração, o que permite editar comportamento sem redeploy e rodar uma versão específica em modo teste.
+O agente não é um objeto estático em código. Ele é construído por request a partir da versão vigente da configuração — isso permite editar comportamento sem redeploy e rodar uma versão específica em modo teste.
 
 ## Stack
 
-| Camada | Escolha | Motivo |
+| Camada | Tecnologia | Decisão |
 |---|---|---|
-| Runtime de agente | Agno (AgentOS) | FastAPI pronto, JWT com scopes por endpoint, traces e sessions persistidos |
-| API | Python 3.12, `uv` | Lockfile e resolução rápida |
-| Banco | Postgres, Alembic | Migrations próprias, isoladas das tabelas do framework |
-| Painel | Next.js, TypeScript, Tailwind, shadcn/ui | Mesma stack do `agent-ui`, que é forkado para a superfície de chat |
-| Formulários | `react-hook-form` + `zod` | A tela de edição tem habilitação condicional; schema declarativo é requisito, não preferência |
-| Testes | `pytest`, Vitest, Playwright | Mais os evals do próprio Agno para confiabilidade de tool call |
+| Runtime de agente | Agno 2.8.7 (AgentOS) | FastAPI integrado, JWT com scopes, traces e sessions persistidos |
+| API | Python 3.12, `uv` | Resolução determinística com lockfile |
+| Banco | PostgreSQL 17, Alembic | Migrations próprias, isoladas das tabelas do framework |
+| Painel | Next.js 16, TypeScript strict, Tailwind, shadcn/ui | Tipos do client gerados via openapi-typescript — nunca escritos à mão |
+| Formulários | react-hook-form + zod | Habilitação condicional de campos requer schema declarativo |
+| Testes | pytest + asyncio, Vitest, Playwright | Evals do Agno para confiabilidade de tool call; testcontainers para integração |
 
-Monorepo sem ferramenta de monorepo: são duas aplicações isoladas em linguagens diferentes, e `uv` com `pnpm` bastam. Justificativa em [ADR-0001](docs/adr/0001-monorepo.md).
+Monorepo sem ferramenta de monorepo: `uv` e `pnpm` bastam para duas aplicações em linguagens diferentes. Justificativa em [ADR-0001](docs/adr/0001-monorepo.md).
 
-## Situação atual
+## Decisões de arquitetura
 
-- [x] Decisões de arquitetura registradas
-- [x] Fundação da API e schema de configuração versionada
-- [x] Factory de construção de agente por request
-- [x] Linter de prompt
-- [x] Auth JWT com papéis e scopes
-- [x] Metering de consumo por período
-- [x] CI com evals de confiabilidade
-- [x] Painel: login e sessão
-- [x] Painel: lista e edição de agentes
-- [x] Painel: seletor de modelo, linter, estimativa de custo
-- [x] Painel: versões, diff e rollback
-- [x] Painel: modo teste com chat integrado
-- [x] Imagem Docker versionada e publicação no GHCR
-- [x] Demo pública (replay de inferência, reset periódico)
+A parte substantiva do projeto está em [`docs/adr/`](docs/adr/). Cada registro tem contexto, alternativas descartadas com o motivo específico, consequências — incluindo o que ficou pior — e o gatilho concreto que faria reverter.
+
+Os mais relevantes para entender o desenho:
+
+- [ADR-0002 — Config em banco próprio](docs/adr/0002-config-em-banco-proprio.md): por que não usar o editor visual do framework como fonte da verdade
+- [ADR-0003 — Deploy single-tenant](docs/adr/0003-single-tenant.md): por que uma instância por cliente, e a assimetria que torna difícil desfazer
+- [ADR-0005 — Auth JWT](docs/adr/0005-auth-jwt-proprio.md): por que a chave de assinatura nunca chega ao browser
+- [ADR-0006 — Instructions agnósticas de provider](docs/adr/0006-instructions-agnosticas-de-provider.md): a regra que sustenta a promessa de trocar modelo
+
+---
 
 ## Rodando local
+
+**Pré-requisitos:** Docker Desktop, Node.js 22+, pnpm 11+, Python 3.12+, uv
 
 ```bash
 git clone https://github.com/WellCod/automata.git
 cd automata
-cp .env.example .env    # preencha as chaves
-docker compose up
+cp .env.example .env   # preencha DATABASE_URL, JWT_PRIVATE_KEY, JWT_PUBLIC_KEY
 ```
 
-Pré-requisitos: Docker, `uv` e `pnpm`.
+**Terminal 1 — banco de dados e API:**
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+A API sobe em `http://localhost:8000`. As migrations rodam automaticamente no boot.
+
+**Terminal 2 — painel:**
+```bash
+pnpm --filter web dev
+```
+
+O painel sobe em `http://localhost:3000`.
+
+**Seed inicial** (com os containers no ar):
+```bash
+docker exec \
+  -e SEED_OWNER_EMAIL="admin@exemplo.com" \
+  -e SEED_OWNER_PASSWORD="senha" \
+  automata-api-1 python scripts/seed.py minimal
+```
+
+## Testes
+
+```bash
+# API — suite completa sem LLM real
+cd api && uv run pytest -m "not nightly"
+
+# API — evals com LLM (requer ANTHROPIC_API_KEY)
+cd api && uv run pytest -m nightly
+
+# Web — unitários e de componente
+pnpm --filter web test
+
+# Web — E2E
+pnpm --filter web test:e2e
+```
 
 ## Estrutura
 
 ```
-api/        API em Python sobre o Agno
-web/        painel em Next.js
-docs/adr/   decisões de arquitetura
-docs/prompts/  scaffolding usado para gerar os projetos
+api/            API Python (FastAPI + Agno AgentOS)
+  app/          código da aplicação
+  alembic/      migrations do banco próprio
+  scripts/      seed, gen_openapi, demo_reset
+  tests/        pytest: smoke + evals nightly
+web/            painel Next.js (App Router)
+  src/app/      rotas e Route Handlers (BFF)
+  src/components/
+  src/lib/      client gerado, hooks, utils
+docs/adr/       Architecture Decision Records
 ```
+
+## Situação atual
+
+- [x] Decisões de arquitetura registradas (9 ADRs)
+- [x] Schema de configuração versionada e migrations
+- [x] Factory de agente construído por request
+- [x] Linter de prompt e estimativa de custo
+- [x] Auth JWT RS256 com papéis e scopes (owner / editor / viewer)
+- [x] Metering de consumo por período
+- [x] CI com evals de confiabilidade (smoke + nightly)
+- [x] Painel: login, sessão e proteção de rotas
+- [x] Painel: lista e edição de agentes
+- [x] Painel: seletor de modelo com capabilities condicionais
+- [x] Painel: versões, diff visual e rollback
+- [x] Painel: modo teste com chat integrado
+- [x] Imagem Docker versionada publicada no GHCR
+- [x] Demo pública com replay de inferência e reset periódico
 
 ## Licença
 
-Ver [`LICENSE`](LICENSE). A intenção de licenciamento e o raciocínio por trás dela estão em [ADR-0007](docs/adr/0007-licenciamento.md), com status de proposta.
+Ver [`LICENSE`](LICENSE). O raciocínio de licenciamento está em [ADR-0007](docs/adr/0007-licenciamento.md).
 
 ---
 

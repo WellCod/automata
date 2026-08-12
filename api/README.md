@@ -15,10 +15,20 @@ A licença do Agno na versão 2.8.7 é **Apache 2.0**, confirmada em `github.com
 
 ## Rodando local
 
+Para desenvolvimento, a API roda em Docker junto com o banco. A partir da raiz do repositório:
+
 ```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+A API sobe em `http://localhost:8000` com hot-reload ativo. As migrations rodam automaticamente no boot via `alembic upgrade head`.
+
+Para rodar isolado (sem Docker), com banco já acessível via `DATABASE_URL`:
+
+```bash
+cd api
 uv sync
-uv run pytest -m "not nightly"   # suite completa sem LLM real
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ## Evals de confiabilidade
