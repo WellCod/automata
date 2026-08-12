@@ -15,13 +15,12 @@ def get_db() -> PostgresDb:
 
 
 @lru_cache(maxsize=1)
+def _build_engine(db_url: str) -> Engine:
+    return create_engine(db_url, pool_size=5, max_overflow=10, pool_pre_ping=True)
+
+
 def get_engine() -> Engine:
-    return create_engine(
-        get_settings().database_url,
-        pool_size=5,
-        max_overflow=10,
-        pool_pre_ping=True,
-    )
+    return _build_engine(get_settings().database_url)
 
 
 def get_session() -> Generator[Session, None, None]:
