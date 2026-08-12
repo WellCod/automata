@@ -5,9 +5,17 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY web/package.json ./web/
 RUN pnpm install --frozen-lockfile --filter web
 
+FROM node:22-alpine AS dev
+WORKDIR /app
+RUN corepack enable
+COPY --from=deps /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/web/node_modules ./web/node_modules
+
 FROM node:22-alpine AS builder
 WORKDIR /app
 RUN corepack enable
+COPY --from=deps /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/web/node_modules ./web/node_modules
 COPY web/ ./web/
