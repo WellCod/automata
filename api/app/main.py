@@ -46,7 +46,11 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
             request_id_var.reset(token)
         logger.info(
             "request",
-            extra={"method": request.method, "path": request.url.path, "status": response.status_code},
+            extra={
+                "method": request.method,
+                "path": request.url.path,
+                "status": response.status_code,
+            },
         )
         return response
 
