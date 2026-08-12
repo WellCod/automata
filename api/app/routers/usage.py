@@ -3,11 +3,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
 
+from app.db import SessionDep
 from app.repositories.usage import UsageRepository, UsageRollup
-from app.settings import get_settings
 
 router = APIRouter(prefix="/api/v1/usage", tags=["usage"])
 
@@ -40,6 +38,7 @@ def _to_item(r: UsageRollup) -> RollupItem:
 
 @router.get("/rollup", response_model=list[RollupItem])
 def get_rollup(
+    session: SessionDep,
     period: str = Query(
         default="",
         description="Período no formato YYYYMM. Vazio = mês corrente.",
@@ -48,8 +47,6 @@ def get_rollup(
     agent_id: UUID | None = Query(default=None),  # noqa: B008
 ) -> list[RollupItem]:
     resolved_period = period or _current_period()
-    engine = create_engine(get_settings().database_url)
-    with Session(engine) as session:
-        repo = UsageRepository(session)
-        rows = repo.rollup(period=resolved_period, agent_config_id=agent_id)
+    repo = UsageRepository(session)
+    rows = repo.rollup(period=resolved_period, agent_config_id=agent_id)
     return [_to_item(r) for r in rows]

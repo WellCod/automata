@@ -7,14 +7,13 @@ from agno.agent.factory import AgentFactory
 from agno.db.base import AsyncBaseDb, BaseDb
 from agno.factory.utils import RequestContext
 from pydantic import BaseModel
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.agents.models_map import resolve_model
+from app.db import get_engine
 from app.repositories.config import ConfigRepository
 from app.repositories.usage import UsageRepository
 from app.schemas.config import ConfigPayload
-from app.settings import get_settings
 
 
 class FactoryInput(BaseModel):
@@ -26,8 +25,7 @@ def _make_usage_hook(config_id: UUID, model_id: str) -> Any:
         metrics = getattr(run_output, "metrics", None)
         if metrics is None:
             return
-        engine = create_engine(get_settings().database_url)
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             repo = UsageRepository(session)
             repo.record_event(
                 agent_config_id=config_id,
@@ -57,8 +55,7 @@ def make_agent_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> AgentFactor
         if isinstance(ctx.input, FactoryInput):
             version_id = ctx.input.version_id
 
-        engine = create_engine(get_settings().database_url)
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             repo = ConfigRepository(session)
             config = repo.get_config(config_id)
             if config is None:
