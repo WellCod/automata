@@ -1,6 +1,9 @@
 dev:
     docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 
+dev-web:
+    pnpm --filter web dev
+
 test:
     cd api && uv run pytest
 

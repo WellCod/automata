@@ -133,3 +133,11 @@ Thumbs.db
 
 # Docker
 *.override.yml
+
+# pnpm artefatos locais
+.pnpm-store/
+web/pnpm-lock.yaml
+web/pnpm-workspace.yaml
+
+# Next.js auto-gerado
+web/AGENTS.md
