@@ -15,6 +15,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.logging_config import configure_logging, request_id_var
 from app.routers.auth import router as auth_router
 from app.routers.configs import router as configs_router
+from app.routers.health import router as health_router
 from app.routers.linter import router as linter_router
 from app.routers.models import router as models_router
 from app.routers.usage import router as usage_router
@@ -107,6 +108,7 @@ def create_app(
     outer.add_middleware(SecurityHeadersMiddleware)
     outer.add_middleware(RequestIDMiddleware)
     outer.include_router(auth_router)
+    outer.include_router(health_router)
     outer.mount("/", protected)
     return outer
 
