@@ -103,9 +103,7 @@ def get_config(config_id: UUID, session: SessionDep) -> AgentConfigDetail:
 
 
 @router.get("/{config_id}/versions", response_model=list[AgentConfigVersionDetail])
-def list_versions(
-    config_id: UUID, session: SessionDep
-) -> list[AgentConfigVersionDetail]:
+def list_versions(config_id: UUID, session: SessionDep) -> list[AgentConfigVersionDetail]:
     repo = ConfigRepository(session)
     service = ConfigService(repo)
     try:
@@ -127,9 +125,7 @@ def list_versions(
 
 
 @router.post("/{config_id}/publish", response_model=AgentConfigVersionSummary, status_code=201)
-def publish_draft(
-    config_id: UUID, session: SessionDep
-) -> AgentConfigVersionSummary:
+def publish_draft(config_id: UUID, session: SessionDep) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
     service = ConfigService(repo)
     try:
@@ -159,9 +155,7 @@ def rollback(
 
 
 @router.put("/{config_id}/draft", response_model=AgentConfigVersionSummary, status_code=201)
-def save_draft(
-    config_id: UUID, body: DraftInput, session: SessionDep
-) -> AgentConfigVersionSummary:
+def save_draft(config_id: UUID, body: DraftInput, session: SessionDep) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
     service = ConfigService(repo)
     try:
