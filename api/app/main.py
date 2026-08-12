@@ -5,7 +5,9 @@ from agno.agent.remote import RemoteAgent
 from agno.db.postgres import PostgresDb
 from agno.os import AgentOS
 from agno.os.config import AuthorizationConfig
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import Response
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.routers.auth import router as auth_router
 from app.routers.configs import router as configs_router
@@ -13,6 +15,18 @@ from app.routers.linter import router as linter_router
 from app.routers.models import router as models_router
 from app.routers.usage import router as usage_router
 from app.settings import get_settings
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: object) -> Response:
+        response: Response = await call_next(request)  # type: ignore[operator]
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
 
 
 def create_app(
@@ -63,6 +77,7 @@ def create_app(
     # (não tem como exigir JWT para obter JWT). O /users tem proteção própria
     # via _require_admin que verifica JWT + scope agent_os:admin.
     outer: FastAPI = FastAPI(title="automata")
+    outer.add_middleware(SecurityHeadersMiddleware)
     outer.include_router(auth_router)
     outer.mount("/", protected)
     return outer
