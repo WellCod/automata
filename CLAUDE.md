@@ -94,24 +94,24 @@ Regras críticas:
 
 Derivada de auditoria técnica em 2026-08-12. Detalhes em `docs/roadmap.md`.
 
-- [ ] PR 41 — `fix(security): remove jwt_private_key do container web`
-- [ ] PR 42 — `fix(security): validação jwt no proxy bff e cookie secure`
-- [ ] PR 43 — `fix(security): headers de segurança http`
-- [ ] PR 44 — `fix(security): política de senha, csrf e ip forwarding`
+- [x] PR 41 — `fix(security): remove jwt_private_key do container web`
+- [x] PR 42 — `fix(security): validação jwt no proxy bff e cookie secure`
+- [x] PR 43 — `fix(security): headers de segurança http`
+- [x] PR 44 — `fix(security): política de senha, csrf e ip forwarding`
 
 ## Fase 5 — Estabilidade e Performance
 
-- [ ] PR 45 — `fix(api): pool de conexões sqlalchemy compartilhado`
-- [ ] PR 46 — `chore(infra): restart policies, resource limits e health check`
-- [ ] PR 47 — `feat(api): índices de banco e cache http em capabilities`
+- [x] PR 45 — `fix(api): pool de conexões sqlalchemy compartilhado`
+- [x] PR 46 — `chore(infra): restart policies, resource limits e health check`
+- [x] PR 47 — `feat(api): índices de banco e cache http em capabilities`
 
 ## Fase 6 — Observabilidade
 
-- [ ] PR 48 — `feat(api): logging estruturado com request-id`
-- [ ] PR 49 — `feat(api): health check com validação de banco`
+- [x] PR 48 — `feat(api): logging estruturado com request-id`
+- [x] PR 49 — `feat(api): health check com validação de banco`
 
 ## Fase 7 — Qualidade e CI/CD
 
-- [ ] PR 50 — `chore(ci): testes de integração, coverage e cache de layers docker`
-- [ ] PR 51 — `feat(infra): redis e rate limiting distribuído`
-- [ ] PR 52 — `chore(dev): script de bootstrap e env de desenvolvimento`
+- [x] PR 50 — `chore(ci): testes de integração, coverage e cache de layers docker`
+- [x] PR 51 — `feat(infra): redis e rate limiting distribuído`
+- [x] PR 52 — `chore(dev): script de bootstrap e env de desenvolvimento`

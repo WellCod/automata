@@ -1,3 +1,5 @@
+import logging
+
 import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
@@ -15,6 +17,7 @@ from app.services.user import UserService
 from app.settings import get_settings
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 def get_client_ip(request: Request) -> str:
@@ -40,6 +43,7 @@ def _require_admin(authorization: str = Header(...)) -> None:
 @router.post("/login", response_model=TokenResponse)
 def login(request: Request, body: LoginInput, session: SessionDep) -> TokenResponse:
     ip = get_client_ip(request)
+    logger.info("login attempt", extra={"ip": ip, "email": body.email})
     request.app.state.rate_limiter.check(f"login:{ip}")
     svc = UserService(UserRepository(session))
     try:
@@ -48,7 +52,9 @@ def login(request: Request, body: LoginInput, session: SessionDep) -> TokenRespo
         user_role = user.role
         session.commit()
     except ValueError as e:
+        logger.warning("login failed", extra={"ip": ip, "email": body.email})
         raise HTTPException(status_code=401, detail="Credenciais inválidas") from e
+    logger.info("login ok", extra={"ip": ip, "user_id": user_id, "role": user_role})
     return TokenResponse(access_token=issue_token(user_id, ROLE_SCOPES[user_role]))
 
 

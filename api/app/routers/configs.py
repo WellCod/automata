@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
@@ -20,6 +21,7 @@ from app.schemas.config import (
 from app.services.config import ConfigService
 
 router = APIRouter(prefix="/api/v1/configs", tags=["configs"])
+logger = logging.getLogger(__name__)
 
 
 def _to_version_summary(v: AgentConfigVersion | None) -> AgentConfigVersionSummary | None:
@@ -132,6 +134,10 @@ def publish_draft(config_id: UUID, session: SessionDep) -> AgentConfigVersionSum
         raise HTTPException(status_code=400, detail=str(e)) from e
     result = _to_version_summary(version)
     session.commit()
+    logger.info(
+        "config published",
+        extra={"config_id": str(config_id), "version": version.version_number},
+    )
     return result  # type: ignore[return-value]
 
 
@@ -149,6 +155,10 @@ def rollback(
         raise HTTPException(status_code=500, detail="Estado inválido após rollback")
     result = _to_version_summary(config.current_version)
     session.commit()
+    logger.info(
+        "config rolled back",
+        extra={"config_id": str(config_id), "version_id": str(body.version_id)},
+    )
     return result  # type: ignore[return-value]
 
 

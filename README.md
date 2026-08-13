@@ -101,12 +101,12 @@ Os mais relevantes para entender o desenho:
 
 ## Rodando local
 
-**Pré-requisitos:** Docker Desktop, Node.js 22+, pnpm 11+, Python 3.12+, uv
+**Pré-requisitos:** Docker Desktop, Node.js 22+, pnpm 11+, Python 3.12+, uv, openssl
 
 ```bash
 git clone https://github.com/WellCod/automata.git
 cd automata
-cp .env.example .env   # preencha DATABASE_URL, JWT_PRIVATE_KEY, JWT_PUBLIC_KEY
+bash scripts/bootstrap.sh   # gera chaves RSA, cria .env, instala deps e sobe o banco
 ```
 
 **Terminal 1 — banco de dados e API:**
