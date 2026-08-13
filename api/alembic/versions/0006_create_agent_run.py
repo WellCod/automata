@@ -29,7 +29,9 @@ def upgrade() -> None:
         sa.Column("status", sa.String(20), nullable=False),
         sa.Column("duration_ms", sa.Integer, nullable=True),
         sa.Column("error", sa.Text, nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(["agent_config_id"], ["agent_config.id"], ondelete="CASCADE"),
     )
