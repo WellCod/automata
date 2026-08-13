@@ -1,8 +1,8 @@
 name: Demo reset
 
 on:
-  schedule:
-    - cron: '0 */6 * * *'  # a cada 6 horas
+  # schedule desabilitado temporariamente — secrets DEMO_HOST/USER/SSH_KEY não configurados
+  # - cron: '0 */6 * * *'  # a cada 6 horas
   workflow_dispatch:
 
 jobs:
