@@ -33,7 +33,7 @@ function formatDate(iso: string): string {
 
 function RunItem({ run }: { run: AgentRunResponse }) {
   const icon = STATUS_ICON[run.status] ?? (
-    <Activity className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+    <Activity className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
   );
   return (
     <li className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2">
@@ -71,13 +71,10 @@ export function RunsPanel({ agentId }: Props) {
   });
 
   if (isPending) return <p className="text-muted-foreground text-[13px]">Carregando…</p>;
-  if (isError)
-    return <p className="text-[13px] text-red-400">Falha ao carregar execuções.</p>;
+  if (isError) return <p className="text-[13px] text-red-400">Falha ao carregar execuções.</p>;
 
   if (data.items.length === 0)
-    return (
-      <p className="text-muted-foreground text-[13px]">Nenhuma execução registrada.</p>
-    );
+    return <p className="text-muted-foreground text-[13px]">Nenhuma execução registrada.</p>;
 
   return (
     <div className="flex flex-col gap-3">
