@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     jwt_private_key: str
     jwt_public_key: str
     log_level: str = "INFO"
+    redis_url: str | None = None
 
 
 @lru_cache

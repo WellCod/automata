@@ -13,6 +13,7 @@ from fastapi.responses import Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.logging_config import configure_logging, request_id_var
+from app.rate_limit import make_rate_limiter
 from app.routers.auth import router as auth_router
 from app.routers.configs import router as configs_router
 from app.routers.health import router as health_router
@@ -105,6 +106,7 @@ def create_app(
     # (não tem como exigir JWT para obter JWT). O /users tem proteção própria
     # via _require_admin que verifica JWT + scope agent_os:admin.
     outer: FastAPI = FastAPI(title="automata")
+    outer.state.rate_limiter = make_rate_limiter(settings.redis_url, limit=5, window=60)
     outer.add_middleware(SecurityHeadersMiddleware)
     outer.add_middleware(RequestIDMiddleware)
     outer.include_router(auth_router)
