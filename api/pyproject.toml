@@ -13,6 +13,7 @@ dependencies = [
     "fastmcp>=3.4.6",
     "argon2-cffi>=25.1.0",
     "email-validator>=2.3.0",
+    "redis>=8.1.0",
 ]
 
 [dependency-groups]

@@ -1,7 +1,3 @@
-import time
-from collections import defaultdict
-from threading import Lock
-
 import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
@@ -20,29 +16,12 @@ from app.settings import get_settings
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
-_login_attempts: dict[str, list[float]] = defaultdict(list)
-_lock = Lock()
-_RATE_WINDOW = 60
-_RATE_LIMIT = 5
-
 
 def get_client_ip(request: Request) -> str:
     forwarded_for = request.headers.get("X-Forwarded-For")
     if forwarded_for:
         return forwarded_for.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
-
-
-def _check_rate_limit(ip: str) -> None:
-    now = time.time()
-    with _lock:
-        attempts = _login_attempts[ip]
-        _login_attempts[ip] = [t for t in attempts if now - t < _RATE_WINDOW]
-        if len(_login_attempts[ip]) >= _RATE_LIMIT:
-            raise HTTPException(
-                status_code=429, detail="Muitas tentativas. Tente novamente em breve."
-            )
-        _login_attempts[ip].append(now)
 
 
 def _require_admin(authorization: str = Header(...)) -> None:
@@ -61,7 +40,7 @@ def _require_admin(authorization: str = Header(...)) -> None:
 @router.post("/login", response_model=TokenResponse)
 def login(request: Request, body: LoginInput, session: SessionDep) -> TokenResponse:
     ip = get_client_ip(request)
-    _check_rate_limit(ip)
+    request.app.state.rate_limiter.check(f"login:{ip}")
     svc = UserService(UserRepository(session))
     try:
         user = svc.authenticate(body.email, body.password)
