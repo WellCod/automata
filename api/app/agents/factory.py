@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from time import monotonic
 from typing import Any
 from uuid import UUID
 
@@ -12,12 +13,34 @@ from sqlalchemy.orm import Session
 from app.agents.models_map import resolve_model
 from app.db import get_engine
 from app.repositories.config import ConfigRepository
+from app.repositories.run import RunRepository
 from app.repositories.usage import UsageRepository
 from app.schemas.config import ConfigPayload
 
 
 class FactoryInput(BaseModel):
     version_id: UUID | None = None
+
+
+def _make_run_hook(config_id: UUID) -> Any:
+    def record_run(run_output: Any, user_id: str | None = None) -> None:
+        start: float = getattr(run_output, "_run_start", monotonic())
+        duration_ms: int | None = None
+        elapsed = getattr(run_output, "response_timer", None)
+        if elapsed is not None:
+            duration_ms = int(elapsed * 1000)
+        with Session(get_engine()) as session:
+            repo = RunRepository(session)
+            repo.record(
+                agent_config_id=config_id,
+                user_id=user_id or "anonymous",
+                run_id=getattr(run_output, "run_id", None),
+                status="success",
+                duration_ms=duration_ms,
+            )
+        _ = start  # capturado para possível uso futuro
+
+    return record_run
 
 
 def _make_usage_hook(config_id: UUID, model_id: str) -> Any:
@@ -85,7 +108,10 @@ def make_agent_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> AgentFactor
                 id=str(config_id),
                 model=model,
                 instructions=instructions,
-                post_hooks=[_make_usage_hook(config_id, payload.model_id)],
+                post_hooks=[
+                    _make_run_hook(config_id),
+                    _make_usage_hook(config_id, payload.model_id),
+                ],
             )
 
     return AgentFactory(

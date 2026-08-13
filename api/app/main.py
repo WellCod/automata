@@ -21,6 +21,7 @@ from app.routers.configs import router as configs_router
 from app.routers.health import router as health_router
 from app.routers.linter import router as linter_router
 from app.routers.models import router as models_router
+from app.routers.runs import router as runs_router
 from app.routers.usage import router as usage_router
 from app.settings import get_settings
 
@@ -95,6 +96,7 @@ def create_app(
     base.include_router(configs_router)
     base.include_router(models_router)
     base.include_router(linter_router)
+    base.include_router(runs_router)
     base.include_router(usage_router)
 
     auth_config: AuthorizationConfig | None = None
