@@ -136,6 +136,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/configs/{config_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Runs */
+        get: operations["list_runs_api_v1_configs__config_id__runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/usage/rollup": {
         parameters: {
             query?: never;
@@ -252,6 +269,34 @@ export interface components {
             status: components["schemas"]["ConfigPayloadStatus"];
             /** Author */
             author: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** AgentRunResponse */
+        AgentRunResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Agent Config Id
+             * Format: uuid
+             */
+            agent_config_id: string;
+            /** User Id */
+            user_id: string;
+            /** Run Id */
+            run_id: string | null;
+            /** Status */
+            status: string;
+            /** Duration Ms */
+            duration_ms: number | null;
+            /** Error */
+            error: string | null;
             /**
              * Created At
              * Format: date-time
@@ -391,6 +436,17 @@ export interface components {
             total_tokens: number;
             /** Cost */
             cost: number | null;
+        };
+        /** RunsPage */
+        RunsPage: {
+            /** Items */
+            items: components["schemas"]["AgentRunResponse"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -689,6 +745,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LintWarning"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_runs_api_v1_configs__config_id__runs_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                config_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunsPage"];
                 };
             };
             /** @description Validation Error */

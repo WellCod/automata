@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, BarChart2, FlaskConical, History } from "lucide-react";
+import { Activity, AlertTriangle, ArrowLeft, BarChart2, FlaskConical, History } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -11,6 +11,7 @@ import { z } from "zod";
 import { CostPanel } from "@/components/cost-panel";
 import { LintPanel } from "@/components/lint-panel";
 import { ModelSelector } from "@/components/model-selector";
+import { RunsPanel } from "@/components/runs-panel";
 import { TestPanel } from "@/components/test-panel";
 import { VersionsPanel } from "@/components/versions-panel";
 import client from "@/lib/api/client";
@@ -54,6 +55,7 @@ const EMPTY_CAPS = { extended_thinking: false, structured_output: false, vision:
 const PANEL_TABS = [
   { id: "teste" as const, label: "Teste", icon: FlaskConical },
   { id: "versoes" as const, label: "Versões", icon: History },
+  { id: "runs" as const, label: "Execuções", icon: Activity },
   { id: "custo" as const, label: "Custo", icon: BarChart2 },
   { id: "linter" as const, label: "Linter", icon: AlertTriangle },
 ];
@@ -313,6 +315,7 @@ export default function AgentEditPage() {
               <TestPanel agentId={id} draftVersionId={data?.draft_version?.id} defaultOpen />
             )}
             {activePanel === "versoes" && <VersionsPanel agentId={id} />}
+            {activePanel === "runs" && <RunsPanel agentId={id} />}
             {activePanel === "custo" && <CostPanel agentId={id} />}
             {activePanel === "linter" && <LintPanel getPayload={getPayload} />}
           </div>
