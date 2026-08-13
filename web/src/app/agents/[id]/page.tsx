@@ -2,7 +2,15 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, AlertTriangle, ArrowLeft, BarChart2, FlaskConical, History } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  ArrowLeft,
+  BarChart2,
+  FlaskConical,
+  History,
+  TrendingUp,
+} from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -10,6 +18,7 @@ import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { CostPanel } from "@/components/cost-panel";
 import { LintPanel } from "@/components/lint-panel";
+import { MetricsPanel } from "@/components/metrics-panel";
 import { ModelSelector } from "@/components/model-selector";
 import { RunsPanel } from "@/components/runs-panel";
 import { TestPanel } from "@/components/test-panel";
@@ -56,6 +65,7 @@ const PANEL_TABS = [
   { id: "teste" as const, label: "Teste", icon: FlaskConical },
   { id: "versoes" as const, label: "Versões", icon: History },
   { id: "runs" as const, label: "Execuções", icon: Activity },
+  { id: "metricas" as const, label: "Métricas", icon: TrendingUp },
   { id: "custo" as const, label: "Custo", icon: BarChart2 },
   { id: "linter" as const, label: "Linter", icon: AlertTriangle },
 ];
@@ -316,6 +326,7 @@ export default function AgentEditPage() {
             )}
             {activePanel === "versoes" && <VersionsPanel agentId={id} />}
             {activePanel === "runs" && <RunsPanel agentId={id} />}
+            {activePanel === "metricas" && <MetricsPanel agentId={id} />}
             {activePanel === "custo" && <CostPanel agentId={id} />}
             {activePanel === "linter" && <LintPanel getPayload={getPayload} />}
           </div>
