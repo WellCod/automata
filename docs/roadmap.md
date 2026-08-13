@@ -571,3 +571,73 @@ if __name__ == "__main__":
 | 5 — Estabilidade | 45–47 | Pool DB, restart, índices, cache | PR 45 antes de 46 |
 | 6 — Observabilidade | 48–49 | Logging, health check | PR 45 (pool) |
 | 7 — Qualidade | 50–52 | CI, Redis, bootstrap | PR 46 (Redis infra) |
+| 8 — Agentes Vivos | 54–58 | Factories dinâmicas, runs, métricas, MCP | — |
+
+---
+
+## Fase 8 — Agentes Vivos (PRs 54–58)
+
+Fecha o gap estrutural — `main.py` tinha `factories = []`, nenhum agente era carregado do banco. Adiciona visibilidade de execução e resolve pendências do ADR-0009.
+
+---
+
+### PR 54 — `feat(api): carregamento dinâmico de factories a partir de configs publicados`
+
+**Problema:** `create_app()` inicializava `factories = []` — configs publicados existem no banco mas nenhum agente estava registrado no AgentOS.
+
+**Arquivos:**
+- `api/app/main.py` — função `_load_published_factories(db)` que consulta configs com `current_version_id IS NOT NULL` e cria um `AgentFactory` por config; erro no carregamento loga warning e continua com lista vazia
+
+**Critério de aceite:** Após publicar um config, o endpoint `/agents/{id}` responde sem redeploy manual das factories.
+
+---
+
+### PR 55 — `feat(api): router de runs — histórico e status por agente`
+
+**Problema:** Não há registro de execuções — impossível saber se um agente está falhando, lento ou sequer sendo invocado.
+
+**Arquivos:**
+- `api/alembic/versions/0006_create_agent_run.py` — nova tabela `agent_run(id, agent_config_id, user_id, run_id, status, duration_ms, error, created_at)`
+- `api/app/models/run.py` — model SQLAlchemy
+- `api/app/repositories/run.py` — `RunRepository` com `record` e `list_by_config`
+- `api/app/agents/factory.py` — adicionar `post_hook` que persiste o run com status e duração
+- `api/app/routers/runs.py` — `GET /api/v1/configs/{id}/runs`
+
+**Critério de aceite:** Após invocar um agente, `GET /api/v1/configs/{id}/runs` retorna o run com status e duração.
+
+---
+
+### PR 56 — `feat(web): painel de runs em tempo real com SSE`
+
+**Problema:** Não há UI para inspecionar execuções — operador não sabe o estado do agente sem acessar logs do container.
+
+**Arquivos:**
+- `web/src/components/runs-panel.tsx` — tabela de runs com status, duração e erro
+- `web/src/app/api/configs/[id]/runs/route.ts` — BFF proxy para `GET /api/v1/configs/{id}/runs`
+- `web/src/app/(dashboard)/configs/[id]/page.tsx` — aba "Runs" no painel do config
+
+**Critério de aceite:** Painel atualiza a lista de runs a cada 5s via polling (SSE pode ser fase seguinte).
+
+---
+
+### PR 57 — `feat(api): métricas por agente — p50/p95 de latência e taxa de erro`
+
+**Problema:** Sem percentis de latência, impossível detectar degradação de performance por versão de config.
+
+**Arquivos:**
+- `api/app/routers/runs.py` — endpoint `GET /api/v1/configs/{id}/metrics?period=30d` com `percentile_cont` via PostgreSQL
+- `web/src/components/metrics-panel.tsx` — cards p50/p95/taxa de erro
+
+**Critério de aceite:** `GET /api/v1/configs/{id}/metrics` retorna `{p50_ms, p95_ms, error_rate, total_runs}`.
+
+---
+
+### PR 58 — `fix(api): reconexão de MCPTools e validação de escopo em /mcp`
+
+**Problema:** ADR-0009 tem dois itens abertos: (1) reconexão automática de MCPTools quando conexão cai; (2) `/mcp` não valida JWT/scopes da mesma forma que as rotas do AgentOS.
+
+**Arquivos:**
+- `api/app/main.py` — habilitar `enable_mcp_server=True` com configuração de auth
+- Verificar e documentar comportamento de reconexão do Agno
+
+**Critério de aceite:** `curl /mcp` sem token retorna 401. Conexão MCP reconecta após queda de rede (teste manual).

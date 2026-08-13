@@ -115,3 +115,13 @@ Derivada de auditoria técnica em 2026-08-12. Detalhes em `docs/roadmap.md`.
 - [x] PR 50 — `chore(ci): testes de integração, coverage e cache de layers docker`
 - [x] PR 51 — `feat(infra): redis e rate limiting distribuído`
 - [x] PR 52 — `chore(dev): script de bootstrap e env de desenvolvimento`
+
+## Fase 8 — Agentes Vivos
+
+Fecha o gap de factories vazias e adiciona visibilidade de execução. Detalhes em `docs/roadmap.md`.
+
+- [ ] PR 54 — `feat(api): carregamento dinâmico de factories a partir de configs publicados`
+- [ ] PR 55 — `feat(api): router de runs — histórico e status por agente`
+- [ ] PR 56 — `feat(web): painel de runs em tempo real com SSE`
+- [ ] PR 57 — `feat(api): métricas por agente — p50/p95 de latência e taxa de erro`
+- [ ] PR 58 — `fix(api): reconexão de MCPTools e validação de escopo em /mcp`
