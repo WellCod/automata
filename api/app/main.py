@@ -12,6 +12,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.agents.factory import make_agent_factory
+from app.db import get_engine
 from app.logging_config import configure_logging, request_id_var
 from app.rate_limit import make_rate_limiter
 from app.routers.auth import router as auth_router
@@ -57,6 +59,29 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         return response
 
 
+AgentList = list[Agent | RemoteAgent | AgentProtocol | AgentFactory]
+
+
+def _load_published_factories(db: PostgresDb) -> AgentList:
+    from sqlalchemy.orm import Session
+
+    from app.repositories.config import ConfigRepository
+    from app.schemas.config import ConfigPayloadStatus
+
+    try:
+        with Session(get_engine()) as session:
+            repo = ConfigRepository(session)
+            configs, _ = repo.list_configs(
+                page=1, page_size=500, status=ConfigPayloadStatus.published
+            )
+            result: AgentList = [make_agent_factory(c.id, db) for c in configs]
+            logger.info("factories carregadas", extra={"count": len(result)})
+            return result
+    except Exception as exc:
+        logger.warning("falha ao carregar factories", extra={"error": str(exc)})
+        return []
+
+
 def create_app(
     auto_provision_dbs: bool = True,
     enable_auth: bool = True,
@@ -80,16 +105,7 @@ def create_app(
             user_isolation=True,
         )
 
-    # Factories são carregadas dinamicamente aqui a partir dos configs ativos.
-    # Exemplo de registro manual para desenvolvimento/testes:
-    #
-    #   from uuid import UUID
-    #   from app.agents.factory import make_agent_factory
-    #   factories = [make_agent_factory(UUID("<config-id>"), db)]
-    #
-    # O carregamento automático a partir do banco virá em PR futuro
-    # junto com a camada de API REST de gerenciamento de configs.
-    factories: list[Agent | RemoteAgent | AgentProtocol | AgentFactory] = []
+    factories: AgentList = _load_published_factories(db)
 
     protected = AgentOS(
         id="automata",
