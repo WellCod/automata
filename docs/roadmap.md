@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 7
+# Roadmap — Fases 4 a 10
 
 Plano de ação derivado de auditoria técnica e de segurança realizada em 2026-08-12.
 Ordem otimizada: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade.
@@ -641,3 +641,82 @@ Fecha o gap estrutural — `main.py` tinha `factories = []`, nenhum agente era c
 - Verificar e documentar comportamento de reconexão do Agno
 
 **Critério de aceite:** `curl /mcp` sem token retorna 401. Conexão MCP reconecta após queda de rede (teste manual).
+
+---
+
+## Fase 9 — Analytics (pós-Fase 8)
+
+Painel analítico consolidado aproveitando `agent_run` e `usage_event` já persistidos.
+
+### PRs entregues
+
+- [x] PR 59 — `feat(web): painel analytics global — runs, latência, custo e tokens`
+  - `RunRepository.metrics_global()` e `UsageRepository.usage_summary()` com dados cross-agente
+  - `GET /api/v1/metrics/summary` e `GET /api/v1/metrics/by-agent` com filtro `period=Xd`
+  - Página `/analytics` com 6 cards (conversas, falhas, p50, p95, tokens, custo) + tabela por agente
+  - Link Analytics no sidebar
+
+- [x] PR 60 — `fix(analytics): filtro de período na tabela de uso por agente`
+  - Tabela "uso por agente" agora respeita o filtro 7d/30d/90d selecionado
+  - Labels dos cards reescritos em linguagem acessível (sem "p50 latência")
+
+- [x] PR 61 — `feat(analytics): seletor de intervalo de datas personalizado`
+  - Parâmetros opcionais `start` e `end` (YYYY-MM-DD) nos dois endpoints de métricas
+  - Repositórios refatorados para `since`/`until` ao invés de `period_days` fixo
+  - Campos de data no painel ao lado dos botões de período pré-definido
+
+---
+
+## Fase 10 — Demo e Portfólio
+
+Torna a plataforma demonstrável sem credencial de LLM e com dados realistas visíveis.
+
+### Contexto
+
+Para uso como portfólio, a plataforma precisa funcionar sem `ANTHROPIC_API_KEY` nem `OPENAI_API_KEY`. O mecanismo de replay (`DEMO_REPLAY=true`) já existia em `api/app/agents/models_map.py`, mas faltavam fixtures realistas e seed de dados.
+
+### PR entregue — `chore/demo-seed-e-docs`
+
+**Fixtures de resposta** (`api/fixtures/`):
+
+| Arquivo | Usado por |
+|---------|-----------|
+| `claude-opus-4-7.json` | Analista Financeiro — análises de balanço, valuation, DCF, KPIs |
+| `claude-sonnet-4-6.json` | Redator de Conteúdo, Assistente de Código — posts, scripts, code review |
+| `claude-haiku-4-5.json` | Atendimento ao Cliente, Suporte Técnico — respostas curtas e objetivas |
+| `default.json` | Fallback para qualquer modelo não listado |
+
+Cada arquivo tem 10 respostas realistas em PT-BR. O `ReplayModel` cicla pela lista de forma determinística.
+
+**Seed completo** (`uv run python scripts/seed.py full`):
+
+Cria em sequência:
+1. Usuário owner via `seed_minimal`
+2. 5 agentes com instruções completas e versão publicada via `seed_demo`:
+   - Analista Financeiro (`claude-opus-4-7`)
+   - Redator de Conteúdo (`claude-sonnet-4-6`)
+   - Atendimento ao Cliente (`claude-haiku-4-5`)
+   - Suporte Técnico (`claude-haiku-4-5`)
+   - Assistente de Código (`claude-sonnet-4-6`)
+3. 500 runs históricos distribuídos nos últimos 90 dias via `seed_analytics`:
+   - Taxas de erro por agente: 3–8%
+   - Latências proporcionais ao modelo: haiku ~1,1s · sonnet ~2,8–3,5s · opus ~4,2s
+   - Tokens e custo por run proporcional ao preço do modelo
+   - Pesos de distribuição: atendimento (4×) > suporte (3×) > demais (2×)
+
+**Documentação:**
+- `DEMO.md` — guia completo de como rodar a demo local
+- `README.md` — seção Demo reescrita com comandos prontos
+- `docs/roadmap.md` — este documento
+
+**Como rodar:**
+
+```bash
+DEMO_REPLAY=true docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+docker exec \
+  -e SEED_OWNER_EMAIL="admin@automata.dev" \
+  -e SEED_OWNER_PASSWORD="Automata2024!" \
+  automata-api-1 uv run python scripts/seed.py full
+```
+
+**Critério de aceite:** Painel funcional com 5 agentes listados, modo teste respondendo via fixture, painel Analytics mostrando dados dos últimos 90 dias — sem nenhuma credencial de LLM configurada.

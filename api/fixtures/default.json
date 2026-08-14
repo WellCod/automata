@@ -1,7 +1,12 @@
 [
-  "Posso ajudar com isso! Me conte mais sobre o que você precisa.",
-  "Boa pergunta. Aqui está o que você deve saber sobre o assunto.",
-  "Entendido. Deixe-me processar essa informação e dar uma resposta completa.",
-  "Claro, vou te orientar sobre isso passo a passo.",
-  "Essa é uma abordagem válida. Há algumas considerações importantes a ter em mente."
+  "Olá! Posso ajudar com isso. Me conte mais detalhes sobre o que você precisa.",
+  "Boa pergunta. Aqui está o que você deve saber:\n\n1. O contexto importa muito para uma boa resposta\n2. Há algumas considerações técnicas relevantes\n3. Recomendo começar pelo ponto mais crítico\n\nQuer que eu aprofunde algum desses pontos?",
+  "Entendido. Vou processar essa informação e dar uma resposta estruturada.\n\nCom base no que você descreveu, identifico três aspectos principais a considerar. Qual deles é mais urgente para você?",
+  "Claro, vou te orientar sobre isso passo a passo.\n\n**Passo 1:** Identifique o ponto de partida correto\n**Passo 2:** Valide as premissas antes de avançar\n**Passo 3:** Execute com verificação incremental\n\nPosso detalhar qualquer um desses passos.",
+  "Essa é uma abordagem válida. Há algumas considerações importantes:\n\n- Verifique as dependências antes de começar\n- Documente as decisões tomadas\n- Tenha um plano de rollback definido\n\nPrecisa de ajuda para estruturar algum desses pontos?",
+  "Analisando o que você trouxe, identifico a questão central: você precisa de uma solução que equilibre eficiência e manutenibilidade.\n\nA recomendação mais indicada para esse cenário é começar simples e adicionar complexidade apenas quando necessário.",
+  "Resposta estruturada:\n\n**O que está acontecendo:** O comportamento que você descreve é esperado dado o contexto.\n\n**Por quê:** Existe uma lógica subjacente que explica isso.\n\n**Como resolver:** Há algumas opções, dependendo das suas restrições.\n\nQual aspecto quer explorar primeiro?",
+  "Boa observação. Esse é um ponto frequentemente subestimado. Para lidar com isso de forma eficaz, recomendo:\n\n1. Entender a raiz do problema antes de agir\n2. Avaliar o impacto de cada alternativa\n3. Escolher a solução com menor risco de efeitos colaterais",
+  "Processando sua solicitação... Com base nas informações disponíveis, a abordagem mais indicada é estruturada em fases para minimizar riscos e maximizar aprendizado.\n\nPosso detalhar cada fase se precisar.",
+  "Resumo da análise:\n\n- **Situação atual:** Identificada e compreendida\n- **Pontos de atenção:** 2 riscos que merecem monitoramento\n- **Próximos passos:** Ação imediata em um ponto, monitoramento nos demais\n\nGostaria de aprofundar alguma dessas áreas?"
 ]
