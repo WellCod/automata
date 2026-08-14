@@ -15,6 +15,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.agents.factory import make_agent_factory
 from app.db import get_engine
 from app.logging_config import configure_logging, request_id_var
+from app.mcp_auth import JWTMCPAuth
 from app.rate_limit import make_rate_limiter
 from app.routers.auth import router as auth_router
 from app.routers.configs import router as configs_router
@@ -86,7 +87,7 @@ def _load_published_factories(db: PostgresDb) -> AgentList:
 def create_app(
     auto_provision_dbs: bool = True,
     enable_auth: bool = True,
-    enable_mcp_server: bool = False,
+    enable_mcp_server: bool = True,
 ) -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
@@ -109,6 +110,8 @@ def create_app(
 
     factories: AgentList = _load_published_factories(db)
 
+    mcp_auth = JWTMCPAuth() if enable_auth and enable_mcp_server else None
+
     protected = AgentOS(
         id="automata",
         db=db,
@@ -118,6 +121,7 @@ def create_app(
         authorization=enable_auth,
         authorization_config=auth_config,
         mcp_server=enable_mcp_server,
+        mcp_auth=mcp_auth,
     ).get_app()
 
     # auth_router fica fora do middleware do Agno: /login precisa ser público
