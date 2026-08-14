@@ -16,6 +16,13 @@ class UsageSummary:
 
 
 @dataclass
+class AgentUsageSummary:
+    agent_config_id: UUID
+    total_tokens: int
+    total_cost: float | None
+
+
+@dataclass
 class UsageRollup:
     agent_config_id: UUID
     period: str
@@ -61,19 +68,59 @@ class UsageRepository:
         self._session.refresh(event)
         return event
 
-    def usage_summary(self, *, period_days: int = 30) -> UsageSummary:
-        since = datetime.now(UTC) - timedelta(days=period_days)
+    def usage_summary(
+        self,
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        period_days: int = 30,
+    ) -> UsageSummary:
+        if since is None:
+            since = datetime.now(UTC) - timedelta(days=period_days)
+        where_clauses = [UsageEvent.created_at >= since]
+        if until is not None:
+            where_clauses.append(UsageEvent.created_at <= until)
         row = self._session.execute(
             select(
                 func.sum(UsageEvent.total_tokens).label("tokens"),
                 func.sum(UsageEvent.cost).label("cost"),
-            ).where(UsageEvent.created_at >= since)
+            ).where(*where_clauses)
         ).one()
         cost = float(row.cost) if isinstance(row.cost, Decimal) else row.cost
         return UsageSummary(
             total_tokens=int(row.tokens or 0),
             total_cost=cost,
         )
+
+    def usage_by_agent(
+        self,
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        period_days: int = 30,
+    ) -> list[AgentUsageSummary]:
+        if since is None:
+            since = datetime.now(UTC) - timedelta(days=period_days)
+        where_clauses = [UsageEvent.created_at >= since]
+        if until is not None:
+            where_clauses.append(UsageEvent.created_at <= until)
+        rows = self._session.execute(
+            select(
+                UsageEvent.agent_config_id,
+                func.sum(UsageEvent.total_tokens).label("tokens"),
+                func.sum(UsageEvent.cost).label("cost"),
+            )
+            .where(*where_clauses)
+            .group_by(UsageEvent.agent_config_id)
+        ).all()
+        return [
+            AgentUsageSummary(
+                agent_config_id=r.agent_config_id,
+                total_tokens=int(r.tokens or 0),
+                total_cost=float(r.cost) if isinstance(r.cost, Decimal) else r.cost,
+            )
+            for r in rows
+        ]
 
     def rollup(
         self,
