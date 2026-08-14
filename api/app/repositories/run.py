@@ -102,3 +102,36 @@ class RunRepository:
             p95_ms=p95,
             period_days=period_days,
         )
+
+    def metrics_global(self, *, period_days: int = 30) -> RunMetrics:
+        since = datetime.now(UTC) - timedelta(days=period_days)
+
+        stats = self._session.execute(
+            select(
+                func.count(AgentRun.id).label("total"),
+                func.count(AgentRun.id).filter(AgentRun.status == "error").label("errors"),
+            ).where(AgentRun.created_at >= since)
+        ).one()
+
+        total = int(stats.total)
+        error_rate = int(stats.errors) / total if total > 0 else 0.0
+
+        p50: float | None = None
+        p95: float | None = None
+        if total > 0:
+            pct = self._session.execute(
+                select(
+                    func.percentile_cont(0.5).within_group(AgentRun.duration_ms).label("p50"),
+                    func.percentile_cont(0.95).within_group(AgentRun.duration_ms).label("p95"),
+                ).where(AgentRun.created_at >= since, AgentRun.duration_ms.isnot(None))
+            ).one()
+            p50 = float(pct.p50) if pct.p50 is not None else None
+            p95 = float(pct.p95) if pct.p95 is not None else None
+
+        return RunMetrics(
+            total_runs=total,
+            error_rate=error_rate,
+            p50_ms=p50,
+            p95_ms=p95,
+            period_days=period_days,
+        )

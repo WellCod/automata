@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -7,6 +7,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.usage import UsageEvent
+
+
+@dataclass
+class UsageSummary:
+    total_tokens: int
+    total_cost: float | None
 
 
 @dataclass
@@ -54,6 +60,20 @@ class UsageRepository:
         self._session.commit()
         self._session.refresh(event)
         return event
+
+    def usage_summary(self, *, period_days: int = 30) -> UsageSummary:
+        since = datetime.now(UTC) - timedelta(days=period_days)
+        row = self._session.execute(
+            select(
+                func.sum(UsageEvent.total_tokens).label("tokens"),
+                func.sum(UsageEvent.cost).label("cost"),
+            ).where(UsageEvent.created_at >= since)
+        ).one()
+        cost = float(row.cost) if isinstance(row.cost, Decimal) else row.cost
+        return UsageSummary(
+            total_tokens=int(row.tokens or 0),
+            total_cost=cost,
+        )
 
     def rollup(
         self,

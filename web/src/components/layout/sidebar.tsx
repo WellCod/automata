@@ -1,13 +1,16 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { LayoutGrid, LogOut, Moon, Sun } from "lucide-react";
+import { BarChart3, LayoutGrid, LogOut, Moon, Sun } from "lucide-react";
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "./theme-provider";
 
-const navItems = [{ href: "/", label: "Agentes", icon: LayoutGrid, exact: true }];
+const navItems = [
+  { href: "/", label: "Agentes", icon: LayoutGrid, exact: true },
+  { href: "/analytics", label: "Analytics", icon: BarChart3, exact: true },
+];
 
 function LogoMark() {
   return (

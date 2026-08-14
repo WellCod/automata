@@ -19,6 +19,7 @@ from fastapi import FastAPI  # noqa: E402
 
 from app.routers.configs import router as configs_router  # noqa: E402
 from app.routers.linter import router as linter_router  # noqa: E402
+from app.routers.metrics import router as metrics_router  # noqa: E402
 from app.routers.models import router as models_router  # noqa: E402
 from app.routers.runs import router as runs_router  # noqa: E402
 from app.routers.usage import router as usage_router  # noqa: E402
@@ -27,6 +28,7 @@ app = FastAPI(title="automata", version="0.1.0")
 app.include_router(configs_router)
 app.include_router(models_router)
 app.include_router(linter_router)
+app.include_router(metrics_router)
 app.include_router(runs_router)
 app.include_router(usage_router)
 
