@@ -49,35 +49,112 @@ function SummaryCard({ label, value, hint }: { label: string; value: string; hin
   );
 }
 
-function PeriodSelector({ period, onChange }: { period: Period; onChange: (p: Period) => void }) {
+interface DateRange {
+  start: string;
+  end: string;
+}
+
+interface FilterState {
+  period: Period;
+  custom: DateRange | null;
+}
+
+function PeriodSelector({
+  filter,
+  onChange,
+}: {
+  filter: FilterState;
+  onChange: (f: FilterState) => void;
+}) {
+  function handlePeriod(p: Period) {
+    onChange({ period: p, custom: null });
+  }
+
+  function handleDateChange(field: "start" | "end", value: string) {
+    const current = filter.custom ?? { start: "", end: "" };
+    onChange({ period: filter.period, custom: { ...current, [field]: value } });
+  }
+
+  const isCustomActive = filter.custom !== null && filter.custom.start !== "";
+
   return (
-    <div className="flex gap-1">
-      {PERIODS.map((p) => (
-        <button
-          key={p.value}
-          type="button"
-          onClick={() => onChange(p.value)}
-          className={`rounded px-3 py-1 text-[12px] font-medium transition-colors ${
-            period === p.value
-              ? "bg-accent text-accent-foreground"
-              : "text-muted-foreground hover:text-foreground"
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex gap-1">
+        {PERIODS.map((p) => (
+          <button
+            key={p.value}
+            type="button"
+            onClick={() => handlePeriod(p.value)}
+            className={`rounded px-3 py-1 text-[12px] font-medium transition-colors ${
+              !isCustomActive && filter.period === p.value
+                ? "bg-accent text-accent-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      <span className="text-muted-foreground text-[11px]">ou</span>
+
+      <div className="flex items-center gap-1">
+        <input
+          type="date"
+          value={filter.custom?.start ?? ""}
+          onChange={(e) => handleDateChange("start", e.target.value)}
+          className={`border-border bg-background text-foreground rounded border px-2 py-1 text-[12px] ${
+            isCustomActive ? "border-accent" : ""
           }`}
-        >
-          {p.label}
-        </button>
-      ))}
+        />
+        <span className="text-muted-foreground text-[11px]">até</span>
+        <input
+          type="date"
+          value={filter.custom?.end ?? ""}
+          onChange={(e) => handleDateChange("end", e.target.value)}
+          min={filter.custom?.start ?? undefined}
+          className={`border-border bg-background text-foreground rounded border px-2 py-1 text-[12px] ${
+            isCustomActive ? "border-accent" : ""
+          }`}
+        />
+        {isCustomActive && (
+          <button
+            type="button"
+            onClick={() => onChange({ period: filter.period, custom: null })}
+            className="text-muted-foreground hover:text-foreground text-[11px]"
+          >
+            ×
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
+function periodLabel(filter: FilterState): string {
+  if (filter.custom && filter.custom.start) {
+    if (filter.custom.end) return `${filter.custom.start} → ${filter.custom.end}`;
+    return `desde ${filter.custom.start}`;
+  }
+  return PERIODS.find((p) => p.value === filter.period)?.label ?? filter.period;
+}
+
 export default function AnalyticsPage() {
-  const [period, setPeriod] = useState<Period>("30d");
+  const [filter, setFilter] = useState<FilterState>({ period: "30d", custom: null });
+
+  const queryKey = JSON.stringify(filter);
+
+  const isCustom = filter.custom !== null && filter.custom.start !== "";
+  const summaryQuery = isCustom
+    ? { start: filter.custom!.start, end: filter.custom!.end || undefined }
+    : { period: filter.period };
+  const byAgentQuery = summaryQuery;
 
   const { data: summary, isPending: summaryPending } = useQuery<GlobalMetricsSummary>({
-    queryKey: ["analytics:summary", period],
+    queryKey: ["analytics:summary", queryKey],
     queryFn: async () => {
       const res = await client.GET("/api/v1/metrics/summary", {
-        params: { query: { period } },
+        params: { query: summaryQuery },
       });
       if (res.error) throw new Error("Falha ao carregar sumário");
       return res.data!;
@@ -85,23 +162,21 @@ export default function AnalyticsPage() {
   });
 
   const { data: breakdown, isPending: breakdownPending } = useQuery<AgentBreakdownItem[]>({
-    queryKey: ["analytics:by-agent", period],
+    queryKey: ["analytics:by-agent", queryKey],
     queryFn: async () => {
       const res = await client.GET("/api/v1/metrics/by-agent", {
-        params: { query: { period } },
+        params: { query: byAgentQuery },
       });
       if (res.error) throw new Error("Falha ao carregar breakdown");
       return res.data!;
     },
   });
 
-  const periodLabel = PERIODS.find((p) => p.value === period)?.label ?? period;
-
   return (
     <div className="w-full px-6 py-6">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-foreground text-[18px] font-semibold">Analytics</h1>
-        <PeriodSelector period={period} onChange={setPeriod} />
+        <PeriodSelector filter={filter} onChange={setFilter} />
       </div>
 
       {summaryPending ? (
@@ -143,7 +218,7 @@ export default function AnalyticsPage() {
 
       <div>
         <h2 className="text-foreground mb-3 text-[13px] font-medium">
-          Uso por agente · últimos {periodLabel}
+          Uso por agente · {periodLabel(filter)}
         </h2>
 
         {breakdownPending ? (

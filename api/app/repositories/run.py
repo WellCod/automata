@@ -73,12 +73,22 @@ class RunRepository:
         )
         return list(runs), total
 
-    def metrics(self, config_id: UUID, *, period_days: int = 30) -> RunMetrics:
-        since = datetime.now(UTC) - timedelta(days=period_days)
-        base_filter = (
+    def metrics(
+        self,
+        config_id: UUID,
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        period_days: int = 30,
+    ) -> RunMetrics:
+        if since is None:
+            since = datetime.now(UTC) - timedelta(days=period_days)
+        base_filter = [
             AgentRun.agent_config_id == config_id,
             AgentRun.created_at >= since,
-        )
+        ]
+        if until is not None:
+            base_filter.append(AgentRun.created_at <= until)
 
         stats = self._session.execute(
             select(
@@ -110,15 +120,25 @@ class RunRepository:
             period_days=period_days,
         )
 
-    def runs_by_agent(self, *, period_days: int = 30) -> list[AgentRunSummary]:
-        since = datetime.now(UTC) - timedelta(days=period_days)
+    def runs_by_agent(
+        self,
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        period_days: int = 30,
+    ) -> list[AgentRunSummary]:
+        if since is None:
+            since = datetime.now(UTC) - timedelta(days=period_days)
+        where_clauses = [AgentRun.created_at >= since]
+        if until is not None:
+            where_clauses.append(AgentRun.created_at <= until)
         rows = self._session.execute(
             select(
                 AgentRun.agent_config_id,
                 func.count(AgentRun.id).label("total"),
                 func.count(AgentRun.id).filter(AgentRun.status == "error").label("errors"),
             )
-            .where(AgentRun.created_at >= since)
+            .where(*where_clauses)
             .group_by(AgentRun.agent_config_id)
             .order_by(func.count(AgentRun.id).desc())
         ).all()
@@ -131,14 +151,24 @@ class RunRepository:
             for r in rows
         ]
 
-    def metrics_global(self, *, period_days: int = 30) -> RunMetrics:
-        since = datetime.now(UTC) - timedelta(days=period_days)
+    def metrics_global(
+        self,
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        period_days: int = 30,
+    ) -> RunMetrics:
+        if since is None:
+            since = datetime.now(UTC) - timedelta(days=period_days)
+        where_clauses = [AgentRun.created_at >= since]
+        if until is not None:
+            where_clauses.append(AgentRun.created_at <= until)
 
         stats = self._session.execute(
             select(
                 func.count(AgentRun.id).label("total"),
                 func.count(AgentRun.id).filter(AgentRun.status == "error").label("errors"),
-            ).where(AgentRun.created_at >= since)
+            ).where(*where_clauses)
         ).one()
 
         total = int(stats.total)
@@ -151,7 +181,7 @@ class RunRepository:
                 select(
                     func.percentile_cont(0.5).within_group(AgentRun.duration_ms).label("p50"),
                     func.percentile_cont(0.95).within_group(AgentRun.duration_ms).label("p95"),
-                ).where(AgentRun.created_at >= since, AgentRun.duration_ms.isnot(None))
+                ).where(*where_clauses, AgentRun.duration_ms.isnot(None))
             ).one()
             p50 = float(pct.p50) if pct.p50 is not None else None
             p95 = float(pct.p95) if pct.p95 is not None else None

@@ -1,3 +1,4 @@
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Query
@@ -35,18 +36,38 @@ def _parse_period(period: str) -> int:
     return int(period[:-1])
 
 
+def _resolve_range(
+    period: str,
+    start: date | None,
+    end: date | None,
+) -> tuple[datetime, datetime | None, int]:
+    if start is not None:
+        since = datetime(start.year, start.month, start.day, tzinfo=UTC)
+        until = (
+            datetime(end.year, end.month, end.day, 23, 59, 59, tzinfo=UTC)
+            if end is not None
+            else None
+        )
+        period_days = (end - start).days + 1 if end is not None else 0
+        return since, until, period_days
+    period_days = _parse_period(period)
+    return datetime.now(UTC) - timedelta(days=period_days), None, period_days
+
+
 @router.get("/summary", response_model=GlobalMetricsSummary)
 def get_summary(
     session: SessionDep,
     period: str = Query(default="30d", pattern=r"^\d+d$"),  # noqa: B008
+    start: date | None = Query(default=None),  # noqa: B008
+    end: date | None = Query(default=None),  # noqa: B008
 ) -> GlobalMetricsSummary:
-    period_days = _parse_period(period)
+    since, until, period_days = _resolve_range(period, start, end)
 
     run_repo = RunRepository(session)
-    metrics = run_repo.metrics_global(period_days=period_days)
+    metrics = run_repo.metrics_global(since=since, until=until, period_days=period_days)
 
     usage_repo = UsageRepository(session)
-    usage = usage_repo.usage_summary(period_days=period_days)
+    usage = usage_repo.usage_summary(since=since, until=until, period_days=period_days)
 
     return GlobalMetricsSummary(
         total_runs=metrics.total_runs,
@@ -63,15 +84,22 @@ def get_summary(
 def get_by_agent(
     session: SessionDep,
     period: str = Query(default="30d", pattern=r"^\d+d$"),  # noqa: B008
+    start: date | None = Query(default=None),  # noqa: B008
+    end: date | None = Query(default=None),  # noqa: B008
 ) -> list[AgentBreakdownItem]:
-    period_days = _parse_period(period)
+    since, until, period_days = _resolve_range(period, start, end)
 
     runs_by_id: dict[UUID, AgentRunSummary] = {
-        r.agent_config_id: r for r in RunRepository(session).runs_by_agent(period_days=period_days)
+        r.agent_config_id: r
+        for r in RunRepository(session).runs_by_agent(
+            since=since, until=until, period_days=period_days
+        )
     }
     usage_by_id: dict[UUID, AgentUsageSummary] = {
         u.agent_config_id: u
-        for u in UsageRepository(session).usage_by_agent(period_days=period_days)
+        for u in UsageRepository(session).usage_by_agent(
+            since=since, until=until, period_days=period_days
+        )
     }
 
     all_ids = runs_by_id.keys() | usage_by_id.keys()
