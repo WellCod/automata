@@ -120,8 +120,14 @@ Derivada de auditoria técnica em 2026-08-12. Detalhes em `docs/roadmap.md`.
 
 Fecha o gap de factories vazias e adiciona visibilidade de execução. Detalhes em `docs/roadmap.md`.
 
-- [ ] PR 54 — `feat(api): carregamento dinâmico de factories a partir de configs publicados`
-- [ ] PR 55 — `feat(api): router de runs — histórico e status por agente`
-- [ ] PR 56 — `feat(web): painel de runs em tempo real com SSE`
-- [ ] PR 57 — `feat(api): métricas por agente — p50/p95 de latência e taxa de erro`
-- [ ] PR 58 — `fix(api): reconexão de MCPTools e validação de escopo em /mcp`
+- [x] PR 54 — `feat(api): carregamento dinâmico de factories a partir de configs publicados`
+- [x] PR 55 — `feat(api): router de runs — histórico e status por agente`
+- [x] PR 56 — `feat(web): painel de runs em tempo real com SSE`
+- [x] PR 57 — `feat(api): métricas por agente — p50/p95 de latência e taxa de erro`
+- [x] PR 58 — `fix(api): reconexão de MCPTools e validação de escopo em /mcp`
+
+## Fase 9 — Analytics
+
+Painel analítico consolidado aproveitando `agent_run` e `usage_event` já persistidos.
+
+- [x] PR 59 — `feat(web): painel analytics global — runs, latência, custo e tokens`
