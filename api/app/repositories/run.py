@@ -9,6 +9,13 @@ from app.models.run import AgentRun
 
 
 @dataclass
+class AgentRunSummary:
+    agent_config_id: UUID
+    total_runs: int
+    error_count: int
+
+
+@dataclass
 class RunMetrics:
     total_runs: int
     error_rate: float
@@ -102,6 +109,27 @@ class RunRepository:
             p95_ms=p95,
             period_days=period_days,
         )
+
+    def runs_by_agent(self, *, period_days: int = 30) -> list[AgentRunSummary]:
+        since = datetime.now(UTC) - timedelta(days=period_days)
+        rows = self._session.execute(
+            select(
+                AgentRun.agent_config_id,
+                func.count(AgentRun.id).label("total"),
+                func.count(AgentRun.id).filter(AgentRun.status == "error").label("errors"),
+            )
+            .where(AgentRun.created_at >= since)
+            .group_by(AgentRun.agent_config_id)
+            .order_by(func.count(AgentRun.id).desc())
+        ).all()
+        return [
+            AgentRunSummary(
+                agent_config_id=r.agent_config_id,
+                total_runs=int(r.total),
+                error_count=int(r.errors),
+            )
+            for r in rows
+        ]
 
     def metrics_global(self, *, period_days: int = 30) -> RunMetrics:
         since = datetime.now(UTC) - timedelta(days=period_days)
