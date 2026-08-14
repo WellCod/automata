@@ -88,12 +88,8 @@ class RunRepository:
         if total > 0:
             pct = self._session.execute(
                 select(
-                    func.percentile_cont(0.5)
-                    .within_group(AgentRun.duration_ms)
-                    .label("p50"),
-                    func.percentile_cont(0.95)
-                    .within_group(AgentRun.duration_ms)
-                    .label("p95"),
+                    func.percentile_cont(0.5).within_group(AgentRun.duration_ms).label("p50"),
+                    func.percentile_cont(0.95).within_group(AgentRun.duration_ms).label("p95"),
                 ).where(*base_filter, AgentRun.duration_ms.isnot(None))
             ).one()
             p50 = float(pct.p50) if pct.p50 is not None else None
