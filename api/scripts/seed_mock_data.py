@@ -53,13 +53,28 @@ def seed(session: Session, n_runs: int = 200) -> None:
 
         # 8% taxa de erro, tempo de resposta variado por agente
         status = "error" if random.random() < 0.08 else "success"
-        duration_ms = int(random.gauss(
-            mu={"Analista": 3200, "Redator": 2800, "Atendimento": 1200,
-                "Suporte": 1100, "Assistente": 2400}.get(
-                    next((k for k in ["Analista", "Redator", "Atendimento", "Suporte", "Assistente"]
-                          if k in str(agent_id)), "Suporte"), 1500),
-            sigma=600,
-        ))
+        duration_ms = int(
+            random.gauss(
+                mu={
+                    "Analista": 3200,
+                    "Redator": 2800,
+                    "Atendimento": 1200,
+                    "Suporte": 1100,
+                    "Assistente": 2400,
+                }.get(
+                    next(
+                        (
+                            k
+                            for k in ["Analista", "Redator", "Atendimento", "Suporte", "Assistente"]
+                            if k in str(agent_id)
+                        ),
+                        "Suporte",
+                    ),
+                    1500,
+                ),
+                sigma=600,
+            )
+        )
         duration_ms = max(300, duration_ms)
 
         run = AgentRun(
@@ -78,19 +93,21 @@ def seed(session: Session, n_runs: int = 200) -> None:
             in_tok = random.randint(200, 1500)
             out_tok = random.randint(100, 800)
             cost = round((in_tok / 1000) * price_in + (out_tok / 1000) * price_out, 8)
-            events.append(UsageEvent(
-                id=uuid.uuid4(),
-                agent_config_id=agent_id,
-                user_id=run.user_id,
-                run_id=run.run_id,
-                model_id=model_id,
-                period=period,
-                input_tokens=in_tok,
-                output_tokens=out_tok,
-                total_tokens=in_tok + out_tok,
-                cost=cost,
-                created_at=ts,
-            ))
+            events.append(
+                UsageEvent(
+                    id=uuid.uuid4(),
+                    agent_config_id=agent_id,
+                    user_id=run.user_id,
+                    run_id=run.run_id,
+                    model_id=model_id,
+                    period=period,
+                    input_tokens=in_tok,
+                    output_tokens=out_tok,
+                    total_tokens=in_tok + out_tok,
+                    cost=cost,
+                    created_at=ts,
+                )
+            )
 
     session.add_all(runs)
     session.add_all(events)
