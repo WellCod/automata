@@ -136,6 +136,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/configs/{config_id}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Metrics */
+        get: operations["get_metrics_api_v1_configs__config_id__metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/configs/{config_id}/runs": {
         parameters: {
             query?: never;
@@ -274,6 +291,19 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** AgentMetricsResponse */
+        AgentMetricsResponse: {
+            /** Total Runs */
+            total_runs: number;
+            /** Error Rate */
+            error_rate: number;
+            /** P50 Ms */
+            p50_ms: number | null;
+            /** P95 Ms */
+            p95_ms: number | null;
+            /** Period Days */
+            period_days: number;
         };
         /** AgentRunResponse */
         AgentRunResponse: {
@@ -745,6 +775,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LintWarning"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_metrics_api_v1_configs__config_id__metrics_get: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header?: never;
+            path: {
+                config_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentMetricsResponse"];
                 };
             };
             /** @description Validation Error */
