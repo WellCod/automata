@@ -1,4 +1,4 @@
-"""Seed de instância. Uso: uv run python scripts/seed.py [minimal|demo]"""
+"""Seed de instância. Uso: uv run python scripts/seed.py [minimal|demo|full]"""
 
 import logging
 import os
@@ -10,11 +10,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.seed import seed_demo, seed_minimal
+from app.seed import seed_demo, seed_full, seed_minimal
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-_SETS = {"minimal": seed_minimal, "demo": seed_demo}
+_SETS = {"minimal": seed_minimal, "demo": seed_demo, "full": seed_full}
 
 
 def main() -> None:

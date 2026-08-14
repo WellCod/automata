@@ -9,14 +9,29 @@ Plataforma de gestão de agentes de IA em produção: catálogo, edição versio
 
 ## Demo
 
-**URL:** _configurar com a URL do deploy_
+**Sem credencial de LLM.** A demo usa `DEMO_REPLAY=true` — as respostas são pré-gravadas em `api/fixtures/` e o painel funciona normalmente. Edição, versionamento, modo teste e analytics rodam sem chamar nenhum provedor.
 
-| Campo | Valor |
-|---|---|
-| Email | `demo@automata.dev` |
-| Senha | secret `DEMO_OWNER_PASSWORD` |
+**Demo local em 3 passos:**
 
-Os dados são resetados a cada 6 horas pelo workflow [demo-reset](.github/workflows/demo-reset.yml). A demo não tem credencial de provedor de IA — as respostas são pré-gravadas.
+```bash
+# 1. Sobe com modo replay
+DEMO_REPLAY=true docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+# 2. Seed completo: owner + 5 agentes + 500 runs históricos
+docker exec \
+  -e SEED_OWNER_EMAIL="admin@automata.dev" \
+  -e SEED_OWNER_PASSWORD="Automata2024!" \
+  automata-api-1 uv run python scripts/seed.py full
+
+# 3. Painel
+pnpm --filter web dev   # http://localhost:3000
+```
+
+Login: `admin@automata.dev` / `Automata2024!`
+
+O seed `full` cria 5 agentes com instruções completas (Analista Financeiro, Redator de Conteúdo, Atendimento, Suporte Técnico, Assistente de Código) e 500 execuções distribuídas nos últimos 90 dias com latências, taxas de erro e custos proporcionais ao modelo de cada agente.
+
+Guia completo em [`DEMO.md`](DEMO.md).
 
 ---
 
@@ -123,12 +138,15 @@ pnpm --filter web dev
 
 O painel sobe em `http://localhost:3000`.
 
-**Seed inicial** (com os containers no ar):
+**Seed** (com os containers no ar):
 ```bash
-docker exec \
-  -e SEED_OWNER_EMAIL="admin@exemplo.com" \
-  -e SEED_OWNER_PASSWORD="senha" \
-  automata-api-1 python scripts/seed.py minimal
+# Mínimo: só cria o owner
+docker exec -e SEED_OWNER_EMAIL="admin@exemplo.com" -e SEED_OWNER_PASSWORD="Senha123!" \
+  automata-api-1 uv run python scripts/seed.py minimal
+
+# Demo completo: owner + 5 agentes publicados + 500 runs de histórico
+docker exec -e SEED_OWNER_EMAIL="admin@exemplo.com" -e SEED_OWNER_PASSWORD="Senha123!" \
+  automata-api-1 uv run python scripts/seed.py full
 ```
 
 ## Testes
@@ -153,13 +171,15 @@ pnpm --filter web test:e2e
 api/            API Python (FastAPI + Agno AgentOS)
   app/          código da aplicação
   alembic/      migrations do banco próprio
-  scripts/      seed, gen_openapi, demo_reset
+  fixtures/     respostas pré-gravadas para DEMO_REPLAY=true
+  scripts/      seed (minimal|demo|full), export_openapi
   tests/        pytest: smoke + evals nightly
 web/            painel Next.js (App Router)
   src/app/      rotas e Route Handlers (BFF)
   src/components/
   src/lib/      client gerado, hooks, utils
 docs/adr/       Architecture Decision Records
+DEMO.md         guia de demo local sem credencial de LLM
 ```
 
 ## Situação atual
@@ -176,8 +196,12 @@ docs/adr/       Architecture Decision Records
 - [x] Painel: seletor de modelo com capabilities condicionais
 - [x] Painel: versões, diff visual e rollback
 - [x] Painel: modo teste com chat integrado
+- [x] Histórico de execuções por agente (runs, latência, erros)
+- [x] Métricas por agente: p50/p95 de latência e taxa de erro
+- [x] Painel Analytics global: volume, latência, custo e tokens — com filtro de período e intervalo de datas
 - [x] Imagem Docker versionada publicada no GHCR
-- [x] Demo pública com replay de inferência e reset periódico
+- [x] Demo com replay de inferência sem credencial de LLM (`DEMO_REPLAY=true`)
+- [x] Seed completo para portfólio: 5 agentes + 500 runs históricos realistas
 
 ## Licença
 

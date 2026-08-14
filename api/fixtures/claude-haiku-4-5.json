@@ -1,7 +1,12 @@
 [
-  "Olá! Estou aqui para ajudar. Pode me descrever o problema que está enfrentando?",
-  "Entendido! Vou verificar isso para você. Pode me dar mais detalhes sobre quando o problema começou?",
-  "Obrigado pelas informações. Identificamos a causa e já estamos trabalhando na resolução. Há mais alguma coisa em que posso ajudar?",
-  "Claro, esse processo é simples. Acesse as configurações da sua conta e selecione a opção desejada. Qualquer dúvida, é só perguntar!",
-  "Compreendo a situação. Vou encaminhar seu caso para a equipe especializada, que entrará em contato em até 24 horas."
+  "Olá! Obrigado por entrar em contato. Já identifiquei seu atendimento no sistema. Pode me contar o que aconteceu?",
+  "Compreendo sua situação e lamento o transtorno. Vou verificar o status do seu pedido agora.\n\n✓ Pedido localizado — em trânsito, previsão de entrega: amanhã até 18h.\n\nHá algo mais que posso esclarecer?",
+  "Solicitação de reembolso registrada com sucesso!\n\nDetalhes:\n- Protocolo: #ATD-2024-7821\n- Prazo: até 5 dias úteis no cartão de origem\n- Confirmação enviada para o e-mail cadastrado\n\nPosso ajudar em mais alguma coisa?",
+  "Para redefinir sua senha:\n\n1. Acesse **Minha Conta → Segurança → Alterar Senha**\n2. Confirme seu e-mail cadastrado\n3. Verifique a caixa de entrada — o link expira em 30 minutos\n\nSe não receber o e-mail em 5 minutos, verifique a pasta de spam. Quer que eu reenvie?",
+  "Houve uma instabilidade hoje entre 14h20 e 14h32 devido a manutenção emergencial. Sua sessão foi preservada e todos os dados estão intactos.\n\nPeço desculpas pelo transtorno. A plataforma está 100% estável desde então.",
+  "Plano atualizado com sucesso!\n\nO que muda a partir do próximo ciclo (dia 15):\n- Acesso às funcionalidades Premium\n- Limite expandido para 10.000 requisições/mês\n- Suporte prioritário com SLA de 4h\n\nUm e-mail de confirmação foi enviado.",
+  "Nossa equipe técnica já identificou o problema e está trabalhando na correção.\n\n**Status:** Em resolução\n**ETA:** 2 horas\n**Impacto:** Funcionalidade X afetada para usuários do plano Y\n\nVou te notificar assim que estiver resolvido.",
+  "Integração configurada com sucesso!\n\n**Canal:** #automata-alerts\n**Eventos:** erros P1/P2, deploys e alertas de threshold\n**Teste:** envie `/ping` no canal para confirmar\n\nTudo pronto.",
+  "Identifiquei 3 ocorrências desse erro nas últimas 24h — todas relacionadas a timeout de conexão durante pico de uso entre 18h e 20h.\n\nJá escalei para o time de infra. Protocolo de acompanhamento: #INC-2024-0891.",
+  "Contrato encerrado conforme solicitado.\n\n- Data de encerramento: hoje\n- Retenção de dados: 30 dias\n- Remoção permanente: automática ao fim do prazo\n- Protocolo: #ENC-2024-1043\n\nSe mudar de ideia antes do prazo, é só entrar em contato. Temos prazer em tê-lo de volta."
 ]
