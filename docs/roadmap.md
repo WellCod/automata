@@ -713,9 +713,12 @@ Cria em sequência:
 
 ```bash
 DEMO_REPLAY=true docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# Defina a senha do owner — ela não fica escrita em lugar nenhum
+read -rsp "Senha do owner: " SEED_OWNER_PASSWORD; echo
+
 docker exec \
-  -e SEED_OWNER_EMAIL="admin@automata.dev" \
-  -e SEED_OWNER_PASSWORD="Automata2024!" \
+  -e SEED_OWNER_EMAIL="admin@exemplo.com" \
+  -e SEED_OWNER_PASSWORD="$SEED_OWNER_PASSWORD" \
   automata-api-1 uv run python scripts/seed.py full
 ```
 
