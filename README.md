@@ -7,6 +7,48 @@ Plataforma de operação de agentes de IA em produção — versionamento imutá
 
 ---
 
+## O problema
+
+Colocar um agente de IA em produção é simples. Operar quarenta, com equipes diferentes editando prompts, é outro problema.
+
+**Prompt sem histórico.** Alguém ajusta uma instrução às 18h, a qualidade cai — e não há caminho de volta. O prompt estava num campo de texto que foi sobrescrito.
+
+**Troca de modelo quebra comportamento silenciosamente.** Instruções acopladas a um provider específico (blocos de raciocínio, formato JSON sem markdown) degradam ao migrar de modelo sem gerar erro visível.
+
+**Custo opaco até a fatura chegar.** Sem estimativa antes de publicar, um prompt de três mil tokens multiplicado pelo volume mensal pode estourar o contrato sem nenhum alerta.
+
+**Configuração e prompt divergem.** O prompt menciona uma ferramenta que não está habilitada no agente. Isso não falha no deploy — falha na conversa com o usuário, dias depois.
+
+Automata trata esses quatro problemas como requisito de produto, não como disciplina de quem edita.
+
+---
+
+## Telas
+
+Painel rodando com o seed de demonstração — cinco agentes publicados e 500
+execuções distribuídas em 90 dias, tudo sintético.
+
+### Configuração do agente
+
+Versão ativa marcada no topo, instruções em campos separados em vez de um
+textão, e as abas que sustentam a operação: modo teste, histórico de versões,
+execuções, métricas, custo estimado e linter de configuração.
+
+![Configuração de um agente](docs/img/agente.png)
+
+### Agentes
+
+![Lista de agentes](docs/img/agentes.png)
+
+### Analytics
+
+Conversas, taxa de falha, latência típica e de pico, tokens e custo estimado —
+com o mesmo recorte por agente.
+
+![Painel de analytics](docs/img/analytics.png)
+
+---
+
 ## Demo
 
 **Sem credencial de LLM.** O modo `DEMO_REPLAY=true` substitui o provider real por respostas pré-gravadas em `api/fixtures/`. Versionamento, rollback, modo teste e analytics funcionam completamente offline.
@@ -34,21 +76,6 @@ O seed `full` gera 5 agentes com perfis distintos (Analista Financeiro em `claud
 
 Guia completo em [`DEMO.md`](DEMO.md).
 
----
-
-## O problema
-
-Colocar um agente de IA em produção é simples. Operar quarenta, com equipes diferentes editando prompts, é outro problema.
-
-**Prompt sem histórico.** Alguém ajusta uma instrução às 18h, a qualidade cai — e não há caminho de volta. O prompt estava num campo de texto que foi sobrescrito.
-
-**Troca de modelo quebra comportamento silenciosamente.** Instruções acopladas a um provider específico (blocos de raciocínio, formato JSON sem markdown) degradam ao migrar de modelo sem gerar erro visível.
-
-**Custo opaco até a fatura chegar.** Sem estimativa antes de publicar, um prompt de três mil tokens multiplicado pelo volume mensal pode estourar o contrato sem nenhum alerta.
-
-**Configuração e prompt divergem.** O prompt menciona uma ferramenta que não está habilitada no agente. Isso não falha no deploy — falha na conversa com o usuário, dias depois.
-
-Automata trata esses quatro problemas como requisito de produto, não como disciplina de quem edita.
 
 ---
 
