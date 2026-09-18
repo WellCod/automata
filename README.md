@@ -16,16 +16,19 @@ Plataforma de operação de agentes de IA em produção — versionamento imutá
 DEMO_REPLAY=true docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 # 2. Seed: owner + 5 agentes publicados + 500 runs históricos (90 dias)
+# Defina a senha do owner — ela não fica escrita em lugar nenhum
+read -rsp "Senha do owner: " SEED_OWNER_PASSWORD; echo
+
 docker exec \
-  -e SEED_OWNER_EMAIL="admin@automata.dev" \
-  -e SEED_OWNER_PASSWORD="Automata2024!" \
+  -e SEED_OWNER_EMAIL="admin@exemplo.com" \
+  -e SEED_OWNER_PASSWORD="$SEED_OWNER_PASSWORD" \
   automata-api-1 bash -c "cd /app && .venv/bin/python scripts/seed.py full"
 
 # 3. Painel
 pnpm --filter web dev   # http://localhost:3000
 ```
 
-Login: `admin@automata.dev` / `Automata2024!`
+Login: o e-mail e a senha definidos no passo 2.
 
 O seed `full` gera 5 agentes com perfis distintos (Analista Financeiro em `claude-opus-4-7`, Redator em `claude-sonnet-4-6`, Atendimento e Suporte em `claude-haiku-4-5`, Assistente de Código em `claude-sonnet-4-6`) e distribui 500 execuções nos últimos 90 dias com latências, taxas de erro e custos proporcionais ao modelo de cada agente. O painel de analytics reflete dados realistas desde o primeiro acesso.
 
@@ -214,15 +217,21 @@ pnpm --filter web dev   # http://localhost:3000
 **Seed:**
 ```bash
 # Mínimo: só cria o owner
+# Defina a senha do owner — ela não fica escrita em lugar nenhum
+read -rsp "Senha do owner: " SEED_OWNER_PASSWORD; echo
+
 docker exec \
   -e SEED_OWNER_EMAIL="admin@exemplo.com" \
-  -e SEED_OWNER_PASSWORD="Senha123!" \
+  -e SEED_OWNER_PASSWORD="$SEED_OWNER_PASSWORD" \
   automata-api-1 bash -c "cd /app && .venv/bin/python scripts/seed.py minimal"
 
 # Demo completo: 5 agentes + 500 runs históricos
+# Defina a senha do owner — ela não fica escrita em lugar nenhum
+read -rsp "Senha do owner: " SEED_OWNER_PASSWORD; echo
+
 docker exec \
   -e SEED_OWNER_EMAIL="admin@exemplo.com" \
-  -e SEED_OWNER_PASSWORD="Senha123!" \
+  -e SEED_OWNER_PASSWORD="$SEED_OWNER_PASSWORD" \
   automata-api-1 bash -c "cd /app && .venv/bin/python scripts/seed.py full"
 ```
 

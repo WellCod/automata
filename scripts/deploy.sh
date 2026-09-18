@@ -176,14 +176,15 @@ echo -e "  ${BOLD}Credenciais do usuário admin:${NC}"
 printf "  Email (ex: admin@seudominio.com): "
 read -r SEED_EMAIL
 printf "  Senha (mín. 8 chars, 1 maiúscula, 1 número, 1 especial): "
-read -r SEED_PASSWORD
+read -rs SEED_PASSWORD
+echo
 
 echo "  Rodando seed full (owner + 5 agentes + 500 runs)..."
 railway run --service api \
   bash -c "SEED_OWNER_EMAIL='$SEED_EMAIL' SEED_OWNER_PASSWORD='$SEED_PASSWORD' .venv/bin/python scripts/seed.py full" \
   2>/dev/null || {
     warn "Seed via railway run falhou — rode manualmente após o deploy:"
-    warn "  railway run bash -c \"SEED_OWNER_EMAIL='$SEED_EMAIL' SEED_OWNER_PASSWORD='$SEED_PASSWORD' .venv/bin/python scripts/seed.py full\""
+    warn "  railway run bash -c \"SEED_OWNER_EMAIL='$SEED_EMAIL' SEED_OWNER_PASSWORD='<a senha digitada acima>' .venv/bin/python scripts/seed.py full\""
   }
 
 # ─────────────────────────────────────────────────────────────────────────────
