@@ -111,8 +111,8 @@ Definidos em `ROLE_SCOPES` (`app/schemas/user.py`) e gravados no token no login.
 | Papel | Scopes |
 |---|---|
 | `owner` | `agent_os:admin` |
-| `editor` | tudo do viewer + `agents:run`, `sessions:write`, `configs:write`, `configs:publish` |
-| `viewer` | `agents:read`, `sessions:read`, `traces:read`, `configs:read`, `metrics:read`, `mcp_servers:read` |
+| `editor` | tudo do viewer + `agents:run`, `teams:run`, `sessions:write`, `configs:write`, `configs:publish` |
+| `viewer` | `agents:read`, `teams:read`, `sessions:read`, `traces:read`, `configs:read`, `metrics:read`, `mcp_servers:read` |
 
 ### Chaves
 
@@ -143,3 +143,17 @@ Tools marcadas em `require_confirmation` no agente pausam o run antes de executa
 - `GET /api/v1/approvals[?agent_id=]` lista os runs pausados com agente, quem pediu, nome e argumentos de cada tool.
 - A decisão é o continue do próprio AgentOS: `POST /agents/{id}/runs/{run_id}/continue`, com `session_id` e `tools` = os `tool_execution` recebidos, cada um com `confirmed: true` ou `false`. Exige `agents:run`. Com `user_isolation`, só o dono da sessão ou um owner retoma.
 - Aprovado, a tool executa e o run segue. Rejeitado, o modelo recebe a recusa e responde sem a ação. Nos dois casos o mesmo `agent_run` passa a `success`, e a pendência some.
+
+## Times multi-agente
+
+Time é um config com `kind: "team"` (ADR-0011), criado com `POST /api/v1/configs` e `"kind": "team"`. Usa o mesmo ciclo de rascunho, publicação, rollback, versões, execuções e métricas do agente. `GET /api/v1/configs?kind=agent|team` filtra.
+
+- Payload: `model_id`, `instructions` e `mcp_servers` são do **líder**. A seção `team` traz:
+  - `mode`: `coordinate` (padrão), `route`, `broadcast` ou `tasks`;
+  - `members`: `[{agent_id, version_id?}]`, de 1 a 20;
+  - `max_iterations` e `share_member_interactions`.
+- Membro sem `version_id` segue a versão vigente do agente; com `version_id`, fica fixado nela.
+- A descrição do agente vira o `role` do membro, que é o que o líder lê para decidir a quem delegar.
+- Validação na escrita: os membros existem, são agentes (sem time dentro de time) e estão publicados. A versão fixada precisa ser publicada e do próprio agente. Agente não aceita seção `team`.
+- Runtime: `TeamFactory` por request; o time é registrado em `os.teams` sem restart, como os agentes. Roda em `POST /teams/{id}/runs` e exige `teams:run` (editor e owner). O `TrackedTeam` conecta de forma estrita o MCP do líder e dos membros antes do run.
+- Só o run do time vai para `agent_run`/`usage_event`, com o consumo somado dos membros. Os membros não ganham run próprio, para o custo não contar duas vezes.
