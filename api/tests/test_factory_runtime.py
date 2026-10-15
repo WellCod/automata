@@ -11,7 +11,7 @@ from testcontainers.postgres import PostgresContainer
 
 from alembic import command
 from app.agents.factory import load_version
-from app.agents.registry import published_config_ids
+from app.agents.registry import published_configs
 from app.agents.tracking import RunRecord, persist
 from app.db import get_engine
 from app.models.run import AgentRun
@@ -76,7 +76,7 @@ def test_publicados_inclui_so_quem_tem_versao_vigente(
     rascunho = svc.create_config("so-rascunho", description="nunca publicado")
     session.commit()
 
-    ids = published_config_ids()
+    ids = [i for i, _ in published_configs()]
     assert config.id in ids  # type: ignore[attr-defined]
     assert rascunho.id not in ids
 
@@ -437,3 +437,129 @@ def test_tool_sensivel_pausa_e_retoma_com_decisao(
         assert client.get("/api/v1/approvals", params={"agent_id": agent_id}).json() == []
         runs = client.get(f"/api/v1/configs/{agent_id}/runs").json()["items"]
         assert [r["status"] for r in runs] == ["success"]
+
+
+# --- times multi-agente ---
+
+
+def _publish(client: object, kind: str, name: str, payload: dict[str, object]) -> str:
+    c = client
+    created = c.post(  # type: ignore[attr-defined]
+        "/api/v1/configs", json={"name": name, "description": f"Use para {name}", "kind": kind}
+    )
+    created.raise_for_status()
+    config_id = created.json()["id"]
+    c.put(  # type: ignore[attr-defined]
+        f"/api/v1/configs/{config_id}/draft",
+        json={"name": name, "description": f"Use para {name}", "payload": payload},
+    ).raise_for_status()
+    c.post(f"/api/v1/configs/{config_id}/publish").raise_for_status()  # type: ignore[attr-defined]
+    return str(config_id)
+
+
+def test_time_delega_ao_membro_que_usa_tool_mcp(
+    db_url: str, mcp_url: str, mcp_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi.testclient import TestClient
+
+    from tests.fake_models import DelegatingModel, tool_args
+    from tests.mcp_fake_server import TOKEN, calls
+
+    model = DelegatingModel(id="claude-haiku-4-5")
+    with TestClient(_app_with_model(monkeypatch, model)) as client:  # type: ignore[arg-type]
+        server = client.post(
+            "/api/v1/mcp-servers",
+            json={
+                "name": "crmtime",
+                "slug": "crmtime",
+                "url": mcp_url,
+                "headers": {"Authorization": f"Bearer {TOKEN}"},
+            },
+        ).json()
+        client.post(f"/api/v1/mcp-servers/{server['id']}/discover").raise_for_status()
+        membro = _publish(
+            client,
+            "agent",
+            "consulta-crm",
+            {
+                "model_id": "claude-haiku-4-5",
+                "mcp_servers": [{"server_id": server["id"], "tools": ["buscar_cliente"]}],
+            },
+        )
+        model.member_id = membro
+        model.member_tool = "crmtime_buscar_cliente"
+        model.member_tool_args = tool_args(cliente_id="42")
+
+        time = _publish(
+            client,
+            "team",
+            "atendimento",
+            {
+                "model_id": "claude-haiku-4-5",
+                "team": {"mode": "coordinate", "members": [{"agent_id": membro}]},
+            },
+        )
+        assert time in [t["id"] for t in client.get("/teams").json()]
+        assert time not in [a["id"] for a in client.get("/agents").json()]
+
+        calls.clear()
+        resp = client.post(
+            f"/teams/{time}/runs", data={"message": "quem é o 42?", "stream": "false"}
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"] == "COMPLETED"
+        assert calls == [("buscar_cliente", {"cliente_id": "42"})]
+
+        # só o time é registrado; o membro não ganha run próprio
+        assert client.get(f"/api/v1/configs/{time}/runs").json()["total"] == 1
+        assert client.get(f"/api/v1/configs/{membro}/runs").json()["total"] == 0
+
+        listed = client.get("/api/v1/configs", params={"kind": "team"}).json()["items"]
+        assert [c["id"] for c in listed] == [time]
+
+
+def test_time_recusa_membro_invalido(
+    db_url: str, mcp_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import uuid
+
+    from fastapi.testclient import TestClient
+
+    with TestClient(_app_with_model(monkeypatch, ReplayModelForTest())) as client:  # type: ignore[arg-type]
+        nao_publicado = client.post(
+            "/api/v1/configs", json={"name": "rascunho", "description": "x"}
+        ).json()["id"]
+        time = client.post(
+            "/api/v1/configs", json={"name": "t", "description": "x", "kind": "team"}
+        ).json()["id"]
+
+        def draft(team: object) -> int:
+            return client.put(
+                f"/api/v1/configs/{time}/draft",
+                json={
+                    "name": "t",
+                    "description": "x",
+                    "payload": {"model_id": "claude-haiku-4-5", "team": team},
+                },
+            ).status_code
+
+        assert draft(None) == 400
+        assert draft({"members": [{"agent_id": str(uuid.uuid4())}]}) == 400
+        assert draft({"members": [{"agent_id": nao_publicado}]}) == 400
+        assert draft({"members": [{"agent_id": time}]}) == 400
+        assert draft({"members": []}) == 422
+        assert draft({"mode": "collaborate", "members": [{"agent_id": nao_publicado}]}) == 422
+
+        # agente não aceita seção de time
+        resp = client.put(
+            f"/api/v1/configs/{nao_publicado}/draft",
+            json={
+                "name": "rascunho",
+                "description": "x",
+                "payload": {
+                    "model_id": "claude-haiku-4-5",
+                    "team": {"members": [{"agent_id": time}]},
+                },
+            },
+        )
+        assert resp.status_code == 400

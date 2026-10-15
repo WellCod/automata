@@ -14,6 +14,7 @@ from app.schemas.config import (
     AgentConfigResponse,
     AgentConfigVersionDetail,
     AgentConfigVersionSummary,
+    ConfigKind,
     ConfigPayload,
     ConfigPayloadStatus,
     CreateConfigInput,
@@ -46,6 +47,7 @@ def _to_version_summary(v: AgentConfigVersion | None) -> AgentConfigVersionSumma
 def _to_detail(c: AgentConfig, payload: ConfigPayload | None) -> AgentConfigDetail:
     return AgentConfigDetail(
         id=c.id,
+        kind=ConfigKind(c.kind),
         name=c.name,
         description=c.description,
         created_at=c.created_at,
@@ -59,6 +61,7 @@ def _to_detail(c: AgentConfig, payload: ConfigPayload | None) -> AgentConfigDeta
 def _to_response(c: AgentConfig) -> AgentConfigResponse:
     return AgentConfigResponse(
         id=c.id,
+        kind=ConfigKind(c.kind),
         name=c.name,
         description=c.description,
         created_at=c.created_at,
@@ -77,7 +80,7 @@ def _to_response(c: AgentConfig) -> AgentConfigResponse:
 def create_config(body: CreateConfigInput, session: SessionDep) -> AgentConfigResponse:
     repo = ConfigRepository(session)
     service = ConfigService(repo, McpServerRepository(session))
-    config = service.create_config(name=body.name, description=body.description)
+    config = service.create_config(name=body.name, description=body.description, kind=body.kind)
     result = _to_response(config)
     session.commit()
     return result
@@ -90,10 +93,13 @@ def list_configs(
     page_size: int = Query(default=20, ge=1, le=100),
     q: str | None = Query(default=None, description="Busca por nome (substring) ou ID exato"),
     status: ConfigPayloadStatus | None = Query(default=None),  # noqa: B008
+    kind: ConfigKind | None = Query(default=None),  # noqa: B008
 ) -> AgentConfigPage:
     repo = ConfigRepository(session)
     service = ConfigService(repo, McpServerRepository(session))
-    items, total = service.list_configs(page=page, page_size=page_size, q=q, status=status)
+    items, total = service.list_configs(
+        page=page, page_size=page_size, q=q, status=status, kind=kind
+    )
     return AgentConfigPage(
         items=[_to_response(c) for c in items],
         total=total,

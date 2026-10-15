@@ -28,7 +28,7 @@ Por padrão, o membro segue a versão **vigente** do agente. Opcionalmente o mem
 ## Consequências
 
 - A coluna `kind` entra em `agent_config` com default `"agent"`. Listagens e o registro no AgentOS filtram por `kind`. O nome `agent_config` passa a ser impreciso: aceito para não renomear a tabela com dados.
-- O payload passa a ser uma união discriminada por `kind`. Validação na escrita: membros existem, são agentes, estão publicados, não se repetem e o time tem ao menos um. No modo `route`, um membro sem descrição é erro.
+- O payload ganha uma seção opcional `team` (modo, membros, limite de iterações, compartilhar interações). Modelo, instruções e servidores MCP do payload passam a ser os do líder. Optei por isso em vez de uma união discriminada por `kind`: o painel e os tipos gerados seguem com um formato só. A coerência entre `kind` e a seção `team` é validada no serviço. Validação na escrita: membros existem, são agentes, estão publicados, não se repetem, a versão fixada é publicada e do próprio agente, e o time tem de 1 a 20 membros. A descrição do agente já é obrigatória e vira o `role` do membro.
 - **A descrição do membro é o contrato de roteamento do líder**, como a do agente é para o cliente MCP (ADR-0009). Descrição vaga é falha de delegação. O linter ganha regras para isso.
 - Publicar um agente muda o comportamento de todo time que o usa sem fixação. O painel mostra, no agente, os times que dependem dele.
 - `agent_run` e `usage_event` passam a registrar runs de time, com o consumo agregado (o `RunOutput` do time já soma os membros). O detalhe por membro vem da árvore de execução, não do `agent_run`.
@@ -37,5 +37,5 @@ Por padrão, o membro segue a versão **vigente** do agente. Opcionalmente o mem
 ## O que me faria reverter
 
 - Caso concreto de time dentro de time: liberar com detecção de ciclo e limite de profundidade.
-- Times e agentes divergirem a ponto de a união discriminada encher serviço e tela de `if kind`: separar as tabelas.
+- Times e agentes divergirem a ponto de a seção `team` encher serviço e tela de `if kind`: separar payloads ou tabelas.
 - O Agno passar a fixar versão de membro e a expor persistência auto-hospedável e white-label: reavaliar junto com o ADR-0002.

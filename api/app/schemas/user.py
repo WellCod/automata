@@ -10,6 +10,7 @@ from app.models.user import UserRole
 # configs e metrics são das rotas próprias (app.authz). Tabela em api/README.md.
 _VIEWER_SCOPES = [
     "agents:read",
+    "teams:read",
     "sessions:read",
     "traces:read",
     Scope.CONFIGS_READ,
@@ -22,6 +23,7 @@ ROLE_SCOPES: dict[UserRole, list[str]] = {
     UserRole.editor: [
         *_VIEWER_SCOPES,
         "agents:run",
+        "teams:run",
         "sessions:write",
         Scope.CONFIGS_WRITE,
         Scope.CONFIGS_PUBLISH,

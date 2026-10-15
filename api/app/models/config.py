@@ -44,6 +44,10 @@ class AgentConfig(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
+    # "agent" ou "team" (ADR-0011): times reaproveitam versionamento e métricas
+    kind: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="agent", default="agent", index=True
+    )
     current_version_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("agent_config_version.id", use_alter=True, name="fk_current_version"),

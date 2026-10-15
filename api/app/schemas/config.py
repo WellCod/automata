@@ -11,6 +11,11 @@ class ConfigPayloadStatus(enum.StrEnum):
     published = "published"
 
 
+class ConfigKind(enum.StrEnum):
+    agent = "agent"
+    team = "team"
+
+
 class InstructionSections(BaseModel):
     persona: str = ""
     situation: str = ""
@@ -43,6 +48,31 @@ class McpServerBinding(BaseModel):
         return self
 
 
+TeamModeName = Literal["coordinate", "route", "broadcast", "tasks"]
+
+
+class TeamMember(BaseModel):
+    agent_id: UUID
+    # None segue a versão vigente do agente; preenchido fixa a versão (ADR-0011)
+    version_id: UUID | None = None
+
+
+class TeamSettings(BaseModel):
+    """Seção de time do payload. Só existe em config de kind=team."""
+
+    mode: TeamModeName = "coordinate"
+    members: list[TeamMember] = Field(min_length=1, max_length=20)
+    max_iterations: int = Field(default=10, ge=1, le=50)
+    share_member_interactions: bool = False
+
+    @model_validator(mode="after")
+    def membros_unicos(self) -> "TeamSettings":
+        ids = [m.agent_id for m in self.members]
+        if len(ids) != len(set(ids)):
+            raise ValueError("membro repetido no time")
+        return self
+
+
 class ConfigPayload(BaseModel):
     """Payload JSONB de uma versão de configuração.
 
@@ -60,6 +90,8 @@ class ConfigPayload(BaseModel):
     mcp_servers: list[McpServerBinding] = Field(default_factory=list)
     capabilities: CapabilityFlags = Field(default_factory=CapabilityFlags)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # Em time: modelo, instruções e MCP acima são do líder
+    team: TeamSettings | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -88,6 +120,7 @@ class AgentConfigVersionSummary(BaseModel):
 
 class AgentConfigResponse(BaseModel):
     id: UUID
+    kind: ConfigKind
     name: str
     description: str
     created_at: datetime
@@ -124,3 +157,4 @@ class RollbackInput(BaseModel):
 class CreateConfigInput(BaseModel):
     name: str
     description: str = Field(min_length=1)
+    kind: ConfigKind = ConfigKind.agent

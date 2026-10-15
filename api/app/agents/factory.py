@@ -6,12 +6,14 @@ from agno.agent import Agent
 from agno.agent.factory import AgentFactory
 from agno.db.base import AsyncBaseDb, BaseDb
 from agno.factory.utils import FactoryValidationError, RequestContext
+from agno.team import Team, TeamMode
+from agno.team.factory import TeamFactory
 from agno.tools.mcp import MCPTools
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.agents.models_map import resolve_model
-from app.agents.tracking import TrackedAgent
+from app.agents.tracking import TrackedAgent, TrackedTeam
 from app.db import get_engine
 from app.mcp.client import build_mcp_tools
 from app.mcp.egress import EgressDenied
@@ -95,6 +97,25 @@ def build_instructions(payload: ConfigPayload) -> str | None:
     return "\n\n".join(s for s in sections if s) or None
 
 
+def _agent_from(config_id: UUID, resolved: ResolvedVersion, *, tracked: bool) -> Agent:
+    payload = resolved.payload
+    cls = TrackedAgent if tracked else Agent
+    agent = cls(
+        id=str(config_id),
+        name=resolved.name,
+        # em time, a descrição é o que o líder usa para decidir a quem delegar
+        description=resolved.description,
+        role=resolved.description,
+        model=resolve_model(payload.model_id, payload.capabilities),
+        instructions=build_instructions(payload),
+        tools=list(resolved.mcp_tools),
+    )
+    if isinstance(agent, TrackedAgent):
+        agent.automata_config_id = config_id
+        agent.automata_model_id = payload.model_id
+    return agent
+
+
 def make_agent_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> AgentFactory:
     """Cria um AgentFactory para o config_id informado.
 
@@ -107,21 +128,60 @@ def make_agent_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> AgentFactor
         version_id = ctx.input.version_id if isinstance(ctx.input, FactoryInput) else None
         # leitura síncrona do banco fora do event loop
         resolved = await asyncio.to_thread(load_version, config_id, version_id)
-        payload = resolved.payload
-
-        agent = TrackedAgent(
-            id=str(config_id),
-            name=resolved.name,
-            description=resolved.description,
-            model=resolve_model(payload.model_id, payload.capabilities),
-            instructions=build_instructions(payload),
-            tools=list(resolved.mcp_tools),
-        )
-        agent.automata_config_id = config_id
-        agent.automata_model_id = payload.model_id
-        return agent
+        return _agent_from(config_id, resolved, tracked=True)
 
     return AgentFactory(
+        id=str(config_id),
+        db=db,
+        factory=build,
+        input_schema=FactoryInput,
+    )
+
+
+@dataclass
+class ResolvedTeam:
+    leader: ResolvedVersion
+    members: list[tuple[UUID, ResolvedVersion]]
+
+
+def load_team(config_id: UUID, version_id: UUID | None) -> ResolvedTeam:
+    leader = load_version(config_id, version_id)
+    team = leader.payload.team
+    if team is None:
+        raise FactoryValidationError(f"Config {config_id} não é um time")
+    members = [(m.agent_id, load_version(m.agent_id, m.version_id)) for m in team.members]
+    return ResolvedTeam(leader=leader, members=members)
+
+
+def make_team_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> TeamFactory:
+    """Time por request: líder e membros montados das versões publicadas (ADR-0011).
+
+    Só o time é registrado em agent_run; os membros são Agents comuns.
+    """
+
+    async def build(ctx: RequestContext) -> Team:
+        version_id = ctx.input.version_id if isinstance(ctx.input, FactoryInput) else None
+        resolved = await asyncio.to_thread(load_team, config_id, version_id)
+        leader = resolved.leader
+        settings = leader.payload.team
+        assert settings is not None
+        team = TrackedTeam(
+            id=str(config_id),
+            name=leader.name,
+            description=leader.description,
+            model=resolve_model(leader.payload.model_id, leader.payload.capabilities),
+            instructions=build_instructions(leader.payload),
+            tools=list(leader.mcp_tools),
+            members=[_agent_from(mid, m, tracked=False) for mid, m in resolved.members],
+            mode=TeamMode(settings.mode),
+            max_iterations=settings.max_iterations,
+            share_member_interactions=settings.share_member_interactions,
+        )
+        team.automata_config_id = config_id
+        team.automata_model_id = leader.payload.model_id
+        return team
+
+    return TeamFactory(
         id=str(config_id),
         db=db,
         factory=build,

@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.config import AgentConfig, AgentConfigVersion
-from app.schemas.config import ConfigPayload, ConfigPayloadStatus
+from app.schemas.config import ConfigKind, ConfigPayload, ConfigPayloadStatus
 
 
 class ConfigRepository:
@@ -22,8 +22,10 @@ class ConfigRepository:
         ).all()
         return {row.id: row.name for row in rows}
 
-    def create_config(self, name: str, description: str) -> AgentConfig:
-        config = AgentConfig(name=name, description=description)
+    def create_config(
+        self, name: str, description: str, kind: ConfigKind = ConfigKind.agent
+    ) -> AgentConfig:
+        config = AgentConfig(name=name, description=description, kind=kind.value)
         self._session.add(config)
         self._session.flush()
         return config
@@ -86,8 +88,11 @@ class ConfigRepository:
         page_size: int = 20,
         q: str | None = None,
         status: ConfigPayloadStatus | None = None,
+        kind: ConfigKind | None = None,
     ) -> tuple[list[AgentConfig], int]:
         base = select(AgentConfig)
+        if kind is not None:
+            base = base.where(AgentConfig.kind == kind.value)
 
         if q is not None:
             try:

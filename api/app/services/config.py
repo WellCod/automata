@@ -4,7 +4,7 @@ from app.agents.capabilities import validate_capabilities
 from app.models.config import AgentConfig, AgentConfigVersion
 from app.repositories.config import ConfigRepository
 from app.repositories.mcp_server import McpServerRepository
-from app.schemas.config import ConfigPayload, ConfigPayloadStatus
+from app.schemas.config import ConfigKind, ConfigPayload, ConfigPayloadStatus
 
 
 class ConfigService:
@@ -12,15 +12,16 @@ class ConfigService:
         self._repo = repo
         self._servers = servers
 
-    def create_config(self, name: str, description: str) -> AgentConfig:
-        return self._repo.create_config(name=name, description=description)
+    def create_config(
+        self, name: str, description: str, kind: ConfigKind = ConfigKind.agent
+    ) -> AgentConfig:
+        return self._repo.create_config(name=name, description=description, kind=kind)
 
     def save_draft(
         self, config_id: UUID, payload: ConfigPayload, author: str
     ) -> AgentConfigVersion:
-        self._validate(payload)
-
         config = self._get_or_raise(config_id)
+        self._validate(config, payload)
         version = self._repo.create_version(
             config_id=config_id,
             payload=payload,
@@ -93,9 +94,8 @@ class ConfigService:
         payload: ConfigPayload,
         author: str,
     ) -> AgentConfigVersion:
-        self._validate(payload)
-
         config = self._get_or_raise(config_id)
+        self._validate(config, payload)
         self._repo.update_config(config, name=name, description=description)
         version = self._repo.create_version(
             config_id=config_id,
@@ -117,8 +117,11 @@ class ConfigService:
         page_size: int = 20,
         q: str | None = None,
         status: ConfigPayloadStatus | None = None,
+        kind: ConfigKind | None = None,
     ) -> tuple[list[AgentConfig], int]:
-        return self._repo.list_configs(page=page, page_size=page_size, q=q, status=status)
+        return self._repo.list_configs(
+            page=page, page_size=page_size, q=q, status=status, kind=kind
+        )
 
     def _get_or_raise(self, config_id: UUID) -> AgentConfig:
         config = self._repo.get_config(config_id)
@@ -126,11 +129,41 @@ class ConfigService:
             raise ValueError(f"Config {config_id} não encontrada")
         return config
 
-    def _validate(self, payload: ConfigPayload) -> None:
+    def _validate(self, config: AgentConfig, payload: ConfigPayload) -> None:
         errors = validate_capabilities(payload.model_id, payload.capabilities)
         errors += self._mcp_errors(payload)
+        errors += self._team_errors(config, payload)
         if errors:
             raise ValueError("; ".join(errors))
+
+    def _team_errors(self, config: AgentConfig, payload: ConfigPayload) -> list[str]:
+        """Membros existem, são agentes publicados e a versão fixada é deles (ADR-0011)."""
+        if config.kind != ConfigKind.team:
+            return ["só time tem seção 'team'"] if payload.team is not None else []
+        if payload.team is None:
+            return ["time precisa da seção 'team' com ao menos um membro"]
+        errors: list[str] = []
+        for member in payload.team.members:
+            agent = self._repo.get_config(member.agent_id)
+            if agent is None:
+                errors.append(f"membro {member.agent_id} não existe")
+                continue
+            if agent.kind != ConfigKind.agent:
+                errors.append(f"'{agent.name}' é um time; time dentro de time não é suportado")
+                continue
+            if agent.current_version_id is None:
+                errors.append(f"'{agent.name}' não tem versão publicada")
+            if member.version_id is not None:
+                version = self._repo.get_version(member.version_id)
+                if (
+                    version is None
+                    or version.config_id != agent.id
+                    or version.status != ConfigPayloadStatus.published
+                ):
+                    errors.append(
+                        f"versão fixada de '{agent.name}' não é uma versão publicada dele"
+                    )
+        return errors
 
     def _mcp_errors(self, payload: ConfigPayload) -> list[str]:
         if not payload.mcp_servers:

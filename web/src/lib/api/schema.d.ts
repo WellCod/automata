@@ -361,6 +361,7 @@ export interface components {
        * Format: uuid
        */
       id: string;
+      kind: components["schemas"]["ConfigKind"];
       /** Name */
       name: string;
       /** Description */
@@ -397,6 +398,7 @@ export interface components {
        * Format: uuid
        */
       id: string;
+      kind: components["schemas"]["ConfigKind"];
       /** Name */
       name: string;
       /** Description */
@@ -538,6 +540,11 @@ export interface components {
       vision: boolean;
     };
     /**
+     * ConfigKind
+     * @enum {string}
+     */
+    ConfigKind: "agent" | "team";
+    /**
      * ConfigPayload
      * @description Payload JSONB de uma versão de configuração.
      *
@@ -565,6 +572,7 @@ export interface components {
       metadata?: {
         [key: string]: unknown;
       };
+      team?: components["schemas"]["TeamSettings"] | null;
     };
     /**
      * ConfigPayloadStatus
@@ -577,6 +585,8 @@ export interface components {
       name: string;
       /** Description */
       description: string;
+      /** @default agent */
+      kind: components["schemas"]["ConfigKind"];
     };
     /** CreateUserInput */
     CreateUserInput: {
@@ -805,6 +815,40 @@ export interface components {
       /** Page Size */
       page_size: number;
     };
+    /** TeamMember */
+    TeamMember: {
+      /**
+       * Agent Id
+       * Format: uuid
+       */
+      agent_id: string;
+      /** Version Id */
+      version_id?: string | null;
+    };
+    /**
+     * TeamSettings
+     * @description Seção de time do payload. Só existe em config de kind=team.
+     */
+    TeamSettings: {
+      /**
+       * Mode
+       * @default coordinate
+       * @enum {string}
+       */
+      mode: "coordinate" | "route" | "broadcast" | "tasks";
+      /** Members */
+      members: components["schemas"]["TeamMember"][];
+      /**
+       * Max Iterations
+       * @default 10
+       */
+      max_iterations: number;
+      /**
+       * Share Member Interactions
+       * @default false
+       */
+      share_member_interactions: boolean;
+    };
     /** TokenResponse */
     TokenResponse: {
       /** Access Token */
@@ -899,6 +943,7 @@ export interface operations {
         /** @description Busca por nome (substring) ou ID exato */
         q?: string | null;
         status?: components["schemas"]["ConfigPayloadStatus"] | null;
+        kind?: components["schemas"]["ConfigKind"] | null;
       };
       header?: never;
       path?: never;
