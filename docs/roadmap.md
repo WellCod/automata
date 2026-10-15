@@ -760,7 +760,7 @@ Fecha o que ficou aberto dos PRs 41 e 44.
 
 ### Próximos PRs da fase
 
-- [ ] `fix(api)`: registro real de runs (status de erro e duração), dono da versão no modo teste, banco fora do event loop, agente publicado sem restart, extended thinking aplicado, índices por data e gate de cobertura fora das evals noturnas
+- [ ] #67 — `fix(api)`: registro real de runs (status de erro e duração), dono da versão no modo teste, banco fora do event loop, agente publicado sem restart, extended thinking aplicado, índices por data e gate de cobertura fora das evals noturnas
 - [ ] `fix(infra)`: entrypoint com `exec "$@"`, web de dev só no override, porta 8000 fora do compose de produção
 - [ ] `fix(web)`: fonte (`--font-sans` circular), tema conforme `DESIGN.md`, versão ativa no histórico, confirmação de publicar/reverter, alterações não salvas, estados de erro
 - [ ] `refactor(web)`: componentes shadcn (Button, Tabs, Field, Sonner) e nova página de edição
@@ -771,17 +771,17 @@ Fecha o que ficou aberto dos PRs 41 e 44.
 
 ## Fase 12 — Multi-agente e MCP
 
-Decisões em [ADR-0009](adr/0009-superficie-de-integracao.md), [ADR-0010](adr/0010-servidores-mcp-externos.md) e [ADR-0011](adr/0011-times-versionados.md). Depende do `fix(api)` de runtime da Fase 11 (#67). Cada PR é empilhado sobre o anterior.
+Decisões em [ADR-0009](adr/0009-superficie-de-integracao.md), [ADR-0010](adr/0010-servidores-mcp-externos.md) e [ADR-0011](adr/0011-times-versionados.md). Depende do `fix(api)` de runtime da Fase 11 (#67). Cada PR é empilhado sobre o anterior: #67 a #76 já mergeados (em cascata nas branches); #77 leva tudo à `main`; #78 vem depois.
 
-- [ ] `docs(adr)`: ADR-0010, ADR-0011 e ADR-0009 aceito
-- [ ] `feat(api)`: cadastro de servidores MCP com segredo cifrado e proteção de SSRF (inclui lista única de routers para `main.py` e o export do OpenAPI, que agora traz `/auth`)
-- [ ] `feat(api)`: teste de conexão e descoberta de tools
-- [ ] `feat(api)`: agentes usam tools MCP na factory (payload v2)
-- [ ] `feat(web)`: catálogo de servidores MCP e seleção de tools no agente
-- [ ] `feat`: confirmação humana de tools sensíveis
-- [ ] `feat(api)`: times versionados e `TeamFactory`
-- [ ] `feat(web)`: editor de time e modo teste com rastro de delegação
-- [ ] `feat`: integrações — tokens de consumidor e catálogo exposto via `/mcp`
-- [ ] `feat`: árvore de execução
+- [ ] #68 — `docs(adr)`: ADR-0010, ADR-0011 e ADR-0009 aceito
+- [ ] #69 — `feat(api)`: cadastro de servidores MCP com segredo cifrado e proteção de SSRF (inclui lista única de routers para `main.py` e o export do OpenAPI, que agora traz `/auth`)
+- [ ] #70 — `feat(api)`: teste de conexão e descoberta de tools
+- [ ] #71 — `feat(api)`: agentes usam tools MCP na factory (payload v2)
+- [ ] #72 — `feat(web)`: catálogo de servidores MCP e seleção de tools no agente
+- [ ] #73 — `feat`: confirmação humana de tools sensíveis
+- [ ] #74 — `feat(api)`: times versionados e `TeamFactory`
+- [ ] #75 — `feat(web)`: editor de time e modo teste com rastro de delegação
+- [ ] #76 — `feat`: integrações — tokens de consumidor e catálogo exposto via `/mcp`
+- [ ] #78 — `feat`: árvore de execução
 
 Fica para depois: workflows (condições guardadas no banco exigem `cel-python`), agendamentos (a factory recebe o run sem claims do usuário), guardrails por agente e A2A (exige `a2a-sdk` e não lista agentes de factory).
