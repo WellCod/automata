@@ -3,12 +3,14 @@ from uuid import UUID
 from app.agents.capabilities import validate_capabilities
 from app.models.config import AgentConfig, AgentConfigVersion
 from app.repositories.config import ConfigRepository
+from app.repositories.mcp_server import McpServerRepository
 from app.schemas.config import ConfigPayload, ConfigPayloadStatus
 
 
 class ConfigService:
-    def __init__(self, repo: ConfigRepository) -> None:
+    def __init__(self, repo: ConfigRepository, servers: McpServerRepository | None = None) -> None:
         self._repo = repo
+        self._servers = servers
 
     def create_config(self, name: str, description: str) -> AgentConfig:
         return self._repo.create_config(name=name, description=description)
@@ -16,9 +18,7 @@ class ConfigService:
     def save_draft(
         self, config_id: UUID, payload: ConfigPayload, author: str
     ) -> AgentConfigVersion:
-        errors = validate_capabilities(payload.model_id, payload.capabilities)
-        if errors:
-            raise ValueError("; ".join(errors))
+        self._validate(payload)
 
         config = self._get_or_raise(config_id)
         version = self._repo.create_version(
@@ -93,9 +93,7 @@ class ConfigService:
         payload: ConfigPayload,
         author: str,
     ) -> AgentConfigVersion:
-        errors = validate_capabilities(payload.model_id, payload.capabilities)
-        if errors:
-            raise ValueError("; ".join(errors))
+        self._validate(payload)
 
         config = self._get_or_raise(config_id)
         self._repo.update_config(config, name=name, description=description)
@@ -127,3 +125,33 @@ class ConfigService:
         if config is None:
             raise ValueError(f"Config {config_id} não encontrada")
         return config
+
+    def _validate(self, payload: ConfigPayload) -> None:
+        errors = validate_capabilities(payload.model_id, payload.capabilities)
+        errors += self._mcp_errors(payload)
+        if errors:
+            raise ValueError("; ".join(errors))
+
+    def _mcp_errors(self, payload: ConfigPayload) -> list[str]:
+        if not payload.mcp_servers:
+            return []
+        if self._servers is None:
+            raise RuntimeError("ConfigService sem McpServerRepository para validar mcp_servers")
+        found = {
+            s.id: s for s in self._servers.get_many([b.server_id for b in payload.mcp_servers])
+        }
+        errors: list[str] = []
+        for binding in payload.mcp_servers:
+            server = found.get(binding.server_id)
+            if server is None:
+                errors.append(f"servidor MCP {binding.server_id} não existe")
+                continue
+            if server.tools_snapshot is None:
+                # nunca descoberto: a lista de tools não tem contra o que conferir
+                continue
+            known = {t["name"] for t in server.tools_snapshot}
+            pedidas = set(binding.tools or []) | set(binding.require_confirmation)
+            faltando = pedidas - known
+            if faltando:
+                errors.append(f"tools inexistentes em '{server.slug}': {sorted(faltando)}")
+        return errors

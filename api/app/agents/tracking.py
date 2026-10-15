@@ -7,20 +7,23 @@ fora do event loop.
 """
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import monotonic
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from agno.agent import Agent
-from agno.run.agent import RunOutput
+from agno.run.agent import RunErrorEvent, RunOutput
 from agno.run.base import RunStatus
+from agno.tools.mcp import MCPTools
 from sqlalchemy.orm import Session
 
 from app.db import get_engine
+from app.mcp.client import McpUnavailable, connect_strict
 from app.repositories.run import RunRepository
 from app.repositories.usage import UsageRepository
 
@@ -111,8 +114,49 @@ class TrackedAgent(Agent):
             return self._track_output(result, kwargs)
         return self._track_stream(result, kwargs)
 
+    def _mcp_tools(self) -> list[MCPTools]:
+        tools = self.tools if isinstance(self.tools, list) else []
+        return [t for t in tools if isinstance(t, MCPTools)]
+
+    async def _connect_mcp(self) -> None:
+        """Conecta os servidores MCP antes do run, falhando alto (ADR-0010).
+
+        Roda na mesma task que o run do Agno; registrar em
+        _mcp_tools_initialized_on_run faz o próprio Agno fechar as conexões no
+        finally do run, na mesma task em que foram abertas.
+        """
+        connected: list[MCPTools] = []
+        try:
+            for tools in self._mcp_tools():
+                await connect_strict(tools, tools.tool_name_prefix or tools.name)
+                connected.append(tools)
+        except McpUnavailable:
+            for tools in connected:
+                with contextlib.suppress(Exception):
+                    await tools.close()
+            raise
+        self._mcp_tools_initialized_on_run.extend(connected)
+
+    def _error_output(self, kwargs: dict[str, Any], message: str) -> RunOutput:
+        return RunOutput(
+            run_id=kwargs.get("run_id") or str(uuid4()),
+            agent_id=self.id,
+            agent_name=self.name,
+            session_id=kwargs.get("session_id"),
+            user_id=kwargs.get("user_id"),
+            content=message,
+            status=RunStatus.error,
+        )
+
     async def _track_output(self, coro: Any, kwargs: dict[str, Any]) -> Any:
         start = monotonic()
+        try:
+            await self._connect_mcp()
+        except McpUnavailable as exc:
+            coro.close()
+            output = self._error_output(kwargs, str(exc))
+            await self._save(self._record(kwargs, start, output, output.run_id, "error", str(exc)))
+            return output
         try:
             output = await coro
         except asyncio.CancelledError:
@@ -131,6 +175,20 @@ class TrackedAgent(Agent):
         session_id: str | None = kwargs.get("session_id")
         last_event: str | None = None
         output: RunOutput | None = None
+        try:
+            await self._connect_mcp()
+        except McpUnavailable as exc:
+            await stream.aclose()  # type: ignore[attr-defined]
+            failed = self._error_output(kwargs, str(exc))
+            yield RunErrorEvent(
+                run_id=failed.run_id,
+                agent_id=self.id or "",
+                session_id=failed.session_id,
+                content=str(exc),
+                error_type="mcp_unavailable",
+            )
+            await self._save(self._record(kwargs, start, failed, failed.run_id, "error", str(exc)))
+            return
         try:
             async for event in stream:
                 run_id = getattr(event, "run_id", None) or run_id

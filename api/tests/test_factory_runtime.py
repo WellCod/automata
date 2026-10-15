@@ -151,3 +151,193 @@ def test_publicar_registra_agente_sem_restart_e_run_e_gravado(
         assert runs["total"] == 1
         assert runs["items"][0]["status"] == "success"
         assert runs["items"][0]["duration_ms"] is not None
+
+
+# --- agente com tools MCP de verdade ---
+
+
+@pytest.fixture(scope="module")
+def mcp_url() -> Generator[str, None, None]:
+    from tests.mcp_fake_server import running_server
+
+    with running_server() as url:
+        yield url
+
+
+@pytest.fixture
+def mcp_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    from cryptography.fernet import Fernet
+
+    monkeypatch.setenv("MCP_SECRETS_KEY", Fernet.generate_key().decode())
+    monkeypatch.setenv("MCP_ALLOWED_HOSTS", "127.0.0.1")
+    get_settings.cache_clear()
+
+
+def _app_with_model(monkeypatch: pytest.MonkeyPatch, model: object) -> object:
+    import app.agents.factory as factory
+
+    monkeypatch.setattr(factory, "resolve_model", lambda *a, **k: model)
+    from app.main import create_app
+
+    return create_app(auto_provision_dbs=True, enable_auth=False, enable_mcp_server=False)
+
+
+def _agent_with_server(client: object, url: str, slug: str, tools: list[str] | None) -> str:
+    from tests.mcp_fake_server import TOKEN
+
+    c = client  # TestClient
+    server = c.post(  # type: ignore[attr-defined]
+        "/api/v1/mcp-servers",
+        json={
+            "name": slug,
+            "slug": slug,
+            "url": url,
+            "headers": {"Authorization": f"Bearer {TOKEN}"},
+        },
+    ).json()
+    c.post(f"/api/v1/mcp-servers/{server['id']}/discover").raise_for_status()  # type: ignore[attr-defined]
+    agent = c.post(  # type: ignore[attr-defined]
+        "/api/v1/configs", json={"name": f"agente-{slug}", "description": "Use para clientes"}
+    ).json()
+    c.put(  # type: ignore[attr-defined]
+        f"/api/v1/configs/{agent['id']}/draft",
+        json={
+            "name": f"agente-{slug}",
+            "description": "Use para clientes",
+            "payload": {
+                "model_id": "claude-haiku-4-5",
+                "mcp_servers": [{"server_id": server["id"], "tools": tools}],
+            },
+        },
+    ).raise_for_status()
+    c.post(f"/api/v1/configs/{agent['id']}/publish").raise_for_status()  # type: ignore[attr-defined]
+    return str(agent["id"]), str(server["id"])  # type: ignore[return-value]
+
+
+def test_agente_chama_tool_do_servidor_mcp(
+    db_url: str, mcp_url: str, mcp_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi.testclient import TestClient
+
+    from tests.fake_models import ToolCallingModel, tool_args
+    from tests.mcp_fake_server import calls
+
+    model = ToolCallingModel(
+        id="claude-haiku-4-5", tool_name="crm_buscar_cliente", tool_args=tool_args(cliente_id="42")
+    )
+    with TestClient(_app_with_model(monkeypatch, model)) as client:  # type: ignore[arg-type]
+        agent_id, _ = _agent_with_server(client, mcp_url, "crm", ["buscar_cliente"])
+        calls.clear()
+
+        resp = client.post(
+            f"/agents/{agent_id}/runs", data={"message": "quem é o 42?", "stream": "false"}
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["status"] == "COMPLETED"
+        assert "Maria" in body["content"]
+        assert calls == [("buscar_cliente", {"cliente_id": "42"})]
+
+        runs = client.get(f"/api/v1/configs/{agent_id}/runs").json()
+        assert runs["items"][0]["status"] == "success"
+
+
+def test_tool_fora_da_lista_liberada_nao_chega_ao_agente(
+    db_url: str, mcp_url: str, mcp_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi.testclient import TestClient
+
+    from tests.fake_models import ToolCallingModel, tool_args
+    from tests.mcp_fake_server import calls
+
+    model = ToolCallingModel(
+        id="claude-haiku-4-5",
+        tool_name="crm2_cancelar_assinatura",
+        tool_args=tool_args(cliente_id="42"),
+    )
+    with TestClient(_app_with_model(monkeypatch, model)) as client:  # type: ignore[arg-type]
+        agent_id, _ = _agent_with_server(client, mcp_url, "crm2", ["buscar_cliente"])
+        calls.clear()
+
+        client.post(f"/agents/{agent_id}/runs", data={"message": "cancela o 42", "stream": "false"})
+        assert ("cancelar_assinatura", {"cliente_id": "42"}) not in calls
+
+
+def test_servidor_fora_do_ar_vira_run_com_erro(
+    db_url: str, mcp_url: str, mcp_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi.testclient import TestClient
+
+    from app.models.mcp_server import McpServer
+
+    model = ReplayModelForTest()
+    with TestClient(_app_with_model(monkeypatch, model)) as client:  # type: ignore[arg-type]
+        agent_id, server_id = _agent_with_server(client, mcp_url, "crm3", None)
+        with Session(get_engine()) as session:
+            row = session.get(McpServer, server_id)
+            assert row is not None
+            row.url = "http://127.0.0.1:1/mcp"
+            session.commit()
+
+        resp = client.post(f"/agents/{agent_id}/runs", data={"message": "oi", "stream": "false"})
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"] == "ERROR"
+        assert "crm3" in resp.json()["content"]
+
+        stream = client.post(f"/agents/{agent_id}/runs", data={"message": "oi", "stream": "true"})
+        assert "RunError" in stream.text
+
+        runs = client.get(f"/api/v1/configs/{agent_id}/runs").json()["items"]
+        assert [r["status"] for r in runs] == ["error", "error"]
+        assert "indisponível" in runs[0]["error"]
+
+
+def ReplayModelForTest() -> object:  # noqa: N802
+    from app.agents.replay import ReplayModel
+
+    return ReplayModel(id="claude-haiku-4-5")
+
+
+def test_rascunho_recusa_tool_ou_servidor_inexistente(
+    db_url: str, mcp_url: str, mcp_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import uuid
+
+    from fastapi.testclient import TestClient
+
+    with TestClient(_app_with_model(monkeypatch, ReplayModelForTest())) as client:  # type: ignore[arg-type]
+        agent_id, server_id = _agent_with_server(client, mcp_url, "crm4", None)
+
+        def draft(bindings: list[dict[str, object]]) -> int:
+            return client.put(
+                f"/api/v1/configs/{agent_id}/draft",
+                json={
+                    "name": "x",
+                    "description": "Use para clientes",
+                    "payload": {"model_id": "claude-haiku-4-5", "mcp_servers": bindings},
+                },
+            ).status_code
+
+        assert draft([{"server_id": server_id, "tools": ["nao_existe"]}]) == 400
+        assert draft([{"server_id": str(uuid.uuid4())}]) == 400
+        assert (
+            draft(
+                [
+                    {
+                        "server_id": server_id,
+                        "tools": ["buscar_cliente"],
+                        "require_confirmation": ["cancelar_assinatura"],
+                    }
+                ]
+            )
+            == 422
+        )
+        assert draft([{"server_id": server_id, "tools": ["buscar_cliente"]}]) == 201
+
+
+def test_payload_v1_gravado_continua_legivel() -> None:
+    payload = ConfigPayload.model_validate(
+        {"schema_version": 1, "model_id": "gpt-4o", "tools": ["web_search"]}
+    )
+    assert payload.schema_version == 2
+    assert payload.mcp_servers == []

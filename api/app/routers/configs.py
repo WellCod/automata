@@ -7,6 +7,7 @@ from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.models.config import AgentConfig, AgentConfigVersion
 from app.repositories.config import ConfigRepository
+from app.repositories.mcp_server import McpServerRepository
 from app.schemas.config import (
     AgentConfigDetail,
     AgentConfigPage,
@@ -75,7 +76,7 @@ def _to_response(c: AgentConfig) -> AgentConfigResponse:
 )
 def create_config(body: CreateConfigInput, session: SessionDep) -> AgentConfigResponse:
     repo = ConfigRepository(session)
-    service = ConfigService(repo)
+    service = ConfigService(repo, McpServerRepository(session))
     config = service.create_config(name=body.name, description=body.description)
     result = _to_response(config)
     session.commit()
@@ -91,7 +92,7 @@ def list_configs(
     status: ConfigPayloadStatus | None = Query(default=None),  # noqa: B008
 ) -> AgentConfigPage:
     repo = ConfigRepository(session)
-    service = ConfigService(repo)
+    service = ConfigService(repo, McpServerRepository(session))
     items, total = service.list_configs(page=page, page_size=page_size, q=q, status=status)
     return AgentConfigPage(
         items=[_to_response(c) for c in items],
@@ -104,7 +105,7 @@ def list_configs(
 @router.get("/{config_id}", response_model=AgentConfigDetail)
 def get_config(config_id: UUID, session: SessionDep) -> AgentConfigDetail:
     repo = ConfigRepository(session)
-    service = ConfigService(repo)
+    service = ConfigService(repo, McpServerRepository(session))
     try:
         config, payload = service.get_detail(config_id)
     except ValueError as e:
@@ -115,7 +116,7 @@ def get_config(config_id: UUID, session: SessionDep) -> AgentConfigDetail:
 @router.get("/{config_id}/versions", response_model=list[AgentConfigVersionDetail])
 def list_versions(config_id: UUID, session: SessionDep) -> list[AgentConfigVersionDetail]:
     repo = ConfigRepository(session)
-    service = ConfigService(repo)
+    service = ConfigService(repo, McpServerRepository(session))
     try:
         versions = service.list_versions(config_id)
     except ValueError as e:
@@ -144,7 +145,7 @@ def publish_draft(
     config_id: UUID, session: SessionDep, request: Request
 ) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
-    service = ConfigService(repo)
+    service = ConfigService(repo, McpServerRepository(session))
     try:
         version = service.publish(config_id=config_id, author="panel")
     except ValueError as e:
@@ -169,7 +170,7 @@ def rollback(
     config_id: UUID, body: RollbackInput, session: SessionDep
 ) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
-    service = ConfigService(repo)
+    service = ConfigService(repo, McpServerRepository(session))
     try:
         config = service.rollback(config_id=config_id, version_id=body.version_id)
     except ValueError as e:
@@ -193,7 +194,7 @@ def rollback(
 )
 def save_draft(config_id: UUID, body: DraftInput, session: SessionDep) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
-    service = ConfigService(repo)
+    service = ConfigService(repo, McpServerRepository(session))
     try:
         version = service.update_draft(
             config_id=config_id,

@@ -182,10 +182,10 @@ export default function AgentEditPage() {
           name: values.name,
           description: values.description ?? "",
           payload: {
-            schema_version: 1,
+            schema_version: 2,
             model_id: values.model_id,
             instructions: values.instructions,
-            tools: data?.payload?.tools ?? [],
+            mcp_servers: data?.payload?.mcp_servers ?? [],
             capabilities: values.capabilities,
             metadata: data?.payload?.metadata ?? {},
           },
@@ -213,10 +213,10 @@ export default function AgentEditPage() {
     const values = form.getValues();
     if (!values.model_id) return null;
     return {
-      schema_version: 1 as const,
+      schema_version: 2 as const,
       model_id: values.model_id,
       instructions: values.instructions,
-      tools: data?.payload?.tools ?? [],
+      mcp_servers: data?.payload?.mcp_servers ?? [],
       capabilities: values.capabilities,
       metadata: data?.payload?.metadata ?? {},
     };

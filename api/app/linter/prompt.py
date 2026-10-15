@@ -20,7 +20,7 @@ PROVIDER_TERMS: list[str] = [
 ]
 
 # Nomes canônicos de ferramentas conhecidas, em snake_case.
-# Aparecer em instrução sem estar em payload.tools → aviso.
+# Aparecer em instrução sem estar liberado em nenhum servidor MCP do agente → aviso.
 KNOWN_TOOLS: list[str] = [
     "web_search",
     "file_read",
@@ -78,7 +78,10 @@ def _check_provider_coupling(payload: ConfigPayload, out: list[LintWarning]) -> 
 
 
 def _check_tool_citations(payload: ConfigPayload, out: list[LintWarning]) -> None:
-    enabled = set(payload.tools)
+    # Servidor com tools=None libera tudo dele: sem a lista não dá para afirmar que falta
+    if any(b.tools is None for b in payload.mcp_servers):
+        return
+    enabled = {t for b in payload.mcp_servers for t in b.tools or []}
     all_text = " ".join(_instruction_sections(payload).values()).lower()
     for tool in KNOWN_TOOLS:
         if tool in all_text and tool not in enabled:

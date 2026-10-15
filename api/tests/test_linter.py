@@ -4,13 +4,14 @@ O teste test_adr0006_* é o gate de ADR-0006: falha o build se a detecção
 de termos acoplados a provider for removida do linter.
 """
 
+import uuid
 from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.linter.prompt import LintWarning, lint_payload
-from app.schemas.config import ConfigPayload, InstructionSections
+from app.schemas.config import ConfigPayload, InstructionSections, McpServerBinding
 from app.settings import get_settings
 
 
@@ -25,10 +26,11 @@ def set_env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
 
 
 def _payload(persona: str = "", tools: list[str] | None = None) -> ConfigPayload:
+    bindings = [McpServerBinding(server_id=uuid.uuid4(), tools=tools)] if tools else []
     return ConfigPayload(
         model_id="claude-sonnet-4-6",
         instructions=InstructionSections(persona=persona),
-        tools=tools or [],
+        mcp_servers=bindings,
     )
 
 
@@ -95,6 +97,15 @@ def test_tool_citada_e_habilitada_sem_aviso() -> None:
     )
     warnings = [w for w in lint_payload(payload) if w.code == "tool-not-enabled"]
     assert warnings == []
+
+
+def test_servidor_com_todas_as_tools_nao_gera_aviso() -> None:
+    payload = ConfigPayload(
+        model_id="claude-sonnet-4-6",
+        instructions=InstructionSections(persona="Use web_search para buscar."),
+        mcp_servers=[McpServerBinding(server_id=uuid.uuid4(), tools=None)],
+    )
+    assert [w for w in lint_payload(payload) if w.code == "tool-not-enabled"] == []
 
 
 def test_sem_ferramentas_citadas_sem_aviso() -> None:

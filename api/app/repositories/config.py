@@ -43,7 +43,7 @@ class ConfigRepository:
             config_id=config_id,
             version_number=next_number,
             status=status,
-            payload=payload.model_dump(),
+            payload=payload.model_dump(mode="json"),
             author=author,
         )
         self._session.add(version)

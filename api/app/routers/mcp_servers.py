@@ -141,7 +141,7 @@ async def discover(server_id: UUID, session: SessionDep) -> McpServerResponse:
     except (McpUnavailable, EgressDenied, SecretsKeyMissing) as exc:
         logger.warning("descoberta mcp falhou", extra={"server_id": str(server_id)})
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    server.tools_snapshot = [t.model_dump() for t in tools]
+    server.tools_snapshot = [t.model_dump(mode="json") for t in tools]
     server.tools_discovered_at = datetime.now(UTC)
     await run_in_threadpool(session.commit)
     await run_in_threadpool(session.refresh, server)
