@@ -51,7 +51,14 @@ Arquivos:
 
 `GET /api/v1/usage/rollup?period=YYYYMM&agent_id=<uuid>` — retorna consumo agregado por agente no período.
 
-Cada execução registra um `UsageEvent` via post_hook injetado pelo `AgentFactory`. O rollup agrega tokens e custo por `(agent_config_id, period)`. Campos: `run_count`, `input_tokens`, `output_tokens`, `total_tokens`, `cost`.
+O rollup agrega tokens e custo por `(agent_config_id, period)`. Campos: `run_count`, `input_tokens`, `output_tokens`, `total_tokens`, `cost`.
+
+## Runtime de agentes
+
+- **Factory por request** (`app/agents/factory.py`): lê a versão vigente (ou a `version_id` do modo teste, que precisa ser do mesmo agente — outra versão dá 400) e monta o `Agent`. Leitura do banco fora do event loop.
+- **Registro sem restart** (`app/agents/registry.py`): a lista de agentes do AgentOS é sincronizada com os configs publicados no boot, logo após cada publicação e, com TTL de 5 s, antes de requests a `/agents`, `/teams`, `/mcp` e `/config` — o que cobre publicações feitas em outro worker.
+- **Registro de execução** (`app/agents/tracking.py`): o `TrackedAgent` envolve `arun` e `acontinue_run` e grava em `agent_run` o desfecho real — `success`, `error`, `cancelled` ou `paused` — com duração e erro, e em `usage_event` os tokens e o custo, na mesma transação. Run pausado e retomado atualiza a mesma linha (por `run_id`). Post-hooks do Agno não serviam: só rodam quando o run termina bem. Runs com `background=true` não são registrados.
+- **Capabilities**: `extended_thinking` liga `thinking` no Claude (budget de 4096 tokens). Visão depende só do modelo; `structured_output` ainda não tem efeito porque o config não guarda `output_schema`.
 
 ## Scopes JWT
 
