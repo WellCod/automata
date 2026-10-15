@@ -156,4 +156,5 @@ Time é um config com `kind: "team"` (ADR-0011), criado com `POST /api/v1/config
 - A descrição do agente vira o `role` do membro, que é o que o líder lê para decidir a quem delegar.
 - Validação na escrita: os membros existem, são agentes (sem time dentro de time) e estão publicados. A versão fixada precisa ser publicada e do próprio agente. Agente não aceita seção `team`.
 - Runtime: `TeamFactory` por request; o time é registrado em `os.teams` sem restart, como os agentes. Roda em `POST /teams/{id}/runs` e exige `teams:run` (editor e owner). O `TrackedTeam` conecta de forma estrita o MCP do líder e dos membros antes do run.
+- `GET /api/v1/configs/{id}/teams` lista os times cuja versão vigente ou rascunho tem o agente como membro. Publicar o agente muda o comportamento deles.
 - Só o run do time vai para `agent_run`/`usage_event`, com o consumo somado dos membros. Os membros não ganham run próprio, para o custo não contar duas vezes.

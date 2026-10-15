@@ -28,12 +28,46 @@ interface Props {
   agentId: string;
   draftVersionId?: string;
   defaultOpen?: boolean;
+  // time usa as rotas /teams e eventos TeamRun*; membros aparecem no rastro
+  kind?: "agent" | "team";
+  memberNames?: Record<string, string>;
+}
+
+interface TraceStep {
+  id: number;
+  text: string;
+}
+
+interface ToolEventData {
+  tool_name?: string | null;
+  tool_args?: Record<string, unknown> | null;
+}
+
+function describeTool(tool: ToolEventData | undefined, names: Record<string, string>): string {
+  const args = tool?.tool_args ?? {};
+  if (tool?.tool_name === "delegate_task_to_member") {
+    const member = String(args.member_id ?? "");
+    return `Delegou a ${names[member] ?? member}: ${String(args.task ?? "")}`;
+  }
+  if (tool?.tool_name === "delegate_task_to_members") {
+    return `Delegou a todos: ${String(args.task ?? "")}`;
+  }
+  return `Chamou ${tool?.tool_name ?? "tool"}`;
 }
 
 const btnCls =
   "inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40";
 
-export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Props) {
+export function TestPanel({
+  agentId,
+  draftVersionId,
+  defaultOpen = false,
+  kind = "agent",
+  memberNames = {},
+}: Props) {
+  const base = kind === "team" ? "teams" : "agents";
+  const prefix = kind === "team" ? "Team" : "";
+  const [trace, setTrace] = useState<TraceStep[]>([]);
   const [open, setOpen] = useState(defaultOpen);
   const [useDraft, setUseDraft] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -56,20 +90,37 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
   async function consume(res: Response) {
     if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
     for await (const { event, data } of readSse(res.body)) {
-      if (typeof data.session_id === "string") sessionIdRef.current = data.session_id;
-      if (event === "RunContent" && typeof data.content === "string") {
+      if (typeof data.session_id === "string" && (kind !== "team" || !data.agent_id)) {
+        sessionIdRef.current = data.session_id;
+      }
+      const memberEvent = kind === "team" && typeof data.agent_id === "string";
+      if (memberEvent) {
+        // membro trabalhando: vai para o rastro, não para a resposta do time
+        if (event === "ToolCallStarted") {
+          const who = memberNames[data.agent_id as string] ?? String(data.agent_name ?? "membro");
+          addTrace(`${who}: ${describeTool(data.tool as ToolEventData, memberNames)}`);
+        }
+        continue;
+      }
+      if (kind === "team" && event === "TeamToolCallStarted") {
+        addTrace(describeTool(data.tool as ToolEventData, memberNames));
+      } else if (event === `${prefix}RunContent` && typeof data.content === "string") {
         appendToLast(data.content);
-      } else if (event === "RunPaused") {
+      } else if (event === `${prefix}RunPaused`) {
         const tools = ((data.tools as PendingToolExecution[] | undefined) ?? []).filter(
           (t) => t.requires_confirmation && t.confirmed == null,
         );
         if (typeof data.run_id === "string" && tools.length > 0) {
           setPaused({ runId: data.run_id, tools });
         }
-      } else if (event === "RunError") {
+      } else if (event === `${prefix}RunError`) {
         setError(typeof data.content === "string" ? data.content : "Erro ao executar agente.");
       }
     }
+  }
+
+  function addTrace(text: string) {
+    setTrace((prev) => [...prev, { id: nextId.current++, text }]);
   }
 
   async function run(request: () => Promise<Response>) {
@@ -88,6 +139,7 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
     if (!input.trim() || isRunning || paused) return;
     const text = input.trim();
     setInput("");
+    setTrace([]);
     setMessages((prev) => [
       ...prev,
       { id: nextId.current++, role: "user", content: text },
@@ -101,7 +153,7 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
     if (useDraft && draftVersionId) {
       form.append("factory_input", JSON.stringify({ version_id: draftVersionId }));
     }
-    await run(() => fetch(`/api/agents/${agentId}/runs`, { method: "POST", body: form }));
+    await run(() => fetch(`/api/${base}/${agentId}/runs`, { method: "POST", body: form }));
   }
 
   async function decide(approve: boolean) {
@@ -113,12 +165,13 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
     form.append("session_id", sessionIdRef.current);
     form.append("stream", "true");
     await run(() =>
-      fetch(`/api/agents/${agentId}/runs/${runId}/continue`, { method: "POST", body: form }),
+      fetch(`/api/${base}/${agentId}/runs/${runId}/continue`, { method: "POST", body: form }),
     );
   }
 
   function clearSession() {
     setMessages([]);
+    setTrace([]);
     setPaused(null);
     sessionIdRef.current = null;
     setError(null);
@@ -180,6 +233,16 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
               </div>
             ))}
           </div>
+
+          {trace.length > 0 && (
+            <ol aria-label="Rastro de delegação" className="flex flex-col gap-1 text-[12px]">
+              {trace.map((step) => (
+                <li key={step.id} className="text-muted-foreground">
+                  → {step.text}
+                </li>
+              ))}
+            </ol>
+          )}
 
           {paused && (
             <div

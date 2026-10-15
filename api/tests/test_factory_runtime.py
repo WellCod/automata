@@ -516,6 +516,9 @@ def test_time_delega_ao_membro_que_usa_tool_mcp(
 
         listed = client.get("/api/v1/configs", params={"kind": "team"}).json()["items"]
         assert [c["id"] for c in listed] == [time]
+        usam = client.get(f"/api/v1/configs/{membro}/teams").json()
+        assert [t["id"] for t in usam] == [time]
+        assert client.get(f"/api/v1/configs/{time}/teams").json() == []
 
 
 def test_time_recusa_membro_invalido(

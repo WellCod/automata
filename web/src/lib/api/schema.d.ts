@@ -51,6 +51,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/configs/{config_id}/teams": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Teams Using
+     * @description Times que usam o agente: publicar o agente muda o comportamento deles (ADR-0011).
+     */
+    get: operations["list_teams_using_api_v1_configs__config_id__teams_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/configs/{config_id}/versions": {
     parameters: {
       query?: never;
@@ -1022,6 +1042,37 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["AgentConfigDetail"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_teams_using_api_v1_configs__config_id__teams_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AgentConfigResponse"][];
         };
       };
       /** @description Validation Error */

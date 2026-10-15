@@ -95,6 +95,7 @@ Guia completo em [`DEMO.md`](DEMO.md).
 
 | Funcionalidade | Detalhe |
 |---|---|
+| **Times multi-agente** | Um líder que coordena, roteia, consulta todos ou gerencia tarefas entre agentes publicados. O time é versionado como agente. O modo teste mostra o rastro da delegação: a quem o líder delegou e que tools o membro chamou ([ADR-0011](docs/adr/0011-times-versionados.md)). |
 | **Ferramentas via MCP** | Catálogo de servidores MCP (`/mcp`) com credenciais cifradas e teste de conexão. Em cada agente, escolhe-se quais servidores e quais tools ele usa, e quais pedem confirmação. Servidor fora do ar faz o run falhar com o motivo, em vez de o agente responder sem as tools ([ADR-0010](docs/adr/0010-servidores-mcp-externos.md)). |
 | **Confirmação humana** | Tools sensíveis pausam a execução até alguém aprovar ou rejeitar, no modo teste ou na página Aprovações, com nome e argumentos da ação. |
 | **Linter de prompt** | Detecta referências a ferramentas não habilitadas e termos acoplados a provider. Alerta inline na edição. |

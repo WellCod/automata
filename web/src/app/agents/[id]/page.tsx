@@ -137,6 +137,35 @@ function StatusBadge({ data }: { data: AgentConfigDetail | undefined }) {
   );
 }
 
+// Publicar o agente muda o comportamento destes times (ADR-0011)
+function TeamsUsingAgent({ agentId }: { agentId: string }) {
+  const { data: teams } = useQuery({
+    queryKey: ["config", agentId, "teams"],
+    queryFn: async () => {
+      const res = await client.GET("/api/v1/configs/{config_id}/teams", {
+        params: { path: { config_id: agentId } },
+      });
+      if (res.error) throw new Error("Falha ao carregar times");
+      return res.data!;
+    },
+  });
+  if (!teams || teams.length === 0) return null;
+  return (
+    <p className="border-border text-muted-foreground rounded border px-3 py-2 text-[13px]">
+      Membro de{" "}
+      {teams.map((t, i) => (
+        <span key={t.id}>
+          {i > 0 && ", "}
+          <Link href={`/times/${t.id}`} className="text-accent hover:underline">
+            {t.name}
+          </Link>
+        </span>
+      ))}
+      . Publicar este agente muda o comportamento desses times.
+    </p>
+  );
+}
+
 export default function AgentEditPage() {
   const { id } = useParams<{ id: string }>();
   const [activePanel, setActivePanel] = useState<PanelId>("teste");
@@ -273,6 +302,8 @@ export default function AgentEditPage() {
             onSubmit={form.handleSubmit((v) => mutation.mutate(v))}
             className="mx-auto flex max-w-2xl flex-col gap-5"
           >
+            <TeamsUsingAgent agentId={id} />
+
             <Field label="Nome" required error={form.formState.errors.name?.message}>
               <input {...form.register("name")} className={inputCls} />
             </Field>

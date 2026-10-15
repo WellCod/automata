@@ -22,6 +22,23 @@ class ConfigRepository:
         ).all()
         return {row.id: row.name for row in rows}
 
+    def teams_using(self, agent_id: UUID) -> list[AgentConfig]:
+        """Times cuja versão vigente ou rascunho tem o agente como membro."""
+        member = [{"agent_id": str(agent_id)}]
+        version_ids = select(AgentConfigVersion.id).where(
+            AgentConfigVersion.payload["team"]["members"].contains(member)
+        )
+        stmt = (
+            select(AgentConfig)
+            .where(
+                AgentConfig.kind == ConfigKind.team.value,
+                (AgentConfig.current_version_id.in_(version_ids))
+                | (AgentConfig.draft_version_id.in_(version_ids)),
+            )
+            .order_by(AgentConfig.name)
+        )
+        return list(self._session.scalars(stmt))
+
     def create_config(
         self, name: str, description: str, kind: ConfigKind = ConfigKind.agent
     ) -> AgentConfig:

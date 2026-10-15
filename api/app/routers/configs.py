@@ -119,6 +119,12 @@ def get_config(config_id: UUID, session: SessionDep) -> AgentConfigDetail:
     return _to_detail(config, payload)
 
 
+@router.get("/{config_id}/teams", response_model=list[AgentConfigResponse])
+def list_teams_using(config_id: UUID, session: SessionDep) -> list[AgentConfigResponse]:
+    """Times que usam o agente: publicar o agente muda o comportamento deles (ADR-0011)."""
+    return [_to_response(t) for t in ConfigRepository(session).teams_using(config_id)]
+
+
 @router.get("/{config_id}/versions", response_model=list[AgentConfigVersionDetail])
 def list_versions(config_id: UUID, session: SessionDep) -> list[AgentConfigVersionDetail]:
     repo = ConfigRepository(session)
