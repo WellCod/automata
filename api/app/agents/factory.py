@@ -1,20 +1,18 @@
-from datetime import UTC, datetime
-from time import monotonic
-from typing import Any
+import asyncio
+from dataclasses import dataclass
 from uuid import UUID
 
 from agno.agent import Agent
 from agno.agent.factory import AgentFactory
 from agno.db.base import AsyncBaseDb, BaseDb
-from agno.factory.utils import RequestContext
+from agno.factory.utils import FactoryValidationError, RequestContext
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.agents.models_map import resolve_model
+from app.agents.tracking import TrackedAgent
 from app.db import get_engine
 from app.repositories.config import ConfigRepository
-from app.repositories.run import RunRepository
-from app.repositories.usage import UsageRepository
 from app.schemas.config import ConfigPayload
 
 
@@ -22,47 +20,49 @@ class FactoryInput(BaseModel):
     version_id: UUID | None = None
 
 
-def _make_run_hook(config_id: UUID) -> Any:
-    def record_run(run_output: Any, user_id: str | None = None) -> None:
-        start: float = getattr(run_output, "_run_start", monotonic())
-        duration_ms: int | None = None
-        elapsed = getattr(run_output, "response_timer", None)
-        if elapsed is not None:
-            duration_ms = int(elapsed * 1000)
-        with Session(get_engine()) as session:
-            repo = RunRepository(session)
-            repo.record(
-                agent_config_id=config_id,
-                user_id=user_id or "anonymous",
-                run_id=getattr(run_output, "run_id", None),
-                status="success",
-                duration_ms=duration_ms,
-            )
-        _ = start  # capturado para possível uso futuro
-
-    return record_run
+@dataclass
+class ResolvedVersion:
+    name: str
+    description: str
+    payload: ConfigPayload
 
 
-def _make_usage_hook(config_id: UUID, model_id: str) -> Any:
-    def record_usage(run_output: Any, user_id: str | None = None) -> None:
-        metrics = getattr(run_output, "metrics", None)
-        if metrics is None:
-            return
-        with Session(get_engine()) as session:
-            repo = UsageRepository(session)
-            repo.record_event(
-                agent_config_id=config_id,
-                user_id=user_id or "anonymous",
-                run_id=getattr(run_output, "run_id", None),
-                model_id=model_id,
-                input_tokens=int(getattr(metrics, "input_tokens", None) or 0),
-                output_tokens=int(getattr(metrics, "output_tokens", None) or 0),
-                total_tokens=int(getattr(metrics, "total_tokens", None) or 0),
-                cost=getattr(metrics, "cost", None),
-                period=datetime.now(UTC).strftime("%Y%m"),
-            )
+def load_version(config_id: UUID, version_id: UUID | None) -> ResolvedVersion:
+    """Versão vigente do config, ou a pedida pelo modo teste.
 
-    return record_usage
+    A versão pedida precisa ser do próprio config: sem essa checagem dava para
+    rodar o agente A com prompt e modelo de B, com run e custo contados em A.
+    """
+    with Session(get_engine()) as session:
+        repo = ConfigRepository(session)
+        config = repo.get_config(config_id)
+        if config is None:
+            raise FactoryValidationError(f"Config {config_id} não encontrada")
+
+        vid = version_id or config.current_version_id
+        if vid is None:
+            raise FactoryValidationError("Nenhuma versão publicada para este agente")
+
+        version = repo.get_version(vid)
+        if version is None or version.config_id != config_id:
+            raise FactoryValidationError(f"Versão {vid} não pertence a este agente")
+
+        return ResolvedVersion(
+            name=config.name,
+            description=config.description,
+            payload=ConfigPayload.model_validate(version.payload),
+        )
+
+
+def build_instructions(payload: ConfigPayload) -> str | None:
+    sections = [
+        payload.instructions.persona,
+        payload.instructions.situation,
+        payload.instructions.tone,
+        payload.instructions.objective,
+        payload.instructions.guardrails,
+    ]
+    return "\n\n".join(s for s in sections if s) or None
 
 
 def make_agent_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> AgentFactory:
@@ -73,46 +73,22 @@ def make_agent_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> AgentFactor
     específica — comportamento de modo teste.
     """
 
-    def build(ctx: RequestContext) -> Agent:
-        version_id: UUID | None = None
-        if isinstance(ctx.input, FactoryInput):
-            version_id = ctx.input.version_id
+    async def build(ctx: RequestContext) -> Agent:
+        version_id = ctx.input.version_id if isinstance(ctx.input, FactoryInput) else None
+        # leitura síncrona do banco fora do event loop
+        resolved = await asyncio.to_thread(load_version, config_id, version_id)
+        payload = resolved.payload
 
-        with Session(get_engine()) as session:
-            repo = ConfigRepository(session)
-            config = repo.get_config(config_id)
-            if config is None:
-                raise ValueError(f"Config {config_id} não encontrada")
-
-            vid = version_id or config.current_version_id
-            if vid is None:
-                raise ValueError("Nenhuma versão publicada para este agente")
-
-            version = repo.get_version(vid)
-            if version is None:
-                raise ValueError(f"Versão {vid} não encontrada")
-
-            payload = ConfigPayload.model_validate(version.payload)
-            model = resolve_model(payload.model_id)
-
-            sections = [
-                payload.instructions.persona,
-                payload.instructions.situation,
-                payload.instructions.tone,
-                payload.instructions.objective,
-                payload.instructions.guardrails,
-            ]
-            instructions = "\n\n".join(s for s in sections if s) or None
-
-            return Agent(
-                id=str(config_id),
-                model=model,
-                instructions=instructions,
-                post_hooks=[
-                    _make_run_hook(config_id),
-                    _make_usage_hook(config_id, payload.model_id),
-                ],
-            )
+        agent = TrackedAgent(
+            id=str(config_id),
+            name=resolved.name,
+            description=resolved.description,
+            model=resolve_model(payload.model_id, payload.capabilities),
+            instructions=build_instructions(payload),
+        )
+        agent.automata_config_id = config_id
+        agent.automata_model_id = payload.model_id
+        return agent
 
     return AgentFactory(
         id=str(config_id),
