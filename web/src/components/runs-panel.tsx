@@ -1,7 +1,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Ban, CheckCircle2, PauseCircle, XCircle } from "lucide-react";
+import { Activity, Ban, CheckCircle2, ChevronRight, PauseCircle, XCircle } from "lucide-react";
+import { useState } from "react";
+import { RunTrace } from "@/components/run-trace";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
 
@@ -44,10 +46,23 @@ function RunItem({ run }: { run: AgentRunResponse }) {
   const icon = STATUS_ICON[run.status] ?? (
     <Activity className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
   );
+  const [open, setOpen] = useState(false);
   return (
     <li className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2">
-      <div className="flex items-center justify-between gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        disabled={!run.run_id}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 text-left disabled:cursor-default"
+      >
         <div className="flex items-center gap-1.5">
+          {run.run_id && (
+            <ChevronRight
+              className={`text-muted-foreground h-3 w-3 transition-transform ${open ? "rotate-90" : ""}`}
+              aria-hidden
+            />
+          )}
           {icon}
           <span className="text-foreground text-[13px] font-medium">
             {STATUS_LABEL[run.status] ?? run.status}
@@ -60,9 +75,19 @@ function RunItem({ run }: { run: AgentRunResponse }) {
           </span>
           <span className="text-muted-foreground text-[11px]">{formatDate(run.created_at)}</span>
         </div>
-      </div>
+      </button>
       {run.error && (
-        <p className="text-muted-foreground mt-0.5 truncate font-mono text-[11px]">{run.error}</p>
+        <p
+          title={run.error}
+          className={`text-muted-foreground mt-0.5 font-mono text-[11px] ${open ? "whitespace-pre-wrap" : "truncate"}`}
+        >
+          {run.error}
+        </p>
+      )}
+      {open && run.run_id && (
+        <div className="border-border mt-1 border-t pt-2">
+          <RunTrace runId={run.run_id} />
+        </div>
       )}
     </li>
   );
