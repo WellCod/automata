@@ -149,7 +149,8 @@ function TeamsUsingAgent({ agentId }: { agentId: string }) {
       return res.data!;
     },
   });
-  if (!teams || teams.length === 0) return null;
+  // aviso secundário: resposta inesperada não pode derrubar a tela de edição
+  if (!Array.isArray(teams) || teams.length === 0) return null;
   return (
     <p className="border-border text-muted-foreground rounded border px-3 py-2 text-[13px]">
       Membro de{" "}

@@ -81,6 +81,12 @@ async function mockAllApiRoutes(page: Page) {
     if (url.includes("/usage/rollup")) {
       return route.fulfill({ json: [] });
     }
+    if (url.match(/\/configs\/[^/?]+\/teams/)) {
+      return route.fulfill({ json: [] });
+    }
+    if (url.includes("/mcp-servers") || url.includes("/approvals")) {
+      return route.fulfill({ json: [] });
+    }
     if (url.includes("/linter") && method === "POST") {
       return route.fulfill({ json: [] });
     }
