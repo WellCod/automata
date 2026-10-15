@@ -129,6 +129,17 @@ Espaçamento base: **4px**. Esta UI é densa de propósito.
 Gap entre itens de lista: 4px. Padding interno de card: 12px.  
 Se uma tela parecer "espaçosa", há espaço demais.
 
+## Gráficos
+
+Recharts via `ChartContainer` do shadcn (`src/components/ui/chart.tsx`), em `src/components/metrics-charts.tsx`.
+
+- Séries: `--chart-1` `#14A394` e `--chart-2` `#D95926`; erro em `--chart-error` `#D03B3B`. O accent `#25E0C8`
+  é claro demais para marca de dados no fundo escuro (OKLCH L 0.82, fora da faixa 0.48–0.67); as três
+  cores passam no validador de paleta contra `--card` (CVD ΔE ≥ 12, contraste ≥ 3:1).
+- Um eixo por gráfico; medidas de escala diferente vão em gráficos separados.
+- Linha 2px sem marcadores, barra com topo arredondado em 4px, grade só horizontal.
+- Legenda sempre que houver duas séries; tooltip no hover; tabela com os mesmos dados em "Ver tabela".
+
 ## Proibido
 
 - `box-shadow` em qualquer elemento
