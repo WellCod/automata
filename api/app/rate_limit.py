@@ -13,11 +13,12 @@ class MemoryRateLimiter:
         self._attempts: dict[str, list[float]] = defaultdict(list)
         self._lock = Lock()
 
-    def check(self, key: str) -> None:
+    def check(self, key: str, limit: int | None = None) -> None:
+        limit = limit or self._limit
         now = time.time()
         with self._lock:
             self._attempts[key] = [t for t in self._attempts[key] if now - t < self._window]
-            if len(self._attempts[key]) >= self._limit:
+            if len(self._attempts[key]) >= limit:
                 raise HTTPException(
                     status_code=429, detail="Muitas tentativas. Tente novamente em breve."
                 )
@@ -30,12 +31,15 @@ class RedisRateLimiter:
         self._limit = limit
         self._window = window
 
-    def check(self, key: str) -> None:
+    def check(self, key: str, limit: int | None = None) -> None:
+        limit = limit or self._limit
         pipe = self._client.pipeline()
         pipe.incr(key)
-        pipe.expire(key, self._window)
+        # NX: a janela começa na primeira tentativa; renovar a cada tentativa
+        # manteria a chave bloqueada para sempre sob tentativas contínuas
+        pipe.expire(key, self._window, nx=True)
         results = pipe.execute()
-        if int(results[0]) > self._limit:
+        if int(results[0]) > limit:
             raise HTTPException(
                 status_code=429, detail="Muitas tentativas. Tente novamente em breve."
             )

@@ -1,6 +1,8 @@
 import { decodeJwt } from "jose";
 import { NextRequest, NextResponse } from "next/server";
 
+import { FORWARDING_HEADERS } from "@/lib/bff/client-ip";
+
 const API_URL = process.env.AUTOMATA_API_URL ?? "http://localhost:8000";
 
 function expiredResponse(): NextResponse {
@@ -26,6 +28,10 @@ async function forward(req: NextRequest, segments: string[]): Promise<NextRespon
   }
 
   const path = segments.join("/");
+  // Login tem rota própria, que repassa o IP do cliente ao rate limit
+  if (path === "v1/auth/login") {
+    return new NextResponse("Não encontrado", { status: 404 });
+  }
   const search = req.nextUrl.search;
   const target = path.startsWith("v1/")
     ? `${API_URL}/api/${path}${search}`
@@ -34,6 +40,9 @@ async function forward(req: NextRequest, segments: string[]): Promise<NextRespon
   const headers = new Headers(req.headers);
   headers.set("Authorization", `Bearer ${token}`);
   headers.delete("host");
+  // O cookie de sessão já virou Authorization; a API não precisa dele
+  headers.delete("cookie");
+  for (const name of FORWARDING_HEADERS) headers.delete(name);
 
   const upstream = await fetch(target, {
     method: req.method,
