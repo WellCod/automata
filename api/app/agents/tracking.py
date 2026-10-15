@@ -54,6 +54,8 @@ class RunRecord:
     output_tokens: int = 0
     total_tokens: int = 0
     cost: float | None = None
+    session_id: str | None = None
+    pending_tools: list[dict[str, Any]] | None = None
 
 
 def persist(record: RunRecord) -> None:
@@ -65,6 +67,8 @@ def persist(record: RunRecord) -> None:
             status=record.status,
             duration_ms=record.duration_ms,
             error=record.error,
+            session_id=record.session_id,
+            pending_tools=record.pending_tools,
         )
         if record.total_tokens:
             UsageRepository(session).record_event(
@@ -79,6 +83,16 @@ def persist(record: RunRecord) -> None:
                 period=datetime.now(UTC).strftime("%Y%m"),
             )
         session.commit()
+
+
+def _pending_tools(output: RunOutput | None) -> list[dict[str, Any]] | None:
+    """Tools que pausaram o run aguardando confirmação humana."""
+    if output is None or output.status != RunStatus.paused:
+        return None
+    pending = [
+        t.to_dict() for t in output.tools or [] if t.requires_confirmation and t.confirmed is None
+    ]
+    return pending or None
 
 
 def _status_of(output: RunOutput | None, last_event: str | None) -> str:
@@ -238,6 +252,8 @@ class TrackedAgent(Agent):
             output_tokens=int(getattr(metrics, "output_tokens", 0) or 0),
             total_tokens=int(getattr(metrics, "total_tokens", 0) or 0),
             cost=getattr(metrics, "cost", None),
+            session_id=kwargs.get("session_id") or (output.session_id if output else None),
+            pending_tools=_pending_tools(output),
         )
 
     @staticmethod

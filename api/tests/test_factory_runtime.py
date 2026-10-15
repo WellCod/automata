@@ -341,3 +341,99 @@ def test_payload_v1_gravado_continua_legivel() -> None:
     )
     assert payload.schema_version == 2
     assert payload.mcp_servers == []
+
+
+# --- confirmação humana ---
+
+
+def _agent_with_confirmation(client: object, url: str, slug: str) -> str:
+    from tests.mcp_fake_server import TOKEN
+
+    c = client
+    server = c.post(  # type: ignore[attr-defined]
+        "/api/v1/mcp-servers",
+        json={
+            "name": slug,
+            "slug": slug,
+            "url": url,
+            "headers": {"Authorization": f"Bearer {TOKEN}"},
+        },
+    ).json()
+    c.post(f"/api/v1/mcp-servers/{server['id']}/discover").raise_for_status()  # type: ignore[attr-defined]
+    agent = c.post(  # type: ignore[attr-defined]
+        "/api/v1/configs", json={"name": f"agente-{slug}", "description": "Use para cancelar"}
+    ).json()
+    c.put(  # type: ignore[attr-defined]
+        f"/api/v1/configs/{agent['id']}/draft",
+        json={
+            "name": f"agente-{slug}",
+            "description": "Use para cancelar",
+            "payload": {
+                "model_id": "claude-haiku-4-5",
+                "mcp_servers": [
+                    {
+                        "server_id": server["id"],
+                        "tools": ["cancelar_assinatura"],
+                        "require_confirmation": ["cancelar_assinatura"],
+                    }
+                ],
+            },
+        },
+    ).raise_for_status()
+    c.post(f"/api/v1/configs/{agent['id']}/publish").raise_for_status()  # type: ignore[attr-defined]
+    return str(agent["id"])
+
+
+@pytest.mark.parametrize("aprovar", [True, False])
+def test_tool_sensivel_pausa_e_retoma_com_decisao(
+    db_url: str, mcp_url: str, mcp_env: None, monkeypatch: pytest.MonkeyPatch, aprovar: bool
+) -> None:
+    import json
+
+    from fastapi.testclient import TestClient
+
+    from tests.fake_models import ToolCallingModel, tool_args
+    from tests.mcp_fake_server import calls
+
+    slug = "crmok" if aprovar else "crmnao"
+    model = ToolCallingModel(
+        id="claude-haiku-4-5",
+        tool_name=f"{slug}_cancelar_assinatura",
+        tool_args=tool_args(cliente_id="7"),
+    )
+    with TestClient(_app_with_model(monkeypatch, model)) as client:  # type: ignore[arg-type]
+        agent_id = _agent_with_confirmation(client, mcp_url, slug)
+        calls.clear()
+
+        first = client.post(
+            f"/agents/{agent_id}/runs",
+            data={"message": "cancela o 7", "stream": "false", "session_id": f"s-{slug}"},
+        )
+        assert first.status_code == 200, first.text
+        assert first.json()["status"] == "PAUSED"
+        assert calls == []
+
+        pending = client.get("/api/v1/approvals", params={"agent_id": agent_id}).json()
+        assert len(pending) == 1
+        item = pending[0]
+        assert item["session_id"] == f"s-{slug}"
+        assert item["tools"][0]["tool_name"] == f"{slug}_cancelar_assinatura"
+        assert item["tools"][0]["tool_args"] == {"cliente_id": "7"}
+
+        decided = [{**t["tool_execution"], "confirmed": aprovar} for t in item["tools"]]
+        resumed = client.post(
+            f"/agents/{agent_id}/runs/{item['run_id']}/continue",
+            data={
+                "tools": json.dumps(decided),
+                "session_id": item["session_id"],
+                "stream": "false",
+            },
+        )
+        assert resumed.status_code == 200, resumed.text
+        assert resumed.json()["status"] == "COMPLETED"
+
+        executou = ("cancelar_assinatura", {"cliente_id": "7"}) in calls
+        assert executou is aprovar
+        assert client.get("/api/v1/approvals", params={"agent_id": agent_id}).json() == []
+        runs = client.get(f"/api/v1/configs/{agent_id}/runs").json()["items"]
+        assert [r["status"] for r in runs] == ["success"]

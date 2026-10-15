@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Activity, CheckCircle2, XCircle } from "lucide-react";
+import { Activity, Ban, CheckCircle2, PauseCircle, XCircle } from "lucide-react";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
 
@@ -14,6 +14,15 @@ interface Props {
 const STATUS_ICON: Record<string, React.ReactNode> = {
   success: <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-500" />,
   error: <XCircle className="h-3.5 w-3.5 shrink-0 text-red-400" />,
+  paused: <PauseCircle className="h-3.5 w-3.5 shrink-0 text-amber-400" />,
+  cancelled: <Ban className="text-muted-foreground h-3.5 w-3.5 shrink-0" />,
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  success: "Sucesso",
+  error: "Erro",
+  paused: "Aguardando confirmação",
+  cancelled: "Cancelado",
 };
 
 function formatDuration(ms: number | null): string {
@@ -40,7 +49,9 @@ function RunItem({ run }: { run: AgentRunResponse }) {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           {icon}
-          <span className="text-foreground text-[13px] font-medium capitalize">{run.status}</span>
+          <span className="text-foreground text-[13px] font-medium">
+            {STATUS_LABEL[run.status] ?? run.status}
+          </span>
           <span className="text-muted-foreground text-[11px]">{run.user_id}</span>
         </div>
         <div className="flex items-center gap-2">

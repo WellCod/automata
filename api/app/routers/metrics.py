@@ -3,11 +3,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import select
 
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
-from app.models.config import AgentConfig
+from app.repositories.config import ConfigRepository
 from app.repositories.run import AgentRunSummary, RunRepository
 from app.repositories.usage import AgentUsageSummary, UsageRepository
 
@@ -108,12 +107,7 @@ def get_by_agent(
     }
 
     all_ids = runs_by_id.keys() | usage_by_id.keys()
-    names: dict[UUID, str] = {
-        row.id: row.name
-        for row in session.execute(
-            select(AgentConfig.id, AgentConfig.name).where(AgentConfig.id.in_(list(all_ids)))
-        ).all()
-    }
+    names = ConfigRepository(session).names_by_ids(list(all_ids))
 
     def _run_count(i: UUID) -> int:
         return -(runs_by_id.get(i, AgentRunSummary(i, 0, 0)).total_runs)

@@ -97,7 +97,7 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | `configs:read` | `GET /api/v1/configs`, `GET /api/v1/configs/{id}`, `GET /api/v1/configs/{id}/versions`, `GET /api/v1/models/capabilities`, `POST /api/v1/linter` |
 | `configs:write` | `POST /api/v1/configs`, `PUT /api/v1/configs/{id}/draft`, `POST /api/v1/mcp-servers/{id}/discover` |
 | `configs:publish` | `POST /api/v1/configs/{id}/publish`, `POST /api/v1/configs/{id}/rollback` |
-| `metrics:read` | `GET /api/v1/configs/{id}/runs`, `GET /api/v1/configs/{id}/metrics`, `GET /api/v1/metrics/*`, `GET /api/v1/usage/rollup` |
+| `metrics:read` | `GET /api/v1/configs/{id}/runs`, `GET /api/v1/configs/{id}/metrics`, `GET /api/v1/metrics/*`, `GET /api/v1/usage/rollup`, `GET /api/v1/approvals` |
 | `mcp_servers:read` | `GET /api/v1/mcp-servers`, `GET /api/v1/mcp-servers/{id}` |
 | `mcp_servers:write` | `POST`, `PUT` e `DELETE` em `/api/v1/mcp-servers` — só owner (`agent_os:admin`) |
 | `agent_os:admin` | `POST /api/v1/auth/users` |
@@ -135,3 +135,11 @@ Cadastro dos servidores MCP que os agentes consomem (ADR-0010). Não é versiona
 - A conexão é estrita (`app/mcp/client.py`). O `MCPTools.connect()` do Agno engole a falha e o agente seguiria sem as tools. Em 401 ou conexão recusada, o cliente streamable-http ainda cancela a task que conectou. `connect_strict` converte os dois casos em `McpUnavailable` e só repassa cancelamento que venha de fora.
 
 Gerar a chave: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Perder a chave obriga a recadastrar os headers.
+
+## Confirmação humana de tools
+
+Tools marcadas em `require_confirmation` no agente pausam o run antes de executar (`status=PAUSED`, evento `RunPaused`). O `TrackedAgent` grava o run como `paused`, com o `session_id` e as tools pendentes (`ToolExecution` serializado) em `agent_run.pending_tools`.
+
+- `GET /api/v1/approvals[?agent_id=]` lista os runs pausados com agente, quem pediu, nome e argumentos de cada tool.
+- A decisão é o continue do próprio AgentOS: `POST /agents/{id}/runs/{run_id}/continue`, com `session_id` e `tools` = os `tool_execution` recebidos, cada um com `confirmed: true` ou `false`. Exige `agents:run`. Com `user_isolation`, só o dono da sessão ou um owner retoma.
+- Aprovado, a tool executa e o run segue. Rejeitado, o modelo recebe a recusa e responde sem a ação. Nos dois casos o mesmo `agent_run` passa a `success`, e a pendência some.

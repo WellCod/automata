@@ -96,6 +96,7 @@ Guia completo em [`DEMO.md`](DEMO.md).
 | Funcionalidade | Detalhe |
 |---|---|
 | **Ferramentas via MCP** | Catálogo de servidores MCP (`/mcp`) com credenciais cifradas e teste de conexão. Em cada agente, escolhe-se quais servidores e quais tools ele usa, e quais pedem confirmação. Servidor fora do ar faz o run falhar com o motivo, em vez de o agente responder sem as tools ([ADR-0010](docs/adr/0010-servidores-mcp-externos.md)). |
+| **Confirmação humana** | Tools sensíveis pausam a execução até alguém aprovar ou rejeitar, no modo teste ou na página Aprovações, com nome e argumentos da ação. |
 | **Linter de prompt** | Detecta referências a ferramentas não habilitadas e termos acoplados a provider. Alerta inline na edição. |
 | **Estimativa de custo** | Tokens estimados, custo por mensagem e projeção por volume — visíveis enquanto se edita. |
 | **Capabilities condicionais** | Extended thinking, structured output e visão são habilitadas por modelo. O campo é desativado e explicado se o modelo escolhido não suportar. Extended thinking liga o `thinking` do Claude na execução. |

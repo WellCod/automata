@@ -1,4 +1,21 @@
 export interface paths {
+  "/api/v1/approvals": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Pending */
+    get: operations["list_pending_api_v1_approvals_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/configs": {
     parameters: {
       query?: never;
@@ -479,6 +496,29 @@ export interface components {
        */
       created_at: string;
     };
+    /** ApprovalItem */
+    ApprovalItem: {
+      /** Run Id */
+      run_id: string;
+      /**
+       * Agent Id
+       * Format: uuid
+       */
+      agent_id: string;
+      /** Agent Name */
+      agent_name: string;
+      /** Session Id */
+      session_id: string | null;
+      /** User Id */
+      user_id: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Tools */
+      tools: components["schemas"]["PendingTool"][];
+    };
     /** CapabilityFlags */
     CapabilityFlags: {
       /**
@@ -711,6 +751,21 @@ export interface components {
         [key: string]: unknown;
       };
     };
+    /** PendingTool */
+    PendingTool: {
+      /** Tool Call Id */
+      tool_call_id: string | null;
+      /** Tool Name */
+      tool_name: string | null;
+      /** Tool Args */
+      tool_args: {
+        [key: string]: unknown;
+      } | null;
+      /** Tool Execution */
+      tool_execution: {
+        [key: string]: unknown;
+      };
+    };
     /** RollbackInput */
     RollbackInput: {
       /**
@@ -805,6 +860,37 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  list_pending_api_v1_approvals_get: {
+    parameters: {
+      query?: {
+        agent_id?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApprovalItem"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   list_configs_api_v1_configs_get: {
     parameters: {
       query?: {

@@ -14,6 +14,14 @@ class ConfigRepository:
     def get_config(self, config_id: UUID) -> AgentConfig | None:
         return self._session.get(AgentConfig, config_id)
 
+    def names_by_ids(self, config_ids: list[UUID]) -> dict[UUID, str]:
+        if not config_ids:
+            return {}
+        rows = self._session.execute(
+            select(AgentConfig.id, AgentConfig.name).where(AgentConfig.id.in_(config_ids))
+        ).all()
+        return {row.id: row.name for row in rows}
+
     def create_config(self, name: str, description: str) -> AgentConfig:
         config = AgentConfig(name=name, description=description)
         self._session.add(config)
