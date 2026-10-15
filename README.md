@@ -97,7 +97,7 @@ Guia completo em [`DEMO.md`](DEMO.md).
 |---|---|
 | **Linter de prompt** | Detecta referências a ferramentas não habilitadas e termos acoplados a provider. Alerta inline na edição. |
 | **Estimativa de custo** | Tokens estimados, custo por mensagem e projeção por volume — visíveis enquanto se edita. |
-| **Capabilities condicionais** | Extended thinking, structured output e tool use são habilitadas por modelo. O campo é desativado e explicado se o modelo escolhido não suportar. |
+| **Capabilities condicionais** | Extended thinking, structured output e visão são habilitadas por modelo. O campo é desativado e explicado se o modelo escolhido não suportar. Extended thinking liga o `thinking` do Claude na execução. |
 | **Validação na escrita** | Capabilities solicitadas mas não suportadas pelo modelo bloqueiam o save — não chegam a produção. |
 | **Instructions agnósticas de provider** | Validação recusa instruções com termos acoplados a provider específico. Garantida por teste no CI ([ADR-0006](docs/adr/0006-instructions-agnosticas-de-provider.md)). |
 
@@ -128,9 +128,10 @@ Guia completo em [`DEMO.md`](DEMO.md).
 | Área | Implementação |
 |---|---|
 | **Pool de conexões compartilhado** | SQLAlchemy Engine criado uma vez e reusado. Configurado com `pool_size`, `max_overflow` e `pool_pre_ping`. |
-| **Índices de banco** | Índices em `agent_run(config_id, started_at)` e `usage_event(config_id, recorded_at)` — as duas colunas usadas em todos os filtros de analytics. |
-| **Cache HTTP em capabilities** | Endpoint `/capabilities` retorna `Cache-Control: public, max-age=300`. |
-| **Reconnect de MCP Tools** | Factory recupera a conexão de MCP Tools antes de cada execução, eliminando falhas por sessão expirada. |
+| **Índices de banco** | `agent_run(agent_config_id, created_at)`, `agent_run(created_at)`, `agent_run(run_id)`, `usage_event(period, agent_config_id)` e `usage_event(created_at)` — cobrem o histórico por agente e o analytics global. |
+| **Cache HTTP em capabilities** | Endpoint `/capabilities` retorna `Cache-Control: public, max-age=86400`. |
+| **Agentes publicados sem restart** | Publicar registra o agente no AgentOS na hora; outros workers sincronizam em até 5 s. |
+| **Execuções gravadas de verdade** | Sucesso, erro, cancelamento e pausa, com duração e consumo, inclusive em streaming. |
 
 ---
 

@@ -10,7 +10,11 @@ from app.models.config import Base
 
 class AgentRun(Base):
     __tablename__ = "agent_run"
-    __table_args__ = (Index("ix_agent_run_config_created", "agent_config_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_agent_run_config_created", "agent_config_id", "created_at"),
+        Index("ix_agent_run_created_at", "created_at"),
+        Index("ix_agent_run_run_id", "run_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     agent_config_id: Mapped[uuid.UUID] = mapped_column(

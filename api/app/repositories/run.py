@@ -47,9 +47,42 @@ class RunRepository:
             error=error,
         )
         self._session.add(run)
-        self._session.commit()
-        self._session.refresh(run)
+        self._session.flush()
         return run
+
+    def upsert(
+        self,
+        *,
+        agent_config_id: UUID,
+        user_id: str,
+        status: str,
+        run_id: str | None = None,
+        duration_ms: int | None = None,
+        error: str | None = None,
+    ) -> AgentRun:
+        """Atualiza o run de mesmo run_id (pausado e retomado) ou cria um novo."""
+        existing = None
+        if run_id is not None:
+            existing = self._session.scalars(
+                select(AgentRun).where(
+                    AgentRun.run_id == run_id, AgentRun.agent_config_id == agent_config_id
+                )
+            ).first()
+        if existing is None:
+            return self.record(
+                agent_config_id=agent_config_id,
+                user_id=user_id,
+                run_id=run_id,
+                status=status,
+                duration_ms=duration_ms,
+                error=error,
+            )
+        existing.status = status
+        existing.error = error
+        if duration_ms is not None:
+            existing.duration_ms = (existing.duration_ms or 0) + duration_ms
+        self._session.flush()
+        return existing
 
     def list_by_config(
         self,

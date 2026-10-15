@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
@@ -140,7 +140,9 @@ def list_versions(config_id: UUID, session: SessionDep) -> list[AgentConfigVersi
     status_code=201,
     dependencies=[Depends(require_scopes(Scope.CONFIGS_PUBLISH))],
 )
-def publish_draft(config_id: UUID, session: SessionDep) -> AgentConfigVersionSummary:
+def publish_draft(
+    config_id: UUID, session: SessionDep, request: Request
+) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
     service = ConfigService(repo)
     try:
@@ -149,6 +151,8 @@ def publish_draft(config_id: UUID, session: SessionDep) -> AgentConfigVersionSum
         raise HTTPException(status_code=400, detail=str(e)) from e
     result = _to_version_summary(version)
     session.commit()
+    # Primeira publicação: o agente passa a responder sem restart
+    request.app.state.published_agents.sync()
     logger.info(
         "config published",
         extra={"config_id": str(config_id), "version": version.version_number},

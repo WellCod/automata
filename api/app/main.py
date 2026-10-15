@@ -10,10 +10,11 @@ from agno.os import AgentOS
 from agno.os.config import AuthorizationConfig
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.agents.factory import make_agent_factory
-from app.db import get_engine
+from app.agents.registry import PublishedAgents
 from app.logging_config import configure_logging, request_id_var
 from app.mcp_auth import JWTMCPAuth
 from app.rate_limit import make_rate_limiter
@@ -65,24 +66,21 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 AgentList = list[Agent | RemoteAgent | AgentProtocol | AgentFactory]
 
 
-def _load_published_factories(db: PostgresDb) -> AgentList:
-    from sqlalchemy.orm import Session
+_RUNTIME_PREFIXES = ("/agents", "/teams", "/mcp", "/config")
 
-    from app.repositories.config import ConfigRepository
-    from app.schemas.config import ConfigPayloadStatus
 
-    try:
-        with Session(get_engine()) as session:
-            repo = ConfigRepository(session)
-            configs, _ = repo.list_configs(
-                page=1, page_size=500, status=ConfigPayloadStatus.published
-            )
-            result: AgentList = [make_agent_factory(c.id, db) for c in configs]
-            logger.info("factories carregadas", extra={"count": len(result)})
-            return result
-    except Exception as exc:
-        logger.warning("falha ao carregar factories", extra={"error": str(exc)})
-        return []
+class SyncPublishedAgentsMiddleware(BaseHTTPMiddleware):
+    """Registra no AgentOS configs publicados por outros workers antes de rotas do runtime."""
+
+    def __init__(self, app: object, published: PublishedAgents) -> None:
+        super().__init__(app)  # type: ignore[arg-type]
+        self._published = published
+
+    async def dispatch(self, request: Request, call_next: object) -> Response:
+        if request.url.path.startswith(_RUNTIME_PREFIXES) and self._published.is_stale():
+            await run_in_threadpool(self._published.sync)
+        response: Response = await call_next(request)  # type: ignore[operator]
+        return response
 
 
 def create_app(
@@ -111,14 +109,18 @@ def create_app(
             user_isolation=True,
         )
 
-    factories: AgentList = _load_published_factories(db)
+    # Lista compartilhada com o AgentOS, que a lê a cada request
+    factories: AgentList = []
+    published = PublishedAgents(factories, lambda config_id: make_agent_factory(config_id, db))
+    published.sync()
+    base.state.published_agents = published
 
     mcp_auth = JWTMCPAuth() if enable_auth and enable_mcp_server else None
 
     protected = AgentOS(
         id="automata",
         db=db,
-        agents=factories or None,
+        agents=factories,
         base_app=base,
         auto_provision_dbs=auto_provision_dbs,
         authorization=enable_auth,
@@ -132,6 +134,7 @@ def create_app(
     # via _require_admin que verifica JWT + scope agent_os:admin.
     outer: FastAPI = FastAPI(title="automata")
     outer.state.rate_limiter = make_rate_limiter(settings.redis_url, limit=5, window=60)
+    outer.add_middleware(SyncPublishedAgentsMiddleware, published=published)
     outer.add_middleware(SecurityHeadersMiddleware)
     outer.add_middleware(RequestIDMiddleware)
     outer.include_router(auth_router)

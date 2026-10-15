@@ -760,7 +760,7 @@ Fecha o que ficou aberto dos PRs 41 e 44.
 
 ### Próximos PRs da fase
 
-- [ ] `fix(api)`: registro real de runs (status de erro e `metrics.duration`), dono da versão no modo teste, hooks fora do event loop
+- [ ] `fix(api)`: registro real de runs (status de erro e duração), dono da versão no modo teste, banco fora do event loop, agente publicado sem restart, extended thinking aplicado, índices por data e gate de cobertura fora das evals noturnas
 - [ ] `fix(infra)`: entrypoint com `exec "$@"`, web de dev só no override, porta 8000 fora do compose de produção
 - [ ] `fix(web)`: fonte (`--font-sans` circular), tema conforme `DESIGN.md`, versão ativa no histórico, confirmação de publicar/reverter, alterações não salvas, estados de erro
 - [ ] `refactor(web)`: componentes shadcn (Button, Tabs, Field, Sonner) e nova página de edição

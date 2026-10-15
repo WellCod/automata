@@ -4,9 +4,12 @@ from pydantic import ValidationError
 from app.settings import Settings, get_settings
 
 
-def test_settings_falha_sem_vars_obrigatorias() -> None:
+def test_settings_falha_sem_vars_obrigatorias(monkeypatch: pytest.MonkeyPatch) -> None:
+    for var in ("DATABASE_URL", "JWT_PRIVATE_KEY", "JWT_PUBLIC_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    # sem isso o api/.env da máquina preenche as variáveis e o teste passa a depender dela
     with pytest.raises(ValidationError):
-        Settings()
+        Settings(_env_file=None)  # type: ignore[call-arg]
 
 
 def test_settings_carrega_vars(monkeypatch: pytest.MonkeyPatch) -> None:

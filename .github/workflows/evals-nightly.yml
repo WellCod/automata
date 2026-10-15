@@ -15,7 +15,8 @@ jobs:
           working-directory: api
       - run: uv sync --frozen
         working-directory: api
-      - run: uv run pytest -m nightly -v
+      # suíte parcial: o gate de cobertura do pyproject só faz sentido na suíte completa
+      - run: uv run pytest -m nightly -v --no-cov
         working-directory: api
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
