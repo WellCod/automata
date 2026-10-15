@@ -774,7 +774,7 @@ Fecha o que ficou aberto dos PRs 41 e 44.
 Decisões em [ADR-0009](adr/0009-superficie-de-integracao.md), [ADR-0010](adr/0010-servidores-mcp-externos.md) e [ADR-0011](adr/0011-times-versionados.md). Depende do `fix(api)` de runtime da Fase 11 (#67). Cada PR é empilhado sobre o anterior.
 
 - [ ] `docs(adr)`: ADR-0010, ADR-0011 e ADR-0009 aceito
-- [ ] `feat(api)`: cadastro de servidores MCP com segredo cifrado e proteção de SSRF
+- [ ] `feat(api)`: cadastro de servidores MCP com segredo cifrado e proteção de SSRF (inclui lista única de routers para `main.py` e o export do OpenAPI, que agora traz `/auth`)
 - [ ] `feat(api)`: teste de conexão e descoberta de tools
 - [ ] `feat(api)`: agentes usam tools MCP na factory (payload v2)
 - [ ] `feat(web)`: catálogo de servidores MCP e seleção de tools no agente

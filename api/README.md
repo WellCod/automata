@@ -95,6 +95,8 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | `configs:write` | `POST /api/v1/configs`, `PUT /api/v1/configs/{id}/draft` |
 | `configs:publish` | `POST /api/v1/configs/{id}/publish`, `POST /api/v1/configs/{id}/rollback` |
 | `metrics:read` | `GET /api/v1/configs/{id}/runs`, `GET /api/v1/configs/{id}/metrics`, `GET /api/v1/metrics/*`, `GET /api/v1/usage/rollup` |
+| `mcp_servers:read` | `GET /api/v1/mcp-servers`, `GET /api/v1/mcp-servers/{id}` |
+| `mcp_servers:write` | `POST`, `PUT` e `DELETE` em `/api/v1/mcp-servers` — só owner (`agent_os:admin`) |
 | `agent_os:admin` | `POST /api/v1/auth/users` |
 
 `POST /api/v1/auth/login` e `GET /health` são públicos.
@@ -107,7 +109,7 @@ Definidos em `ROLE_SCOPES` (`app/schemas/user.py`) e gravados no token no login.
 |---|---|
 | `owner` | `agent_os:admin` |
 | `editor` | tudo do viewer + `agents:run`, `sessions:write`, `configs:write`, `configs:publish` |
-| `viewer` | `agents:read`, `sessions:read`, `traces:read`, `configs:read`, `metrics:read` |
+| `viewer` | `agents:read`, `sessions:read`, `traces:read`, `configs:read`, `metrics:read`, `mcp_servers:read` |
 
 ### Chaves
 
@@ -116,3 +118,15 @@ A chave privada (`JWT_PRIVATE_KEY`) existe só no processo da API, que emite os 
 ### Rate limit do login
 
 5 tentativas por minuto por e-mail e 20 por IP. O IP vem de `X-Forwarded-For` só quando a conexão chega de um proxy listado em `TRUSTED_PROXIES` (IPs ou CIDRs); o header é lido da direita para a esquerda e vale o primeiro hop fora da lista. Sem `TRUSTED_PROXIES`, vale o IP da conexão. O BFF repassa o IP do cliente na rota `/api/auth/login` e descarta cabeçalhos de encaminhamento vindos do browser no proxy genérico, que também recusa `v1/auth/login`.
+
+## Servidores MCP externos
+
+Cadastro dos servidores MCP que os agentes consomem (ADR-0010). Não é versionado: alterar URL ou credencial vale na hora para todo agente que usa o servidor.
+
+- `GET|POST /api/v1/mcp-servers`, `GET|PUT|DELETE /api/v1/mcp-servers/{id}`. Escrita só para owner.
+- Campos: `name`, `slug` (prefixo das tools, `^[a-z][a-z0-9_]{1,30}$`), `url`, `timeout_seconds` (1–120) e `headers`.
+- `headers` é só escrita: os valores são cifrados com Fernet (`MCP_SECRETS_KEY`) e a resposta traz apenas `header_names`. No `PUT`, `headers: null` mantém o que está salvo e `{}` apaga.
+- Só `streamable-http`, sem `stdio`. A URL precisa ser `https` e não pode resolver para rede privada, loopback ou link-local (inclui `169.254.169.254`), a não ser que o host esteja em `MCP_ALLOWED_HOSTS` — aí `http` também é aceito. A checagem roda ao salvar e de novo ao conectar.
+- Trocar a URL descarta as tools descobertas, que valiam para o endereço antigo.
+
+Gerar a chave: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Perder a chave obriga a recadastrar os headers.
