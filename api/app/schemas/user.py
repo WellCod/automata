@@ -14,6 +14,7 @@ _VIEWER_SCOPES = [
     "traces:read",
     Scope.CONFIGS_READ,
     Scope.METRICS_READ,
+    Scope.MCP_SERVERS_READ,
 ]
 
 ROLE_SCOPES: dict[UserRole, list[str]] = {

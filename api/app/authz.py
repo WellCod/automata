@@ -16,6 +16,10 @@ class Scope:
     CONFIGS_WRITE = "configs:write"
     CONFIGS_PUBLISH = "configs:publish"
     METRICS_READ = "metrics:read"
+    MCP_SERVERS_READ = "mcp_servers:read"
+    # Define para onde a API conecta e com qual credencial: nenhum papel além do
+    # owner (agent_os:admin) recebe este scope
+    MCP_SERVERS_WRITE = "mcp_servers:write"
 
 
 def require_scopes(*required: str) -> Callable[[Request], None]:
