@@ -78,6 +78,34 @@ Autenticação por JWT assimétrico RS256. O backend emite o token (via `app.aut
 | `service_accounts:read` | Listar service accounts |
 | `service_accounts:write` | Emitir tokens de service account |
 
-Rotas próprias (`/api/v1/*`) não estão no mapa de scopes do AgentOS — acessíveis com qualquer JWT válido, independente de escopo.
+### Rotas próprias (`/api/v1/*`)
 
-Chave privada (`JWT_PRIVATE_KEY`) usada apenas pelo BFF do painel (Next.js Route Handler) e pelos testes de integração. Nunca chega ao browser (ADR-0005).
+O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige scope nas do mapa padrão dele. As rotas próprias declaram o scope com `require_scopes` (`app/authz.py`), que usa a mesma regra de casamento do Agno (`agent_os:admin` libera tudo).
+
+| Scope | Rotas |
+|---|---|
+| `configs:read` | `GET /api/v1/configs`, `GET /api/v1/configs/{id}`, `GET /api/v1/configs/{id}/versions`, `GET /api/v1/models/capabilities`, `POST /api/v1/linter` |
+| `configs:write` | `POST /api/v1/configs`, `PUT /api/v1/configs/{id}/draft` |
+| `configs:publish` | `POST /api/v1/configs/{id}/publish`, `POST /api/v1/configs/{id}/rollback` |
+| `metrics:read` | `GET /api/v1/configs/{id}/runs`, `GET /api/v1/configs/{id}/metrics`, `GET /api/v1/metrics/*`, `GET /api/v1/usage/rollup` |
+| `agent_os:admin` | `POST /api/v1/auth/users` |
+
+`POST /api/v1/auth/login` e `GET /health` são públicos.
+
+### Papéis
+
+Definidos em `ROLE_SCOPES` (`app/schemas/user.py`) e gravados no token no login. Mudança de papel vale a partir do próximo login.
+
+| Papel | Scopes |
+|---|---|
+| `owner` | `agent_os:admin` |
+| `editor` | tudo do viewer + `agents:run`, `sessions:write`, `configs:write`, `configs:publish` |
+| `viewer` | `agents:read`, `sessions:read`, `traces:read`, `configs:read`, `metrics:read` |
+
+### Chaves
+
+A chave privada (`JWT_PRIVATE_KEY`) existe só no processo da API, que emite os tokens. O painel recebe apenas `JWT_PUBLIC_KEY` para verificar o cookie no proxy (ADR-0005). Os testes geram um par em memória.
+
+### Rate limit do login
+
+5 tentativas por minuto por e-mail e 20 por IP. O IP vem de `X-Forwarded-For` só quando a conexão chega de um proxy listado em `TRUSTED_PROXIES` (IPs ou CIDRs); o header é lido da direita para a esquerda e vale o primeiro hop fora da lista. Sem `TRUSTED_PROXIES`, vale o IP da conexão. O BFF repassa o IP do cliente na rota `/api/auth/login` e descarta cabeçalhos de encaminhamento vindos do browser no proxy genérico, que também recusa `v1/auth/login`.
