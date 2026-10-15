@@ -63,6 +63,9 @@ describe("AgentEditPage", () => {
       if ((path as string).includes("usage/rollup")) {
         return { data: [], error: undefined } as never;
       }
+      if ((path as string).includes("mcp-servers")) {
+        return { data: [], error: undefined } as never;
+      }
       return { data: mockDetail, error: undefined } as never;
     });
     vi.mocked(client.PUT).mockResolvedValue({
