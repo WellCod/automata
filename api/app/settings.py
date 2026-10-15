@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     mcp_allowed_hosts: str = ""
     # URL pública da API, usada para montar o endereço do /mcp nas integrações
     public_base_url: str | None = None
+    # Spans de agente, time, modelo e tool gravados no banco (árvore de execução)
+    tracing_enabled: bool = True
 
 
 @lru_cache

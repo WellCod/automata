@@ -336,6 +336,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/runs/{run_id}/trace": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Run Trace */
+    get: operations["get_run_trace_api_v1_runs__run_id__trace_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/usage/rollup": {
     parameters: {
       query?: never;
@@ -933,6 +950,23 @@ export interface components {
       /** Cost */
       cost: number | null;
     };
+    /** RunTrace */
+    RunTrace: {
+      /** Trace Id */
+      trace_id: string;
+      /** Run Id */
+      run_id: string | null;
+      /** Status */
+      status: string;
+      /** Duration */
+      duration: string;
+      /** Total Spans */
+      total_spans: number;
+      /** Error Count */
+      error_count: number;
+      /** Tree */
+      tree: components["schemas"]["TraceSpan"][];
+    };
     /** RunsPage */
     RunsPage: {
       /** Items */
@@ -987,6 +1021,37 @@ export interface components {
        * @default bearer
        */
       token_type: string;
+    };
+    /** TraceSpan */
+    TraceSpan: {
+      /** Id */
+      id: string;
+      /** Name */
+      name: string;
+      /** Type */
+      type: string;
+      /** Duration */
+      duration: string;
+      /** Status */
+      status: string;
+      /**
+       * Start Time
+       * Format: date-time
+       */
+      start_time: string;
+      /**
+       * End Time
+       * Format: date-time
+       */
+      end_time: string;
+      /** Input */
+      input?: string | null;
+      /** Output */
+      output?: string | null;
+      /** Error */
+      error?: string | null;
+      /** Spans */
+      spans?: components["schemas"]["TraceSpan"][];
     };
     /** UserResponse */
     UserResponse: {
@@ -1767,6 +1832,37 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["RunsPage"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_run_trace_api_v1_runs__run_id__trace_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        run_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RunTrace"];
         };
       };
       /** @description Validation Error */

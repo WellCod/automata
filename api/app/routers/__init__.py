@@ -8,6 +8,7 @@ from app.routers.mcp_servers import router as mcp_servers_router
 from app.routers.metrics import router as metrics_router
 from app.routers.models import router as models_router
 from app.routers.runs import router as runs_router
+from app.routers.traces import router as traces_router
 from app.routers.usage import router as usage_router
 
 # Rotas /api/v1 montadas dentro do AgentOS (atrás do JWT). main.py e o export
@@ -21,5 +22,6 @@ PROTECTED_ROUTERS: list[APIRouter] = [
     mcp_servers_router,
     metrics_router,
     runs_router,
+    traces_router,
     usage_router,
 ]

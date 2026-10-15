@@ -99,6 +99,7 @@ Guia completo em [`DEMO.md`](DEMO.md).
 | **Ferramentas via MCP** | Catálogo de servidores MCP (`/mcp`) com credenciais cifradas e teste de conexão. Em cada agente, escolhe-se quais servidores e quais tools ele usa, e quais pedem confirmação. Servidor fora do ar faz o run falhar com o motivo, em vez de o agente responder sem as tools ([ADR-0010](docs/adr/0010-servidores-mcp-externos.md)). |
 | **Confirmação humana** | Tools sensíveis pausam a execução até alguém aprovar ou rejeitar, no modo teste ou na página Aprovações, com nome e argumentos da ação. |
 | **Integrações** | Tokens por sistema consumidor, limitados aos agentes e times escolhidos, com validade e revogação imediata. O painel entrega a configuração pronta para Claude Desktop ou Cursor usarem os agentes via MCP. |
+| **Árvore de execução** | Cada execução abre em árvore: time → agentes → chamadas de modelo e tools, com duração, entrada, saída e erro de cada etapa. |
 | **Linter de prompt** | Detecta referências a ferramentas não habilitadas e termos acoplados a provider. Alerta inline na edição. |
 | **Estimativa de custo** | Tokens estimados, custo por mensagem e projeção por volume — visíveis enquanto se edita. |
 | **Capabilities condicionais** | Extended thinking, structured output e visão são habilitadas por modelo. O campo é desativado e explicado se o modelo escolhido não suportar. Extended thinking liga o `thinking` do Claude na execução. |

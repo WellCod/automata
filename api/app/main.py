@@ -114,6 +114,7 @@ def create_app(
     )
     published.sync()
     base.state.published_agents = published
+    base.state.agno_db = db if settings.tracing_enabled else None
     revoked = RevokedTokens()
     base.state.revoked_tokens = revoked
 
@@ -130,6 +131,7 @@ def create_app(
         authorization_config=auth_config,
         mcp_server=enable_mcp_server,
         mcp_auth=mcp_auth,
+        tracing=settings.tracing_enabled,
     ).get_app()
 
     # auth_router fica fora do middleware do Agno: /login precisa ser público

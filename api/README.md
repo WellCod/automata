@@ -97,7 +97,7 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | `configs:read` | `GET /api/v1/configs`, `GET /api/v1/configs/{id}`, `GET /api/v1/configs/{id}/versions`, `GET /api/v1/models/capabilities`, `POST /api/v1/linter` |
 | `configs:write` | `POST /api/v1/configs`, `PUT /api/v1/configs/{id}/draft`, `POST /api/v1/mcp-servers/{id}/discover` |
 | `configs:publish` | `POST /api/v1/configs/{id}/publish`, `POST /api/v1/configs/{id}/rollback` |
-| `metrics:read` | `GET /api/v1/configs/{id}/runs`, `GET /api/v1/configs/{id}/metrics`, `GET /api/v1/metrics/*`, `GET /api/v1/usage/rollup`, `GET /api/v1/approvals` |
+| `metrics:read` | `GET /api/v1/configs/{id}/runs`, `GET /api/v1/configs/{id}/metrics`, `GET /api/v1/metrics/*`, `GET /api/v1/usage/rollup`, `GET /api/v1/approvals`, `GET /api/v1/runs/{run_id}/trace` (este só para o dono do run ou owner) |
 | `mcp_servers:read` | `GET /api/v1/mcp-servers`, `GET /api/v1/mcp-servers/{id}` |
 | `mcp_servers:write` | `POST`, `PUT` e `DELETE` em `/api/v1/mcp-servers` — só owner (`agent_os:admin`) |
 | `agent_os:admin` | `POST /api/v1/auth/users`; `integrations:write` (rotas `/api/v1/integrations`) só vem pelo admin |
@@ -168,3 +168,11 @@ Tokens para sistemas externos e assistentes de IA chamarem agentes e times via R
 - `GET /api/v1/integrations` lista sem o token. `DELETE /api/v1/integrations/{id}` revoga.
 - Revogação: o Agno só valida assinatura e expiração, então o `RevocationMiddleware` (`app/integrations.py`) recusa com 401 o `jti` revogado antes de a request chegar a ele. No processo que revogou, vale na hora; nos outros workers, em até 30 s (cache).
 - No `/mcp`, as tools `run_agent`/`run_team` exigem os mesmos scopes por recurso da REST, e `get_agentos_config` lista só o liberado.
+
+## Árvore de execução
+
+Com `TRACING_ENABLED=true` (padrão), o AgentOS grava em banco, via OpenTelemetry, os spans de cada run: time, agente, chamada de modelo e tool. A exportação é imediata (`SimpleSpanProcessor`).
+
+- `GET /api/v1/runs/{run_id}/trace` devolve a árvore tipada: `{trace_id, status, duration, total_spans, error_count, tree: [{type, name, duration, status, input, output, error, spans[]}]}`. Num time, a raiz é `TEAM`; abaixo dela vêm os membros (`AGENT`), as chamadas de modelo (`LLM`) e as tools (`TOOL`), inclusive as MCP.
+- O trace traz entrada e saída da conversa, então segue a regra do Agno: só o dono do run ou owner. Run sem trace (tracing desligado ou anterior a ele) dá 404.
+- A rota é própria porque as `/traces` do Agno ficam fora do OpenAPI que gera os tipos do painel.
