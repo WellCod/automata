@@ -302,6 +302,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/metrics/timeseries": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Timeseries */
+    get: operations["get_timeseries_api_v1_metrics_timeseries_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/configs/{config_id}/metrics": {
     parameters: {
       query?: never;
@@ -671,6 +688,26 @@ export interface components {
       password: string;
       /** @default viewer */
       role: components["schemas"]["UserRole"];
+    };
+    /** DailyMetricsPoint */
+    DailyMetricsPoint: {
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** Total Runs */
+      total_runs: number;
+      /** Error Count */
+      error_count: number;
+      /** P50 Ms */
+      p50_ms: number | null;
+      /** P95 Ms */
+      p95_ms: number | null;
+      /** Total Tokens */
+      total_tokens: number;
+      /** Total Cost */
+      total_cost: number | null;
     };
     /** DraftInput */
     DraftInput: {
@@ -1765,6 +1802,40 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["AgentBreakdownItem"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_timeseries_api_v1_metrics_timeseries_get: {
+    parameters: {
+      query?: {
+        period?: string;
+        start?: string | null;
+        end?: string | null;
+        agent_id?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DailyMetricsPoint"][];
         };
       };
       /** @description Validation Error */

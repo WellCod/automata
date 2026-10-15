@@ -1,9 +1,9 @@
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import Date, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.models.run import AgentRun
@@ -14,6 +14,15 @@ class AgentRunSummary:
     agent_config_id: UUID
     total_runs: int
     error_count: int
+
+
+@dataclass
+class DailyRunStats:
+    day: date
+    total_runs: int
+    error_count: int
+    p50_ms: float | None
+    p95_ms: float | None
 
 
 @dataclass
@@ -247,3 +256,40 @@ class RunRepository:
             p95_ms=p95,
             period_days=period_days,
         )
+
+    def daily(
+        self,
+        *,
+        since: datetime,
+        until: datetime | None = None,
+        config_id: UUID | None = None,
+    ) -> list[DailyRunStats]:
+        """Runs por dia (UTC); dias sem run não aparecem."""
+        day = cast(func.timezone("UTC", AgentRun.created_at), Date).label("day")
+        where_clauses = [AgentRun.created_at >= since]
+        if until is not None:
+            where_clauses.append(AgentRun.created_at <= until)
+        if config_id is not None:
+            where_clauses.append(AgentRun.agent_config_id == config_id)
+        rows = self._session.execute(
+            select(
+                day,
+                func.count(AgentRun.id).label("total"),
+                func.count(AgentRun.id).filter(AgentRun.status == "error").label("errors"),
+                func.percentile_cont(0.5).within_group(AgentRun.duration_ms).label("p50"),
+                func.percentile_cont(0.95).within_group(AgentRun.duration_ms).label("p95"),
+            )
+            .where(*where_clauses)
+            .group_by(day)
+            .order_by(day)
+        ).all()
+        return [
+            DailyRunStats(
+                day=r.day,
+                total_runs=int(r.total),
+                error_count=int(r.errors),
+                p50_ms=float(r.p50) if r.p50 is not None else None,
+                p95_ms=float(r.p95) if r.p95 is not None else None,
+            )
+            for r in rows
+        ]

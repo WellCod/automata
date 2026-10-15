@@ -53,6 +53,8 @@ Arquivos:
 
 O rollup agrega tokens e custo por `(agent_config_id, period)`. Campos: `run_count`, `input_tokens`, `output_tokens`, `total_tokens`, `cost`.
 
+`GET /api/v1/metrics/timeseries?period=30d|start=&end=&agent_id=<uuid>` — um ponto por dia (UTC) com `total_runs`, `error_count`, `p50_ms`, `p95_ms`, `total_tokens` e `total_cost`. Dia sem execução vem zerado, com latência e custo nulos. Limite de 366 dias. Alimenta os gráficos do analytics e da aba Desempenho do agente.
+
 ## Runtime de agentes
 
 - **Factory por request** (`app/agents/factory.py`): lê a versão vigente (ou a `version_id` do modo teste, que precisa ser do mesmo agente — outra versão dá 400) e monta o `Agent`. Leitura do banco fora do event loop.
