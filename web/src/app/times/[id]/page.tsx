@@ -18,6 +18,7 @@ import { VersionsPanel } from "@/components/versions-panel";
 import client from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const MODES = [
   {
@@ -234,14 +235,9 @@ export default function TeamEditPage() {
           {save.isSuccess && !form.formState.isDirty && (
             <span className="text-accent text-[11px] tracking-[0.05em] uppercase">Salvo</span>
           )}
-          <button
-            type="submit"
-            form="team-form"
-            disabled={save.isPending}
-            className="border-foreground text-foreground hover:border-accent hover:text-accent inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
-          >
+          <Button type="submit" form="team-form" disabled={save.isPending} variant="strong">
             {save.isPending ? "Salvando…" : "Salvar rascunho"}
-          </button>
+          </Button>
         </div>
       </header>
 

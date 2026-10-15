@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
+import { Button } from "@/components/ui/button";
 
 type GlobalMetricsSummary = components["schemas"]["GlobalMetricsSummary"];
 type AgentBreakdownItem = components["schemas"]["AgentBreakdownItem"];
@@ -41,13 +42,9 @@ function LoadError({ message, onRetry }: { message: string; onRetry: () => void 
   return (
     <div className="border-destructive/30 text-destructive flex items-center justify-between gap-3 rounded border px-4 py-3 text-[13px]">
       <span>{message}</span>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="border-border text-foreground hover:border-accent hover:text-accent inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors"
-      >
+      <Button onClick={onRetry} size="sm">
         Tentar de novo
-      </button>
+      </Button>
     </div>
   );
 }
@@ -96,18 +93,15 @@ function PeriodSelector({
     <div className="flex flex-wrap items-center gap-2">
       <div className="flex gap-1">
         {PERIODS.map((p) => (
-          <button
+          <Button
             key={p.value}
-            type="button"
+            size="sm"
+            variant={!isCustomActive && filter.period === p.value ? "accent" : "muted"}
+            aria-pressed={!isCustomActive && filter.period === p.value}
             onClick={() => handlePeriod(p.value)}
-            className={`rounded px-3 py-1 text-[12px] font-medium transition-colors ${
-              !isCustomActive && filter.period === p.value
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
           >
             {p.label}
-          </button>
+          </Button>
         ))}
       </div>
 

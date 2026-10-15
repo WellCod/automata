@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle } from "lucide-react";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
+import { Button } from "@/components/ui/button";
 
 type ConfigPayload = components["schemas"]["ConfigPayload"];
 type LintWarning = components["schemas"]["LintWarning"];
@@ -29,14 +30,14 @@ export function LintPanel({ getPayload }: Props) {
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-foreground text-[13px] font-medium">Linter</h2>
-        <button
-          type="button"
+        <Button
           onClick={() => mutation.mutate()}
           disabled={mutation.isPending}
-          className="border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
+          variant="muted"
+          size="sm"
         >
           {mutation.isPending ? "Verificando…" : "Verificar"}
-        </button>
+        </Button>
       </div>
 
       {mutation.isSuccess && (

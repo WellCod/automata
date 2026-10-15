@@ -168,7 +168,7 @@ test.describe("Formulário de edição", () => {
     await page.goto(`/agents/${AGENT_ID}`);
     await page.locator('input[name="name"]').fill("Agente Renomeado");
     await page.getByRole("button", { name: /salvar rascunho/i }).click();
-    await expect(page.getByText("Salvo")).toBeVisible();
+    await expect(page.getByText("Rascunho salvo")).toBeVisible();
   });
 
   test("envia o payload correto ao salvar", async ({ page }) => {
@@ -183,7 +183,7 @@ test.describe("Formulário de edição", () => {
 
     await page.goto(`/agents/${AGENT_ID}`);
     await page.getByRole("button", { name: /salvar rascunho/i }).click();
-    await expect(page.getByText("Salvo")).toBeVisible();
+    await expect(page.getByText("Rascunho salvo")).toBeVisible();
 
     expect(capturedBody).toMatchObject({
       name: "Agente Teste",
@@ -198,6 +198,6 @@ test.describe("Formulário de edição", () => {
 
     await page.goto(`/agents/${AGENT_ID}`);
     await page.getByRole("button", { name: /salvar rascunho/i }).click();
-    await expect(page.getByText("Erro ao salvar")).toBeVisible();
+    await expect(page.getByText("Erro ao salvar rascunho")).toBeVisible();
   });
 });

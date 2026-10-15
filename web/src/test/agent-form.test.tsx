@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AgentEditPage from "@/app/agents/[id]/page";
+import { Toaster } from "@/components/ui/sonner";
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" }),
@@ -19,8 +20,14 @@ function makeQueryClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
 }
 
+// o sonner guarda os toasts em estado global: um toast de teste anterior pode seguir na tela
 function wrapper({ children }: { children: React.ReactNode }) {
-  return <QueryClientProvider client={makeQueryClient()}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={makeQueryClient()}>
+      {children}
+      <Toaster />
+    </QueryClientProvider>
+  );
 }
 
 const mockDetail = {
@@ -125,7 +132,7 @@ describe("AgentEditPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /salvar rascunho/i }));
 
     await waitFor(() => {
-      expect(screen.getByText("Salvo")).toBeInTheDocument();
+      expect(screen.getAllByText("Rascunho salvo")[0]).toBeInTheDocument();
     });
     expect(client.PUT).toHaveBeenCalledOnce();
   });
@@ -144,7 +151,7 @@ describe("AgentEditPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /salvar rascunho/i }));
 
     await waitFor(() => {
-      expect(screen.getByText("Erro ao salvar")).toBeInTheDocument();
+      expect(screen.getAllByText("Erro ao salvar rascunho")[0]).toBeInTheDocument();
     });
   });
 
@@ -158,7 +165,7 @@ describe("AgentEditPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /salvar rascunho/i }));
     await waitFor(() => {
-      expect(screen.getByText("Salvo")).toBeInTheDocument();
+      expect(screen.getAllByText("Rascunho salvo")[0]).toBeInTheDocument();
     });
     expect(screen.queryByText(/alterações não salvas/i)).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Agente Teste 2")).toBeInTheDocument();
@@ -183,5 +190,22 @@ describe("AgentEditPage", () => {
     render(<AgentEditPage />, { wrapper });
     expect(await screen.findByText("Erro ao carregar o agente.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /tentar de novo/i })).toBeInTheDocument();
+  });
+
+  it("organiza a página em abas e mantém o painel de teste visível", async () => {
+    render(<AgentEditPage />, { wrapper });
+    await screen.findByDisplayValue("Agente Teste");
+    for (const name of [/configuração/i, /execuções/i, /desempenho/i, /versões/i]) {
+      expect(screen.getByRole("tab", { name })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("complementary", { name: "Testar" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("tab", { name: /versões/i }));
+    expect(await screen.findByText("Nenhuma versão salva.")).toBeInTheDocument();
+    // o form continua montado: salvar funciona fora da aba de configuração
+    await userEvent.click(screen.getByRole("button", { name: /salvar rascunho/i }));
+    await waitFor(() => {
+      expect(client.PUT).toHaveBeenCalled();
+    });
   });
 });

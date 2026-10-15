@@ -5,6 +5,7 @@ import { useId, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import type { McpServer } from "@/components/mcp-tools-selector";
+import { Button } from "@/components/ui/button";
 
 const schema = z.object({
   name: z.string().min(1, "Nome obrigatório").max(255),
@@ -45,8 +46,6 @@ interface Props {
 
 const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors focus:border-accent focus:outline-none";
-const btnCls =
-  "inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40";
 
 export function slugify(name: string): string {
   const slug = name
@@ -173,13 +172,9 @@ export function McpServerForm({ server, pending, error, onSubmit, onCancel }: Pr
                 ? `Salvos: ${server.header_names.join(", ")}`
                 : "Nenhum header salvo"}
             </span>
-            <button
-              type="button"
-              onClick={() => setReplaceHeaders(true)}
-              className={`${btnCls} border-border text-muted-foreground hover:text-foreground`}
-            >
+            <Button onClick={() => setReplaceHeaders(true)} variant="muted">
               Substituir headers
-            </button>
+            </Button>
           </div>
         ) : (
           <>
@@ -199,27 +194,23 @@ export function McpServerForm({ server, pending, error, onSubmit, onCancel }: Pr
                   aria-label={`Valor do header ${index + 1}`}
                   className={inputCls}
                 />
-                <button
-                  type="button"
+                <Button
                   onClick={() => headers.remove(index)}
-                  className={`${btnCls} border-border text-muted-foreground hover:text-destructive flex-none`}
+                  variant="subtleDestructive"
+                  className="flex-none"
                   aria-label={`Remover header ${index + 1}`}
                 >
                   ×
-                </button>
+                </Button>
               </div>
             ))}
             {errors.headers && (
               <p className="text-destructive text-[11px]">Confira nome e valor dos headers.</p>
             )}
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => headers.append({ name: "", value: "" })}
-                className={`${btnCls} border-border text-muted-foreground hover:text-foreground`}
-              >
+              <Button onClick={() => headers.append({ name: "", value: "" })} variant="muted">
                 Adicionar header
-              </button>
+              </Button>
               {editing && (
                 <span className="text-muted-foreground self-center text-[11px]">
                   Salvar substitui todos os headers. Sem nenhum, os atuais são apagados.
@@ -237,20 +228,12 @@ export function McpServerForm({ server, pending, error, onSubmit, onCancel }: Pr
       )}
 
       <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className={`${btnCls} border-border text-muted-foreground hover:text-foreground`}
-        >
+        <Button onClick={onCancel} variant="muted">
           Cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={pending}
-          className={`${btnCls} border-foreground text-foreground hover:border-accent hover:text-accent`}
-        >
+        </Button>
+        <Button type="submit" disabled={pending} variant="strong">
           {pending ? "Salvando…" : "Salvar"}
-        </button>
+        </Button>
       </div>
     </form>
   );

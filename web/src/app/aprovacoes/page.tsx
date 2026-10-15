@@ -5,11 +5,9 @@ import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePendingApprovals } from "@/lib/api/approvals";
 import type { components } from "@/lib/api/schema.d.ts";
+import { Button } from "@/components/ui/button";
 
 type ApprovalItem = components["schemas"]["ApprovalItem"];
-
-const btnCls =
-  "inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40";
 
 function ApprovalCard({ item }: { item: ApprovalItem }) {
   const queryClient = useQueryClient();
@@ -71,22 +69,16 @@ function ApprovalCard({ item }: { item: ApprovalItem }) {
       )}
 
       <div className="flex gap-2">
-        <button
-          type="button"
-          disabled={decide.isPending}
-          onClick={() => decide.mutate(true)}
-          className={`${btnCls} border-foreground text-foreground hover:border-accent hover:text-accent`}
-        >
+        <Button disabled={decide.isPending} onClick={() => decide.mutate(true)} variant="strong">
           Aprovar
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
           disabled={decide.isPending}
           onClick={() => decide.mutate(false)}
-          className={`${btnCls} border-destructive text-destructive`}
+          variant="destructive"
         >
           Rejeitar
-        </button>
+        </Button>
       </div>
     </li>
   );

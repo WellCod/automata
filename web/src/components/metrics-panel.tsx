@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
 
@@ -57,18 +58,15 @@ export function MetricsPanel({ agentId }: Props) {
     <div className="flex flex-col gap-3">
       <div className="flex gap-1">
         {PERIODS.map((p) => (
-          <button
+          <Button
             key={p.value}
-            type="button"
+            size="sm"
+            variant={period === p.value ? "accent" : "muted"}
+            aria-pressed={period === p.value}
             onClick={() => setPeriod(p.value)}
-            className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
-              period === p.value
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
           >
             {p.label}
-          </button>
+          </Button>
         ))}
       </div>
 

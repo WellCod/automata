@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { readSse } from "@/lib/sse";
+import { Button } from "@/components/ui/button";
 
 interface ChatMessage {
   id: number;
@@ -54,9 +55,6 @@ function describeTool(tool: ToolEventData | undefined, names: Record<string, str
   }
   return `Chamou ${tool?.tool_name ?? "tool"}`;
 }
-
-const btnCls =
-  "inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40";
 
 export function TestPanel({
   agentId,
@@ -181,13 +179,9 @@ export function TestPanel({
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-foreground text-[13px] font-medium">Modo teste</h2>
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors"
-        >
+        <Button onClick={() => setOpen((o) => !o)} variant="muted" size="sm">
           {open ? "Fechar" : "Abrir chat"}
-        </button>
+        </Button>
       </div>
 
       {open && (
@@ -264,20 +258,12 @@ export function TestPanel({
                 ))}
               </ul>
               <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => void decide(true)}
-                  className={`${btnCls} border-foreground text-foreground hover:border-accent hover:text-accent`}
-                >
+                <Button onClick={() => void decide(true)} variant="strong">
                   Aprovar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void decide(false)}
-                  className={`${btnCls} border-destructive text-destructive`}
-                >
+                </Button>
+                <Button onClick={() => void decide(false)} variant="destructive">
                   Rejeitar
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -299,23 +285,17 @@ export function TestPanel({
               disabled={isRunning || paused !== null}
               className="border-border text-foreground placeholder:text-muted-foreground focus:border-accent flex-1 rounded border bg-[var(--input)] px-3 py-1.5 text-[13px] transition-colors focus:outline-none disabled:opacity-40"
             />
-            <button
-              type="button"
+            <Button
               onClick={() => void sendMessage()}
               disabled={isRunning || paused !== null || !input.trim()}
-              className={`${btnCls} border-foreground text-foreground hover:border-accent hover:text-accent`}
+              variant="strong"
             >
               {isRunning ? "…" : "Enviar"}
-            </button>
+            </Button>
             {messages.length > 0 && (
-              <button
-                type="button"
-                onClick={clearSession}
-                disabled={isRunning}
-                className="border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground inline-flex h-7 items-center rounded border px-2 text-[11px] tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
-              >
+              <Button onClick={clearSession} disabled={isRunning} variant="muted">
                 Limpar
-              </button>
+              </Button>
             )}
           </div>
         </div>

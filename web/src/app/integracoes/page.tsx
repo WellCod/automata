@@ -7,12 +7,11 @@ import client from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
 import { mcpSnippet } from "@/lib/mcp-snippet";
 import type { components } from "@/lib/api/schema.d.ts";
+import { Button } from "@/components/ui/button";
 
 type Integration = components["schemas"]["IntegrationResponse"];
 type Issued = components["schemas"]["IssuedIntegration"];
 
-const btnCls =
-  "inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40";
 const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none";
 
@@ -66,27 +65,13 @@ function IssuedToken({ issued, onClose }: { issued: Issued; onClose: () => void 
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => void copy("token", issued.token)}
-          className={`${btnCls} border-foreground text-foreground hover:border-accent hover:text-accent`}
-        >
+        <Button onClick={() => void copy("token", issued.token)} variant="strong">
           Copiar token
-        </button>
-        <button
-          type="button"
-          onClick={() => void copy("config", snippet)}
-          className={`${btnCls} border-border text-foreground hover:border-accent hover:text-accent`}
-        >
-          Copiar configuração
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className={`${btnCls} border-border text-muted-foreground hover:text-foreground`}
-        >
+        </Button>
+        <Button onClick={() => void copy("config", snippet)}>Copiar configuração</Button>
+        <Button onClick={onClose} variant="muted">
           Já copiei
-        </button>
+        </Button>
         <span aria-live="polite" className="text-accent text-[11px]">
           {copied === "token" && "Token copiado"}
           {copied === "config" && "Configuração copiada"}
@@ -213,13 +198,13 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
         </p>
       )}
       <div className="flex justify-end">
-        <button
+        <Button
           type="submit"
           disabled={issue.isPending || !name.trim() || nothingSelected}
-          className={`${btnCls} border-foreground text-foreground hover:border-accent hover:text-accent`}
+          variant="strong"
         >
           {issue.isPending ? "Emitindo…" : "Emitir token"}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -263,30 +248,21 @@ function IntegrationRow({ item, names }: { item: Integration; names: Record<stri
       {status === "ativo" &&
         (confirm ? (
           <div className="flex gap-2">
-            <button
-              type="button"
+            <Button
               onClick={() => revoke.mutate()}
               disabled={revoke.isPending}
-              className={`${btnCls} border-destructive text-destructive`}
+              variant="destructive"
             >
               Confirmar revogação
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirm(false)}
-              className={`${btnCls} border-border text-muted-foreground hover:text-foreground`}
-            >
+            </Button>
+            <Button onClick={() => setConfirm(false)} variant="muted">
               Manter
-            </button>
+            </Button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setConfirm(true)}
-            className={`${btnCls} border-border text-muted-foreground hover:border-destructive hover:text-destructive`}
-          >
+          <Button onClick={() => setConfirm(true)} variant="subtleDestructive">
             Revogar
-          </button>
+          </Button>
         ))}
     </li>
   );

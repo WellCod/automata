@@ -7,9 +7,7 @@ import { McpServerForm, type McpServerBody } from "@/components/mcp-server-form"
 import { type McpServer, useMcpServers } from "@/components/mcp-tools-selector";
 import client from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
-
-const btnCls =
-  "inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40";
+import { Button } from "@/components/ui/button";
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "nunca";
@@ -49,47 +47,29 @@ function ServerCard({ server, onEdit }: { server: McpServer; onEdit: () => void 
           <span className="text-muted-foreground truncate text-[13px]">{server.url}</span>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => discover.mutate()}
-            disabled={discover.isPending}
-            className={`${btnCls} border-border text-foreground hover:border-accent hover:text-accent`}
-          >
+          <Button onClick={() => discover.mutate()} disabled={discover.isPending}>
             {discover.isPending ? "Conectando…" : "Testar conexão"}
-          </button>
-          <button
-            type="button"
-            onClick={onEdit}
-            className={`${btnCls} border-border text-muted-foreground hover:text-foreground`}
-          >
+          </Button>
+          <Button onClick={onEdit} variant="muted">
             Editar
-          </button>
+          </Button>
           {confirmDelete ? (
             <>
-              <button
-                type="button"
+              <Button
                 onClick={() => remove.mutate()}
                 disabled={remove.isPending}
-                className={`${btnCls} border-destructive text-destructive`}
+                variant="destructive"
               >
                 Confirmar exclusão
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(false)}
-                className={`${btnCls} border-border text-muted-foreground hover:text-foreground`}
-              >
+              </Button>
+              <Button onClick={() => setConfirmDelete(false)} variant="muted">
                 Manter
-              </button>
+              </Button>
             </>
           ) : (
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(true)}
-              className={`${btnCls} text-muted-foreground hover:border-destructive hover:text-destructive border-border`}
-            >
+            <Button onClick={() => setConfirmDelete(true)} variant="subtleDestructive">
               Excluir
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -190,13 +170,9 @@ export default function McpServersPage() {
     <div className="flex min-h-screen flex-col">
       <header className="border-border bg-background sticky top-0 z-10 flex h-11 flex-none items-center justify-between border-b px-6">
         <h1 className="text-foreground text-sm font-medium">Servidores MCP</h1>
-        <button
-          type="button"
-          onClick={() => openForm("new")}
-          className={`${btnCls} border-accent text-accent hover:text-foreground hover:border-foreground`}
-        >
+        <Button onClick={() => openForm("new")} variant="accent">
           Novo servidor
-        </button>
+        </Button>
       </header>
 
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-6 py-6">

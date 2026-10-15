@@ -31,8 +31,9 @@ execuções distribuídas em 90 dias, tudo sintético.
 ### Configuração do agente
 
 Versão ativa marcada no topo, instruções em campos separados em vez de um
-textão, e as abas que sustentam a operação: modo teste, histórico de versões,
-execuções, métricas, custo estimado e linter de configuração.
+textão e linter junto da configuração. A página tem abas para Configuração,
+Execuções, Desempenho (métricas e custo) e Versões; o modo teste fica fixo ao
+lado, visível em qualquer aba.
 
 ![Configuração de um agente](docs/img/agente.png)
 
