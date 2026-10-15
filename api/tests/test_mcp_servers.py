@@ -234,3 +234,64 @@ def test_so_owner_cadastra_servidor(
     resp = client.post("/api/v1/mcp-servers", json=_BODY, headers=admin)
     assert resp.status_code not in (401, 403)
     get_settings.cache_clear()
+
+
+# --- descoberta contra servidor MCP real ---
+
+
+@pytest.fixture(scope="module")
+def mcp_url() -> Generator[str, None, None]:
+    from tests.mcp_fake_server import running_server
+
+    with running_server() as url:
+        yield url
+
+
+@pytest.fixture
+def local_env(env: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MCP_ALLOWED_HOSTS", "127.0.0.1")
+    get_settings.cache_clear()
+
+
+def test_descoberta_lista_tools_e_salva_retrato(
+    client: TestClient, mcp_url: str, local_env: None
+) -> None:
+    from tests.mcp_fake_server import TOKEN
+
+    body = {
+        "name": "CRM real",
+        "slug": "crmreal",
+        "url": mcp_url,
+        "headers": {"Authorization": f"Bearer {TOKEN}"},
+    }
+    server_id = client.post("/api/v1/mcp-servers", json=body).json()["id"]
+
+    resp = client.post(f"/api/v1/mcp-servers/{server_id}/discover")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    names = sorted(t["name"] for t in data["tools"])
+    assert names == ["buscar_cliente", "cancelar_assinatura"]
+    assert data["tools_discovered_at"] is not None
+    buscar = next(t for t in data["tools"] if t["name"] == "buscar_cliente")
+    assert "cliente_id" in buscar["input_schema"]["properties"]
+
+
+def test_descoberta_sem_token_falha_com_502(
+    client: TestClient, mcp_url: str, local_env: None
+) -> None:
+    body = {"name": "CRM sem token", "slug": "crmsemtoken", "url": mcp_url}
+    server_id = client.post("/api/v1/mcp-servers", json=body).json()["id"]
+
+    resp = client.post(f"/api/v1/mcp-servers/{server_id}/discover")
+    assert resp.status_code == 502
+    assert "crmsemtoken" in resp.json()["detail"]
+
+
+def test_descoberta_servidor_fora_do_ar_falha_com_502(client: TestClient, local_env: None) -> None:
+    body = {"name": "Fora do ar", "slug": "foradoar", "url": "http://127.0.0.1:1/mcp"}
+    server_id = client.post("/api/v1/mcp-servers", json=body).json()["id"]
+
+    resp = client.post(f"/api/v1/mcp-servers/{server_id}/discover")
+    assert resp.status_code == 502
+    # a API segue respondendo depois da falha
+    assert client.get(f"/api/v1/mcp-servers/{server_id}").status_code == 200

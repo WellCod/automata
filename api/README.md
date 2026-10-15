@@ -92,7 +92,7 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | Scope | Rotas |
 |---|---|
 | `configs:read` | `GET /api/v1/configs`, `GET /api/v1/configs/{id}`, `GET /api/v1/configs/{id}/versions`, `GET /api/v1/models/capabilities`, `POST /api/v1/linter` |
-| `configs:write` | `POST /api/v1/configs`, `PUT /api/v1/configs/{id}/draft` |
+| `configs:write` | `POST /api/v1/configs`, `PUT /api/v1/configs/{id}/draft`, `POST /api/v1/mcp-servers/{id}/discover` |
 | `configs:publish` | `POST /api/v1/configs/{id}/publish`, `POST /api/v1/configs/{id}/rollback` |
 | `metrics:read` | `GET /api/v1/configs/{id}/runs`, `GET /api/v1/configs/{id}/metrics`, `GET /api/v1/metrics/*`, `GET /api/v1/usage/rollup` |
 | `mcp_servers:read` | `GET /api/v1/mcp-servers`, `GET /api/v1/mcp-servers/{id}` |
@@ -128,5 +128,7 @@ Cadastro dos servidores MCP que os agentes consomem (ADR-0010). Não é versiona
 - `headers` é só escrita: os valores são cifrados com Fernet (`MCP_SECRETS_KEY`) e a resposta traz apenas `header_names`. No `PUT`, `headers: null` mantém o que está salvo e `{}` apaga.
 - Só `streamable-http`, sem `stdio`. A URL precisa ser `https` e não pode resolver para rede privada, loopback ou link-local (inclui `169.254.169.254`), a não ser que o host esteja em `MCP_ALLOWED_HOSTS` — aí `http` também é aceito. A checagem roda ao salvar e de novo ao conectar.
 - Trocar a URL descarta as tools descobertas, que valiam para o endereço antigo.
+- `POST /api/v1/mcp-servers/{id}/discover` conecta, lista as tools (nome, descrição e schema de entrada, sem o prefixo) e salva o retrato usado pelo painel. Exige `configs:write`, porque quem edita agente precisa da lista atualizada, e não muda URL nem credencial. Servidor fora do ar, credencial recusada ou URL bloqueada respondem 502 com o motivo.
+- A conexão é estrita (`app/mcp/client.py`). O `MCPTools.connect()` do Agno engole a falha e o agente seguiria sem as tools. Em 401 ou conexão recusada, o cliente streamable-http ainda cancela a task que conectou. `connect_strict` converte os dois casos em `McpUnavailable` e só repassa cancelamento que venha de fora.
 
 Gerar a chave: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Perder a chave obriga a recadastrar os headers.
