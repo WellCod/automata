@@ -18,14 +18,9 @@ from app.agents.registry import PublishedAgents
 from app.logging_config import configure_logging, request_id_var
 from app.mcp_auth import JWTMCPAuth
 from app.rate_limit import make_rate_limiter
+from app.routers import PROTECTED_ROUTERS
 from app.routers.auth import router as auth_router
-from app.routers.configs import router as configs_router
 from app.routers.health import router as health_router
-from app.routers.linter import router as linter_router
-from app.routers.metrics import router as metrics_router
-from app.routers.models import router as models_router
-from app.routers.runs import router as runs_router
-from app.routers.usage import router as usage_router
 from app.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -93,13 +88,9 @@ def create_app(
     db = PostgresDb(db_url=settings.database_url)
 
     base = FastAPI(title="automata")
+    for router in PROTECTED_ROUTERS:
+        base.include_router(router)
     base.state.enforce_scopes = enable_auth
-    base.include_router(configs_router)
-    base.include_router(models_router)
-    base.include_router(linter_router)
-    base.include_router(metrics_router)
-    base.include_router(runs_router)
-    base.include_router(usage_router)
 
     auth_config: AuthorizationConfig | None = None
     if enable_auth:
