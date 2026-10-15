@@ -36,6 +36,8 @@ step "gerando par RSA 2048"
 _PRIV_PEM=$(openssl genrsa 2048 2>/dev/null)
 _PUB_PEM=$(echo "$_PRIV_PEM" | openssl rsa -pubout 2>/dev/null)
 _DB_PASS=$(openssl rand -hex 16)
+# chave Fernet: 32 bytes em base64 url-safe (cifra headers de servidores MCP)
+_MCP_KEY=$(openssl rand -base64 32 | tr '+/' '-_')
 
 # converte PEM multi-linha para uma linha com \n literal (lido por python-dotenv)
 inline() { printf '%s' "$1" | awk 'NF {sub(/\r/, ""); printf "%s\\n", $0}'; }
@@ -53,6 +55,7 @@ if [ ! -f .env ]; then
     printf 'DATABASE_URL=postgresql+psycopg://automata:%s@db:5432/automata\n\n' "$_DB_PASS"
     printf 'JWT_PRIVATE_KEY=%s\n' "$PRIV_INLINE"
     printf 'JWT_PUBLIC_KEY=%s\n\n' "$PUB_INLINE"
+    printf 'MCP_SECRETS_KEY=%s\n\n' "$_MCP_KEY"
     printf 'AUTOMATA_API_URL=http://localhost:8000\n'
   } > .env
   echo -e "  ${GREEN}criado${NC}"
@@ -67,6 +70,7 @@ if [ ! -f api/.env ]; then
     printf 'DATABASE_URL=postgresql+psycopg://automata:%s@localhost:5432/automata\n' "$_DB_PASS"
     printf 'JWT_PRIVATE_KEY=%s\n' "$PRIV_INLINE"
     printf 'JWT_PUBLIC_KEY=%s\n' "$PUB_INLINE"
+    printf 'MCP_SECRETS_KEY=%s\n' "$_MCP_KEY"
   } > api/.env
   echo -e "  ${GREEN}criado${NC}"
 else

@@ -1,15 +1,30 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { BarChart3, LayoutGrid, LogOut, Moon, Sun } from "lucide-react";
+import {
+  BarChart3,
+  KeyRound,
+  LayoutGrid,
+  LogOut,
+  Moon,
+  Plug,
+  ShieldCheck,
+  Sun,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { usePendingApprovals } from "@/lib/api/approvals";
 import { useTheme } from "./theme-provider";
 
 const navItems = [
   { href: "/", label: "Agentes", icon: LayoutGrid, exact: true },
+  { href: "/times", label: "Times", icon: Users, exact: false },
   { href: "/analytics", label: "Analytics", icon: BarChart3, exact: true },
+  { href: "/mcp", label: "Servidores MCP", icon: Plug, exact: true },
+  { href: "/aprovacoes", label: "Aprovações", icon: ShieldCheck, exact: true },
+  { href: "/integracoes", label: "Integrações", icon: KeyRound, exact: true },
 ];
 
 function LogoMark() {
@@ -28,6 +43,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
   const router = useRouter();
+  const { data: pending } = usePendingApprovals();
   const isClient = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -61,6 +77,14 @@ export function Sidebar() {
             >
               <Icon className="h-4 w-4" />
               {label}
+              {href === "/aprovacoes" && pending && pending.length > 0 && (
+                <span
+                  className="ml-auto rounded border border-amber-400/60 px-1.5 text-[11px] text-amber-400"
+                  aria-label={`${pending.length} aguardando`}
+                >
+                  {pending.length}
+                </span>
+              )}
             </Link>
           );
         })}

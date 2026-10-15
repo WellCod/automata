@@ -20,6 +20,7 @@ async function fetchConfigs(page: number, q: string, status: StatusFilter) {
         page_size: PAGE_SIZE,
         q: q || undefined,
         status: status || undefined,
+        kind: "agent",
       },
     },
   });
@@ -34,7 +35,9 @@ function NewAgentInline({ onCancel }: { onCancel: () => void }) {
 
   const mutation = useMutation({
     mutationFn: async (name: string) => {
-      const res = await client.POST("/api/v1/configs", { body: { name, description: name } });
+      const res = await client.POST("/api/v1/configs", {
+        body: { name, description: name, kind: "agent" },
+      });
       if (res.error) throw new Error("Falha ao criar agente");
       return res.data!;
     },

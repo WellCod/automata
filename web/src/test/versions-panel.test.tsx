@@ -13,10 +13,10 @@ import client from "@/lib/api/client";
 const AGENT_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 
 const basePayload = {
-  schema_version: 1 as const,
+  schema_version: 2 as const,
   model_id: "claude-sonnet-4-6",
   instructions: { persona: "A", situation: "", tone: "", objective: "", guardrails: "" },
-  tools: [],
+  mcp_servers: [],
   capabilities: { extended_thinking: false, structured_output: false, vision: false },
   metadata: {},
 };

@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 11
+# Roadmap — Fases 4 a 12
 
 Plano de ação derivado de auditoria técnica e de segurança realizada em 2026-08-12.
 Ordem otimizada: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade.
@@ -766,3 +766,22 @@ Fecha o que ficou aberto dos PRs 41 e 44.
 - [ ] `refactor(web)`: componentes shadcn (Button, Tabs, Field, Sonner) e nova página de edição
 - [ ] `feat(web)`: gráficos no analytics e no desempenho do agente
 - [ ] Segurança restante: enumeração por tempo no login, revogação de token (`jti`), CSP/HSTS, `/docs` em produção, `.dockerignore` sem `.env`, `deploy.sh:184` montando senha em `bash -c`, reset da demo sem `agent_run` e sessões do Agno
+
+---
+
+## Fase 12 — Multi-agente e MCP
+
+Decisões em [ADR-0009](adr/0009-superficie-de-integracao.md), [ADR-0010](adr/0010-servidores-mcp-externos.md) e [ADR-0011](adr/0011-times-versionados.md). Depende do `fix(api)` de runtime da Fase 11 (#67). Cada PR é empilhado sobre o anterior.
+
+- [ ] `docs(adr)`: ADR-0010, ADR-0011 e ADR-0009 aceito
+- [ ] `feat(api)`: cadastro de servidores MCP com segredo cifrado e proteção de SSRF (inclui lista única de routers para `main.py` e o export do OpenAPI, que agora traz `/auth`)
+- [ ] `feat(api)`: teste de conexão e descoberta de tools
+- [ ] `feat(api)`: agentes usam tools MCP na factory (payload v2)
+- [ ] `feat(web)`: catálogo de servidores MCP e seleção de tools no agente
+- [ ] `feat`: confirmação humana de tools sensíveis
+- [ ] `feat(api)`: times versionados e `TeamFactory`
+- [ ] `feat(web)`: editor de time e modo teste com rastro de delegação
+- [ ] `feat`: integrações — tokens de consumidor e catálogo exposto via `/mcp`
+- [ ] `feat`: árvore de execução
+
+Fica para depois: workflows (condições guardadas no banco exigem `cel-python`), agendamentos (a factory recebe o run sem claims do usuário), guardrails por agente e A2A (exige `a2a-sdk` e não lista agentes de factory).

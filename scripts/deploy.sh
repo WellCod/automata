@@ -133,12 +133,19 @@ echo
 # Aponta para o diretório da API
 cd api
 
+# Chave dos segredos MCP: gerada uma vez e guardada junto das chaves JWT
+if [ -z "${MCP_SECRETS_KEY:-}" ]; then
+  MCP_SECRETS_KEY=$(openssl rand -base64 32 | tr '+/' '-_')
+  printf 'MCP_SECRETS_KEY="%s"\n' "$MCP_SECRETS_KEY" >> "$KEYS_FILE"
+fi
+
 # Configura variáveis de ambiente da API
 echo "  Configurando variáveis de ambiente..."
 railway variables set \
   DATABASE_URL="$DATABASE_URL" \
   JWT_PRIVATE_KEY="$JWT_PRIVATE_KEY_API" \
   JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
+  MCP_SECRETS_KEY="$MCP_SECRETS_KEY" \
   REDIS_URL="$REDIS_URL" \
   LOG_LEVEL="INFO" \
   DEMO_REPLAY="true"

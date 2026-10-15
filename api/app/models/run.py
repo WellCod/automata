@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.config import Base
@@ -14,6 +15,7 @@ class AgentRun(Base):
         Index("ix_agent_run_config_created", "agent_config_id", "created_at"),
         Index("ix_agent_run_created_at", "created_at"),
         Index("ix_agent_run_run_id", "run_id"),
+        Index("ix_agent_run_status", "status"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -24,9 +26,12 @@ class AgentRun(Base):
     )
     user_id: Mapped[str] = mapped_column(String(255), nullable=False)
     run_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    session_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # ToolExecution.to_dict() das tools aguardando confirmação; só em run pausado
+    pending_tools: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

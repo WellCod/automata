@@ -22,10 +22,10 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 const mockPayload: ConfigPayload = {
-  schema_version: 1,
+  schema_version: 2 as const,
   model_id: "claude-sonnet-4-6",
   instructions: { persona: "Assistente", situation: "", tone: "", objective: "", guardrails: "" },
-  tools: [],
+  mcp_servers: [],
   capabilities: { extended_thinking: false, structured_output: false, vision: false },
   metadata: {},
 };

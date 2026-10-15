@@ -1,115 +1,178 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { readSse } from "@/lib/sse";
 
 interface ChatMessage {
+  id: number;
   role: "user" | "assistant";
   content: string;
+}
+
+// ToolExecution do Agno, como chega no evento RunPaused e volta no continue
+export interface PendingToolExecution {
+  tool_call_id?: string | null;
+  tool_name?: string | null;
+  tool_args?: Record<string, unknown> | null;
+  requires_confirmation?: boolean | null;
+  confirmed?: boolean | null;
+  [key: string]: unknown;
+}
+
+interface PausedRun {
+  runId: string;
+  tools: PendingToolExecution[];
 }
 
 interface Props {
   agentId: string;
   draftVersionId?: string;
   defaultOpen?: boolean;
+  // time usa as rotas /teams e eventos TeamRun*; membros aparecem no rastro
+  kind?: "agent" | "team";
+  memberNames?: Record<string, string>;
 }
 
-export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Props) {
+interface TraceStep {
+  id: number;
+  text: string;
+}
+
+interface ToolEventData {
+  tool_name?: string | null;
+  tool_args?: Record<string, unknown> | null;
+}
+
+function describeTool(tool: ToolEventData | undefined, names: Record<string, string>): string {
+  const args = tool?.tool_args ?? {};
+  if (tool?.tool_name === "delegate_task_to_member") {
+    const member = String(args.member_id ?? "");
+    return `Delegou a ${names[member] ?? member}: ${String(args.task ?? "")}`;
+  }
+  if (tool?.tool_name === "delegate_task_to_members") {
+    return `Delegou a todos: ${String(args.task ?? "")}`;
+  }
+  return `Chamou ${tool?.tool_name ?? "tool"}`;
+}
+
+const btnCls =
+  "inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40";
+
+export function TestPanel({
+  agentId,
+  draftVersionId,
+  defaultOpen = false,
+  kind = "agent",
+  memberNames = {},
+}: Props) {
+  const base = kind === "team" ? "teams" : "agents";
+  const prefix = kind === "team" ? "Team" : "";
+  const [trace, setTrace] = useState<TraceStep[]>([]);
   const [open, setOpen] = useState(defaultOpen);
   const [useDraft, setUseDraft] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [paused, setPaused] = useState<PausedRun | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const nextId = useRef(0);
 
-  async function sendMessage() {
-    if (!input.trim() || isRunning) return;
-    const text = input.trim();
-    setInput("");
-    setError(null);
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
-    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-    setIsRunning(true);
+  function appendToLast(text: string) {
+    setMessages((prev) => {
+      const copy = [...prev];
+      const last = copy[copy.length - 1];
+      copy[copy.length - 1] = { ...last, content: last.content + text };
+      return copy;
+    });
+  }
 
-    try {
-      const form = new FormData();
-      form.append("message", text);
-      form.append("stream", "true");
-      if (sessionIdRef.current) form.append("session_id", sessionIdRef.current);
-      if (useDraft && draftVersionId) {
-        form.append("factory_input", JSON.stringify({ version_id: draftVersionId }));
+  async function consume(res: Response) {
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+    for await (const { event, data } of readSse(res.body)) {
+      if (typeof data.session_id === "string" && (kind !== "team" || !data.agent_id)) {
+        sessionIdRef.current = data.session_id;
       }
-
-      const res = await fetch(`/api/agents/${agentId}/runs`, {
-        method: "POST",
-        body: form,
-      });
-
-      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-
-      const flush = (lines: string[]) => {
-        let eventType = "";
-        let dataLine = "";
-        for (const line of lines) {
-          if (line.startsWith("event: ")) {
-            eventType = line.slice(7).trim();
-          } else if (line.startsWith("data: ")) {
-            dataLine = line.slice(6).trim();
-          } else if (line === "" && dataLine) {
-            if (eventType === "run_started") {
-              try {
-                const evt = JSON.parse(dataLine) as { session_id?: string };
-                if (evt.session_id) sessionIdRef.current = evt.session_id;
-              } catch {}
-            } else if (eventType === "run_content") {
-              try {
-                const evt = JSON.parse(dataLine) as { content?: string };
-                if (typeof evt.content === "string") {
-                  setMessages((prev) => {
-                    const copy = [...prev];
-                    const last = copy[copy.length - 1];
-                    copy[copy.length - 1] = {
-                      ...last,
-                      content: last.content + evt.content,
-                    };
-                    return copy;
-                  });
-                }
-              } catch {}
-            }
-            eventType = "";
-            dataLine = "";
-          }
+      const memberEvent = kind === "team" && typeof data.agent_id === "string";
+      if (memberEvent) {
+        // membro trabalhando: vai para o rastro, não para a resposta do time
+        if (event === "ToolCallStarted") {
+          const who = memberNames[data.agent_id as string] ?? String(data.agent_name ?? "membro");
+          addTrace(`${who}: ${describeTool(data.tool as ToolEventData, memberNames)}`);
         }
-      };
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split("\n");
-        buf = lines.pop() ?? "";
-        flush(lines);
+        continue;
       }
-      if (buf) flush([buf, ""]);
+      if (kind === "team" && event === "TeamToolCallStarted") {
+        addTrace(describeTool(data.tool as ToolEventData, memberNames));
+      } else if (event === `${prefix}RunContent` && typeof data.content === "string") {
+        appendToLast(data.content);
+      } else if (event === `${prefix}RunPaused`) {
+        const tools = ((data.tools as PendingToolExecution[] | undefined) ?? []).filter(
+          (t) => t.requires_confirmation && t.confirmed == null,
+        );
+        if (typeof data.run_id === "string" && tools.length > 0) {
+          setPaused({ runId: data.run_id, tools });
+        }
+      } else if (event === `${prefix}RunError`) {
+        setError(typeof data.content === "string" ? data.content : "Erro ao executar agente.");
+      }
+    }
+  }
+
+  function addTrace(text: string) {
+    setTrace((prev) => [...prev, { id: nextId.current++, text }]);
+  }
+
+  async function run(request: () => Promise<Response>) {
+    setIsRunning(true);
+    setError(null);
+    try {
+      await consume(await request());
     } catch {
       setError("Erro ao executar agente.");
-      setMessages((prev) => {
-        const copy = [...prev];
-        copy[copy.length - 1] = { role: "assistant", content: "[Falha na execução]" };
-        return copy;
-      });
     } finally {
       setIsRunning(false);
     }
   }
 
+  async function sendMessage() {
+    if (!input.trim() || isRunning || paused) return;
+    const text = input.trim();
+    setInput("");
+    setTrace([]);
+    setMessages((prev) => [
+      ...prev,
+      { id: nextId.current++, role: "user", content: text },
+      { id: nextId.current++, role: "assistant", content: "" },
+    ]);
+
+    const form = new FormData();
+    form.append("message", text);
+    form.append("stream", "true");
+    if (sessionIdRef.current) form.append("session_id", sessionIdRef.current);
+    if (useDraft && draftVersionId) {
+      form.append("factory_input", JSON.stringify({ version_id: draftVersionId }));
+    }
+    await run(() => fetch(`/api/${base}/${agentId}/runs`, { method: "POST", body: form }));
+  }
+
+  async function decide(approve: boolean) {
+    if (!paused || !sessionIdRef.current) return;
+    const { runId, tools } = paused;
+    setPaused(null);
+    const form = new FormData();
+    form.append("tools", JSON.stringify(tools.map((t) => ({ ...t, confirmed: approve }))));
+    form.append("session_id", sessionIdRef.current);
+    form.append("stream", "true");
+    await run(() =>
+      fetch(`/api/${base}/${agentId}/runs/${runId}/continue`, { method: "POST", body: form }),
+    );
+  }
+
   function clearSession() {
     setMessages([]);
+    setTrace([]);
+    setPaused(null);
     sessionIdRef.current = null;
     setError(null);
   }
@@ -141,20 +204,25 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
             </label>
           )}
 
-          <div className="border-border bg-muted flex max-h-72 min-h-24 flex-col gap-2 overflow-y-auto rounded border p-3">
+          <div
+            role="log"
+            aria-live="polite"
+            aria-busy={isRunning}
+            className="border-border bg-muted flex max-h-72 min-h-24 flex-col gap-2 overflow-y-auto rounded border p-3"
+          >
             {messages.length === 0 && (
               <p className="text-muted-foreground text-[13px]">Nenhuma mensagem ainda.</p>
             )}
-            {messages.map((m, i) => (
+            {messages.map((m) => (
               <div
-                key={i}
+                key={m.id}
                 className={`flex flex-col gap-0.5 ${m.role === "user" ? "items-end" : "items-start"}`}
               >
                 <span className="text-muted-foreground text-[11px]">
                   {m.role === "user" ? "Você" : "Agente"}
                 </span>
                 <div
-                  className={`max-w-xs rounded border px-3 py-1.5 text-[13px] ${
+                  className={`max-w-xs rounded border px-3 py-1.5 text-[13px] whitespace-pre-wrap ${
                     m.role === "user"
                       ? "border-foreground/20 bg-muted text-foreground"
                       : "border-border bg-background text-foreground"
@@ -166,7 +234,59 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
             ))}
           </div>
 
-          {error && <p className="text-destructive text-[13px]">{error}</p>}
+          {trace.length > 0 && (
+            <ol aria-label="Rastro de delegação" className="flex flex-col gap-1 text-[12px]">
+              {trace.map((step) => (
+                <li key={step.id} className="text-muted-foreground">
+                  → {step.text}
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {paused && (
+            <div
+              role="alertdialog"
+              aria-label="Confirmação de ferramenta"
+              className="flex flex-col gap-2 rounded border border-amber-400/60 p-3"
+            >
+              <p className="text-foreground text-[13px] font-medium">
+                O agente quer executar uma ação que exige confirmação
+              </p>
+              <ul className="flex flex-col gap-1.5">
+                {paused.tools.map((t) => (
+                  <li key={t.tool_call_id ?? t.tool_name ?? ""} className="text-[13px]">
+                    <code className="text-foreground">{t.tool_name}</code>
+                    <pre className="text-muted-foreground mt-1 overflow-x-auto text-[12px]">
+                      {JSON.stringify(t.tool_args ?? {}, null, 2)}
+                    </pre>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void decide(true)}
+                  className={`${btnCls} border-foreground text-foreground hover:border-accent hover:text-accent`}
+                >
+                  Aprovar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void decide(false)}
+                  className={`${btnCls} border-destructive text-destructive`}
+                >
+                  Rejeitar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <p className="text-destructive text-[13px]" role="alert">
+              {error}
+            </p>
+          )}
 
           <div className="flex gap-2">
             <input
@@ -174,15 +294,16 @@ export function TestPanel({ agentId, draftVersionId, defaultOpen = false }: Prop
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && void sendMessage()}
-              placeholder="Digite uma mensagem…"
-              disabled={isRunning}
+              placeholder={paused ? "Decida a confirmação acima" : "Digite uma mensagem…"}
+              aria-label="Mensagem para o agente"
+              disabled={isRunning || paused !== null}
               className="border-border text-foreground placeholder:text-muted-foreground focus:border-accent flex-1 rounded border bg-[var(--input)] px-3 py-1.5 text-[13px] transition-colors focus:outline-none disabled:opacity-40"
             />
             <button
               type="button"
               onClick={() => void sendMessage()}
-              disabled={isRunning || !input.trim()}
-              className="border-foreground text-foreground hover:border-accent hover:text-accent inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
+              disabled={isRunning || paused !== null || !input.trim()}
+              className={`${btnCls} border-foreground text-foreground hover:border-accent hover:text-accent`}
             >
               {isRunning ? "…" : "Enviar"}
             </button>

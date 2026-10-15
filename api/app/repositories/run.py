@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -37,6 +38,8 @@ class RunRepository:
         run_id: str | None = None,
         duration_ms: int | None = None,
         error: str | None = None,
+        session_id: str | None = None,
+        pending_tools: list[dict[str, Any]] | None = None,
     ) -> AgentRun:
         run = AgentRun(
             agent_config_id=agent_config_id,
@@ -45,6 +48,8 @@ class RunRepository:
             status=status,
             duration_ms=duration_ms,
             error=error,
+            session_id=session_id,
+            pending_tools=pending_tools,
         )
         self._session.add(run)
         self._session.flush()
@@ -59,6 +64,8 @@ class RunRepository:
         run_id: str | None = None,
         duration_ms: int | None = None,
         error: str | None = None,
+        session_id: str | None = None,
+        pending_tools: list[dict[str, Any]] | None = None,
     ) -> AgentRun:
         """Atualiza o run de mesmo run_id (pausado e retomado) ou cria um novo."""
         existing = None
@@ -76,13 +83,27 @@ class RunRepository:
                 status=status,
                 duration_ms=duration_ms,
                 error=error,
+                session_id=session_id,
+                pending_tools=pending_tools,
             )
         existing.status = status
         existing.error = error
+        existing.pending_tools = pending_tools
+        existing.session_id = session_id or existing.session_id
         if duration_ms is not None:
             existing.duration_ms = (existing.duration_ms or 0) + duration_ms
         self._session.flush()
         return existing
+
+    def list_paused(self, config_ids: list[UUID] | None = None) -> list[AgentRun]:
+        stmt = (
+            select(AgentRun)
+            .where(AgentRun.status == "paused", AgentRun.pending_tools.is_not(None))
+            .order_by(AgentRun.created_at.desc())
+        )
+        if config_ids is not None:
+            stmt = stmt.where(AgentRun.agent_config_id.in_(config_ids))
+        return list(self._session.scalars(stmt))
 
     def list_by_config(
         self,

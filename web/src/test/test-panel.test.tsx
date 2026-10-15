@@ -37,10 +37,10 @@ describe("TestPanel", () => {
 
   it("envia mensagem e exibe resposta do agente via SSE", async () => {
     const stream = makeStream([
-      sseChunk("run_started", { session_id: "sess-1", run_id: "run-1" }),
-      sseChunk("run_content", { content: "Olá" }),
-      sseChunk("run_content", { content: ", tudo bem?" }),
-      sseChunk("run_completed", {}),
+      sseChunk("RunStarted", { session_id: "sess-1", run_id: "run-1" }),
+      sseChunk("RunContent", { content: "Olá" }),
+      sseChunk("RunContent", { content: ", tudo bem?" }),
+      sseChunk("RunCompleted", {}),
     ]);
 
     vi.stubGlobal(
@@ -60,7 +60,7 @@ describe("TestPanel", () => {
   });
 
   it("chama /api/agents/{id}/runs com FormData", async () => {
-    const stream = makeStream([sseChunk("run_completed", {})]);
+    const stream = makeStream([sseChunk("RunCompleted", {})]);
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, body: stream } as unknown as Response);
     vi.stubGlobal("fetch", fetchMock);
 
@@ -77,7 +77,7 @@ describe("TestPanel", () => {
   });
 
   it("envia factory_input com version_id ao testar rascunho", async () => {
-    const stream = makeStream([sseChunk("run_completed", {})]);
+    const stream = makeStream([sseChunk("RunCompleted", {})]);
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, body: stream } as unknown as Response);
     vi.stubGlobal("fetch", fetchMock);
 
@@ -110,7 +110,7 @@ describe("TestPanel", () => {
   });
 
   it("limpa sessão ao clicar em limpar", async () => {
-    const stream = makeStream([sseChunk("run_content", { content: "Resposta" })]);
+    const stream = makeStream([sseChunk("RunContent", { content: "Resposta" })]);
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({ ok: true, body: stream } as unknown as Response),
@@ -125,5 +125,63 @@ describe("TestPanel", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /limpar/i }));
     expect(screen.getByText("Nenhuma mensagem ainda.")).toBeInTheDocument();
+  });
+
+  it("pausa para confirmação e retoma com a decisão", async () => {
+    const tool = {
+      tool_call_id: "call_1",
+      tool_name: "crm_cancelar_assinatura",
+      tool_args: { cliente_id: "7" },
+      requires_confirmation: true,
+      confirmed: null,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        body: makeStream([
+          sseChunk("RunStarted", { session_id: "sess-9", run_id: "run-9" }),
+          sseChunk("RunPaused", { run_id: "run-9", session_id: "sess-9", tools: [tool] }),
+        ]),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        body: makeStream([
+          sseChunk("RunContent", { content: "Assinatura cancelada." }),
+          sseChunk("RunCompleted", {}),
+        ]),
+      } as unknown as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<TestPanel agentId="agent-1" defaultOpen />);
+    await userEvent.type(screen.getByLabelText("Mensagem para o agente"), "cancela o 7");
+    await userEvent.click(screen.getByRole("button", { name: /enviar/i }));
+
+    const dialog = await screen.findByRole("alertdialog", { name: /confirmação de ferramenta/i });
+    expect(dialog).toHaveTextContent("crm_cancelar_assinatura");
+    expect(screen.getByLabelText("Mensagem para o agente")).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Aprovar" }));
+    await waitFor(() => expect(screen.getByText("Assinatura cancelada.")).toBeInTheDocument());
+
+    const [url, opts] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(url).toBe("/api/agents/agent-1/runs/run-9/continue");
+    const form = opts.body as FormData;
+    expect(form.get("session_id")).toBe("sess-9");
+    expect(JSON.parse(form.get("tools") as string)).toEqual([{ ...tool, confirmed: true }]);
+  });
+
+  it("mostra a mensagem de RunError", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        body: makeStream([sseChunk("RunError", { content: "servidor MCP 'crm' indisponível" })]),
+      } as unknown as Response),
+    );
+    render(<TestPanel agentId="agent-1" defaultOpen />);
+    await userEvent.type(screen.getByLabelText("Mensagem para o agente"), "oi");
+    await userEvent.click(screen.getByRole("button", { name: /enviar/i }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("indisponível"));
   });
 });

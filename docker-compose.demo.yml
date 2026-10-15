@@ -53,6 +53,9 @@ services:
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
       REDIS_URL: redis://redis:6379/0
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      MCP_SECRETS_KEY: ${MCP_SECRETS_KEY:-}
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
       DEMO_REPLAY: "true"
     ports:
       - "8000:8000"

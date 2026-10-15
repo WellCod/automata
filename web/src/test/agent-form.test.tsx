@@ -32,7 +32,7 @@ const mockDetail = {
   current_version: null,
   draft_version: null,
   payload: {
-    schema_version: 1 as const,
+    schema_version: 2 as const,
     model_id: "claude-sonnet-4-6",
     instructions: {
       persona: "Sou um assistente",
@@ -41,7 +41,7 @@ const mockDetail = {
       objective: "",
       guardrails: "",
     },
-    tools: [],
+    mcp_servers: [],
     capabilities: { extended_thinking: false, structured_output: false, vision: false },
     metadata: {},
   },
@@ -61,6 +61,12 @@ describe("AgentEditPage", () => {
         return { data: [], error: undefined } as never;
       }
       if ((path as string).includes("usage/rollup")) {
+        return { data: [], error: undefined } as never;
+      }
+      if ((path as string).endsWith("/teams")) {
+        return { data: [], error: undefined } as never;
+      }
+      if ((path as string).includes("mcp-servers")) {
         return { data: [], error: undefined } as never;
       }
       return { data: mockDetail, error: undefined } as never;

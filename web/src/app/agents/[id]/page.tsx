@@ -18,6 +18,7 @@ import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { CostPanel } from "@/components/cost-panel";
 import { LintPanel } from "@/components/lint-panel";
+import { McpToolsSelector } from "@/components/mcp-tools-selector";
 import { MetricsPanel } from "@/components/metrics-panel";
 import { ModelSelector } from "@/components/model-selector";
 import { RunsPanel } from "@/components/runs-panel";
@@ -47,6 +48,13 @@ const schema = z.object({
     vision: z.boolean(),
   }),
   instructions: instructionSchema,
+  mcp_servers: z.array(
+    z.object({
+      server_id: z.string(),
+      tools: z.array(z.string()).nullable(),
+      require_confirmation: z.array(z.string()),
+    }),
+  ),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -129,6 +137,36 @@ function StatusBadge({ data }: { data: AgentConfigDetail | undefined }) {
   );
 }
 
+// Publicar o agente muda o comportamento destes times (ADR-0011)
+function TeamsUsingAgent({ agentId }: { agentId: string }) {
+  const { data: teams } = useQuery({
+    queryKey: ["config", agentId, "teams"],
+    queryFn: async () => {
+      const res = await client.GET("/api/v1/configs/{config_id}/teams", {
+        params: { path: { config_id: agentId } },
+      });
+      if (res.error) throw new Error("Falha ao carregar times");
+      return res.data!;
+    },
+  });
+  // aviso secundário: resposta inesperada não pode derrubar a tela de edição
+  if (!Array.isArray(teams) || teams.length === 0) return null;
+  return (
+    <p className="border-border text-muted-foreground rounded border px-3 py-2 text-[13px]">
+      Membro de{" "}
+      {teams.map((t, i) => (
+        <span key={t.id}>
+          {i > 0 && ", "}
+          <Link href={`/times/${t.id}`} className="text-accent hover:underline">
+            {t.name}
+          </Link>
+        </span>
+      ))}
+      . Publicar este agente muda o comportamento desses times.
+    </p>
+  );
+}
+
 export default function AgentEditPage() {
   const { id } = useParams<{ id: string }>();
   const [activePanel, setActivePanel] = useState<PanelId>("teste");
@@ -153,6 +191,7 @@ export default function AgentEditPage() {
       model_id: "",
       capabilities: EMPTY_CAPS,
       instructions: { persona: "", situation: "", tone: "", objective: "", guardrails: "" },
+      mcp_servers: [],
     },
   });
 
@@ -171,6 +210,11 @@ export default function AgentEditPage() {
         objective: data.payload?.instructions?.objective ?? "",
         guardrails: data.payload?.instructions?.guardrails ?? "",
       },
+      mcp_servers: (data.payload?.mcp_servers ?? []).map((b) => ({
+        server_id: b.server_id,
+        tools: b.tools ?? null,
+        require_confirmation: b.require_confirmation ?? [],
+      })),
     });
   }, [data, reset]);
 
@@ -182,10 +226,10 @@ export default function AgentEditPage() {
           name: values.name,
           description: values.description ?? "",
           payload: {
-            schema_version: 1,
+            schema_version: 2,
             model_id: values.model_id,
             instructions: values.instructions,
-            tools: data?.payload?.tools ?? [],
+            mcp_servers: values.mcp_servers,
             capabilities: values.capabilities,
             metadata: data?.payload?.metadata ?? {},
           },
@@ -213,10 +257,10 @@ export default function AgentEditPage() {
     const values = form.getValues();
     if (!values.model_id) return null;
     return {
-      schema_version: 1 as const,
+      schema_version: 2 as const,
       model_id: values.model_id,
       instructions: values.instructions,
-      tools: data?.payload?.tools ?? [],
+      mcp_servers: values.mcp_servers,
       capabilities: values.capabilities,
       metadata: data?.payload?.metadata ?? {},
     };
@@ -259,6 +303,8 @@ export default function AgentEditPage() {
             onSubmit={form.handleSubmit((v) => mutation.mutate(v))}
             className="mx-auto flex max-w-2xl flex-col gap-5"
           >
+            <TeamsUsingAgent agentId={id} />
+
             <Field label="Nome" required error={form.formState.errors.name?.message}>
               <input {...form.register("name")} className={inputCls} />
             </Field>
@@ -280,6 +326,14 @@ export default function AgentEditPage() {
                   }}
                   error={fieldState.error?.message}
                 />
+              )}
+            />
+
+            <Controller
+              name="mcp_servers"
+              control={form.control}
+              render={({ field }) => (
+                <McpToolsSelector value={field.value} onChange={field.onChange} />
               )}
             />
 

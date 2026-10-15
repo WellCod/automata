@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.config import AgentConfig, AgentConfigVersion
-from app.schemas.config import ConfigPayload, ConfigPayloadStatus
+from app.schemas.config import ConfigKind, ConfigPayload, ConfigPayloadStatus
 
 
 class ConfigRepository:
@@ -14,8 +14,35 @@ class ConfigRepository:
     def get_config(self, config_id: UUID) -> AgentConfig | None:
         return self._session.get(AgentConfig, config_id)
 
-    def create_config(self, name: str, description: str) -> AgentConfig:
-        config = AgentConfig(name=name, description=description)
+    def names_by_ids(self, config_ids: list[UUID]) -> dict[UUID, str]:
+        if not config_ids:
+            return {}
+        rows = self._session.execute(
+            select(AgentConfig.id, AgentConfig.name).where(AgentConfig.id.in_(config_ids))
+        ).all()
+        return {row.id: row.name for row in rows}
+
+    def teams_using(self, agent_id: UUID) -> list[AgentConfig]:
+        """Times cuja versão vigente ou rascunho tem o agente como membro."""
+        member = [{"agent_id": str(agent_id)}]
+        version_ids = select(AgentConfigVersion.id).where(
+            AgentConfigVersion.payload["team"]["members"].contains(member)
+        )
+        stmt = (
+            select(AgentConfig)
+            .where(
+                AgentConfig.kind == ConfigKind.team.value,
+                (AgentConfig.current_version_id.in_(version_ids))
+                | (AgentConfig.draft_version_id.in_(version_ids)),
+            )
+            .order_by(AgentConfig.name)
+        )
+        return list(self._session.scalars(stmt))
+
+    def create_config(
+        self, name: str, description: str, kind: ConfigKind = ConfigKind.agent
+    ) -> AgentConfig:
+        config = AgentConfig(name=name, description=description, kind=kind.value)
         self._session.add(config)
         self._session.flush()
         return config
@@ -43,7 +70,7 @@ class ConfigRepository:
             config_id=config_id,
             version_number=next_number,
             status=status,
-            payload=payload.model_dump(),
+            payload=payload.model_dump(mode="json"),
             author=author,
         )
         self._session.add(version)
@@ -78,8 +105,11 @@ class ConfigRepository:
         page_size: int = 20,
         q: str | None = None,
         status: ConfigPayloadStatus | None = None,
+        kind: ConfigKind | None = None,
     ) -> tuple[list[AgentConfig], int]:
         base = select(AgentConfig)
+        if kind is not None:
+            base = base.where(AgentConfig.kind == kind.value)
 
         if q is not None:
             try:

@@ -95,6 +95,10 @@ Guia completo em [`DEMO.md`](DEMO.md).
 
 | Funcionalidade | Detalhe |
 |---|---|
+| **Times multi-agente** | Um líder que coordena, roteia, consulta todos ou gerencia tarefas entre agentes publicados. O time é versionado como agente. O modo teste mostra o rastro da delegação: a quem o líder delegou e que tools o membro chamou ([ADR-0011](docs/adr/0011-times-versionados.md)). |
+| **Ferramentas via MCP** | Catálogo de servidores MCP (`/mcp`) com credenciais cifradas e teste de conexão. Em cada agente, escolhe-se quais servidores e quais tools ele usa, e quais pedem confirmação. Servidor fora do ar faz o run falhar com o motivo, em vez de o agente responder sem as tools ([ADR-0010](docs/adr/0010-servidores-mcp-externos.md)). |
+| **Confirmação humana** | Tools sensíveis pausam a execução até alguém aprovar ou rejeitar, no modo teste ou na página Aprovações, com nome e argumentos da ação. |
+| **Integrações** | Tokens por sistema consumidor, limitados aos agentes e times escolhidos, com validade e revogação imediata. O painel entrega a configuração pronta para Claude Desktop ou Cursor usarem os agentes via MCP. |
 | **Linter de prompt** | Detecta referências a ferramentas não habilitadas e termos acoplados a provider. Alerta inline na edição. |
 | **Estimativa de custo** | Tokens estimados, custo por mensagem e projeção por volume — visíveis enquanto se edita. |
 | **Capabilities condicionais** | Extended thinking, structured output e visão são habilitadas por modelo. O campo é desativado e explicado se o modelo escolhido não suportar. Extended thinking liga o `thinking` do Claude na execução. |
@@ -197,6 +201,9 @@ Cada decisão relevante está documentada em [`docs/adr/`](docs/adr/) com contex
 | [ADR-0003](docs/adr/0003-single-tenant.md) | Deploy single-tenant — por que uma instância por cliente, e a assimetria que torna difícil desfazer |
 | [ADR-0005](docs/adr/0005-auth-jwt-proprio.md) | Auth JWT RS256 próprio — a chave de assinatura nunca sai do servidor |
 | [ADR-0006](docs/adr/0006-instructions-agnosticas-de-provider.md) | Instructions agnósticas de provider — a regra que sustenta a promessa de trocar modelo |
+| [ADR-0009](docs/adr/0009-superficie-de-integracao.md) | REST e MCP server mode como superfície de integração — descrição de agente vira contrato |
+| [ADR-0010](docs/adr/0010-servidores-mcp-externos.md) | Servidores MCP externos — cadastro não versionado, segredo cifrado, só HTTP e falha visível |
+| [ADR-0011](docs/adr/0011-times-versionados.md) | Times multi-agente na mesma tabela de configs, com membros seguindo a versão vigente |
 
 ---
 
