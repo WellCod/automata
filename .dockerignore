@@ -7,3 +7,13 @@
 api/.venv
 api/htmlcov
 **/*.pyc
+
+# Segredos locais nunca entram no contexto de build
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+.deploy-keys
+api/.env
+web/.env.local
