@@ -5,7 +5,7 @@ from collections.abc import Generator
 import pytest
 from starlette.requests import Request
 
-from app.routers.auth import get_client_ip
+from app.proxy import get_client_ip
 from app.settings import get_settings
 
 
