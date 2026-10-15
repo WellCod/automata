@@ -22,7 +22,7 @@ function parDeTeste() {
   return par;
 }
 
-const { privateKey: E2E_PRIVATE_KEY, publicKey: E2E_PUBLIC_KEY } = parDeTeste();
+const { publicKey: E2E_PUBLIC_KEY } = parDeTeste();
 
 export default defineConfig({
   testDir: "./e2e",
@@ -53,8 +53,8 @@ export default defineConfig({
     command: "pnpm dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
+    // O servidor só verifica tokens; a chave privada fica com o auth.setup.ts
     env: {
-      JWT_PRIVATE_KEY: E2E_PRIVATE_KEY,
       JWT_PUBLIC_KEY: E2E_PUBLIC_KEY,
       AUTOMATA_API_URL: "http://localhost:8000",
     },

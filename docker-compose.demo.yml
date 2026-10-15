@@ -6,9 +6,8 @@
 #   DATABASE_URL, JWT_PRIVATE_KEY, JWT_PUBLIC_KEY
 #   AUTOMATA_API_URL=http://api:8000  (interno ao compose)
 #
-# JWT_PRIVATE_KEY e JWT_PUBLIC_KEY são passadas SOMENTE para a API.
-# O container web não recebe a chave privada — o BFF Next.js a lê
-# via variável de ambiente do processo Node (não do Docker environment).
+# JWT_PRIVATE_KEY vai SOMENTE para a API, que emite os tokens.
+# O container web recebe só JWT_PUBLIC_KEY, usada pelo proxy para verificá-los.
 services:
   db:
     image: postgres:17
@@ -53,6 +52,7 @@ services:
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
       REDIS_URL: redis://redis:6379/0
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       DEMO_REPLAY: "true"
     ports:
       - "8000:8000"
@@ -79,6 +79,7 @@ services:
     restart: unless-stopped
     environment:
       AUTOMATA_API_URL: ${AUTOMATA_API_URL:-http://api:8000}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
     ports:
       - "3000:3000"
     healthcheck:

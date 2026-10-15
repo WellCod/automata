@@ -45,6 +45,7 @@ services:
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
       REDIS_URL: redis://redis:6379/0
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
     ports:
       - "8000:8000"
     healthcheck:
@@ -75,6 +76,7 @@ services:
       - /app/node_modules
     environment:
       AUTOMATA_API_URL: ${AUTOMATA_API_URL}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
     ports:
       - "3000:3000"
     healthcheck:
