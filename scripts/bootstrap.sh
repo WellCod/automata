@@ -35,14 +35,12 @@ ok
 step "gerando par RSA 2048"
 _PRIV_PEM=$(openssl genrsa 2048 2>/dev/null)
 _PUB_PEM=$(echo "$_PRIV_PEM" | openssl rsa -pubout 2>/dev/null)
-_PRIV_PKCS8=$(echo "$_PRIV_PEM" | openssl pkcs8 -topk8 -nocrypt 2>/dev/null)
 _DB_PASS=$(openssl rand -hex 16)
 
 # converte PEM multi-linha para uma linha com \n literal (lido por python-dotenv)
 inline() { printf '%s' "$1" | awk 'NF {sub(/\r/, ""); printf "%s\\n", $0}'; }
 PRIV_INLINE=$(inline "$_PRIV_PEM")
 PUB_INLINE=$(inline "$_PUB_PEM")
-PRIV_PKCS8_INLINE=$(inline "$_PRIV_PKCS8")
 ok
 
 # ── 3. .env (docker-compose) ─────────────────────────────────────────────────
@@ -80,9 +78,9 @@ step "web/.env.local"
 if [ ! -f web/.env.local ]; then
   {
     printf 'AUTOMATA_API_URL=http://localhost:8000\n'
-    printf 'JWT_PRIVATE_KEY=%s\n' "$PRIV_PKCS8_INLINE"
+    # o painel só verifica tokens: chave pública, nunca a privada
+    printf 'JWT_PUBLIC_KEY=%s\n' "$PUB_INLINE"
     printf 'JWT_AUDIENCE=automata\n'
-    printf 'PANEL_USER_ID=panel\n'
   } > web/.env.local
   echo -e "  ${GREEN}criado${NC}"
 else

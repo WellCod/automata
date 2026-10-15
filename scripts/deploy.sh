@@ -45,19 +45,16 @@ else
   echo "  Gerando par RSA 2048..."
   _PRIV_RSA=$(openssl genrsa 2048 2>/dev/null)
   _PUB_PEM=$(echo "$_PRIV_RSA" | openssl rsa -pubout 2>/dev/null)
-  _PRIV_PKCS8=$(echo "$_PRIV_RSA" | openssl pkcs8 -topk8 -nocrypt 2>/dev/null)
 
-  # RSA (para a API) e PKCS8 (para o BFF Next.js) — em uma linha com \n literal
+  # Privada só para a API; o painel recebe a pública — em uma linha com \n literal
   inline() { printf '%s' "$1" | awk 'NF {sub(/\r/, ""); printf "%s\\n", $0}'; }
   JWT_PRIVATE_KEY_API=$(inline "$_PRIV_RSA")
   JWT_PUBLIC_KEY=$(inline "$_PUB_PEM")
-  JWT_PRIVATE_KEY_WEB=$(inline "$_PRIV_PKCS8")
 
   # Salva para não regenerar se o script for reexecutado
   cat > "$KEYS_FILE" <<EOF
 JWT_PRIVATE_KEY_API="${JWT_PRIVATE_KEY_API}"
 JWT_PUBLIC_KEY="${JWT_PUBLIC_KEY}"
-JWT_PRIVATE_KEY_WEB="${JWT_PRIVATE_KEY_WEB}"
 EOF
   chmod 600 "$KEYS_FILE"
   ok "Chaves geradas e salvas em $KEYS_FILE"
@@ -206,9 +203,11 @@ vercel --yes 2>/dev/null || vercel
 echo
 echo "  Configurando variáveis de ambiente no Vercel..."
 echo "$API_URL"          | vercel env add AUTOMATA_API_URL production
-echo "$JWT_PRIVATE_KEY_WEB" | vercel env add JWT_PRIVATE_KEY production
+# Deploys anteriores mandavam a chave privada ao Vercel; o painel só verifica tokens
+vercel env rm JWT_PRIVATE_KEY production --yes >/dev/null 2>&1 || true
+vercel env rm PANEL_USER_ID production --yes >/dev/null 2>&1 || true
+echo "$JWT_PUBLIC_KEY"   | vercel env add JWT_PUBLIC_KEY production
 echo "automata"          | vercel env add JWT_AUDIENCE production
-echo "panel"             | vercel env add PANEL_USER_ID production
 
 echo "  Redeploy com as variáveis..."
 vercel --prod --yes

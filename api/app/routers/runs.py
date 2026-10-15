@@ -1,14 +1,19 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.repositories.config import ConfigRepository
 from app.repositories.run import RunMetrics, RunRepository
 
-router = APIRouter(prefix="/api/v1/configs", tags=["runs"])
+router = APIRouter(
+    prefix="/api/v1/configs",
+    tags=["runs"],
+    dependencies=[Depends(require_scopes(Scope.METRICS_READ))],
+)
 
 
 class AgentRunResponse(BaseModel):

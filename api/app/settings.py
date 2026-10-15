@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     jwt_public_key: str
     log_level: str = "INFO"
     redis_url: str | None = None
+    # IPs ou CIDRs de proxies cujo X-Forwarded-For é confiável (separados por vírgula).
+    # Vazio: o header é ignorado e vale o IP da conexão.
+    trusted_proxies: str = ""
 
 
 @lru_cache

@@ -134,12 +134,25 @@ def test_owner_tem_scope_admin() -> None:
     assert "agent_os:admin" in ROLE_SCOPES[UserRole.owner]
 
 
-def test_editor_tem_scope_write() -> None:
-    assert "agent_os:write" in ROLE_SCOPES[UserRole.editor]
+def test_editor_escreve_publica_e_executa() -> None:
+    scopes = ROLE_SCOPES[UserRole.editor]
+    for scope in ("configs:write", "configs:publish", "agents:run", "agents:read"):
+        assert scope in scopes
 
 
-def test_viewer_tem_scope_read() -> None:
-    assert "agent_os:read" in ROLE_SCOPES[UserRole.viewer]
+def test_viewer_so_le() -> None:
+    scopes = ROLE_SCOPES[UserRole.viewer]
+    assert "configs:read" in scopes
+    assert "agents:read" in scopes
+    assert not any(s.endswith((":write", ":publish", ":run")) for s in scopes)
+
+
+def test_papeis_usam_apenas_scopes_validos_do_agno() -> None:
+    from agno.os.scopes import parse_scope
+
+    for scopes in ROLE_SCOPES.values():
+        for scope in scopes:
+            assert parse_scope(scope).scope_type != "unknown", scope
 
 
 # --- endpoints ---
@@ -161,7 +174,7 @@ def test_login_sucesso(client: TestClient) -> None:
     payload = jwt.decode(
         data["access_token"], _PUBLIC_KEY, algorithms=["RS256"], audience="automata"
     )
-    assert "agent_os:write" in payload["scopes"]
+    assert "configs:write" in payload["scopes"]
 
 
 def test_login_credenciais_invalidas(client: TestClient) -> None:
@@ -180,7 +193,7 @@ def test_criar_usuario_sem_token_retorna_422(client: TestClient) -> None:
 def test_criar_usuario_sem_scope_admin_retorna_403(client: TestClient) -> None:
     from app.auth import issue_token
 
-    token = issue_token("u1", ["agent_os:read"])
+    token = issue_token("u1", ROLE_SCOPES[UserRole.viewer])
     resp = client.post(
         "/api/v1/auth/users",
         json={"email": "new@x.com", "password": "Senha12345678", "role": "viewer"},

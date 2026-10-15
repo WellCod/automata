@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 10
+# Roadmap — Fases 4 a 11
 
 Plano de ação derivado de auditoria técnica e de segurança realizada em 2026-08-12.
 Ordem otimizada: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade.
@@ -572,6 +572,7 @@ if __name__ == "__main__":
 | 6 — Observabilidade | 48–49 | Logging, health check | PR 45 (pool) |
 | 7 — Qualidade | 50–52 | CI, Redis, bootstrap | PR 46 (Redis infra) |
 | 8 — Agentes Vivos | 54–58 | Factories dinâmicas, runs, métricas, MCP | — |
+| 11 — Auditoria 2026-10-15 | #66 em diante | Fecha a Fase 4, runtime de agentes, infra, UI/UX | — |
 
 ---
 
@@ -723,3 +724,45 @@ docker exec \
 ```
 
 **Critério de aceite:** Painel funcional com 5 agentes listados, modo teste respondendo via fixture, painel Analytics mostrando dados dos últimos 90 dias — sem nenhuma credencial de LLM configurada.
+
+---
+
+## Fase 11 — Auditoria 2026-10-15
+
+Revisão de estrutura, segurança e UI/UX feita sobre a `main` em `cf186bc`. Os achados abaixo foram conferidos no código. A partir daqui o número do PR é o do GitHub, para não colidir com a numeração interna das fases anteriores.
+
+### Ação manual pendente (fora do código)
+
+O repositório é público e o histórico guarda duas senhas de owner antigas (README, DEMO, roadmap e `deploy.sh`, removidas no #64) e um par RSA de teste em `web/playwright.config.ts` (`9e52842`). O `deploy.sh` também enviava a chave privada JWT ao Vercel.
+
+- [ ] Gerar par JWT novo em todo ambiente que rodou `scripts/deploy.sh` (apagar `.deploy-keys` e rodar de novo, ou trocar à mão na API)
+- [ ] Remover `JWT_PRIVATE_KEY` do Vercel (o `deploy.sh` novo faz isso)
+- [ ] Trocar a senha do owner em toda instância semeada com um dos valores antigos, incluindo o secret `DEMO_OWNER_PASSWORD`
+
+### PR — `fix(security): papéis nas rotas próprias, ip confiável e chave privada fora do web`
+
+Fecha o que ficou aberto dos PRs 41 e 44.
+
+**Problemas:**
+1. Rotas `/api/v1/*` aceitavam qualquer JWT válido: viewer salvava rascunho, publicava e fazia rollback. Os scopes `agent_os:write`/`agent_os:read` dos papéis não existem no RBAC do Agno, então editor e viewer também não acessavam as rotas do AgentOS (nem o modo teste).
+2. `get_client_ip` confiava no primeiro valor de `X-Forwarded-For`, controlado pelo cliente: força bruta de senha sem limite trocando o header. O BFF não repassava o IP real, então todo login pelo painel caía no mesmo bucket (5 erros por minuto travavam todo mundo), e o `EXPIRE` renovado a cada tentativa nunca deixava a janela expirar.
+3. PR 41 incompleto: `deploy.sh` e `bootstrap.sh` mandavam a chave privada ao web, e `web/src/lib/bff/token.ts` (morto) ainda a carregava. O web nunca recebia `JWT_PUBLIC_KEY`, que o proxy exige.
+
+**O que mudou:**
+- `api/app/authz.py`: dependência `require_scopes` com o casamento de scopes do Agno; scopes próprios `configs:read`, `configs:write`, `configs:publish`, `metrics:read` aplicados em todos os routers `/api/v1`
+- `ROLE_SCOPES` remapeado para scopes reais (tabela em `api/README.md`)
+- `TRUSTED_PROXIES` (settings): `X-Forwarded-For` só vale vindo de proxy listado, lido da direita para a esquerda
+- Login limitado por e-mail (5/min) e por IP (20/min); Redis usa `EXPIRE NX`
+- BFF: login repassa o IP do cliente; proxy genérico descarta `cookie` e cabeçalhos de encaminhamento e recusa `v1/auth/login`
+- `token.ts` removido; scripts, compose e `.env.example` passam só `JWT_PUBLIC_KEY` ao web
+
+**Critério de aceite:** viewer recebe 403 em toda escrita de `/api/v1`; editor passa; `X-Forwarded-For` forjado de cliente direto não muda o bucket; nenhum script ou compose entrega `JWT_PRIVATE_KEY` ao web.
+
+### Próximos PRs da fase
+
+- [ ] `fix(api)`: registro real de runs (status de erro e `metrics.duration`), dono da versão no modo teste, hooks fora do event loop
+- [ ] `fix(infra)`: entrypoint com `exec "$@"`, web de dev só no override, porta 8000 fora do compose de produção
+- [ ] `fix(web)`: fonte (`--font-sans` circular), tema conforme `DESIGN.md`, versão ativa no histórico, confirmação de publicar/reverter, alterações não salvas, estados de erro
+- [ ] `refactor(web)`: componentes shadcn (Button, Tabs, Field, Sonner) e nova página de edição
+- [ ] `feat(web)`: gráficos no analytics e no desempenho do agente
+- [ ] Segurança restante: enumeração por tempo no login, revogação de token (`jti`), CSP/HSTS, `/docs` em produção, `.dockerignore` sem `.env`, `deploy.sh:184` montando senha em `bash -c`, reset da demo sem `agent_run` e sessões do Agno

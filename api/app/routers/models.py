@@ -1,10 +1,15 @@
 from dataclasses import asdict
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Depends, Response
 
 from app.agents.capabilities import all_capabilities
+from app.authz import Scope, require_scopes
 
-router = APIRouter(prefix="/api/v1/models", tags=["models"])
+router = APIRouter(
+    prefix="/api/v1/models",
+    tags=["models"],
+    dependencies=[Depends(require_scopes(Scope.CONFIGS_READ))],
+)
 
 
 @router.get("/capabilities")
