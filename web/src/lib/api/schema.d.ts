@@ -139,6 +139,41 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/integrations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Integrations */
+    get: operations["list_integrations_api_v1_integrations_get"];
+    put?: never;
+    /** Issue */
+    post: operations["issue_api_v1_integrations_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/integrations/{integration_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Revoke */
+    delete: operations["revoke_api_v1_integrations__integration_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/models/capabilities": {
     parameters: {
       query?: never;
@@ -678,6 +713,80 @@ export interface components {
        */
       guardrails: string;
     };
+    /** IntegrationInput */
+    IntegrationInput: {
+      /** Name */
+      name: string;
+      /** Agent Ids */
+      agent_ids?: string[];
+      /** Team Ids */
+      team_ids?: string[];
+      /**
+       * Expires In Days
+       * @default 30
+       */
+      expires_in_days: number;
+    };
+    /** IntegrationResponse */
+    IntegrationResponse: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Name */
+      name: string;
+      /** Agent Ids */
+      agent_ids: string[];
+      /** Team Ids */
+      team_ids: string[];
+      /** Created By */
+      created_by: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Expires At
+       * Format: date-time
+       */
+      expires_at: string;
+      /** Revoked At */
+      revoked_at: string | null;
+    };
+    /** IssuedIntegration */
+    IssuedIntegration: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Name */
+      name: string;
+      /** Agent Ids */
+      agent_ids: string[];
+      /** Team Ids */
+      team_ids: string[];
+      /** Created By */
+      created_by: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Expires At
+       * Format: date-time
+       */
+      expires_at: string;
+      /** Revoked At */
+      revoked_at: string | null;
+      /** Token */
+      token: string;
+      /** Mcp Url */
+      mcp_url: string | null;
+    };
     /** LintWarning */
     LintWarning: {
       /** Section */
@@ -1205,6 +1314,90 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["AgentConfigVersionSummary"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_integrations_api_v1_integrations_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IntegrationResponse"][];
+        };
+      };
+    };
+  };
+  issue_api_v1_integrations_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["IntegrationInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IssuedIntegration"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  revoke_api_v1_integrations__integration_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        integration_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IntegrationResponse"];
         };
       };
       /** @description Validation Error */

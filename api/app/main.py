@@ -17,6 +17,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.agents.factory import make_agent_factory, make_team_factory
 from app.agents.registry import PublishedAgents
+from app.integrations import RevocationMiddleware, RevokedTokens
 from app.logging_config import configure_logging, request_id_var
 from app.mcp_auth import JWTMCPAuth
 from app.rate_limit import make_rate_limiter
@@ -113,6 +114,8 @@ def create_app(
     )
     published.sync()
     base.state.published_agents = published
+    revoked = RevokedTokens()
+    base.state.revoked_tokens = revoked
 
     mcp_auth = JWTMCPAuth() if enable_auth and enable_mcp_server else None
 
@@ -135,6 +138,8 @@ def create_app(
     outer: FastAPI = FastAPI(title="automata")
     outer.state.rate_limiter = make_rate_limiter(settings.redis_url, limit=5, window=60)
     outer.add_middleware(SyncPublishedAgentsMiddleware, published=published)
+    if enable_auth:
+        outer.add_middleware(RevocationMiddleware, revoked=revoked)
     outer.add_middleware(SecurityHeadersMiddleware)
     outer.add_middleware(RequestIDMiddleware)
     outer.include_router(auth_router)

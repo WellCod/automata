@@ -100,7 +100,7 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | `metrics:read` | `GET /api/v1/configs/{id}/runs`, `GET /api/v1/configs/{id}/metrics`, `GET /api/v1/metrics/*`, `GET /api/v1/usage/rollup`, `GET /api/v1/approvals` |
 | `mcp_servers:read` | `GET /api/v1/mcp-servers`, `GET /api/v1/mcp-servers/{id}` |
 | `mcp_servers:write` | `POST`, `PUT` e `DELETE` em `/api/v1/mcp-servers` — só owner (`agent_os:admin`) |
-| `agent_os:admin` | `POST /api/v1/auth/users` |
+| `agent_os:admin` | `POST /api/v1/auth/users`; `integrations:write` (rotas `/api/v1/integrations`) só vem pelo admin |
 
 `POST /api/v1/auth/login` e `GET /health` são públicos.
 
@@ -158,3 +158,13 @@ Time é um config com `kind: "team"` (ADR-0011), criado com `POST /api/v1/config
 - Runtime: `TeamFactory` por request; o time é registrado em `os.teams` sem restart, como os agentes. Roda em `POST /teams/{id}/runs` e exige `teams:run` (editor e owner). O `TrackedTeam` conecta de forma estrita o MCP do líder e dos membros antes do run.
 - `GET /api/v1/configs/{id}/teams` lista os times cuja versão vigente ou rascunho tem o agente como membro. Publicar o agente muda o comportamento deles.
 - Só o run do time vai para `agent_run`/`usage_event`, com o consumo somado dos membros. Os membros não ganham run próprio, para o custo não contar duas vezes.
+
+## Integrações (tokens de consumidor)
+
+Tokens para sistemas externos e assistentes de IA chamarem agentes e times via REST ou `/mcp` (ADR-0009). Só owner emite, lista e revoga.
+
+- `POST /api/v1/integrations` recebe `{name, agent_ids, team_ids, expires_in_days}` (até 90 dias) e devolve o token **uma vez só**, junto com o `mcp_url` (`PUBLIC_BASE_URL` + `/mcp`).
+- O token carrega só `agents:<id>:read|run` e `teams:<id>:read|run` dos recursos liberados, com `sub = integration:<id>` e um `jti`. Ele lista e executa apenas esses recursos, e não acessa config, métricas nem sessões de outros. Os recursos precisam estar publicados.
+- `GET /api/v1/integrations` lista sem o token. `DELETE /api/v1/integrations/{id}` revoga.
+- Revogação: o Agno só valida assinatura e expiração, então o `RevocationMiddleware` (`app/integrations.py`) recusa com 401 o `jti` revogado antes de a request chegar a ele. No processo que revogou, vale na hora; nos outros workers, em até 30 s (cache).
+- No `/mcp`, as tools `run_agent`/`run_team` exigem os mesmos scopes por recurso da REST, e `get_agentos_config` lista só o liberado.

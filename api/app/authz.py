@@ -20,6 +20,8 @@ class Scope:
     # Define para onde a API conecta e com qual credencial: nenhum papel além do
     # owner (agent_os:admin) recebe este scope
     MCP_SERVERS_WRITE = "mcp_servers:write"
+    # Emitir token para terceiros: também só owner
+    INTEGRATIONS_WRITE = "integrations:write"
 
 
 def require_scopes(*required: str) -> Callable[[Request], None]:

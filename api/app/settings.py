@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     mcp_secrets_key: str | None = None
     # Hosts liberados da checagem de rede interna (separados por vírgula)
     mcp_allowed_hosts: str = ""
+    # URL pública da API, usada para montar o endereço do /mcp nas integrações
+    public_base_url: str | None = None
 
 
 @lru_cache

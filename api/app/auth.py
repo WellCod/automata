@@ -14,6 +14,7 @@ def issue_token(
     *,
     audience: str = "automata",
     expires_in: int = _DEFAULT_EXPIRY,
+    jti: str | None = None,
 ) -> str:
     """Emite JWT RS256 assinado com a chave privada da instância.
 
@@ -30,4 +31,7 @@ def issue_token(
         "iat": now,
         "exp": now + timedelta(seconds=expires_in),
     }
+    if jti is not None:
+        # identifica o token para revogação (tokens de integração)
+        payload["jti"] = jti
     return jwt.encode(payload, settings.jwt_private_key, algorithm=_ALGORITHM)

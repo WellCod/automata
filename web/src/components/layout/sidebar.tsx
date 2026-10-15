@@ -1,7 +1,17 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { BarChart3, LayoutGrid, LogOut, Moon, Plug, ShieldCheck, Sun, Users } from "lucide-react";
+import {
+  BarChart3,
+  KeyRound,
+  LayoutGrid,
+  LogOut,
+  Moon,
+  Plug,
+  ShieldCheck,
+  Sun,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -14,6 +24,7 @@ const navItems = [
   { href: "/analytics", label: "Analytics", icon: BarChart3, exact: true },
   { href: "/mcp", label: "Servidores MCP", icon: Plug, exact: true },
   { href: "/aprovacoes", label: "Aprovações", icon: ShieldCheck, exact: true },
+  { href: "/integracoes", label: "Integrações", icon: KeyRound, exact: true },
 ];
 
 function LogoMark() {
