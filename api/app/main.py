@@ -95,6 +95,7 @@ def create_app(
     db = PostgresDb(db_url=settings.database_url)
 
     base = FastAPI(title="automata")
+    base.state.enforce_scopes = enable_auth
     base.include_router(configs_router)
     base.include_router(models_router)
     base.include_router(linter_router)

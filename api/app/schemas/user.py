@@ -3,12 +3,29 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from app.authz import Scope
 from app.models.user import UserRole
+
+# Scopes do AgentOS seguem o mapa padrão do Agno (agno.os.scopes); os de
+# configs e metrics são das rotas próprias (app.authz). Tabela em api/README.md.
+_VIEWER_SCOPES = [
+    "agents:read",
+    "sessions:read",
+    "traces:read",
+    Scope.CONFIGS_READ,
+    Scope.METRICS_READ,
+]
 
 ROLE_SCOPES: dict[UserRole, list[str]] = {
     UserRole.owner: ["agent_os:admin"],
-    UserRole.editor: ["agent_os:write"],
-    UserRole.viewer: ["agent_os:read"],
+    UserRole.editor: [
+        *_VIEWER_SCOPES,
+        "agents:run",
+        "sessions:write",
+        Scope.CONFIGS_WRITE,
+        Scope.CONFIGS_PUBLISH,
+    ],
+    UserRole.viewer: _VIEWER_SCOPES,
 }
 
 

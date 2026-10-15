@@ -1,8 +1,9 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.models.config import AgentConfig, AgentConfigVersion
 from app.repositories.config import ConfigRepository
@@ -20,7 +21,11 @@ from app.schemas.config import (
 )
 from app.services.config import ConfigService
 
-router = APIRouter(prefix="/api/v1/configs", tags=["configs"])
+router = APIRouter(
+    prefix="/api/v1/configs",
+    tags=["configs"],
+    dependencies=[Depends(require_scopes(Scope.CONFIGS_READ))],
+)
 logger = logging.getLogger(__name__)
 
 
@@ -62,7 +67,12 @@ def _to_response(c: AgentConfig) -> AgentConfigResponse:
     )
 
 
-@router.post("", response_model=AgentConfigResponse, status_code=201)
+@router.post(
+    "",
+    response_model=AgentConfigResponse,
+    status_code=201,
+    dependencies=[Depends(require_scopes(Scope.CONFIGS_WRITE))],
+)
 def create_config(body: CreateConfigInput, session: SessionDep) -> AgentConfigResponse:
     repo = ConfigRepository(session)
     service = ConfigService(repo)
@@ -124,7 +134,12 @@ def list_versions(config_id: UUID, session: SessionDep) -> list[AgentConfigVersi
     ]
 
 
-@router.post("/{config_id}/publish", response_model=AgentConfigVersionSummary, status_code=201)
+@router.post(
+    "/{config_id}/publish",
+    response_model=AgentConfigVersionSummary,
+    status_code=201,
+    dependencies=[Depends(require_scopes(Scope.CONFIGS_PUBLISH))],
+)
 def publish_draft(config_id: UUID, session: SessionDep) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
     service = ConfigService(repo)
@@ -141,7 +156,11 @@ def publish_draft(config_id: UUID, session: SessionDep) -> AgentConfigVersionSum
     return result  # type: ignore[return-value]
 
 
-@router.post("/{config_id}/rollback", response_model=AgentConfigVersionSummary)
+@router.post(
+    "/{config_id}/rollback",
+    response_model=AgentConfigVersionSummary,
+    dependencies=[Depends(require_scopes(Scope.CONFIGS_PUBLISH))],
+)
 def rollback(
     config_id: UUID, body: RollbackInput, session: SessionDep
 ) -> AgentConfigVersionSummary:
@@ -162,7 +181,12 @@ def rollback(
     return result  # type: ignore[return-value]
 
 
-@router.put("/{config_id}/draft", response_model=AgentConfigVersionSummary, status_code=201)
+@router.put(
+    "/{config_id}/draft",
+    response_model=AgentConfigVersionSummary,
+    status_code=201,
+    dependencies=[Depends(require_scopes(Scope.CONFIGS_WRITE))],
+)
 def save_draft(config_id: UUID, body: DraftInput, session: SessionDep) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
     service = ConfigService(repo)

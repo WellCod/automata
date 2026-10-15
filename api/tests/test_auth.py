@@ -33,6 +33,7 @@ def _generate_rsa_key_pair() -> tuple[str, str]:
 
 
 _PRIVATE_KEY, _PUBLIC_KEY = _generate_rsa_key_pair()
+_ID = "00000000-0000-0000-0000-000000000001"
 
 
 @pytest.fixture
@@ -154,10 +155,72 @@ def test_admin_scope_acessa_qualquer_rota(client_with_auth: TestClient) -> None:
     assert response.status_code == 200
 
 
-def test_rota_propria_acessivel_com_token_sem_scope(client_with_auth: TestClient) -> None:
+def test_rota_propria_sem_scope_retorna_403(client_with_auth: TestClient) -> None:
     token = _token("u1", scopes=[])
     response = client_with_auth.get(
         "/api/v1/models/capabilities",
         headers={"Authorization": f"Bearer {token}"},
     )
+    assert response.status_code == 403
+
+
+def test_rota_propria_com_scope_de_leitura_retorna_200(client_with_auth: TestClient) -> None:
+    token = _token("u1", scopes=["configs:read"])
+    response = client_with_auth.get(
+        "/api/v1/models/capabilities",
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert response.status_code == 200
+
+
+# --- papéis nas rotas próprias ---
+
+_ESCRITAS = [
+    ("POST", "/api/v1/configs", {"name": "x", "description": "x"}),
+    ("PUT", f"/api/v1/configs/{_ID}/draft", {}),
+    ("POST", f"/api/v1/configs/{_ID}/publish", None),
+    ("POST", f"/api/v1/configs/{_ID}/rollback", {"version_id": _ID}),
+]
+
+
+@pytest.mark.parametrize(("method", "path", "body"), _ESCRITAS)
+def test_viewer_nao_escreve_nem_publica(
+    client_with_auth: TestClient, method: str, path: str, body: object
+) -> None:
+    from app.models.user import UserRole
+    from app.schemas.user import ROLE_SCOPES
+
+    token = _token("viewer", scopes=ROLE_SCOPES[UserRole.viewer])
+    response = client_with_auth.request(
+        method, path, json=body, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize(("method", "path", "body"), _ESCRITAS)
+def test_editor_passa_da_autorizacao_nas_escritas(
+    client_with_auth: TestClient, method: str, path: str, body: object
+) -> None:
+    from app.models.user import UserRole
+    from app.schemas.user import ROLE_SCOPES
+
+    token = _token("editor", scopes=ROLE_SCOPES[UserRole.editor])
+    client = TestClient(client_with_auth.app, raise_server_exceptions=False)
+    response = client.request(method, path, json=body, headers={"Authorization": f"Bearer {token}"})
+    # sem banco no teste a rota falha depois da autorização; o que importa é não ser 401/403
+    assert response.status_code not in (401, 403)
+
+
+def test_viewer_le_metricas_e_editor_executa_agente() -> None:
+    from agno.os.scopes import has_required_scopes
+
+    from app.models.user import UserRole
+    from app.schemas.user import ROLE_SCOPES
+
+    assert has_required_scopes(ROLE_SCOPES[UserRole.viewer], ["metrics:read"])
+    assert not has_required_scopes(
+        ROLE_SCOPES[UserRole.viewer], ["agents:run"], resource_type="agents", resource_id="a1"
+    )
+    assert has_required_scopes(
+        ROLE_SCOPES[UserRole.editor], ["agents:run"], resource_type="agents", resource_id="a1"
+    )

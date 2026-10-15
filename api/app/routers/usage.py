@@ -1,13 +1,18 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
+from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.repositories.usage import UsageRepository, UsageRollup
 
-router = APIRouter(prefix="/api/v1/usage", tags=["usage"])
+router = APIRouter(
+    prefix="/api/v1/usage",
+    tags=["usage"],
+    dependencies=[Depends(require_scopes(Scope.METRICS_READ))],
+)
 
 
 class RollupItem(BaseModel):

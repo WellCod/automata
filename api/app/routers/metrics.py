@@ -1,16 +1,21 @@
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.models.config import AgentConfig
 from app.repositories.run import AgentRunSummary, RunRepository
 from app.repositories.usage import AgentUsageSummary, UsageRepository
 
-router = APIRouter(prefix="/api/v1/metrics", tags=["metrics"])
+router = APIRouter(
+    prefix="/api/v1/metrics",
+    tags=["metrics"],
+    dependencies=[Depends(require_scopes(Scope.METRICS_READ))],
+)
 
 
 class GlobalMetricsSummary(BaseModel):
