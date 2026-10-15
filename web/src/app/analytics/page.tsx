@@ -37,6 +37,21 @@ function formatCost(cost: number | null): string {
   });
 }
 
+function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="border-destructive/30 text-destructive flex items-center justify-between gap-3 rounded border px-4 py-3 text-[13px]">
+      <span>{message}</span>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="border-border text-foreground hover:border-accent hover:text-accent inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors"
+      >
+        Tentar de novo
+      </button>
+    </div>
+  );
+}
+
 function SummaryCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="border-border bg-card flex flex-col gap-1 rounded border px-4 py-3">
@@ -150,7 +165,12 @@ export default function AnalyticsPage() {
     : { period: filter.period };
   const byAgentQuery = summaryQuery;
 
-  const { data: summary, isPending: summaryPending } = useQuery<GlobalMetricsSummary>({
+  const {
+    data: summary,
+    isPending: summaryPending,
+    isError: summaryError,
+    refetch: refetchSummary,
+  } = useQuery<GlobalMetricsSummary>({
     queryKey: ["analytics:summary", queryKey],
     queryFn: async () => {
       const res = await client.GET("/api/v1/metrics/summary", {
@@ -161,7 +181,12 @@ export default function AnalyticsPage() {
     },
   });
 
-  const { data: breakdown, isPending: breakdownPending } = useQuery<AgentBreakdownItem[]>({
+  const {
+    data: breakdown,
+    isPending: breakdownPending,
+    isError: breakdownError,
+    refetch: refetchBreakdown,
+  } = useQuery<AgentBreakdownItem[]>({
     queryKey: ["analytics:by-agent", queryKey],
     queryFn: async () => {
       const res = await client.GET("/api/v1/metrics/by-agent", {
@@ -181,36 +206,43 @@ export default function AnalyticsPage() {
 
       {summaryPending ? (
         <p className="text-muted-foreground text-[13px]">Carregando…</p>
+      ) : summaryError ? (
+        <div className="mb-8">
+          <LoadError
+            message="Erro ao carregar o resumo do período."
+            onRetry={() => void refetchSummary()}
+          />
+        </div>
       ) : (
         <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <SummaryCard
             label="Conversas"
-            value={String(summary?.total_runs ?? 0)}
+            value={String(summary.total_runs)}
             hint="total de interações com agentes"
           />
           <SummaryCard
             label="Falhas"
-            value={`${((summary?.error_rate ?? 0) * 100).toFixed(1)}%`}
+            value={`${(summary.error_rate * 100).toFixed(1)}%`}
             hint="percentual de respostas com erro"
           />
           <SummaryCard
             label="Tempo de resposta típico"
-            value={formatMs(summary?.p50_ms ?? null)}
+            value={formatMs(summary.p50_ms)}
             hint="metade das respostas foi mais rápida"
           />
           <SummaryCard
             label="Tempo de resposta no pico"
-            value={formatMs(summary?.p95_ms ?? null)}
+            value={formatMs(summary.p95_ms)}
             hint="95% das respostas ficaram abaixo disso"
           />
           <SummaryCard
             label="Tokens processados"
-            value={formatTokens(summary?.total_tokens ?? 0)}
+            value={formatTokens(summary.total_tokens)}
             hint="palavras consumidas pela IA"
           />
           <SummaryCard
             label="Custo estimado"
-            value={formatCost(summary?.total_cost ?? null)}
+            value={formatCost(summary.total_cost)}
             hint="baseado no consumo de tokens"
           />
         </div>
@@ -223,6 +255,11 @@ export default function AnalyticsPage() {
 
         {breakdownPending ? (
           <p className="text-muted-foreground text-[13px]">Carregando…</p>
+        ) : breakdownError ? (
+          <LoadError
+            message="Erro ao carregar o uso por agente."
+            onRetry={() => void refetchBreakdown()}
+          />
         ) : !breakdown || breakdown.length === 0 ? (
           <p className="text-muted-foreground text-[13px]">Nenhum dado neste período.</p>
         ) : (

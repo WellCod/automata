@@ -147,4 +147,41 @@ describe("AgentEditPage", () => {
       expect(screen.getByText("Erro ao salvar")).toBeInTheDocument();
     });
   });
+
+  it("marca alterações não salvas e limpa ao salvar", async () => {
+    render(<AgentEditPage />, { wrapper });
+    const nameInput = await screen.findByDisplayValue("Agente Teste");
+    expect(screen.queryByText(/alterações não salvas/i)).not.toBeInTheDocument();
+
+    await userEvent.type(nameInput, " 2");
+    expect(screen.getByText(/alterações não salvas/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /salvar rascunho/i }));
+    await waitFor(() => {
+      expect(screen.getByText("Salvo")).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/alterações não salvas/i)).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue("Agente Teste 2")).toBeInTheDocument();
+  });
+
+  it("pede confirmação ao sair com alterações não salvas", async () => {
+    window.history.pushState({}, "", "/agents/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<AgentEditPage />, { wrapper });
+    const nameInput = await screen.findByDisplayValue("Agente Teste");
+    await userEvent.type(nameInput, " 2");
+
+    await userEvent.click(screen.getByRole("link", { name: "Voltar" }));
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(window.location.pathname).toBe("/agents/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    confirm.mockRestore();
+    window.history.pushState({}, "", "/");
+  });
+
+  it("exibe erro quando o agente não carrega", async () => {
+    vi.mocked(client.GET).mockResolvedValue({ data: undefined, error: { detail: "x" } } as never);
+    render(<AgentEditPage />, { wrapper });
+    expect(await screen.findByText("Erro ao carregar o agente.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /tentar de novo/i })).toBeInTheDocument();
+  });
 });

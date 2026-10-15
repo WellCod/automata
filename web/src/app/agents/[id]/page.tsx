@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { CostPanel } from "@/components/cost-panel";
@@ -25,6 +25,7 @@ import { RunsPanel } from "@/components/runs-panel";
 import { TestPanel } from "@/components/test-panel";
 import { VersionsPanel } from "@/components/versions-panel";
 import client from "@/lib/api/client";
+import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes";
 import { cn } from "@/lib/utils";
 import type { components } from "@/lib/api/schema.d.ts";
 
@@ -172,7 +173,12 @@ export default function AgentEditPage() {
   const [activePanel, setActivePanel] = useState<PanelId>("teste");
   const queryClient = useQueryClient();
 
-  const { data, isPending: isLoading } = useQuery({
+  const {
+    data,
+    isPending: isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ["config", id],
     queryFn: async () => {
       const res = await client.GET("/api/v1/configs/{config_id}", {
@@ -196,8 +202,17 @@ export default function AgentEditPage() {
   });
 
   const { reset } = form;
+  const isDirty = form.formState.isDirty;
+  useUnsavedChangesWarning(isDirty);
+
+  // refetch (foco na janela, invalidação) não pode apagar o que ainda não foi salvo
+  const dirtyRef = useRef(isDirty);
   useEffect(() => {
-    if (!data) return;
+    dirtyRef.current = isDirty;
+  }, [isDirty]);
+
+  useEffect(() => {
+    if (!data || dirtyRef.current) return;
     reset({
       name: data.name,
       description: data.description ?? "",
@@ -238,7 +253,9 @@ export default function AgentEditPage() {
       if (res.error) throw new Error("Falha ao salvar rascunho");
       return res.data!;
     },
-    onSuccess: () => {
+    onSuccess: (_, values) => {
+      dirtyRef.current = false;
+      reset(values);
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
       void queryClient.invalidateQueries({ queryKey: ["config", id] });
     },
@@ -249,6 +266,29 @@ export default function AgentEditPage() {
       <div className="border-border bg-background flex h-11 items-center border-b px-6">
         <span className="sr-only">Carregando…</span>
         <div className="bg-muted h-3.5 w-48 animate-pulse rounded" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-start gap-3 px-6 py-6">
+        <p className="text-destructive text-[13px]">Erro ao carregar o agente.</p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="border-border text-foreground hover:border-accent hover:text-accent inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors"
+          >
+            Tentar de novo
+          </button>
+          <Link
+            href="/"
+            className="border-border text-muted-foreground hover:text-foreground inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors"
+          >
+            Voltar
+          </Link>
+        </div>
       </div>
     );
   }
@@ -281,7 +321,12 @@ export default function AgentEditPage() {
           <StatusBadge data={data} />
         </div>
         <div className="flex items-center gap-3">
-          {mutation.isSuccess && (
+          {isDirty && !mutation.isPending && (
+            <span className="text-[11px] tracking-[0.05em] text-amber-400 uppercase">
+              Alterações não salvas
+            </span>
+          )}
+          {mutation.isSuccess && !isDirty && (
             <span className="text-accent text-[11px] tracking-[0.05em] uppercase">Salvo</span>
           )}
           {mutation.isError && <span className="text-destructive text-[11px]">Erro ao salvar</span>}
@@ -378,7 +423,13 @@ export default function AgentEditPage() {
             {activePanel === "teste" && (
               <TestPanel agentId={id} draftVersionId={data?.draft_version?.id} defaultOpen />
             )}
-            {activePanel === "versoes" && <VersionsPanel agentId={id} />}
+            {activePanel === "versoes" && (
+              <VersionsPanel
+                agentId={id}
+                currentVersionId={data?.current_version?.id}
+                hasUnsavedChanges={isDirty}
+              />
+            )}
             {activePanel === "runs" && <RunsPanel agentId={id} />}
             {activePanel === "metricas" && <MetricsPanel agentId={id} />}
             {activePanel === "custo" && <CostPanel agentId={id} />}

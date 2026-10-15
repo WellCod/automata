@@ -5,9 +5,9 @@ Fonte de verdade do sistema visual. Todas as decisões de estilo partem daqui.
 ## Tema
 
 Único tema: dark. O design é definido e testado apenas neste modo.  
-Implementação: tokens em `:root` e `.dark` idênticos; a classe `.dark` é
-adicionada por padrão pelo ThemeProvider para ativar as variantes `dark:`
-nos componentes existentes durante a migração.
+Implementação: um único bloco de tokens em `:root, .dark` com `color-scheme: dark`;
+a classe `.dark` vai fixa no `<html>` (`layout.tsx`) para as variantes `dark:` dos
+componentes shadcn. Não há alternância de tema.
 
 ## Tokens de cor
 

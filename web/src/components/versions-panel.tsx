@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
 
@@ -9,7 +10,12 @@ type ConfigPayload = components["schemas"]["ConfigPayload"];
 
 interface Props {
   agentId: string;
+  // versão em produção vem do detalhe do agente: depois de um rollback ela não é a publicada mais recente
+  currentVersionId?: string | null;
+  hasUnsavedChanges?: boolean;
 }
+
+type Pending = { kind: "publish" } | { kind: "rollback"; versionId: string; versionNumber: number };
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Rascunho",
@@ -37,8 +43,9 @@ function diffPayload(a: ConfigPayload, b: ConfigPayload): string[] {
   return diffs;
 }
 
-export function VersionsPanel({ agentId }: Props) {
+export function VersionsPanel({ agentId, currentVersionId, hasUnsavedChanges = false }: Props) {
   const queryClient = useQueryClient();
+  const [pending, setPending] = useState<Pending | null>(null);
 
   const {
     data: versions,
@@ -87,8 +94,15 @@ export function VersionsPanel({ agentId }: Props) {
   });
 
   const draft = versions?.find((v) => v.status === "draft");
-  const published = versions?.filter((v) => v.status === "published") ?? [];
-  const current = published[0];
+  const current = versions?.find((v) => v.id === currentVersionId);
+  const busy = publishMutation.isPending || rollbackMutation.isPending;
+
+  function confirm() {
+    if (!pending) return;
+    if (pending.kind === "publish") publishMutation.mutate();
+    else rollbackMutation.mutate(pending.versionId);
+    setPending(null);
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -97,14 +111,49 @@ export function VersionsPanel({ agentId }: Props) {
         {draft && (
           <button
             type="button"
-            onClick={() => publishMutation.mutate()}
-            disabled={publishMutation.isPending}
+            onClick={() => setPending({ kind: "publish" })}
+            disabled={busy || pending !== null}
             className="border-accent text-accent hover:border-accent/70 hover:text-accent/70 inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
           >
             {publishMutation.isPending ? "Publicando…" : "Publicar"}
           </button>
         )}
       </div>
+
+      {pending && (
+        <div
+          role="alertdialog"
+          aria-label="Confirmar"
+          className="border-border bg-card flex flex-col gap-2 rounded border px-3 py-2"
+        >
+          <p className="text-foreground text-[13px]">
+            {pending.kind === "publish"
+              ? "Publicar o rascunho? A nova versão passa a responder em produção."
+              : `Reverter para v${pending.versionNumber}? Ela volta a responder em produção.`}
+          </p>
+          {pending.kind === "publish" && hasUnsavedChanges && (
+            <p className="text-[11px] text-amber-400">
+              Há alterações não salvas no formulário. Elas não entram na publicação.
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setPending(null)}
+              className="border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={confirm}
+              className="border-accent text-accent hover:border-accent/70 hover:text-accent/70 inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors"
+            >
+              {pending.kind === "publish" ? "Confirmar publicação" : "Confirmar reversão"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {publishMutation.isError && (
         <p className="text-destructive text-[11px]">Erro ao publicar. Tente novamente.</p>
@@ -147,11 +196,22 @@ export function VersionsPanel({ agentId }: Props) {
                     <span className="text-muted-foreground text-[11px]">
                       {new Date(v.created_at).toLocaleDateString("pt-BR")}
                     </span>
-                    {v.status === "published" && v.id !== current?.id && (
+                    {v.id === currentVersionId && (
+                      <span className="text-accent text-[10px] font-medium tracking-[0.05em] uppercase">
+                        ativa
+                      </span>
+                    )}
+                    {v.status === "published" && v.id !== currentVersionId && (
                       <button
                         type="button"
-                        onClick={() => rollbackMutation.mutate(v.id)}
-                        disabled={rollbackMutation.isPending}
+                        onClick={() =>
+                          setPending({
+                            kind: "rollback",
+                            versionId: v.id,
+                            versionNumber: v.version_number,
+                          })
+                        }
+                        disabled={busy || pending !== null}
                         className="border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground inline-flex h-5 items-center rounded border px-1.5 text-[10px] transition-colors disabled:opacity-40"
                       >
                         Reverter
