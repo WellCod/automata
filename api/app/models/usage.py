@@ -10,7 +10,10 @@ from app.models.config import Base
 
 class UsageEvent(Base):
     __tablename__ = "usage_event"
-    __table_args__ = (Index("ix_usage_event_period_agent_config_id", "period", "agent_config_id"),)
+    __table_args__ = (
+        Index("ix_usage_event_period_agent_config_id", "period", "agent_config_id"),
+        Index("ix_usage_event_created_at", "created_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     agent_config_id: Mapped[uuid.UUID] = mapped_column(

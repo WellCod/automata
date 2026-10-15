@@ -64,8 +64,7 @@ class UsageRepository:
             cost=cost,
         )
         self._session.add(event)
-        self._session.commit()
-        self._session.refresh(event)
+        self._session.flush()
         return event
 
     def usage_summary(
