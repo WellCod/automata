@@ -4,6 +4,22 @@ services:
   api:
     restart: "no"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./api:/app
+      - /app/.venv
+    ports:
+      - "8000:8000"
 
+  # Painel em container só com --profile docker-web; o normal é `pnpm --filter web dev` no host.
   web:
     profiles: [docker-web]
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      target: dev
+    restart: "no"
+    working_dir: /app/web
+    command: pnpm dev --hostname 0.0.0.0
+    volumes:
+      - ./web:/app/web
+      - /app/web/node_modules
