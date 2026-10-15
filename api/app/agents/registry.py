@@ -65,7 +65,10 @@ class PublishedAgents:
         try:
             published = self._load()
         except Exception as exc:
+            # tenta de novo só após o TTL, para banco fora do ar não atrasar toda request
             logger.warning("falha ao sincronizar agentes", extra={"error": str(exc)})
+            with self._lock:
+                self._synced_at = monotonic()
             return 0
         added = 0
         with self._lock:

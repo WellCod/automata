@@ -153,3 +153,22 @@ def test_recusa_recurso_invalido(client: TestClient) -> None:
         ).status_code
         == 422
     )
+
+
+def test_revogados_com_banco_fora_nao_consulta_a_cada_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.integrations as integrations
+
+    chamadas = 0
+
+    def boom() -> set[str]:
+        nonlocal chamadas
+        chamadas += 1
+        raise RuntimeError("db fora")
+
+    monkeypatch.setattr(integrations, "_load_revoked", boom)
+    revoked = integrations.RevokedTokens(ttl_seconds=60)
+    assert not revoked.is_revoked("a")
+    assert not revoked.is_revoked("b")
+    assert chamadas == 1

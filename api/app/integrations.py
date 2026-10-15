@@ -64,8 +64,11 @@ class RevokedTokens:
         try:
             revoked = _load_revoked()
         except Exception as exc:
-            # sem banco o Agno também falha; não derrubar a request por isso
+            # Mantém a última lista e só tenta de novo após o TTL: sem isso, banco
+            # fora do ar somaria um timeout de conexão a cada request com token
             logger.warning("falha ao carregar tokens revogados", extra={"error": str(exc)})
+            with self._lock:
+                self._loaded_at = monotonic()
             return
         with self._lock:
             self._revoked = revoked

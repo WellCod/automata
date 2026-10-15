@@ -63,3 +63,17 @@ def test_times_vao_para_a_lista_de_times() -> None:
     published.sync()
     assert [e.id for e in entries] == [f"a-{agente}"]  # type: ignore[attr-defined]
     assert [t.id for t in teams] == [str(time)]  # type: ignore[attr-defined]
+
+
+def test_falha_no_banco_espera_o_ttl_para_tentar_de_novo() -> None:
+    chamadas = 0
+
+    def boom() -> list[tuple[uuid.UUID, str]]:
+        nonlocal chamadas
+        chamadas += 1
+        raise RuntimeError("db fora")
+
+    published = PublishedAgents([], lambda i: FakeFactory(str(i)), ttl_seconds=60, load=boom)
+    published.sync()
+    assert not published.is_stale()
+    assert chamadas == 1
