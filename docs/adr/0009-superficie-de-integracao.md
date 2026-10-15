@@ -50,11 +50,16 @@ Consequência tratada como requisito, não como detalhe: **nome e descrição de
 
 **Superfície de ataque cresce.** Um endpoint a mais, exposto a clientes que não controlamos. Autorização por scope é obrigatória em `/mcp`, não opcional — confirmar que o modo MCP respeita a configuração de autorização antes de expor publicamente.
 
-## Pendências antes de aceitar
+## Pendências resolvidas (2026-10-15)
 
-- Confirmar que `/mcp` está sujeito à mesma verificação de JWT e scopes da REST. Se não estiver, MCP server mode não é habilitável em produção como está.
-- Verificar comportamento de reconexão de `MCPTools`.
-- Definir a política de emissão de token por ferramenta consumidora e onde ela é administrada no painel.
+Conferido no Agno 2.8.7 instalado e no código do projeto:
+
+- **`/mcp` respeita a mesma autorização da REST.** O `JWTMCPAuth` valida assinatura RS256 e audiência com a mesma chave da API. Cada tool embutida (`run_agent`, `run_team`, `run_workflow`, `get_sessions`…) exige os scopes da rota REST equivalente (`agno/os/mcp.py`, `_require_tool_scopes`), então `agents:<id>:run` limita o que um token invoca. `get_agentos_config` filtra a lista pelos scopes do chamador.
+- **Reconexão de `MCPTools`.** Existe `refresh_connection=True`, que testa a sessão (`is_alive`) e reconecta antes de cada run. A pegadinha verificada é outra: falha de conexão é silenciosa e o agente roda sem as tools. Tratado no ADR-0010.
+- **Restrição de `reload=True`.** Vale para `MCPTools` estáticos no lifespan do AgentOS. Os nossos são criados por request na factory, então não se aplica.
+- **Política de token por consumidor.** Tokens de integração são emitidos pelo painel (só owner), com scopes por recurso (`agents:<id>:run`, `teams:<id>:run`), validade máxima de 90 dias e `jti` registrado em tabela. A API recusa `jti` revogado antes do middleware do Agno. O painel lista quem pode chamar o quê.
+
+Duas limitações ficam registradas. O `/mcp` não repassa `factory_input`, então o modo teste (versão específica) não está disponível via MCP, só a versão vigente. E não há allowlist de agentes no `MCPServerConfig`: o catálogo exposto a um consumidor é exatamente o que os scopes do token dele permitem.
 
 ## O que me faria reverter
 
