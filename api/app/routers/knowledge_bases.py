@@ -140,7 +140,14 @@ def update_base(
 @router.delete("/{base_id}", status_code=204, dependencies=_WRITE)
 def delete_base(base_id: UUID, session: SessionDep) -> None:
     repo = KnowledgeBaseRepository(session)
-    repo.delete(_get_or_404(repo, base_id))
+    base = _get_or_404(repo, base_id)
+    users = repo.used_by(base_id)
+    if users:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Base usada por: {', '.join(users)}. Desligue antes de remover.",
+        )
+    repo.delete(base)
     session.commit()
     logger.info("base de conhecimento removida", extra={"base_id": str(base_id)})
 

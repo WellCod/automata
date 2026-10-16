@@ -44,6 +44,7 @@ def lint_payload(payload: ConfigPayload) -> list[LintWarning]:
     warnings: list[LintWarning] = []
     _check_provider_coupling(payload, warnings)
     _check_tool_citations(payload, warnings)
+    _check_knowledge_guardrail(payload, warnings)
     return warnings
 
 
@@ -92,3 +93,19 @@ def _check_tool_citations(payload: ConfigPayload, out: list[LintWarning]) -> Non
                     message=f"instrução menciona '{tool}' mas a ferramenta não está habilitada",
                 )
             )
+
+
+def _check_knowledge_guardrail(payload: ConfigPayload, out: list[LintWarning]) -> None:
+    # A instrução fixa da factory já diz para tratar trecho como dado; o guardrail do
+    # próprio agente define o que fazer quando a base não cobre a pergunta (ADR-0012)
+    if payload.knowledge and not payload.instructions.guardrails.strip():
+        out.append(
+            LintWarning(
+                section="guardrails",
+                code="knowledge-without-guardrail",
+                message=(
+                    "agente consulta base de conhecimento mas não tem guardrails: defina o que"
+                    " fazer quando a base não cobrir a pergunta"
+                ),
+            )
+        )
