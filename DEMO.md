@@ -14,9 +14,12 @@ git clone https://github.com/WellCod/automata.git
 cd automata
 bash scripts/bootstrap.sh
 
-# 2. Sobe banco + API em modo demo
+# 2. Sobe banco + API em modo demo (--build -V recria imagem e venv da API se as dependências mudaram)
 DEMO_REPLAY=true \
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build -V
+
+# Confere que o replay ligou: deve imprimir true
+docker exec automata-api-1 printenv DEMO_REPLAY
 
 # 3. Painel
 pnpm --filter web dev
@@ -32,8 +35,7 @@ read -rsp "Senha do owner: " SEED_OWNER_PASSWORD; echo
 docker exec \
   -e SEED_OWNER_EMAIL="admin@exemplo.com" \
   -e SEED_OWNER_PASSWORD="$SEED_OWNER_PASSWORD" \
-  automata-api-1 \
-  uv run python scripts/seed.py full
+  automata-api-1 bash -c "cd /app && .venv/bin/python scripts/seed.py full"
 ```
 
 Acesse `http://localhost:3000` e faça login com as credenciais acima.
@@ -102,13 +104,12 @@ Para ver uma resposta diferente, envie outra mensagem. O modelo cicla pelas resp
 ```bash
 # Remove todos os dados e recria o schema
 docker compose down -v
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+DEMO_REPLAY=true docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 # Defina a senha do owner — ela não fica escrita em lugar nenhum
 read -rsp "Senha do owner: " SEED_OWNER_PASSWORD; echo
 
 docker exec \
   -e SEED_OWNER_EMAIL="admin@exemplo.com" \
   -e SEED_OWNER_PASSWORD="$SEED_OWNER_PASSWORD" \
-  automata-api-1 \
-  uv run python scripts/seed.py full
+  automata-api-1 bash -c "cd /app && .venv/bin/python scripts/seed.py full"
 ```
