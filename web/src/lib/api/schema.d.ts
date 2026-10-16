@@ -918,6 +918,7 @@ export interface components {
       mcp_servers?: components["schemas"]["McpServerBinding"][];
       /** Knowledge */
       knowledge?: components["schemas"]["KnowledgeBinding"][];
+      guardrails?: components["schemas"]["GuardrailSettings"];
       capabilities?: components["schemas"]["CapabilityFlags"];
       /** Metadata */
       metadata?: {
@@ -1018,6 +1019,34 @@ export interface components {
       embedding_cost?: number | null;
       /** Period Days */
       period_days: number;
+    };
+    /**
+     * GuardrailSettings
+     * @description Regras de entrada do agente (ADR-0013). Tudo desligado por padrão.
+     */
+    GuardrailSettings: {
+      pii?: components["schemas"]["PiiRule"];
+      /**
+       * Prompt Injection
+       * @default false
+       */
+      prompt_injection: boolean;
+      /** Injection Extra Terms */
+      injection_extra_terms?: string[];
+      /** Blocked Topics */
+      blocked_topics?: string[];
+      /** Max Input Chars */
+      max_input_chars?: number | null;
+      /**
+       * Moderation
+       * @default false
+       */
+      moderation: boolean;
+      /**
+       * Blocked Message
+       * @default Não posso ajudar com essa mensagem por aqui.
+       */
+      blocked_message: string;
     };
     /** HTTPValidationError */
     HTTPValidationError: {
@@ -1399,6 +1428,17 @@ export interface components {
       tool_execution: {
         [key: string]: unknown;
       };
+    };
+    /** PiiRule */
+    PiiRule: {
+      /**
+       * Mode
+       * @default off
+       * @enum {string}
+       */
+      mode: "off" | "mask" | "block";
+      /** Types */
+      types?: ("cpf" | "cnpj" | "cartao" | "email" | "telefone")[];
     };
     /** ResetPasswordInput */
     ResetPasswordInput: {

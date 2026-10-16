@@ -221,6 +221,23 @@ Fase 13 ([ADR-0012](../docs/adr/0012-bases-de-conhecimento.md)). Ingestão, busc
 - Settings: `KNOWLEDGE_DEFAULT_EMBEDDER`, `VOYAGE_API_KEY`, `KNOWLEDGE_MAX_UPLOAD_MB` (20), `KNOWLEDGE_ALLOWED_EXTENSIONS` (`pdf,docx,md,txt,csv,json`).
 - O SDK da Voyage e os leitores somam ~85 MB de memória quando importados; o limite da API nos compose passou de 256M para 512M.
 
+## Guardrails (ADR-0013)
+
+Regras por agente, no payload versionado (`guardrails`), tudo desligado por padrão. A factory transforma a seção em `pre_hooks` do Agent, do líder do time e de cada membro (com os guardrails da própria versão). Rodam antes de o Agno montar as mensagens: bloquear não custa token de modelo.
+
+| Campo | Regra |
+|---|---|
+| `pii.mode` = `mask` / `block`, `pii.types` | CPF e CNPJ com dígito verificador, cartão com Luhn, e-mail e telefone brasileiro (com DDD formatado ou +55). `mask` troca o dado por `[CPF removido]` e segue; `block` mascara e bloqueia. Número de pedido de 11 dígitos sem dígito verificador válido passa |
+| `prompt_injection`, `injection_extra_terms` | Lista própria em português e inglês, comparada sem acento e sem maiúscula; os termos extras somam à lista |
+| `blocked_topics` | Termos que bloqueiam a mensagem (3 a 100 caracteres) |
+| `max_input_chars` | Tamanho máximo da mensagem (50 a 100 000) |
+| `moderation` | API de moderação da OpenAI; exige `OPENAI_API_KEY` (400 ao salvar sem ela). Uma chamada por mensagem, com o texto saindo da instância |
+| `blocked_message` | O que o usuário vê quando bloqueia |
+
+- Dados pessoais rodam primeiro: o input fica mascarado mesmo quando outra regra bloqueia. O Agno grava o run bloqueado com o input, então a sessão guarda a versão mascarada.
+- Bloqueio: run com status `ERROR` e `content` igual à mensagem de bloqueio; no stream, `RunError` com `error_id` (`pii_detected`, `prompt_injection`, `off_topic`, `input_not_allowed`) e `additional_data.rule` com o motivo.
+- As regras são `BaseGuardrail` próprias (`app/guardrails/`): os guardrails prontos do Agno só têm padrões dos EUA e lista de injeção em inglês.
+
 ## Árvore de execução
 
 Com `TRACING_ENABLED=true` (padrão), o AgentOS grava em banco, via OpenTelemetry, os spans de cada run: time, agente, chamada de modelo e tool. A exportação é imediata (`SimpleSpanProcessor`).
