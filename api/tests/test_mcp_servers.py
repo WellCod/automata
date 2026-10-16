@@ -101,7 +101,7 @@ def test_chave_errada_recusa(env: None, monkeypatch: pytest.MonkeyPatch) -> None
 
 @pytest.fixture(scope="module")
 def db_url() -> Generator[str, None, None]:
-    with PostgresContainer("postgres:17") as pg:
+    with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         os.environ["DATABASE_URL"] = url
         os.environ.setdefault("JWT_PRIVATE_KEY", "x")

@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -24,6 +25,20 @@ class Settings(BaseSettings):
     public_base_url: str | None = None
     # Spans de agente, time, modelo e tool gravados no banco (árvore de execução)
     tracing_enabled: bool = True
+    # Bases de conhecimento (ADR-0012): embedder escolhido na criação de cada base
+    knowledge_default_embedder: Literal["voyage", "openai"] = "voyage"
+    # Lida pelo SDK da Voyage; a do OpenAI vem de OPENAI_API_KEY, como nos modelos
+    voyage_api_key: str | None = None
+    knowledge_max_upload_mb: int = 20
+    knowledge_allowed_extensions: str = "pdf,docx,md,txt,csv,json"
+
+    @property
+    def knowledge_extensions(self) -> frozenset[str]:
+        return frozenset(
+            e.strip().lower().lstrip(".")
+            for e in self.knowledge_allowed_extensions.split(",")
+            if e.strip()
+        )
 
     @property
     def docs_enabled(self) -> bool:

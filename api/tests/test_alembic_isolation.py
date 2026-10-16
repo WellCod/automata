@@ -20,7 +20,7 @@ from app.models import Base
 
 @pytest.fixture(scope="module")
 def postgres_url() -> Generator[str, None, None]:
-    with PostgresContainer("postgres:17") as pg:
+    with PostgresContainer("pgvector/pgvector:pg17") as pg:
         yield pg.get_connection_url().replace("psycopg2", "psycopg")
 
 

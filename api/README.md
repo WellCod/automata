@@ -183,6 +183,16 @@ Tokens para sistemas externos e assistentes de IA chamarem agentes e times via R
 - Revogação: o Agno só valida assinatura e expiração, então o `RevocationMiddleware` (`app/integrations.py`) recusa com 401 o `jti` revogado (de integração ou de sessão encerrada no logout) antes de a request chegar a ele. No processo que revogou, vale na hora; nos outros workers, em até 30 s (cache).
 - No `/mcp`, as tools `run_agent`/`run_team` exigem os mesmos scopes por recurso da REST, e `get_agentos_config` lista só o liberado.
 
+## Bases de conhecimento (RAG)
+
+Infraestrutura da Fase 13 ([ADR-0012](../docs/adr/0012-bases-de-conhecimento.md)). O cadastro e as rotas vêm nos próximos PRs.
+
+- Postgres com a extensão `vector`: os compose e o testcontainers usam `pgvector/pgvector:pg17` (mesmo Postgres 17, volume existente continua válido). O `PgVector` do Agno roda `CREATE EXTENSION IF NOT EXISTS vector` ao criar a tabela da base, então o usuário do banco precisa poder criar extensão; em Postgres gerenciado (Railway, RDS), habilite `vector` antes.
+- Embedder por base, escolhido na criação: `voyage` (padrão, `voyage-3.5`, 1024 dimensões, lê `VOYAGE_API_KEY`) ou `openai` (lê `OPENAI_API_KEY`). A Voyage dá 200M tokens grátis por conta e cobra depois.
+- Leitores instalados: PDF (`pypdf`), DOCX (`python-docx`), Markdown, texto, CSV (`aiofiles`), JSON e páginas web (`beautifulsoup4`).
+- Settings: `KNOWLEDGE_DEFAULT_EMBEDDER`, `VOYAGE_API_KEY`, `KNOWLEDGE_MAX_UPLOAD_MB` (20), `KNOWLEDGE_ALLOWED_EXTENSIONS` (`pdf,docx,md,txt,csv,json`).
+- O SDK da Voyage e os leitores somam ~85 MB de memória quando importados; o limite da API nos compose passou de 256M para 512M.
+
 ## Árvore de execução
 
 Com `TRACING_ENABLED=true` (padrão), o AgentOS grava em banco, via OpenTelemetry, os spans de cada run: time, agente, chamada de modelo e tool. A exportação é imediata (`SimpleSpanProcessor`).
