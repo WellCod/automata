@@ -56,8 +56,8 @@ A aba Desempenho de cada agente mostra os mesmos gráficos filtrados por ele.
 **Sem credencial de LLM.** O modo `DEMO_REPLAY=true` substitui o provider real por respostas pré-gravadas em `api/fixtures/`. Versionamento, rollback, modo teste e analytics funcionam completamente offline.
 
 ```bash
-# 1. Sobe com replay
-DEMO_REPLAY=true docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# 1. Sobe com replay (--build -V recria imagem e venv da API se as dependências mudaram)
+DEMO_REPLAY=true docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build -V
 
 # 2. Seed: owner + 5 agentes publicados + 500 runs históricos (90 dias)
 # Defina a senha do owner — ela não fica escrita em lugar nenhum
@@ -254,6 +254,10 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
 API disponível em `http://localhost:8000`. Migrations rodam automaticamente no boot. A porta 8000 só é publicada pelo override de dev; em `docker-compose.yml` (produção) e `docker-compose.demo.yml` a API fica só na rede do compose e o painel fala com ela por `http://api:8000`.
+
+Depois de um `git pull` que mexe em `api/pyproject.toml` ou `api/uv.lock`, recrie a API com `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build -V api`. O override monta um volume anônimo em `/app/.venv` e, sem `-V`, o container reaproveita o venv antigo mesmo com a imagem nova: a API cai no boot com `ImportError` da dependência nova.
+
+Para o modo replay sem chave de LLM, prefixe o comando com `DEMO_REPLAY=true` (ver [Demo](#demo)).
 
 Painel em container, com hot-reload, em vez do terminal 2: `docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile docker-web up`.
 
