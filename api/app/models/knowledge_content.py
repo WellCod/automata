@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -12,6 +12,10 @@ class KnowledgeContent(Base):
     """Documento de uma base (ADR-0012). Os trechos ficam na tabela de vetores da base."""
 
     __tablename__ = "knowledge_content"
+    __table_args__ = (
+        Index("ix_knowledge_content_base_created", "base_id", "created_at"),
+        Index("ix_knowledge_content_status", "status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     base_id: Mapped[uuid.UUID] = mapped_column(
