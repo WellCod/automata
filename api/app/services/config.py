@@ -1,6 +1,8 @@
 from uuid import UUID
 
 from app.agents.capabilities import validate_capabilities
+from app.guardrails.input import moderation_available
+from app.knowledge.embedders import demo_replay
 from app.models.config import AgentConfig, AgentConfigVersion
 from app.repositories.config import ConfigRepository
 from app.repositories.knowledge_base import KnowledgeBaseRepository
@@ -140,6 +142,7 @@ class ConfigService:
         errors = validate_capabilities(payload.model_id, payload.capabilities)
         errors += self._mcp_errors(payload)
         errors += self._knowledge_errors(payload)
+        errors += self._guardrail_errors(payload)
         errors += self._team_errors(config, payload)
         if errors:
             raise ValueError("; ".join(errors))
@@ -172,6 +175,12 @@ class ConfigService:
                         f"versão fixada de '{agent.name}' não é uma versão publicada dele"
                     )
         return errors
+
+    def _guardrail_errors(self, payload: ConfigPayload) -> list[str]:
+        # sem a chave, a moderação falharia a cada mensagem em produção
+        if payload.guardrails.moderation and not (moderation_available() or demo_replay()):
+            return ["moderação exige OPENAI_API_KEY na API"]
+        return []
 
     def _knowledge_errors(self, payload: ConfigPayload) -> list[str]:
         if not payload.knowledge:

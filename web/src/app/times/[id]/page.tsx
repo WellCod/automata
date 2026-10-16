@@ -196,6 +196,8 @@ export default function TeamEditPage() {
             mcp_servers: values.mcp_servers,
             capabilities: values.capabilities,
             knowledge: values.knowledge,
+            // o painel ainda não edita guardrails: preserva os da versão carregada
+            guardrails: data?.payload?.guardrails,
             metadata: data?.payload?.metadata ?? {},
             team: values.team,
           },

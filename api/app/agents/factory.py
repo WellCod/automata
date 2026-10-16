@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.agents.models_map import resolve_model
 from app.agents.tracking import TrackedAgent, TrackedTeam
 from app.db import get_engine
+from app.guardrails.input import input_guardrails
 from app.knowledge.tools import knowledge_instructions, knowledge_tool
 from app.mcp.client import build_mcp_tools
 from app.mcp.egress import EgressDenied
@@ -137,6 +138,7 @@ def _agent_from(config_id: UUID, resolved: ResolvedVersion, *, tracked: bool) ->
         model=resolve_model(payload.model_id, payload.capabilities),
         instructions=build_instructions(payload, resolved.bases),
         tools=[*resolved.mcp_tools, *resolved.knowledge_tools],
+        pre_hooks=list(input_guardrails(payload.guardrails)) or None,
     )
     if isinstance(agent, TrackedAgent):
         agent.automata_config_id = config_id
@@ -200,6 +202,7 @@ def make_team_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> TeamFactory:
             model=resolve_model(leader.payload.model_id, leader.payload.capabilities),
             instructions=build_instructions(leader.payload, leader.bases),
             tools=[*leader.mcp_tools, *leader.knowledge_tools],
+            pre_hooks=list(input_guardrails(leader.payload.guardrails)) or None,
             members=[_agent_from(mid, m, tracked=False) for mid, m in resolved.members],
             mode=TeamMode(settings.mode),
             max_iterations=settings.max_iterations,

@@ -3,7 +3,9 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from app.guardrails.pii import PII_TYPES, PiiType
 
 
 class ConfigPayloadStatus(enum.StrEnum):
@@ -55,6 +57,37 @@ class KnowledgeBinding(BaseModel):
     max_results: int = Field(default=5, ge=1, le=20)
 
 
+class PiiRule(BaseModel):
+    # off: não olha; mask: troca o dado por um marcador e segue; block: mascara e bloqueia
+    mode: Literal["off", "mask", "block"] = "off"
+    types: list[PiiType] = Field(default_factory=lambda: list(PII_TYPES))
+
+
+DEFAULT_BLOCKED_MESSAGE = "Não posso ajudar com essa mensagem por aqui."
+
+
+class GuardrailSettings(BaseModel):
+    """Regras de entrada do agente (ADR-0013). Tudo desligado por padrão."""
+
+    pii: PiiRule = Field(default_factory=PiiRule)
+    prompt_injection: bool = False
+    # somam à lista padrão em português e inglês
+    injection_extra_terms: list[str] = Field(default_factory=list, max_length=50)
+    blocked_topics: list[str] = Field(default_factory=list, max_length=50)
+    max_input_chars: int | None = Field(default=None, ge=50, le=100_000)
+    # API de moderação da OpenAI: uma chamada por mensagem, com o texto saindo da instância
+    moderation: bool = False
+    blocked_message: str = Field(default=DEFAULT_BLOCKED_MESSAGE, min_length=1, max_length=500)
+
+    @field_validator("injection_extra_terms", "blocked_topics")
+    @classmethod
+    def termos_validos(cls, v: list[str]) -> list[str]:
+        cleaned = [t.strip() for t in v if t.strip()]
+        if any(len(t) < 3 or len(t) > 100 for t in cleaned):
+            raise ValueError("cada termo precisa ter de 3 a 100 caracteres")
+        return cleaned
+
+
 TeamModeName = Literal["coordinate", "route", "broadcast", "tasks"]
 
 
@@ -96,6 +129,7 @@ class ConfigPayload(BaseModel):
     instructions: InstructionSections = Field(default_factory=InstructionSections)
     mcp_servers: list[McpServerBinding] = Field(default_factory=list)
     knowledge: list[KnowledgeBinding] = Field(default_factory=list, max_length=10)
+    guardrails: GuardrailSettings = Field(default_factory=GuardrailSettings)
     capabilities: CapabilityFlags = Field(default_factory=CapabilityFlags)
     metadata: dict[str, Any] = Field(default_factory=dict)
     # Em time: modelo, instruções e MCP acima são do líder

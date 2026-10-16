@@ -814,8 +814,8 @@ Fica para depois: conectores remotos (S3, SharePoint, GitHub, já no Agno), rera
 
 Decisão em [ADR-0013](adr/0013-guardrails-por-agente.md). Guardrails entram no payload versionado do agente (`guardrails`), viram `pre_hooks` e `post_hooks` do Agno na factory e são implementações próprias de `BaseGuardrail`: os prontos do Agno só têm padrões dos EUA e lista de injeção em inglês. Run bloqueado ganha status `blocked` e motivo em `agent_run`, fora da taxa de falha.
 
-- [ ] `docs(adr)`: ADR-0013 e esta seção
-- [ ] `feat(api)`: seção `guardrails` no payload e regras de entrada — dados pessoais (CPF e CNPJ com dígito verificador, cartão com Luhn, e-mail, telefone BR; bloquear ou mascarar, mascarando também o input gravado quando bloqueia), injeção de prompt em PT e EN com termos extras, tópicos proibidos, tamanho máximo e moderação opcional da OpenAI (400 ao salvar sem `OPENAI_API_KEY`); factory aplica no agente, no líder e nos membros; mensagem de bloqueio configurável
+- [x] `docs(adr)`: ADR-0013 e esta seção
+- [x] `feat(api)`: seção `guardrails` no payload e regras de entrada — dados pessoais (CPF e CNPJ com dígito verificador, cartão com Luhn, e-mail, telefone BR; bloquear ou mascarar, mascarando também o input gravado quando bloqueia), injeção de prompt em PT e EN com termos extras, tópicos proibidos, tamanho máximo e moderação opcional da OpenAI (400 ao salvar sem `OPENAI_API_KEY`); factory aplica no agente, no líder e nos membros; mensagem de bloqueio configurável
 - [ ] `feat(api)`: status `blocked` e `blocked_by` em `agent_run` (migration), tracking lendo o `error_id` do bloqueio no stream e no não-stream, analytics e métricas por agente separando bloqueio de falha
 - [ ] `feat(api)`: guardrail de saída (dados pessoais e termos proibidos na resposta); troca a resposta no não-stream e marca o run no stream
 - [ ] `feat(web)`: seção Guardrails na aba Configuração do agente e do time, com aviso sobre moderação e sobre saída em stream; modo teste mostra qual regra bloqueou
