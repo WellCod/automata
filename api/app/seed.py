@@ -9,15 +9,27 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
+from app.knowledge import demo_content
+from app.knowledge.embedders import EMBEDDERS, is_configured
+from app.knowledge.ingest import ingest
 from app.models.config import AgentConfig
+from app.models.knowledge_base import KnowledgeBase
+from app.models.knowledge_content import KnowledgeContent
 from app.models.run import AgentRun
 from app.models.usage import UsageEvent
 from app.models.user import UserRole
 from app.repositories.config import ConfigRepository
+from app.repositories.knowledge_base import KnowledgeBaseRepository
 from app.repositories.user import UserRepository
-from app.schemas.config import CapabilityFlags, ConfigPayload, InstructionSections
+from app.schemas.config import (
+    CapabilityFlags,
+    ConfigPayload,
+    InstructionSections,
+    KnowledgeBinding,
+)
 from app.services.config import ConfigService
 from app.services.user import UserService
+from app.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -256,6 +268,75 @@ def seed_demo(session: Session) -> None:
         config_svc.publish(config.id, author=email)
         session.commit()
         logger.info("agente criado e publicado: %s", agent_def["name"])
+
+    seed_knowledge(session)
+
+
+_KNOWLEDGE_AGENT = "Atendimento ao Cliente"
+
+
+def seed_knowledge(session: Session) -> None:
+    """Base de políticas de atendimento ligada ao agente de atendimento (ADR-0012).
+
+    Só roda com embedder disponível: na demo, o local do DEMO_REPLAY; numa instância
+    real, a chave da Voyage ou da OpenAI.
+    """
+    spec = EMBEDDERS[get_settings().knowledge_default_embedder]
+    if not is_configured(spec):
+        logger.info("base de exemplo pulada: embedder %s sem chave", spec.name)
+        return
+    repo = KnowledgeBaseRepository(session)
+    if repo.find_conflict(demo_content.BASE_NAME, demo_content.BASE_SLUG) is not None:
+        logger.info("base de exemplo já existe")
+        return
+    email = os.environ["SEED_OWNER_EMAIL"]
+    base_id = uuid.uuid4()
+    base = repo.add(
+        KnowledgeBase(
+            id=base_id,
+            name=demo_content.BASE_NAME,
+            slug=demo_content.BASE_SLUG,
+            description=demo_content.BASE_DESCRIPTION,
+            embedder=spec.name,
+            embedder_model=spec.model,
+            dimensions=spec.dimensions,
+            chunk_size=2000,
+            vector_table=f"kb_{base_id.hex}",
+            updated_by=email,
+        )
+    )
+    contents = [
+        KnowledgeContent(
+            base_id=base.id,
+            name=name,
+            source_type="text",
+            source=name,
+            extension="txt",
+            size_bytes=len(text.encode()),
+            status="processing",
+            created_by=email,
+        )
+        for name, text in demo_content.DOCUMENTS.items()
+    ]
+    session.add_all(contents)
+    session.commit()
+    for content in contents:
+        ingest(content.id, demo_content.DOCUMENTS[content.name].encode())
+
+    agents, _ = ConfigService(ConfigRepository(session)).list_configs(q=_KNOWLEDGE_AGENT)
+    agent = next((a for a in agents if a.name == _KNOWLEDGE_AGENT), None)
+    if agent is None or agent.current_version_id is None:
+        return
+    config_repo = ConfigRepository(session)
+    current = config_repo.get_version(agent.current_version_id)
+    assert current is not None
+    payload = ConfigPayload.model_validate(current.payload)
+    payload.knowledge = [KnowledgeBinding(base_id=base.id, max_results=3)]
+    svc = ConfigService(config_repo, bases=repo)
+    svc.save_draft(agent.id, payload, author=email)
+    svc.publish(agent.id, author=email)
+    session.commit()
+    logger.info("base de exemplo criada e ligada a %s", _KNOWLEDGE_AGENT)
 
 
 def seed_analytics(session: Session, n_runs: int = 500) -> None:

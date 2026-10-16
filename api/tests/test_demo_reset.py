@@ -85,3 +85,41 @@ def test_reset_limpa_runs_e_tabelas_do_agno(
     with Session(engine) as session:
         for model in (AgentRun, UsageEvent, User):
             assert session.scalar(select(func.count()).select_from(model)) == 0
+
+
+def test_seed_cria_base_de_exemplo_e_reset_apaga_vetores(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.knowledge import demo_content
+    from app.models.config import AgentConfig, AgentConfigVersion
+    from app.models.knowledge_base import KnowledgeBase
+    from app.models.knowledge_content import KnowledgeContent
+
+    monkeypatch.setenv("SEED_OWNER_EMAIL", "owner@demo.com")
+    monkeypatch.setenv("SEED_OWNER_PASSWORD", "Senha123!")
+    # embedder local: o seed da demo roda sem chave
+    monkeypatch.setenv("DEMO_REPLAY", "true")
+    with Session(engine) as session:
+        seed_demo(session)
+        seed_demo(session)  # idempotente
+
+    with Session(engine) as session:
+        [base] = session.scalars(select(KnowledgeBase)).all()
+        contents = session.scalars(select(KnowledgeContent)).all()
+        assert {c.name for c in contents} == set(demo_content.DOCUMENTS)
+        assert all(c.status == "completed" for c in contents)
+        agent = session.scalars(
+            select(AgentConfig).where(AgentConfig.name == "Atendimento ao Cliente")
+        ).one()
+        version = session.get(AgentConfigVersion, agent.current_version_id)
+        assert version is not None
+        assert version.payload["knowledge"][0]["base_id"] == str(base.id)
+        table = base.vector_table
+
+    truncated = _load_script().truncate_all(engine)
+
+    assert f'ai."{table}"' in truncated
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT to_regclass(:t)"), {"t": f"ai.{table}"}).scalar() is None
+    with Session(engine) as session:
+        assert session.scalar(select(func.count()).select_from(KnowledgeBase)) == 0

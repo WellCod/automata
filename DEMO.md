@@ -52,6 +52,10 @@ Acesse `http://localhost:3000` e faça login com as credenciais acima.
 
 Cada agente tem instruções completas (persona, objetivo, tom, guardrails) e está publicado com versão ativa.
 
+### Base de conhecimento
+
+A base **Políticas de atendimento** (troca e devolução, prazos de entrega, garantia, formas de pagamento; documentos fictícios) vem indexada e ligada ao **Atendimento ao Cliente**, que busca nela com `buscar_politicas_atendimento`. Com `DEMO_REPLAY=true` a indexação usa o embedder local por hash de palavras, sem chave; a busca de teste da página Conhecimento funciona, mas acha por palavra em comum, não por sentido. As respostas do agente continuam vindo das fixtures, então o modo teste não mostra fontes na demo.
+
 ### Histórico de execuções
 
 500 runs distribuídos nos últimos 90 dias com:
