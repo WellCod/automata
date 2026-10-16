@@ -290,3 +290,47 @@ def test_url_interna_recusada_na_hora(client: TestClient, base_id: str) -> None:
         f"/api/v1/knowledge-bases/{base_id}/contents/url", json={"url": "http://192.168.0.10/x"}
     )
     assert resp.status_code == 422
+
+
+# --- busca de teste ---
+
+
+def test_busca_devolve_trecho_fonte_e_score(client: TestClient, base_id: str) -> None:
+    for name, text in [
+        ("Férias", "Cada colaborador tem trinta dias de férias por ano."),
+        ("Reembolso", "Reembolso de viagem exige nota fiscal em até cinco dias."),
+    ]:
+        client.post(
+            f"/api/v1/knowledge-bases/{base_id}/contents/text", json={"name": name, "text": text}
+        )
+
+    resp = client.post(
+        f"/api/v1/knowledge-bases/{base_id}/search",
+        json={"query": "quantos dias de férias", "max_results": 1},
+    )
+    assert resp.status_code == 200, resp.text
+    [hit] = resp.json()
+    assert "férias" in hit["text"]
+    assert hit["content_name"] == "Férias"
+    assert hit["source"] == "Férias"
+    assert 0 <= hit["score"] <= 1
+
+
+def test_busca_em_base_vazia(client: TestClient, base_id: str) -> None:
+    resp = client.post(f"/api/v1/knowledge-bases/{base_id}/search", json={"query": "qualquer"})
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_busca_com_embedder_quebrado_da_502(
+    client: TestClient, base_id: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client.post(
+        f"/api/v1/knowledge-bases/{base_id}/contents/text", json={"name": "a", "text": "texto"}
+    )
+    monkeypatch.setattr(
+        "app.knowledge.runtime.build_embedder", lambda *a: _BrokenEmbedder(dimensions=256)
+    )
+    resp = client.post(f"/api/v1/knowledge-bases/{base_id}/search", json={"query": "texto"})
+    assert resp.status_code == 502
+    assert "chave do embedder inválida" in resp.text

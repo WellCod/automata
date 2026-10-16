@@ -228,6 +228,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/knowledge-bases/{base_id}/search": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Search
+     * @description Trechos que o agente receberia para a pergunta, sem rodar o agente.
+     */
+    post: operations["search_api_v1_knowledge_bases__base_id__search_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/knowledge-bases/{base_id}/contents": {
     parameters: {
       query?: never;
@@ -1323,6 +1343,32 @@ export interface components {
       /** Page Size */
       page_size: number;
     };
+    /** SearchHit */
+    SearchHit: {
+      /** Content Id */
+      content_id: string | null;
+      /** Content Name */
+      content_name: string | null;
+      /** Source */
+      source: string | null;
+      /** Text */
+      text: string;
+      /**
+       * Score
+       * @description Combina similaridade e full-text, de 0 a 1
+       */
+      score: number | null;
+    };
+    /** SearchInput */
+    SearchInput: {
+      /** Query */
+      query: string;
+      /**
+       * Max Results
+       * @default 5
+       */
+      max_results: number;
+    };
     /** TeamMember */
     TeamMember: {
       /**
@@ -1994,6 +2040,41 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  search_api_v1_knowledge_bases__base_id__search_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SearchInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SearchHit"][];
+        };
       };
       /** @description Validation Error */
       422: {

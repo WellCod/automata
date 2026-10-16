@@ -104,7 +104,7 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | `metrics:read` | `GET /api/v1/configs/{id}/runs`, `GET /api/v1/configs/{id}/metrics`, `GET /api/v1/metrics/*`, `GET /api/v1/usage/rollup`, `GET /api/v1/approvals`, `GET /api/v1/runs/{run_id}/trace` (este só para o dono do run ou owner) |
 | `mcp_servers:read` | `GET /api/v1/mcp-servers`, `GET /api/v1/mcp-servers/{id}` |
 | `mcp_servers:write` | `POST`, `PUT` e `DELETE` em `/api/v1/mcp-servers` — só owner (`agent_os:admin`) |
-| `knowledge_bases:read` | `GET /api/v1/knowledge-bases`, `GET /api/v1/knowledge-bases/{id}`, `GET /api/v1/knowledge-bases/embedders`, `GET /api/v1/knowledge-bases/{id}/contents[/{content_id}]` |
+| `knowledge_bases:read` | `GET /api/v1/knowledge-bases`, `GET /api/v1/knowledge-bases/{id}`, `GET /api/v1/knowledge-bases/embedders`, `GET /api/v1/knowledge-bases/{id}/contents[/{content_id}]`, `POST /api/v1/knowledge-bases/{id}/search` |
 | `knowledge_bases:write` | `POST`, `PUT` e `DELETE` em `/api/v1/knowledge-bases`; `POST /contents/file`, `/url` e `/text` e `DELETE /contents/{content_id}` |
 | `agent_os:admin` | `POST /api/v1/auth/users`; `integrations:write` (rotas `/api/v1/integrations`) só vem pelo admin |
 
@@ -197,7 +197,7 @@ Fase 13 ([ADR-0012](../docs/adr/0012-bases-de-conhecimento.md)). Ingestão, busc
 - O `insert` do PgVector pula em silêncio trecho cujo embedding falha. A ingestão embeda o primeiro trecho antes, para o erro real (chave inválida, cota) virar a mensagem, e confere a contagem depois: faltou trecho, apaga o que entrou e marca falha.
 - URL: checagem de SSRF dos servidores MCP (ADR-0010) ao receber e de novo a cada redirect, seguido à mão (até 3). Tipos aceitos pelo `Content-Type`: PDF, DOCX, Markdown, texto, CSV, JSON e HTML; HTML vira texto sem script, estilo, menu e rodapé.
 - Restart no meio deixa o conteúdo em `processing`; no boot, o que está assim há mais de 30 minutos vira `failed` ("reenvie").
-- Busca híbrida (vetor + full-text em português) no PgVector.
+- **Busca de teste** (`POST /api/v1/knowledge-bases/{id}/search`, `{query, max_results}`): devolve os trechos que o agente receberia, com documento, fonte e score (0 a 1, combinação de similaridade e full-text em português). Base sem conteúdo devolve lista vazia; embedder sem chave ou fora do ar dá 502 com o motivo, porque o `search` do PgVector engole a falha e devolveria vazio.
 - `DEMO_REPLAY=true` usa um embedder local por hash de palavras, sem chave nem rede. Serve para a demo e os testes, não para produção.
 
 - Postgres com a extensão `vector`: os compose e o testcontainers usam `pgvector/pgvector:pg17` (mesmo Postgres 17, volume existente continua válido). O `PgVector` do Agno roda `CREATE EXTENSION IF NOT EXISTS vector` ao criar a tabela da base, então o usuário do banco precisa poder criar extensão; em Postgres gerenciado (Railway, RDS), habilite `vector` antes.
