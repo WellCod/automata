@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Badge } from "@/components/ui/status-badge";
 import client from "@/lib/api/client";
@@ -93,10 +94,11 @@ function NewUserForm({ onDone }: { onDone: () => void }) {
         <Field>
           <FieldLabel htmlFor="user-password">Senha temporária</FieldLabel>
           <div className="flex gap-2">
-            <input
+            <PasswordInput
               id="user-password"
               required
               minLength={12}
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className={`${inputCls} font-mono`}
@@ -197,11 +199,12 @@ function UserRow({ user, isSelf }: { user: UserAccount; isSelf: boolean }) {
               reset.mutate();
             }}
           >
-            <div className="flex gap-2">
-              <input
+            <div className="flex flex-wrap gap-2">
+              <PasswordInput
                 aria-label={`Nova senha de ${user.email}`}
                 required
                 minLength={12}
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={`${inputCls} font-mono`}
