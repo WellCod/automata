@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { type KnowledgeSource, mergeSources, sourcesFromTool } from "@/lib/knowledge-sources";
+import { blockLabel, CHECK_ERROR_TYPES } from "@/lib/guardrail-labels";
 import { readSse } from "@/lib/sse";
 import { Button } from "@/components/ui/button";
 
@@ -11,6 +12,8 @@ interface ChatMessage {
   content: string;
   // documentos das bases de conhecimento consultadas para esta resposta
   sources?: KnowledgeSource[];
+  // regra de guardrail que barrou a mensagem ou a resposta (ADR-0013)
+  blockedBy?: string;
 }
 
 // ToolExecution do Agno, como chega no evento RunPaused e volta no continue
@@ -101,6 +104,17 @@ export function TestPanel({
     });
   }
 
+  function markBlocked(message: string, rule: string) {
+    setMessages((prev) => {
+      const copy = [...prev];
+      const last = copy[copy.length - 1];
+      if (!last || last.role !== "assistant") return prev;
+      // na saída o texto já chegou; mantém e só marca
+      copy[copy.length - 1] = { ...last, content: last.content || message, blockedBy: rule };
+      return copy;
+    });
+  }
+
   async function consume(res: Response) {
     if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
     for await (const { event, data } of readSse(res.body)) {
@@ -131,6 +145,17 @@ export function TestPanel({
         if (typeof data.run_id === "string" && tools.length > 0) {
           setPaused({ runId: data.run_id, tools });
         }
+      } else if (
+        event === `${prefix}RunError` &&
+        typeof data.error_type === "string" &&
+        CHECK_ERROR_TYPES.has(data.error_type)
+      ) {
+        // bloqueio é resposta do agente, não falha: a mensagem configurada aparece no chat
+        const extra = (data.additional_data ?? {}) as { rule?: unknown };
+        markBlocked(
+          typeof data.content === "string" ? data.content : "",
+          typeof extra.rule === "string" ? extra.rule : String(data.error_id ?? ""),
+        );
       } else if (event === `${prefix}RunError`) {
         setError(typeof data.content === "string" ? data.content : "Erro ao executar agente.");
       }
@@ -244,6 +269,11 @@ export function TestPanel({
                 >
                   {m.content || (isRunning && m.role === "assistant" ? "▍" : "")}
                 </div>
+                {m.blockedBy && (
+                  <span role="status" className="text-[11px] text-amber-400">
+                    bloqueado pelo guardrail · {blockLabel(m.blockedBy)}
+                  </span>
+                )}
                 {m.sources && m.sources.length > 0 && (
                   <ul aria-label="Fontes" className="flex max-w-xs flex-col gap-0.5 text-[11px]">
                     {m.sources.map((src) => (

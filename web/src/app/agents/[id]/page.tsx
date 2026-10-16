@@ -11,6 +11,12 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { CostPanel } from "@/components/cost-panel";
 import { LintPanel } from "@/components/lint-panel";
+import {
+  DEFAULT_GUARDRAILS,
+  type Guardrails,
+  GuardrailsEditor,
+  withDefaults,
+} from "@/components/guardrails-editor";
 import { KnowledgeSelector } from "@/components/knowledge-selector";
 import { McpToolsSelector } from "@/components/mcp-tools-selector";
 import { MetricsPanel } from "@/components/metrics-panel";
@@ -62,6 +68,8 @@ const schema = z.object({
   knowledge: z.array(
     z.object({ base_id: z.string(), max_results: z.number().int().min(1).max(20) }),
   ),
+  // validado pela API (ADR-0013); o editor só monta o objeto
+  guardrails: z.custom<Guardrails>(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -180,6 +188,7 @@ export default function AgentEditPage() {
       instructions: { persona: "", situation: "", tone: "", objective: "", guardrails: "" },
       mcp_servers: [],
       knowledge: [],
+      guardrails: DEFAULT_GUARDRAILS,
     },
   });
 
@@ -216,6 +225,7 @@ export default function AgentEditPage() {
         base_id: k.base_id,
         max_results: k.max_results ?? 5,
       })),
+      guardrails: withDefaults(data.payload?.guardrails),
     });
   }, [data, reset]);
 
@@ -233,8 +243,7 @@ export default function AgentEditPage() {
             mcp_servers: values.mcp_servers,
             capabilities: values.capabilities,
             knowledge: values.knowledge,
-            // o painel ainda não edita guardrails: preserva os da versão carregada
-            guardrails: data?.payload?.guardrails,
+            guardrails: values.guardrails,
             metadata: data?.payload?.metadata ?? {},
           },
         },
@@ -290,8 +299,7 @@ export default function AgentEditPage() {
       mcp_servers: values.mcp_servers,
       capabilities: values.capabilities,
       knowledge: values.knowledge,
-      // o painel ainda não edita guardrails: preserva os da versão carregada
-      guardrails: data?.payload?.guardrails,
+      guardrails: values.guardrails,
       metadata: data?.payload?.metadata ?? {},
     };
   };
@@ -400,6 +408,14 @@ export default function AgentEditPage() {
                 control={form.control}
                 render={({ field }) => (
                   <KnowledgeSelector value={field.value} onChange={field.onChange} />
+                )}
+              />
+
+              <Controller
+                name="guardrails"
+                control={form.control}
+                render={({ field }) => (
+                  <GuardrailsEditor value={field.value} onChange={field.onChange} />
                 )}
               />
 

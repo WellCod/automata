@@ -1,10 +1,19 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Ban, CheckCircle2, ChevronRight, PauseCircle, XCircle } from "lucide-react";
+import {
+  Activity,
+  Ban,
+  CheckCircle2,
+  ChevronRight,
+  PauseCircle,
+  ShieldAlert,
+  XCircle,
+} from "lucide-react";
 import { useState } from "react";
 import { RunTrace } from "@/components/run-trace";
 import client from "@/lib/api/client";
+import { blockLabel } from "@/lib/guardrail-labels";
 import type { components } from "@/lib/api/schema.d.ts";
 
 type AgentRunResponse = components["schemas"]["AgentRunResponse"];
@@ -18,6 +27,7 @@ const STATUS_ICON: Record<string, React.ReactNode> = {
   error: <XCircle className="h-3.5 w-3.5 shrink-0 text-red-400" />,
   paused: <PauseCircle className="h-3.5 w-3.5 shrink-0 text-amber-400" />,
   cancelled: <Ban className="text-muted-foreground h-3.5 w-3.5 shrink-0" />,
+  blocked: <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-amber-400" />,
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -25,6 +35,7 @@ const STATUS_LABEL: Record<string, string> = {
   error: "Erro",
   paused: "Aguardando confirmação",
   cancelled: "Cancelado",
+  blocked: "Bloqueado",
 };
 
 function formatDuration(ms: number | null): string {
@@ -67,6 +78,9 @@ function RunItem({ run }: { run: AgentRunResponse }) {
           <span className="text-foreground text-[13px] font-medium">
             {STATUS_LABEL[run.status] ?? run.status}
           </span>
+          {run.status === "blocked" && (
+            <span className="text-[11px] text-amber-400">{blockLabel(run.blocked_by)}</span>
+          )}
           <span className="text-muted-foreground text-[11px]">{run.user_id}</span>
         </div>
         <div className="flex items-center gap-2">
