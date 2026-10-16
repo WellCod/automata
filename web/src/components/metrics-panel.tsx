@@ -34,7 +34,7 @@ function formatRate(rate: number): string {
 function MetricCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="border-border bg-card flex flex-col gap-0.5 rounded border px-3 py-2.5">
-      <span className="text-muted-foreground text-[10px] tracking-[0.05em] uppercase">{label}</span>
+      <span className="text-muted-foreground text-[11px]">{label}</span>
       <span className="text-foreground text-[20px] leading-tight font-semibold">{value}</span>
       {sub && <span className="text-muted-foreground text-[11px]">{sub}</span>}
     </div>
@@ -72,7 +72,7 @@ export function MetricsPanel({ agentId }: Props) {
       </div>
 
       {isPending && <p className="text-muted-foreground text-[13px]">Carregando…</p>}
-      {isError && <p className="text-[13px] text-red-400">Falha ao carregar métricas.</p>}
+      {isError && <p className="text-destructive text-[13px]">Falha ao carregar métricas.</p>}
 
       {data && (
         <div className="grid grid-cols-2 gap-2">

@@ -49,51 +49,88 @@
   --radius-4xl: var(--radius);
 }
 
-/* Tema único (DESIGN.md): os tokens valem com ou sem a classe .dark */
-:root,
+/* Paleta grafite e azul (DESIGN.md): claro em :root, escuro em .dark. Azul só em ação,
+   foco e item ativo; o resto é cinza neutro (zinc). */
+:root {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #09090b;
+  --card: #ffffff;
+  --card-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --text-label: #52525b;
+  --accent: #2563eb;
+  --accent-foreground: #ffffff;
+  --destructive: #dc2626;
+  --border: #e4e4e7;
+  --input: #ffffff;
+  --ring: #2563eb;
+  --radius: 6px;
+  /* séries validadas (OKLCH L 0.43–0.77, CVD ΔE ≥ 30) contra --card */
+  --chart-1: #2563eb;
+  --chart-2: #ea580c;
+  --chart-error: #dc2626;
+  --chart-3: #a1a1aa;
+  --chart-4: #d4d4d8;
+  --chart-5: #f4f4f5;
+  --sidebar: #fafafa;
+  --sidebar-foreground: #09090b;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f4f4f5;
+  --sidebar-accent-foreground: #09090b;
+  --sidebar-border: #e4e4e7;
+  --sidebar-ring: #2563eb;
+}
+
 .dark {
   color-scheme: dark;
-  --background: #0b0b0b;
-  --foreground: #f0f0f0;
-  --card: #141414;
-  --card-foreground: #f0f0f0;
-  --popover: #141414;
-  --popover-foreground: #f0f0f0;
-  --primary: #f0f0f0;
-  --primary-foreground: #0b0b0b;
-  --secondary: #1a1a1a;
-  --secondary-foreground: #f0f0f0;
-  --muted: #1a1a1a;
-  --muted-foreground: #8a8a8a;
-  --text-label: #c49a6c;
-  --accent: #25e0c8;
-  --accent-foreground: #0b0b0b;
-  --destructive: #e05252;
-  --border: #262626;
-  --input: #1e1e1e;
-  --ring: #25e0c8;
-  --radius: 4px;
-  /* séries validadas (OKLCH L 0.48–0.67, CVD ΔE ≥ 12) contra --card; o accent é claro demais para marca */
-  --chart-1: #14a394;
-  --chart-2: #d95926;
-  --chart-error: #d03b3b;
-  --chart-3: #4a4a4a;
-  --chart-4: #2a2a2a;
-  --chart-5: #1a1a1a;
-  --sidebar: #0f0f0f;
-  --sidebar-foreground: #f0f0f0;
-  --sidebar-primary: #25e0c8;
-  --sidebar-primary-foreground: #0b0b0b;
-  --sidebar-accent: #1a1a1a;
-  --sidebar-accent-foreground: #f0f0f0;
-  --sidebar-border: #262626;
-  --sidebar-ring: #25e0c8;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #18181b;
+  --card-foreground: #fafafa;
+  --popover: #18181b;
+  --popover-foreground: #fafafa;
+  --primary: #fafafa;
+  --primary-foreground: #18181b;
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --text-label: #a1a1aa;
+  --accent: #3b82f6;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --border: #27272a;
+  --input: #18181b;
+  --ring: #3b82f6;
+  /* séries validadas (OKLCH L 0.48–0.67) contra --card escuro */
+  --chart-1: #3b82f6;
+  --chart-2: #ea580c;
+  --chart-error: #ef4444;
+  --chart-3: #52525b;
+  --chart-4: #3f3f46;
+  --chart-5: #27272a;
+  --sidebar: #0c0c0e;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #18181b;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #27272a;
+  --sidebar-ring: #3b82f6;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    box-shadow: none !important;
   }
   body {
     @apply bg-background text-foreground transition-colors duration-200;

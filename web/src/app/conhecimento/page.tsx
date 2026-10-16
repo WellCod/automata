@@ -166,7 +166,7 @@ export default function KnowledgeBasesPage() {
 
         {noKey && (
           <p
-            className="rounded border border-amber-400/40 px-3 py-2 text-[13px] text-amber-400"
+            className="rounded border border-amber-400/40 px-3 py-2 text-[13px] text-amber-600 dark:text-amber-400"
             role="alert"
           >
             Nenhum embedder com chave na API. Defina <code>VOYAGE_API_KEY</code> ou{" "}

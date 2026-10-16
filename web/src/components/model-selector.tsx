@@ -80,7 +80,7 @@ export function ModelSelector({ value, capabilities, onChange, error }: Props) {
 
       {supported && (
         <fieldset className="border-border bg-muted rounded border px-4 py-3">
-          <legend className="text-muted-foreground px-1 text-[11px] font-medium tracking-[0.05em] uppercase">
+          <legend className="text-muted-foreground px-1 text-[11px] font-medium">
             Capabilities
           </legend>
           <div className="mt-2 flex flex-col gap-2">

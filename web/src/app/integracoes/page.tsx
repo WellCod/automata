@@ -45,7 +45,7 @@ function IssuedToken({ issued, onClose }: { issued: Issued; onClose: () => void 
     <div
       role="alertdialog"
       aria-label="Token emitido"
-      className="flex flex-col gap-3 rounded border border-amber-400/60 p-4"
+      className="flex flex-col gap-3 rounded border border-amber-500/50 p-4"
     >
       <p className="text-foreground text-sm font-medium">
         Copie o token agora: ele não será mostrado de novo
@@ -232,7 +232,7 @@ function IntegrationRow({ item, names }: { item: Integration; names: Record<stri
         <span className="text-foreground text-[13px] font-medium">
           {item.name}{" "}
           <span
-            className={`ml-1 text-[11px] tracking-[0.05em] uppercase ${status === "ativo" ? "text-accent" : "text-muted-foreground"}`}
+            className={`ml-1 text-[11px] ${status === "ativo" ? "text-accent" : "text-muted-foreground"}`}
           >
             {status}
           </span>
