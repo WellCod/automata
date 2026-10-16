@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Badge } from "@/components/ui/status-badge";
 import client from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
 import {
@@ -239,13 +240,9 @@ function UserRow({ user, isSelf }: { user: UserAccount; isSelf: boolean }) {
         </select>
       </td>
       <td className="px-4 py-2.5">
-        <span
-          className={
-            user.is_active ? "text-accent text-[13px]" : "text-muted-foreground text-[13px]"
-          }
-        >
+        <Badge tone={user.is_active ? "active" : "neutral"}>
           {user.is_active ? "Ativo" : "Desativado"}
-        </span>
+        </Badge>
       </td>
       <td className="px-4 py-2.5">
         <div className="flex flex-wrap justify-end gap-2">
