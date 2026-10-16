@@ -16,6 +16,7 @@ class AgentRun(Base):
         Index("ix_agent_run_created_at", "created_at"),
         Index("ix_agent_run_run_id", "run_id"),
         Index("ix_agent_run_status", "status"),
+        Index("ix_agent_run_blocked_by", "blocked_by"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -32,6 +33,10 @@ class AgentRun(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     # ToolExecution.to_dict() das tools aguardando confirmação; só em run pausado
     pending_tools: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    # status=blocked: regra de guardrail que barrou (ADR-0013) e o detalhe dela
+    # (tipos de dado, termo configurado); nunca o valor que o usuário mandou
+    blocked_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    block_detail: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

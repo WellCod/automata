@@ -237,6 +237,7 @@ Regras por agente, no payload versionado (`guardrails`), tudo desligado por padr
 - Dados pessoais rodam primeiro: o input fica mascarado mesmo quando outra regra bloqueia. O Agno grava o run bloqueado com o input, então a sessão guarda a versão mascarada.
 - Bloqueio: run com status `ERROR` e `content` igual à mensagem de bloqueio; no stream, `RunError` com `error_id` (`pii_detected`, `prompt_injection`, `off_topic`, `input_not_allowed`) e `additional_data.rule` com o motivo.
 - As regras são `BaseGuardrail` próprias (`app/guardrails/`): os guardrails prontos do Agno só têm padrões dos EUA e lista de injeção em inglês.
+- Run barrado vira `status=blocked` em `agent_run`, com `blocked_by` (`pii_detected`, `prompt_injection`, `off_topic`, `input_too_long`, `moderation`) e `block_detail` (tipos de dado ou termo configurado, nunca o valor enviado). O motivo vem de um registro (`BlockLog`) que a factory liga aos guardrails e ao `TrackedAgent`/`TrackedTeam`: o `RunOutput` bloqueado só traz a mensagem. Bloqueio conta em `total_runs` e não em `error_rate`; `GET /api/v1/configs/{id}/metrics` e `/api/v1/metrics/summary` trazem `blocked_runs` e `blocked_by` (contagem por motivo), `/by-agent` traz `blocked_runs` e `/timeseries` traz `blocked_count` por dia.
 
 ## Árvore de execução
 

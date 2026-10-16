@@ -8,6 +8,7 @@ mensagem de bloqueio do agente, e o motivo técnico vai em additional_data.
 
 import os
 import unicodedata
+from dataclasses import dataclass, field
 from typing import Any
 
 from agno.exceptions import CheckTrigger, InputCheckError
@@ -63,12 +64,58 @@ def _block(message: str, trigger: CheckTrigger, rule: str, **extra: Any) -> Inpu
     return InputCheckError(message, check_trigger=trigger, additional_data={"rule": rule, **extra})
 
 
+@dataclass
+class Block:
+    rule: str
+    message: str
+    detail: dict[str, Any]
+
+
+@dataclass
+class BlockLog:
+    """Bloqueios do run, lidos pelo tracking (ADR-0013).
+
+    O RunOutput bloqueado só traz a mensagem; o motivo fica aqui. O agente é
+    montado por request, então o registro é de um run só.
+    """
+
+    blocks: list[Block] = field(default_factory=list)
+
+    @property
+    def last(self) -> Block | None:
+        return self.blocks[-1] if self.blocks else None
+
+
 class _Guardrail(BaseGuardrail):
-    def __init__(self, blocked_message: str) -> None:
+    def __init__(self, blocked_message: str, log: BlockLog | None = None) -> None:
         self.blocked_message = blocked_message
+        self.log = log
+
+    def _check(self, run_input: AnyInput) -> None:
+        raise NotImplementedError
+
+    async def _acheck(self, run_input: AnyInput) -> None:
+        self._check(run_input)
+
+    def _note(self, exc: InputCheckError) -> None:
+        if self.log is not None:
+            detail = {k: v for k, v in (exc.additional_data or {}).items() if k != "rule"}
+            rule = (exc.additional_data or {}).get("rule", exc.error_id)
+            self.log.blocks.append(Block(str(rule), exc.message, detail))
+
+    def check(self, run_input: AnyInput) -> None:
+        try:
+            self._check(run_input)
+        except InputCheckError as exc:
+            self._note(exc)
+            raise
 
     async def async_check(self, run_input: AnyInput) -> None:
-        self.check(run_input)
+        try:
+            await self._acheck(run_input)
+        except InputCheckError as exc:
+            self._note(exc)
+            raise
 
 
 class PiiGuardrail(_Guardrail):
@@ -78,12 +125,18 @@ class PiiGuardrail(_Guardrail):
     sessão guardar a versão sem o dado (ADR-0013).
     """
 
-    def __init__(self, blocked_message: str, types: list[PiiType], block: bool) -> None:
-        super().__init__(blocked_message)
+    def __init__(
+        self,
+        blocked_message: str,
+        types: list[PiiType],
+        block: bool,
+        log: BlockLog | None = None,
+    ) -> None:
+        super().__init__(blocked_message, log)
         self.types = types
         self.block = block
 
-    def check(self, run_input: AnyInput) -> None:
+    def _check(self, run_input: AnyInput) -> None:
         if not isinstance(run_input.input_content, str):
             return
         matches = find_pii(run_input.input_content, self.types)
@@ -97,14 +150,19 @@ class PiiGuardrail(_Guardrail):
 
 class TermsGuardrail(_Guardrail):
     def __init__(
-        self, blocked_message: str, terms: list[str], trigger: CheckTrigger, rule: str
+        self,
+        blocked_message: str,
+        terms: list[str],
+        trigger: CheckTrigger,
+        rule: str,
+        log: BlockLog | None = None,
     ) -> None:
-        super().__init__(blocked_message)
+        super().__init__(blocked_message, log)
         self.terms = [t for t in (normalize(t) for t in terms) if t]
         self.trigger = trigger
         self.rule = rule
 
-    def check(self, run_input: AnyInput) -> None:
+    def _check(self, run_input: AnyInput) -> None:
         text = normalize(run_input.input_content_string())
         hit = next((t for t in self.terms if t in text), None)
         if hit is not None:
@@ -112,11 +170,11 @@ class TermsGuardrail(_Guardrail):
 
 
 class LengthGuardrail(_Guardrail):
-    def __init__(self, blocked_message: str, max_chars: int) -> None:
-        super().__init__(blocked_message)
+    def __init__(self, blocked_message: str, max_chars: int, log: BlockLog | None = None) -> None:
+        super().__init__(blocked_message, log)
         self.max_chars = max_chars
 
-    def check(self, run_input: AnyInput) -> None:
+    def _check(self, run_input: AnyInput) -> None:
         size = len(run_input.input_content_string())
         if size > self.max_chars:
             raise _block(
@@ -131,13 +189,13 @@ class LengthGuardrail(_Guardrail):
 class ModerationGuardrail(_Guardrail):
     """Moderação da OpenAI, com a mensagem do agente no lugar da técnica."""
 
-    def __init__(self, blocked_message: str) -> None:
-        super().__init__(blocked_message)
+    def __init__(self, blocked_message: str, log: BlockLog | None = None) -> None:
+        super().__init__(blocked_message, log)
         from agno.guardrails import OpenAIModerationGuardrail
 
         self._inner = OpenAIModerationGuardrail()
 
-    def check(self, run_input: AnyInput) -> None:
+    def _check(self, run_input: AnyInput) -> None:
         try:
             self._inner.check(run_input)
         except InputCheckError as exc:
@@ -149,7 +207,7 @@ class ModerationGuardrail(_Guardrail):
                 categories=categories,
             ) from exc
 
-    async def async_check(self, run_input: AnyInput) -> None:
+    async def _acheck(self, run_input: AnyInput) -> None:
         try:
             await self._inner.async_check(run_input)
         except InputCheckError as exc:
@@ -166,22 +224,24 @@ def moderation_available() -> bool:
     return bool(os.environ.get("OPENAI_API_KEY"))
 
 
-def input_guardrails(settings: GuardrailSettings) -> list[BaseGuardrail]:
+def input_guardrails(
+    settings: GuardrailSettings, log: BlockLog | None = None
+) -> list[BaseGuardrail]:
     """Ordem: dados pessoais primeiro, para o input ficar mascarado mesmo quando
     outra regra bloqueia; moderação por último, porque é a única que sai da API."""
     msg = settings.blocked_message
     hooks: list[BaseGuardrail] = []
     if settings.pii.mode != "off" and settings.pii.types:
-        hooks.append(PiiGuardrail(msg, list(settings.pii.types), settings.pii.mode == "block"))
+        hooks.append(PiiGuardrail(msg, list(settings.pii.types), settings.pii.mode == "block", log))
     if settings.max_input_chars is not None:
-        hooks.append(LengthGuardrail(msg, settings.max_input_chars))
+        hooks.append(LengthGuardrail(msg, settings.max_input_chars, log))
     if settings.prompt_injection:
         terms = [*INJECTION_TERMS, *settings.injection_extra_terms]
-        hooks.append(TermsGuardrail(msg, terms, CheckTrigger.PROMPT_INJECTION, RULE_INJECTION))
+        hooks.append(TermsGuardrail(msg, terms, CheckTrigger.PROMPT_INJECTION, RULE_INJECTION, log))
     if settings.blocked_topics:
         hooks.append(
-            TermsGuardrail(msg, settings.blocked_topics, CheckTrigger.OFF_TOPIC, RULE_TOPIC)
+            TermsGuardrail(msg, settings.blocked_topics, CheckTrigger.OFF_TOPIC, RULE_TOPIC, log)
         )
     if settings.moderation:
-        hooks.append(ModerationGuardrail(msg))
+        hooks.append(ModerationGuardrail(msg, log))
     return hooks

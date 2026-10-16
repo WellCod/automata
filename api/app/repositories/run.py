@@ -14,6 +14,7 @@ class AgentRunSummary:
     agent_config_id: UUID
     total_runs: int
     error_count: int
+    blocked_count: int = 0
 
 
 @dataclass
@@ -23,6 +24,7 @@ class DailyRunStats:
     error_count: int
     p50_ms: float | None
     p95_ms: float | None
+    blocked_count: int = 0
 
 
 @dataclass
@@ -32,6 +34,8 @@ class RunMetrics:
     p50_ms: float | None
     p95_ms: float | None
     period_days: int
+    # barrados por guardrail (ADR-0013): contam no total, não na taxa de erro
+    blocked_runs: int = 0
 
 
 class RunRepository:
@@ -49,6 +53,8 @@ class RunRepository:
         error: str | None = None,
         session_id: str | None = None,
         pending_tools: list[dict[str, Any]] | None = None,
+        blocked_by: str | None = None,
+        block_detail: dict[str, Any] | None = None,
     ) -> AgentRun:
         run = AgentRun(
             agent_config_id=agent_config_id,
@@ -59,6 +65,8 @@ class RunRepository:
             error=error,
             session_id=session_id,
             pending_tools=pending_tools,
+            blocked_by=blocked_by,
+            block_detail=block_detail,
         )
         self._session.add(run)
         self._session.flush()
@@ -75,6 +83,8 @@ class RunRepository:
         error: str | None = None,
         session_id: str | None = None,
         pending_tools: list[dict[str, Any]] | None = None,
+        blocked_by: str | None = None,
+        block_detail: dict[str, Any] | None = None,
     ) -> AgentRun:
         """Atualiza o run de mesmo run_id (pausado e retomado) ou cria um novo."""
         existing = None
@@ -94,10 +104,14 @@ class RunRepository:
                 error=error,
                 session_id=session_id,
                 pending_tools=pending_tools,
+                blocked_by=blocked_by,
+                block_detail=block_detail,
             )
         existing.status = status
         existing.error = error
         existing.pending_tools = pending_tools
+        existing.blocked_by = blocked_by
+        existing.block_detail = block_detail
         existing.session_id = session_id or existing.session_id
         if duration_ms is not None:
             existing.duration_ms = (existing.duration_ms or 0) + duration_ms
@@ -157,6 +171,7 @@ class RunRepository:
             select(
                 func.count(AgentRun.id).label("total"),
                 func.count(AgentRun.id).filter(AgentRun.status == "error").label("errors"),
+                func.count(AgentRun.id).filter(AgentRun.status == "blocked").label("blocked"),
             ).where(*base_filter)
         ).one()
 
@@ -178,6 +193,7 @@ class RunRepository:
         return RunMetrics(
             total_runs=total,
             error_rate=error_rate,
+            blocked_runs=int(stats.blocked),
             p50_ms=p50,
             p95_ms=p95,
             period_days=period_days,
@@ -200,6 +216,7 @@ class RunRepository:
                 AgentRun.agent_config_id,
                 func.count(AgentRun.id).label("total"),
                 func.count(AgentRun.id).filter(AgentRun.status == "error").label("errors"),
+                func.count(AgentRun.id).filter(AgentRun.status == "blocked").label("blocked"),
             )
             .where(*where_clauses)
             .group_by(AgentRun.agent_config_id)
@@ -210,6 +227,7 @@ class RunRepository:
                 agent_config_id=r.agent_config_id,
                 total_runs=int(r.total),
                 error_count=int(r.errors),
+                blocked_count=int(r.blocked),
             )
             for r in rows
         ]
@@ -231,6 +249,7 @@ class RunRepository:
             select(
                 func.count(AgentRun.id).label("total"),
                 func.count(AgentRun.id).filter(AgentRun.status == "error").label("errors"),
+                func.count(AgentRun.id).filter(AgentRun.status == "blocked").label("blocked"),
             ).where(*where_clauses)
         ).one()
 
@@ -252,6 +271,7 @@ class RunRepository:
         return RunMetrics(
             total_runs=total,
             error_rate=error_rate,
+            blocked_runs=int(stats.blocked),
             p50_ms=p50,
             p95_ms=p95,
             period_days=period_days,
@@ -276,6 +296,7 @@ class RunRepository:
                 day,
                 func.count(AgentRun.id).label("total"),
                 func.count(AgentRun.id).filter(AgentRun.status == "error").label("errors"),
+                func.count(AgentRun.id).filter(AgentRun.status == "blocked").label("blocked"),
                 func.percentile_cont(0.5).within_group(AgentRun.duration_ms).label("p50"),
                 func.percentile_cont(0.95).within_group(AgentRun.duration_ms).label("p95"),
             )
@@ -288,8 +309,28 @@ class RunRepository:
                 day=r.day,
                 total_runs=int(r.total),
                 error_count=int(r.errors),
+                blocked_count=int(r.blocked),
                 p50_ms=float(r.p50) if r.p50 is not None else None,
                 p95_ms=float(r.p95) if r.p95 is not None else None,
             )
             for r in rows
         ]
+
+    def blocked_by_rule(
+        self,
+        *,
+        since: datetime,
+        until: datetime | None = None,
+        config_id: UUID | None = None,
+    ) -> dict[str, int]:
+        where = [AgentRun.status == "blocked", AgentRun.created_at >= since]
+        if until is not None:
+            where.append(AgentRun.created_at <= until)
+        if config_id is not None:
+            where.append(AgentRun.agent_config_id == config_id)
+        rows = self._session.execute(
+            select(AgentRun.blocked_by, func.count(AgentRun.id))
+            .where(*where)
+            .group_by(AgentRun.blocked_by)
+        ).all()
+        return {str(rule or "desconhecido"): int(n) for rule, n in rows}

@@ -691,6 +691,11 @@ export interface components {
       total_runs: number;
       /** Error Rate */
       error_rate: number;
+      /**
+       * Blocked Runs
+       * @default 0
+       */
+      blocked_runs: number;
       /** Total Tokens */
       total_tokens: number;
       /** Total Cost */
@@ -811,6 +816,18 @@ export interface components {
       p95_ms: number | null;
       /** Period Days */
       period_days: number;
+      /**
+       * Blocked Runs
+       * @default 0
+       */
+      blocked_runs: number;
+      /**
+       * Blocked By
+       * @default {}
+       */
+      blocked_by: {
+        [key: string]: number;
+      };
     };
     /** AgentRunResponse */
     AgentRunResponse: {
@@ -834,6 +851,8 @@ export interface components {
       duration_ms: number | null;
       /** Error */
       error: string | null;
+      /** Blocked By */
+      blocked_by?: string | null;
       /**
        * Created At
        * Format: date-time
@@ -963,6 +982,11 @@ export interface components {
       total_runs: number;
       /** Error Count */
       error_count: number;
+      /**
+       * Blocked Count
+       * @default 0
+       */
+      blocked_count: number;
       /** P50 Ms */
       p50_ms: number | null;
       /** P95 Ms */
@@ -1002,6 +1026,18 @@ export interface components {
       total_runs: number;
       /** Error Rate */
       error_rate: number;
+      /**
+       * Blocked Runs
+       * @default 0
+       */
+      blocked_runs: number;
+      /**
+       * Blocked By
+       * @default {}
+       */
+      blocked_by: {
+        [key: string]: number;
+      };
       /** P50 Ms */
       p50_ms: number | null;
       /** P95 Ms */
