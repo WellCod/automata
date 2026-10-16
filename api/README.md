@@ -108,9 +108,10 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | `mcp_servers:write` | `POST`, `PUT` e `DELETE` em `/api/v1/mcp-servers` — só owner (`agent_os:admin`) |
 | `knowledge_bases:read` | `GET /api/v1/knowledge-bases`, `GET /api/v1/knowledge-bases/{id}`, `GET /api/v1/knowledge-bases/embedders`, `GET /api/v1/knowledge-bases/{id}/contents[/{content_id}]`, `POST /api/v1/knowledge-bases/{id}/search` |
 | `knowledge_bases:write` | `POST`, `PUT` e `DELETE` em `/api/v1/knowledge-bases`; `POST /contents/file`, `/url` e `/text` e `DELETE /contents/{content_id}` |
+| `users:admin` | `/api/v1/users` (listar, criar, alterar papel e situação, redefinir senha, remover) — só owner (`agent_os:admin`) |
 | `agent_os:admin` | `POST /api/v1/auth/users`; `integrations:write` (rotas `/api/v1/integrations`) só vem pelo admin |
 
-`POST /api/v1/auth/login` e `GET /health` são públicos.
+`POST /api/v1/auth/login` e `GET /health` são públicos. `GET /api/v1/me` vale para qualquer token e devolve id, e-mail e papel (token de integração volta só o `sub`).
 
 ### Papéis
 
@@ -121,6 +122,14 @@ Definidos em `ROLE_SCOPES` (`app/schemas/user.py`) e gravados no token no login.
 | `owner` | `agent_os:admin` |
 | `editor` | tudo do viewer + `agents:run`, `teams:run`, `sessions:write`, `configs:write`, `configs:publish`, `knowledge_bases:write` |
 | `viewer` | `agents:read`, `teams:read`, `sessions:read`, `traces:read`, `configs:read`, `metrics:read`, `mcp_servers:read`, `knowledge_bases:read` |
+
+### Gestão de usuários
+
+Página **Usuários** do painel, só para owner, sobre `/api/v1/users`:
+- Mudar papel, desativar ou redefinir senha grava `user_account.tokens_valid_after` e encerra na hora as sessões abertas: o `RevocationMiddleware` recusa token do usuário com `iat` anterior ao corte (cache de 30 s nos outros workers). O corte vale até o fim do segundo da mudança, porque `iat` é em segundos inteiros.
+- A instância precisa de ao menos um owner ativo: rebaixar ou desativar o último dá 409.
+- Remover exige usuário desativado (o corte de sessão acontece na desativação) e não vale para a própria conta.
+- `last_login_at` é gravado a cada login.
 
 ### Chaves
 
