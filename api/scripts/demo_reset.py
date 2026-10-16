@@ -12,6 +12,9 @@ from sqlalchemy.orm import Session
 from app.seed import seed_demo
 
 _TABLES = [
+    "embedding_usage",
+    "knowledge_content",
+    "knowledge_base",
     "usage_event",
     "agent_run",
     "agent_config_version",
@@ -53,6 +56,17 @@ def truncate_all(engine: Engine) -> list[str]:
         ).scalars()
         tables = _TABLES + [f'{_AGNO_SCHEMA}."{name}"' for name in sorted(existing)]
         conn.execute(text(f"TRUNCATE TABLE {', '.join(tables)} CASCADE"))
+        # vetores das bases de conhecimento: uma tabela por base, criada pelo Agno
+        vector_tables = conn.execute(
+            text(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = :schema AND table_name LIKE 'kb!_%' ESCAPE '!'"
+            ),
+            {"schema": _AGNO_SCHEMA},
+        ).scalars()
+        for name in sorted(vector_tables):
+            conn.execute(text(f'DROP TABLE IF EXISTS {_AGNO_SCHEMA}."{name}"'))
+            tables.append(f'{_AGNO_SCHEMA}."{name}"')
         conn.commit()
     return tables
 

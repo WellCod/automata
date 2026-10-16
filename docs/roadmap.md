@@ -791,18 +791,18 @@ Fica para depois: workflows (condições guardadas no banco exigem `cel-python`)
 
 ## Fase 13 — RAG (bases de conhecimento)
 
-Decisão em [ADR-0012](adr/0012-bases-de-conhecimento.md). Base de conhecimento é cadastro próprio, não versionado; o agente versiona só a ligação (`knowledge: [{base_id, max_results}]` no payload). Conteúdo e vetores no Agno (`Knowledge` + `PgVector`, tabela por base no schema `ai`), por rotas próprias em `/api/v1/knowledge-bases`. Embeddings da Voyage (`voyage-3.5`) por padrão, OpenAI como alternativa. PRs abertos contra a `main`, na ordem abaixo.
+Decisão em [ADR-0012](adr/0012-bases-de-conhecimento.md). Base de conhecimento é cadastro próprio, não versionado; o agente versiona só a ligação (`knowledge: [{base_id, max_results}]` no payload). Conteúdo e vetores no Agno (`Knowledge` + `PgVector`, tabela por base no schema `ai`), por rotas próprias em `/api/v1/knowledge-bases`. Embeddings da Voyage (`voyage-3.5`) por padrão, OpenAI como alternativa. #85 e #86 contra a `main`; #87 a #94 empilhados (base = branch do anterior), mergear na ordem com "Delete branch".
 
-- [ ] `docs(adr)`: ADR-0012 e esta seção
-- [x] `chore(infra)`: Postgres com pgvector (`pgvector/pgvector:pg17` nos compose e nos testes), migration `CREATE EXTENSION vector`, dependências (`pgvector`, `voyageai`, `pypdf`, `python-docx`, `beautifulsoup4`) e settings (`VOYAGE_API_KEY`, embedder padrão, limites de upload)
-- [x] `feat(api)`: cadastro de bases (`knowledge_base`, CRUD, papéis: editor escreve, viewer lê)
-- [x] `feat(api)`: ingestão de arquivo, URL e texto em background, com status, remoção, limites e SSRF na URL
-- [x] `feat(api)`: busca de teste na base (trechos e score, sem rodar agente)
-- [x] `feat(api)`: agentes e times usam bases (payload, factory, uma tool por base, bloco fixo nas instruções, aviso no linter, embedder determinístico no `DEMO_REPLAY`)
-- [x] `feat(web)`: página Conhecimento (bases, upload com arrastar e soltar, status, remoção, busca de teste)
-- [x] `feat(web)`: seleção de bases no agente e no time, e citações no modo teste e na árvore de execução
-- [x] `feat`: custo de embedding no metering, no estimador e no analytics
-- [ ] `test(api)`: evals de recuperação (pergunta com documento esperado entre os primeiros resultados) e seed da demo com base
+- [x] #85 — `docs(adr)`: ADR-0012 e esta seção
+- [x] #86 — `chore(infra)`: Postgres com pgvector (`pgvector/pgvector:pg17` nos compose e nos testes), migration `CREATE EXTENSION vector`, dependências (`pgvector`, `voyageai`, `pypdf`, `python-docx`, `beautifulsoup4`) e settings (`VOYAGE_API_KEY`, embedder padrão, limites de upload)
+- [x] #87 — `feat(api)`: cadastro de bases (`knowledge_base`, CRUD, papéis: editor escreve, viewer lê)
+- [x] #88 — `feat(api)`: ingestão de arquivo, URL e texto em background, com status, remoção, limites e SSRF na URL
+- [x] #89 — `feat(api)`: busca de teste na base (trechos e score, sem rodar agente)
+- [x] #90 — `feat(api)`: agentes e times usam bases (payload, factory, uma tool por base, bloco fixo nas instruções, aviso no linter, embedder determinístico no `DEMO_REPLAY`)
+- [x] #91 — `feat(web)`: página Conhecimento (bases, upload com arrastar e soltar, status, remoção, busca de teste)
+- [x] #92 — `feat(web)`: seleção de bases no agente e no time, e citações no modo teste e na árvore de execução
+- [x] #93 — `feat`: custo de embedding no metering, no estimador e no analytics
+- [x] #94 — `test(api)`: evals de recuperação (pergunta com documento esperado entre os primeiros resultados) e seed da demo com base
 
 **Critério de aceite da fase:** subir um PDF numa base, ligar a base a um agente, publicar e ver no modo teste uma resposta que cita o documento; remover o documento e a resposta deixar de citá-lo.
 

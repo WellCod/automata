@@ -47,6 +47,7 @@ A suite smoke testa a lógica do `ReliabilityEval` com `RunOutput` construído m
 Arquivos:
 - `tests/test_evals_smoke.py` — fixtures gravadas, sem LLM
 - `tests/test_evals_nightly.py` — evals com LLM real, marcados `@pytest.mark.nightly`
+- `tests/test_evals_retrieval.py` — recuperação das bases de conhecimento sobre os documentos e perguntas de `app/knowledge/demo_content.py`: o documento certo precisa voltar entre os 3 primeiros trechos. A versão literal roda em todo PR com o embedder local; a semântica (perguntas com outras palavras) roda na noturna com a Voyage, exige `VOYAGE_API_KEY` e aceita recall@3 de 80%.
 - `.github/workflows/evals-nightly.yml` — workflow agendado
 
 ## Metering
