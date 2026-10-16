@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
+import { InfoHint } from "@/components/ui/info-hint";
 import {
   ChartContainer,
   ChartLegend,
@@ -12,6 +13,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import client from "@/lib/api/client";
+import { LATENCY_HINTS } from "@/lib/metric-hints";
 import type { components } from "@/lib/api/schema.d.ts";
 
 type DailyMetricsPoint = components["schemas"]["DailyMetricsPoint"];
@@ -63,10 +65,21 @@ const axisProps = {
   fontSize: 11,
 } as const;
 
-function ChartFrame({ title, children }: { title: string; children: React.ReactNode }) {
+function ChartFrame({
+  title,
+  hints,
+  children,
+}: {
+  title: string;
+  hints?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <figure className="border-border bg-card flex flex-col gap-2 rounded border px-3 pt-2.5 pb-2">
-      <figcaption className="text-foreground text-[13px] font-medium">{title}</figcaption>
+      <figcaption className="flex items-center justify-between gap-2">
+        <span className="text-foreground text-[13px] font-medium">{title}</span>
+        {hints && <span className="flex items-center gap-3">{hints}</span>}
+      </figcaption>
       {children}
     </figure>
   );
@@ -206,7 +219,19 @@ export function MetricsCharts({ range, agentId }: Props) {
           </ChartContainer>
         </ChartFrame>
 
-        <ChartFrame title="Tempo de resposta">
+        <ChartFrame
+          title="Tempo de resposta"
+          hints={
+            <>
+              <InfoHint label="p50" ariaLabel="O que é p50">
+                {LATENCY_HINTS.p50}
+              </InfoHint>
+              <InfoHint label="p95" ariaLabel="O que é p95">
+                {LATENCY_HINTS.p95}
+              </InfoHint>
+            </>
+          }
+        >
           <ChartContainer config={latencyConfig} className="aspect-auto h-48 w-full">
             <LineChart data={rows}>
               <CartesianGrid vertical={false} />

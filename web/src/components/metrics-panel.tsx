@@ -4,8 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { MetricsCharts } from "@/components/metrics-charts";
 import { Button } from "@/components/ui/button";
+import { InfoHint } from "@/components/ui/info-hint";
 import client from "@/lib/api/client";
 import { blockedHint } from "@/lib/guardrail-labels";
+import { LATENCY_HINTS } from "@/lib/metric-hints";
 import type { components } from "@/lib/api/schema.d.ts";
 
 type AgentMetricsResponse = components["schemas"]["AgentMetricsResponse"];
@@ -32,10 +34,23 @@ function formatRate(rate: number): string {
   return `${(rate * 100).toFixed(1)}%`;
 }
 
-function MetricCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function MetricCard({
+  label,
+  value,
+  sub,
+  hint,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  hint?: string;
+}) {
   return (
     <div className="border-border bg-card flex flex-col gap-0.5 rounded border px-3 py-2.5">
-      <span className="text-muted-foreground text-[11px]">{label}</span>
+      <span className="text-muted-foreground flex items-center gap-1 text-[11px]">
+        {label}
+        {hint && <InfoHint ariaLabel={`O que é ${label}`}>{hint}</InfoHint>}
+      </span>
       <span className="text-foreground text-[20px] leading-tight font-semibold">{value}</span>
       {sub && <span className="text-muted-foreground text-[11px]">{sub}</span>}
     </div>
@@ -83,8 +98,8 @@ export function MetricsPanel({ agentId }: Props) {
             value={formatRate(data.error_rate)}
             sub={data.total_runs === 0 ? "sem dados" : undefined}
           />
-          <MetricCard label="Latência p50" value={formatMs(data.p50_ms)} />
-          <MetricCard label="Latência p95" value={formatMs(data.p95_ms)} />
+          <MetricCard label="Latência p50" value={formatMs(data.p50_ms)} hint={LATENCY_HINTS.p50} />
+          <MetricCard label="Latência p95" value={formatMs(data.p95_ms)} hint={LATENCY_HINTS.p95} />
           <MetricCard
             label="Bloqueios"
             value={String(data.blocked_runs ?? 0)}
