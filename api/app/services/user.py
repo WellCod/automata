@@ -1,3 +1,5 @@
+from contextlib import suppress
+
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 
@@ -5,6 +7,9 @@ from app.models.user import User, UserRole
 from app.repositories.user import UserRepository
 
 _ph = PasswordHasher()
+# Login com e-mail inexistente verifica contra este hash para gastar o mesmo
+# tempo de argon2 e não revelar pela latência quais contas existem
+_DUMMY_HASH = _ph.hash("automata-dummy-password")
 
 
 class UserService:
@@ -19,6 +24,8 @@ class UserService:
     def authenticate(self, email: str, password: str) -> User:
         user = self._repo.get_by_email(email)
         if user is None or not user.is_active:
+            with suppress(VerifyMismatchError):
+                _ph.verify(_DUMMY_HASH, password)
             raise ValueError("Credenciais inválidas")
         try:
             _ph.verify(user.hashed_password, password)

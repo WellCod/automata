@@ -20,6 +20,7 @@ from app.agents.registry import PublishedAgents
 from app.integrations import RevocationMiddleware, RevokedTokens
 from app.logging_config import configure_logging, request_id_var
 from app.mcp_auth import JWTMCPAuth
+from app.proxy import is_https
 from app.rate_limit import make_rate_limiter
 from app.routers import PROTECTED_ROUTERS
 from app.routers.auth import router as auth_router
@@ -36,7 +37,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        if request.url.scheme == "https":
+        if is_https(request):
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
 
@@ -90,7 +91,12 @@ def create_app(
     configure_logging(settings.log_level)
     db = PostgresDb(db_url=settings.database_url)
 
-    base = FastAPI(title="automata")
+    # Fora de dev o schema e as páginas de docs não são servidos; o export do
+    # OpenAPI para o painel usa app.openapi() direto (scripts/export_openapi.py)
+    docs: dict[str, str | None] = (
+        {} if settings.docs_enabled else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    )
+    base = FastAPI(title="automata", **docs)  # type: ignore[arg-type]
     for router in PROTECTED_ROUTERS:
         base.include_router(router)
     base.state.enforce_scopes = enable_auth
@@ -137,7 +143,7 @@ def create_app(
     # auth_router fica fora do middleware do Agno: /login precisa ser público
     # (não tem como exigir JWT para obter JWT). O /users tem proteção própria
     # via _require_admin que verifica JWT + scope agent_os:admin.
-    outer: FastAPI = FastAPI(title="automata")
+    outer: FastAPI = FastAPI(title="automata", **docs)  # type: ignore[arg-type]
     outer.state.rate_limiter = make_rate_limiter(settings.redis_url, limit=5, window=60)
     outer.add_middleware(SyncPublishedAgentsMiddleware, published=published)
     if enable_auth:

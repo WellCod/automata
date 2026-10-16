@@ -126,7 +126,8 @@ Guia completo em [`DEMO.md`](DEMO.md).
 | **BFF pattern** | Todos os requests ao AgentOS passam por Route Handlers server-side do Next.js. O token não toca o client-side. |
 | **Papéis e scopes** | `owner`, `editor`, `viewer` — toda rota, do AgentOS e própria (`/api/v1`), exige scope; viewer só lê. Tabela em [`api/README.md`](api/README.md#scopes-jwt). |
 | **Política de senha** | Comprimento mínimo, caracteres especiais, maiúscula e número — validados na API. |
-| **Headers de segurança** | `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`, `Referrer-Policy`, `Permissions-Policy`. |
+| **Headers de segurança** | `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`. `Strict-Transport-Security` na API (também atrás de proxy TLS em `TRUSTED_PROXIES`) e no painel em produção. O painel envia `Content-Security-Policy` com `frame-ancestors 'none'` e `connect-src 'self'`. |
+| **Superfície mínima** | `/docs`, `/redoc` e `/openapi.json` só com `APP_ENV=development`. Login com e-mail inexistente também roda argon2, para a latência não revelar contas. |
 | **Rate limiting** | Distribuído via Redis — login limitado por e-mail e por IP; `X-Forwarded-For` só vale de proxy em `TRUSTED_PROXIES`. |
 | **Secrets fora do bundle** | Teste no CI inspeciona o bundle compilado do Next.js à procura de padrões de chave. Build falha se encontrar. |
 

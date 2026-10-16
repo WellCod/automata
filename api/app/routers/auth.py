@@ -1,11 +1,11 @@
 import logging
-from ipaddress import IPv4Network, IPv6Network, ip_address, ip_network
 
 import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from app.auth import issue_token
 from app.db import SessionDep
+from app.proxy import get_client_ip
 from app.repositories.user import UserRepository
 from app.schemas.user import (
     ROLE_SCOPES,
@@ -21,36 +21,6 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
 
 _LOGIN_LIMIT_PER_IP = 20
-
-
-def _is_trusted(ip: str, networks: list[IPv4Network | IPv6Network]) -> bool:
-    try:
-        addr = ip_address(ip)
-    except ValueError:
-        return False
-    return any(addr in net for net in networks)
-
-
-def get_client_ip(request: Request) -> str:
-    """IP do cliente, honrando X-Forwarded-For só quando vem de proxy confiável.
-
-    Percorre o header da direita para a esquerda e devolve o primeiro hop que
-    não é proxy confiável: os valores à esquerda dele são do cliente e podem
-    ser forjados.
-    """
-    peer = request.client.host if request.client else "unknown"
-    networks = [
-        ip_network(p.strip(), strict=False)
-        for p in get_settings().trusted_proxies.split(",")
-        if p.strip()
-    ]
-    if not _is_trusted(peer, networks):
-        return peer
-    hops = [h.strip() for h in request.headers.get("X-Forwarded-For", "").split(",") if h.strip()]
-    for hop in reversed(hops):
-        if not _is_trusted(hop, networks):
-            return hop
-    return peer
 
 
 def _require_admin(authorization: str = Header(...)) -> None:

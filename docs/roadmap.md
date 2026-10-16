@@ -765,7 +765,8 @@ Fecha o que ficou aberto dos PRs 41 e 44.
 - [x] `fix(web)`: fonte (`--font-sans` circular), tema conforme `DESIGN.md`, versão ativa no histórico, confirmação de publicar/reverter, alterações não salvas, estados de erro
 - [x] `refactor(web)`: componentes shadcn (Button, Tabs, Field, Sonner) e nova página de edição
 - [x] `feat(web)`: gráficos no analytics e no desempenho do agente
-- [ ] Segurança restante: enumeração por tempo no login, revogação de token (`jti`), CSP/HSTS, `/docs` em produção, `.dockerignore` sem `.env`, `deploy.sh:184` montando senha em `bash -c`, reset da demo sem `agent_run` e sessões do Agno
+- [x] `fix(security)` restante: argon2 contra hash fixo no login (sem enumeração por tempo), CSP no painel e HSTS no painel e na API atrás de proxy confiável, `/docs` só com `APP_ENV=development`, `.dockerignore` sem `.env`, senha do seed fora da linha de comando no `deploy.sh`, reset da demo limpando `agent_run` e as tabelas do Agno
+- [ ] revogação de token (`jti`)
 
 ---
 

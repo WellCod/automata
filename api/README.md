@@ -21,15 +21,17 @@ Para desenvolvimento, a API roda em Docker junto com o banco. A partir da raiz d
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
-A API sobe em `http://localhost:8000` com hot-reload ativo. As migrations rodam automaticamente no boot: o `entrypoint.sh` roda `alembic upgrade head` e depois executa o `command:` do compose (sem ele, o `CMD` da imagem: uvicorn sem reload). Fora do override de dev a porta 8000 não é publicada.
+A API sobe em `http://localhost:8000` com hot-reload ativo e `APP_ENV=development`. As migrations rodam automaticamente no boot: o `entrypoint.sh` roda `alembic upgrade head` e depois executa o `command:` do compose (sem ele, o `CMD` da imagem: uvicorn sem reload). Fora do override de dev a porta 8000 não é publicada.
 
 Para rodar isolado (sem Docker), com banco já acessível via `DATABASE_URL`:
 
 ```bash
 cd api
 uv sync
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+APP_ENV=development uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
+
+`/docs`, `/redoc` e `/openapi.json` só existem com `APP_ENV=development`; o padrão é `production`, que os desliga. Os tipos do painel não dependem dessas rotas: `scripts/export_openapi.py` gera o schema com `app.openapi()`.
 
 ## Evals de confiabilidade
 
@@ -123,6 +125,12 @@ A chave privada (`JWT_PRIVATE_KEY`) existe só no processo da API, que emite os 
 ### Rate limit do login
 
 5 tentativas por minuto por e-mail e 20 por IP. O IP vem de `X-Forwarded-For` só quando a conexão chega de um proxy listado em `TRUSTED_PROXIES` (IPs ou CIDRs); o header é lido da direita para a esquerda e vale o primeiro hop fora da lista. Sem `TRUSTED_PROXIES`, vale o IP da conexão. O BFF repassa o IP do cliente na rota `/api/auth/login` e descarta cabeçalhos de encaminhamento vindos do browser no proxy genérico, que também recusa `v1/auth/login`.
+
+E-mail inexistente ou usuário inativo também passa pelo argon2, contra um hash fixo gerado no import de `app/services/user.py`: a latência do 401 não revela quais contas existem.
+
+### HSTS
+
+`Strict-Transport-Security` vai em toda resposta servida por HTTPS. Atrás de um proxy que termina o TLS, a conexão chega em HTTP; nesse caso vale o `X-Forwarded-Proto: https`, aceito só quando o peer está em `TRUSTED_PROXIES` (mesma regra do `X-Forwarded-For`, em `app/proxy.py`).
 
 ## Servidores MCP externos
 
