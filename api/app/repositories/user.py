@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -16,6 +18,24 @@ class UserRepository:
         self._session.add(user)
         self._session.flush()
         return user
+
+    def get(self, user_id: UUID) -> User | None:
+        return self._session.get(User, user_id)
+
+    def list_all(self) -> list[User]:
+        return list(self._session.scalars(select(User).order_by(User.email)))
+
+    def count_active_owners(self) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(User)
+            .where(User.role == UserRole.owner, User.is_active.is_(True))
+        )
+        return int(self._session.scalar(stmt) or 0)
+
+    def delete(self, user: User) -> None:
+        self._session.delete(user)
+        self._session.flush()
 
     def count(self) -> int:
         result = self._session.scalar(select(func.count()).select_from(User))

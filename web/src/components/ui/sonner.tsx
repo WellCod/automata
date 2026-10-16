@@ -1,6 +1,7 @@
 "use client";
 
 import { Toaster as Sonner, type ToasterProps } from "sonner";
+import { useTheme } from "@/components/layout/theme";
 import {
   CircleCheckIcon,
   InfoIcon,
@@ -9,16 +10,17 @@ import {
   Loader2Icon,
 } from "lucide-react";
 
-// Tema único (DESIGN.md): sem next-themes
+// segue o tema escolhido no painel, sem next-themes
 const Toaster = ({ ...props }: ToasterProps) => {
+  const { resolved } = useTheme();
   return (
     <Sonner
-      theme="dark"
+      theme={resolved}
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="text-accent size-4" />,
         info: <InfoIcon className="size-4" />,
-        warning: <TriangleAlertIcon className="size-4 text-amber-400" />,
+        warning: <TriangleAlertIcon className="size-4 text-amber-600 dark:text-amber-400" />,
         error: <OctagonXIcon className="text-destructive size-4" />,
         loading: <Loader2Icon className="size-4 animate-spin" />,
       }}

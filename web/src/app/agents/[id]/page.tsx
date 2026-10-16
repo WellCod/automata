@@ -18,6 +18,7 @@ import { ModelSelector } from "@/components/model-selector";
 import { RunsPanel } from "@/components/runs-panel";
 import { TestPanel } from "@/components/test-panel";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/status-badge";
 import {
   Field,
   FieldError,
@@ -92,31 +93,15 @@ const textareaCls = `${inputCls} min-h-24 resize-y`;
 function StatusBadge({ data }: { data: AgentConfigDetail | undefined }) {
   if (!data) return null;
   if (data.current_version && data.draft_version) {
-    return (
-      <span className="text-[11px] font-medium tracking-[0.05em] text-amber-400 uppercase">
-        rascunho pendente
-      </span>
-    );
+    return <Badge tone="pending">Rascunho pendente</Badge>;
   }
   if (data.current_version) {
-    return (
-      <span className="text-accent text-[11px] font-medium tracking-[0.05em] uppercase">
-        v{data.current_version.version_number} ativo
-      </span>
-    );
+    return <Badge tone="active">v{data.current_version.version_number} ativa</Badge>;
   }
   if (data.draft_version) {
-    return (
-      <span className="text-[11px] font-medium tracking-[0.05em] text-amber-400 uppercase">
-        rascunho
-      </span>
-    );
+    return <Badge tone="pending">Rascunho</Badge>;
   }
-  return (
-    <span className="text-muted-foreground text-[11px] font-medium tracking-[0.05em] uppercase">
-      sem versão
-    </span>
-  );
+  return <Badge tone="neutral">Sem versão</Badge>;
 }
 
 // Publicar o agente muda o comportamento destes times (ADR-0011)
@@ -269,7 +254,7 @@ export default function AgentEditPage() {
           <Button onClick={() => void refetch()}>Tentar de novo</Button>
           <Link
             href="/"
-            className="border-border text-muted-foreground hover:text-foreground inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors"
+            className="border-border text-muted-foreground hover:text-foreground inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium transition-colors"
           >
             Voltar
           </Link>
@@ -308,7 +293,7 @@ export default function AgentEditPage() {
         </div>
         <div className="flex items-center gap-3">
           {isDirty && !mutation.isPending && (
-            <span className="text-[11px] tracking-[0.05em] text-amber-400 uppercase">
+            <span className="text-[11px] text-amber-600 dark:text-amber-400">
               Alterações não salvas
             </span>
           )}
@@ -456,9 +441,7 @@ export default function AgentEditPage() {
         >
           <div className="border-border flex h-9 items-center gap-1.5 border-b px-4">
             <FlaskConical className="text-muted-foreground h-3.5 w-3.5" />
-            <h2 className="text-foreground text-[11px] font-medium tracking-[0.05em] uppercase">
-              Testar
-            </h2>
+            <h2 className="text-foreground text-[11px] font-medium">Testar</h2>
           </div>
           <div className="p-4">
             <TestPanel agentId={id} draftVersionId={data?.draft_version?.id} defaultOpen />
