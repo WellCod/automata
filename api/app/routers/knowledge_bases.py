@@ -10,6 +10,7 @@ from app.db import SessionDep
 from app.knowledge.embedders import EMBEDDERS, is_configured
 from app.knowledge.search import search_base
 from app.models.knowledge_base import KnowledgeBase
+from app.repositories.embedding_usage import EmbeddingTotals, EmbeddingUsageRepository
 from app.repositories.knowledge_base import KnowledgeBaseRepository
 from app.schemas.knowledge_base import (
     EmbedderInfo,
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 _WRITE = [Depends(require_scopes(Scope.KNOWLEDGE_WRITE))]
 
 
-def to_response(b: KnowledgeBase) -> KnowledgeBaseResponse:
+def to_response(b: KnowledgeBase, usage: EmbeddingTotals | None = None) -> KnowledgeBaseResponse:
     return KnowledgeBaseResponse(
         id=b.id,
         name=b.name,
@@ -41,6 +42,8 @@ def to_response(b: KnowledgeBase) -> KnowledgeBaseResponse:
         embedder_model=b.embedder_model,
         dimensions=b.dimensions,
         chunk_size=b.chunk_size,
+        embedding_tokens=usage.tokens if usage else 0,
+        embedding_cost=usage.cost if usage else None,
         updated_by=b.updated_by,
         created_at=b.created_at,
         updated_at=b.updated_at,
@@ -75,12 +78,16 @@ def list_embedders() -> list[EmbedderInfo]:
 
 @router.get("", response_model=list[KnowledgeBaseResponse])
 def list_bases(session: SessionDep) -> list[KnowledgeBaseResponse]:
-    return [to_response(b) for b in KnowledgeBaseRepository(session).list_all()]
+    bases = KnowledgeBaseRepository(session).list_all()
+    usage = EmbeddingUsageRepository(session).by_base([b.id for b in bases])
+    return [to_response(b, usage.get(b.id)) for b in bases]
 
 
 @router.get("/{base_id}", response_model=KnowledgeBaseResponse)
 def get_base(base_id: UUID, session: SessionDep) -> KnowledgeBaseResponse:
-    return to_response(_get_or_404(KnowledgeBaseRepository(session), base_id))
+    base = _get_or_404(KnowledgeBaseRepository(session), base_id)
+    usage = EmbeddingUsageRepository(session).by_base([base.id])
+    return to_response(base, usage.get(base.id))
 
 
 @router.post("", response_model=KnowledgeBaseResponse, status_code=201, dependencies=_WRITE)

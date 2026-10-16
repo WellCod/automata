@@ -1,4 +1,5 @@
 from app.models.config import AgentConfig, AgentConfigVersion, Base
+from app.models.embedding_usage import EmbeddingUsage
 from app.models.integration import IntegrationToken
 from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_content import KnowledgeContent
@@ -13,6 +14,7 @@ __all__ = [
     "AgentConfigVersion",
     "AgentRun",
     "Base",
+    "EmbeddingUsage",
     "IntegrationToken",
     "KnowledgeBase",
     "KnowledgeContent",

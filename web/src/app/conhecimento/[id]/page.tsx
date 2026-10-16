@@ -475,6 +475,19 @@ function Settings({ base }: { base: KnowledgeBase }) {
             {base.embedder_model} · {base.dimensions} dimensões
           </dd>
         </div>
+        <div>
+          <dt className="text-[var(--text-label)]">Consumo de embeddings</dt>
+          <dd className="text-foreground">
+            {base.embedding_tokens.toLocaleString("pt-BR")} tokens ·{" "}
+            {base.embedding_cost === null || base.embedding_cost === undefined
+              ? "—"
+              : base.embedding_cost.toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "USD",
+                  maximumFractionDigits: 4,
+                })}
+          </dd>
+        </div>
       </dl>
       <div className="border-border flex items-center justify-between gap-2 border-t pt-4">
         {confirmDelete ? (

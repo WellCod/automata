@@ -238,7 +238,11 @@ export default function AnalyticsPage() {
           <SummaryCard
             label="Custo estimado"
             value={formatCost(summary.total_cost)}
-            hint="baseado no consumo de tokens"
+            hint={
+              summary.embedding_tokens > 0
+                ? `modelos; + ${formatCost(summary.embedding_cost ?? null)} em embeddings (${formatTokens(summary.embedding_tokens)} tokens)`
+                : "baseado no consumo de tokens"
+            }
           />
         </div>
       )}

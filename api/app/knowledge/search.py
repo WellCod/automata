@@ -7,9 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_engine
-from app.knowledge.runtime import vector_db_for
+from app.knowledge.runtime import metered, vector_db_for
 from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_content import KnowledgeContent
+from app.repositories.embedding_usage import record_embedding_usage
 
 
 @dataclass
@@ -21,14 +22,25 @@ class Hit:
     score: float | None
 
 
-def search_base(base: KnowledgeBase, query: str, limit: int) -> list[Hit]:
-    vector_db = vector_db_for(base)
+def search_base(
+    base: KnowledgeBase, query: str, limit: int, *, agent_config_id: UUID | None = None
+) -> list[Hit]:
+    vector_db = vector_db_for(base, "query")
     if not vector_db.table_exists():
         return []
     # o search do PgVector engole falha do embedder e devolve vazio, que o agente
-    # leria como "nada sobre isso"; embedar antes faz a falha aparecer
-    vector_db.embedder.get_embedding_and_usage(query)
+    # leria como "nada sobre isso"; embedar antes faz a falha aparecer (e o
+    # MeteredEmbedder devolve o mesmo vetor ao search, sem segunda chamada)
+    embedder = metered(vector_db)
+    embedder.get_embedding_and_usage(query)
     docs = vector_db.search(query, limit=limit)
+    record_embedding_usage(
+        base_id=base.id,
+        model=base.embedder_model,
+        tokens=embedder.tokens,
+        kind="search",
+        agent_config_id=agent_config_id,
+    )
     ids: set[UUID] = set()
     for doc in docs:
         raw = (doc.meta_data or {}).get("content_id")

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.repositories.config import ConfigRepository
+from app.repositories.embedding_usage import EmbeddingUsageRepository
 from app.repositories.run import AgentRunSummary, DailyRunStats, RunRepository
 from app.repositories.usage import AgentUsageSummary, DailyUsage, UsageRepository
 
@@ -24,6 +25,9 @@ class GlobalMetricsSummary(BaseModel):
     p95_ms: float | None
     total_tokens: int
     total_cost: float | None
+    # embeddings de bases de conhecimento: ingestão e buscas (ADR-0012), fora do total_cost
+    embedding_tokens: int = 0
+    embedding_cost: float | None = None
     period_days: int
 
 
@@ -114,6 +118,7 @@ def get_summary(
 
     usage_repo = UsageRepository(session)
     usage = usage_repo.usage_summary(since=since, until=until, period_days=period_days)
+    embeddings = EmbeddingUsageRepository(session).summary(since=since, until=until)
 
     return GlobalMetricsSummary(
         total_runs=metrics.total_runs,
@@ -122,6 +127,8 @@ def get_summary(
         p95_ms=metrics.p95_ms,
         total_tokens=usage.total_tokens,
         total_cost=usage.total_cost,
+        embedding_tokens=embeddings.tokens,
+        embedding_cost=embeddings.cost,
         period_days=period_days,
     )
 

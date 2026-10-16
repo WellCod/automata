@@ -15,14 +15,16 @@ from agno.knowledge.chunking.recursive import RecursiveChunking
 from agno.knowledge.document.base import Document
 from agno.knowledge.reader.base import Reader
 from agno.knowledge.reader.reader_factory import ReaderFactory
+from agno.vectordb.pgvector import PgVector
 from bs4 import BeautifulSoup
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.db import get_engine
-from app.knowledge.runtime import vector_db_for
+from app.knowledge.runtime import metered, vector_db_for
 from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_content import KnowledgeContent
+from app.repositories.embedding_usage import record_embedding_usage
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +104,8 @@ def remove_chunks(base: KnowledgeBase, content_id: UUID) -> None:
 
 def ingest(content_id: UUID, data: bytes) -> None:
     """Processa o conteúdo já registrado como processing. Nunca levanta: grava a falha."""
+    base: KnowledgeBase | None = None
+    vector_db: PgVector | None = None
     try:
         with Session(get_engine()) as session:
             content = session.get(KnowledgeContent, content_id)
@@ -113,7 +117,8 @@ def ingest(content_id: UUID, data: bytes) -> None:
         vector_db = vector_db_for(base)
         vector_db.create()
         # o insert do PgVector loga e pula trecho cujo embedding falha; embedar o
-        # primeiro aqui faz o erro real (chave inválida, cota) virar a mensagem
+        # primeiro aqui faz o erro real (chave inválida, cota) virar a mensagem.
+        # O MeteredEmbedder guarda esse vetor: o insert não paga de novo
         docs[0].embed(vector_db.embedder)
         for doc in docs:
             doc.content_id = str(content_id)
@@ -135,6 +140,18 @@ def ingest(content_id: UUID, data: bytes) -> None:
     except Exception as exc:
         logger.warning("ingestão falhou", extra={"content_id": str(content_id), "error": str(exc)})
         _finish(content_id, status="failed", message=str(exc)[:_MAX_MESSAGE])
+    finally:
+        # cobra também o que foi gasto antes de uma falha no meio
+        if base is not None and vector_db is not None:
+            try:
+                record_embedding_usage(
+                    base_id=base.id,
+                    model=base.embedder_model,
+                    tokens=metered(vector_db).tokens,
+                    kind="ingest",
+                )
+            except Exception as exc:
+                logger.warning("falha ao registrar consumo", extra={"error": str(exc)})
 
 
 def fail_stale(now: datetime | None = None) -> int:

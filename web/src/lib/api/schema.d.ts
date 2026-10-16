@@ -936,6 +936,13 @@ export interface components {
       total_tokens: number;
       /** Total Cost */
       total_cost: number | null;
+      /**
+       * Embedding Tokens
+       * @default 0
+       */
+      embedding_tokens: number;
+      /** Embedding Cost */
+      embedding_cost?: number | null;
       /** Period Days */
       period_days: number;
     };
@@ -1094,6 +1101,13 @@ export interface components {
       dimensions: number;
       /** Chunk Size */
       chunk_size: number;
+      /**
+       * Embedding Tokens
+       * @default 0
+       */
+      embedding_tokens: number;
+      /** Embedding Cost */
+      embedding_cost?: number | null;
       /** Updated By */
       updated_by: string;
       /**
@@ -1332,6 +1346,13 @@ export interface components {
       total_tokens: number;
       /** Cost */
       cost: number | null;
+      /**
+       * Embedding Tokens
+       * @default 0
+       */
+      embedding_tokens: number;
+      /** Embedding Cost */
+      embedding_cost?: number | null;
     };
     /** RunTrace */
     RunTrace: {

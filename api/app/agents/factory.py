@@ -69,7 +69,7 @@ def load_version(config_id: UUID, version_id: UUID | None) -> ResolvedVersion:
             payload=payload,
             mcp_tools=_mcp_tools_for(session, payload),
             bases=[b for b, _ in bases],
-            knowledge_tools=[knowledge_tool(b, n) for b, n in bases],
+            knowledge_tools=[knowledge_tool(b, n, config_id) for b, n in bases],
         )
 
 

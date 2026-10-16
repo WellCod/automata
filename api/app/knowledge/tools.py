@@ -7,6 +7,7 @@ agente, e com o nome da base na tool o modelo escolhe onde buscar.
 import asyncio
 import json
 import logging
+from uuid import UUID
 
 from agno.tools.function import Function
 
@@ -22,7 +23,9 @@ def tool_name(base: KnowledgeBase) -> str:
     return f"{TOOL_PREFIX}{base.slug}"
 
 
-def knowledge_tool(base: KnowledgeBase, max_results: int) -> Function:
+def knowledge_tool(
+    base: KnowledgeBase, max_results: int, agent_config_id: UUID | None = None
+) -> Function:
     async def buscar(pergunta: str) -> str:
         """Busca trechos na base de conhecimento.
 
@@ -30,7 +33,9 @@ def knowledge_tool(base: KnowledgeBase, max_results: int) -> Function:
             pergunta: o que procurar, em linguagem natural.
         """
         try:
-            hits = await asyncio.to_thread(search_base, base, pergunta, max_results)
+            hits = await asyncio.to_thread(
+                search_base, base, pergunta, max_results, agent_config_id=agent_config_id
+            )
         except Exception as exc:
             logger.warning(
                 "busca do agente falhou", extra={"base_id": str(base.id), "error": str(exc)}
