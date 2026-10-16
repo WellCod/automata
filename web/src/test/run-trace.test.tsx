@@ -52,6 +52,32 @@ describe("RunTrace", () => {
     expect(screen.getByText(/3 etapas/)).toBeInTheDocument();
   });
 
+  it("mostra os documentos consultados numa busca em base", async () => {
+    const output = JSON.stringify({
+      base: "RH",
+      trechos: [{ documento: "ferias", fonte: "ferias.pdf", content_id: "c1", texto: "x" }],
+    });
+    vi.mocked(client.GET).mockResolvedValue({
+      data: {
+        trace_id: "t",
+        run_id: "r2",
+        status: "OK",
+        duration: "1s",
+        total_spans: 2,
+        error_count: 0,
+        tree: [span("1", "AGENT", "rh.arun", [{ ...span("2", "TOOL", "buscar_rh"), output }])],
+      },
+      error: undefined,
+      response: { status: 200 },
+    } as never);
+
+    render(<RunTrace runId="r2" />, { wrapper });
+    expect(await screen.findByText("buscar_rh")).toBeInTheDocument();
+    expect(
+      screen.getByText((_, el) => el?.tagName === "P" && el.textContent === "fontes: ferias"),
+    ).toBeInTheDocument();
+  });
+
   it("explica quando não há trace", async () => {
     vi.mocked(client.GET).mockResolvedValue({
       data: undefined,

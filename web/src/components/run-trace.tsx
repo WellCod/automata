@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
+import { mergeSources, sourcesFromTool } from "@/lib/knowledge-sources";
 
 type TraceSpan = components["schemas"]["TraceSpan"];
 
@@ -17,6 +18,11 @@ const TYPE_LABEL: Record<string, string> = {
 function SpanNode({ span }: { span: TraceSpan }) {
   const failed = span.status === "ERROR";
   const children = span.spans ?? [];
+  // busca em base de conhecimento: a saída é o JSON da tool; vale mostrar os documentos
+  const sources =
+    span.type === "TOOL"
+      ? mergeSources([], sourcesFromTool({ tool_name: span.name, result: span.output }))
+      : [];
   return (
     <li className="flex flex-col gap-1">
       <details className="group">
@@ -35,6 +41,12 @@ function SpanNode({ span }: { span: TraceSpan }) {
             <p className="text-muted-foreground line-clamp-6 whitespace-pre-wrap">
               <span className="text-foreground">entrada: </span>
               {span.input}
+            </p>
+          )}
+          {sources.length > 0 && (
+            <p className="text-muted-foreground">
+              <span className="text-foreground">fontes: </span>
+              {sources.map((src) => src.documento).join(", ")}
             </p>
           )}
           {span.output && (

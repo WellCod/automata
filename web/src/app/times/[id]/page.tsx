@@ -8,6 +8,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useId, useMemo, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
+import { KnowledgeSelector } from "@/components/knowledge-selector";
 import { McpToolsSelector } from "@/components/mcp-tools-selector";
 import { MetricsPanel } from "@/components/metrics-panel";
 import { ModelSelector } from "@/components/model-selector";
@@ -65,6 +66,9 @@ const schema = z.object({
       tools: z.array(z.string()).nullable(),
       require_confirmation: z.array(z.string()),
     }),
+  ),
+  knowledge: z.array(
+    z.object({ base_id: z.string(), max_results: z.number().int().min(1).max(20) }),
   ),
   team: z.object({
     mode: z.enum(["coordinate", "route", "broadcast", "tasks"]),
@@ -129,6 +133,7 @@ export default function TeamEditPage() {
       capabilities: EMPTY_CAPS,
       instructions: { persona: "", situation: "", tone: "", objective: "", guardrails: "" },
       mcp_servers: [],
+      knowledge: [],
       team: {
         mode: "coordinate",
         members: [],
@@ -161,6 +166,10 @@ export default function TeamEditPage() {
         tools: b.tools ?? null,
         require_confirmation: b.require_confirmation ?? [],
       })),
+      knowledge: (p?.knowledge ?? []).map((k) => ({
+        base_id: k.base_id,
+        max_results: k.max_results ?? 5,
+      })),
       team: {
         mode: p?.team?.mode ?? "coordinate",
         members: (p?.team?.members ?? []).map((m) => ({
@@ -186,8 +195,7 @@ export default function TeamEditPage() {
             instructions: values.instructions,
             mcp_servers: values.mcp_servers,
             capabilities: values.capabilities,
-            // o painel ainda não edita bases: preserva as ligadas pela API
-            knowledge: data?.payload?.knowledge ?? [],
+            knowledge: values.knowledge,
             metadata: data?.payload?.metadata ?? {},
             team: values.team,
           },
@@ -377,6 +385,14 @@ export default function TeamEditPage() {
               control={form.control}
               render={({ field }) => (
                 <McpToolsSelector value={field.value} onChange={field.onChange} />
+              )}
+            />
+
+            <Controller
+              name="knowledge"
+              control={form.control}
+              render={({ field }) => (
+                <KnowledgeSelector value={field.value} onChange={field.onChange} />
               )}
             />
           </form>
