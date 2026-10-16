@@ -25,11 +25,13 @@ describe("AnalyticsPage", () => {
     expect(await screen.findByText("Erro ao carregar o resumo do período.")).toBeInTheDocument();
     expect(screen.getByText("Erro ao carregar o uso por agente.")).toBeInTheDocument();
     expect(screen.queryByText("Conversas")).not.toBeInTheDocument();
+    expect(screen.getByText("Erro ao carregar os gráficos.")).toBeInTheDocument();
   });
 
   it("mostra o resumo quando a API responde", async () => {
     vi.mocked(client.GET).mockImplementation(async (path: string) => {
       if (path.includes("by-agent")) return { data: [], error: undefined } as never;
+      if (path.includes("timeseries")) return { data: [], error: undefined } as never;
       return {
         data: {
           total_runs: 42,

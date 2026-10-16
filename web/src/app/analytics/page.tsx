@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
+import { MetricsCharts } from "@/components/metrics-charts";
 import { Button } from "@/components/ui/button";
 
 type GlobalMetricsSummary = components["schemas"]["GlobalMetricsSummary"];
@@ -241,6 +242,10 @@ export default function AnalyticsPage() {
           />
         </div>
       )}
+
+      <div className="mb-8">
+        <MetricsCharts range={summaryQuery} />
+      </div>
 
       <div>
         <h2 className="text-foreground mb-3 text-[13px] font-medium">

@@ -73,8 +73,10 @@
   --input: #1e1e1e;
   --ring: #25e0c8;
   --radius: 4px;
-  --chart-1: #25e0c8;
-  --chart-2: #8a8a8a;
+  /* séries validadas (OKLCH L 0.48–0.67, CVD ΔE ≥ 12) contra --card; o accent é claro demais para marca */
+  --chart-1: #14a394;
+  --chart-2: #d95926;
+  --chart-error: #d03b3b;
   --chart-3: #4a4a4a;
   --chart-4: #2a2a2a;
   --chart-5: #1a1a1a;

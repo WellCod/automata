@@ -43,8 +43,9 @@ lado, visível em qualquer aba.
 
 ### Analytics
 
-Conversas, taxa de falha, latência típica e de pico, tokens e custo estimado —
-com o mesmo recorte por agente.
+Conversas, taxa de falha, latência típica e de pico, tokens e custo estimado,
+com gráficos diários de conversas (sucesso e erro), tempo de resposta e custo.
+A aba Desempenho de cada agente mostra os mesmos gráficos filtrados por ele.
 
 ![Painel de analytics](docs/img/analytics.png)
 

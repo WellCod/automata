@@ -1,14 +1,14 @@
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.repositories.config import ConfigRepository
-from app.repositories.run import AgentRunSummary, RunRepository
-from app.repositories.usage import AgentUsageSummary, UsageRepository
+from app.repositories.run import AgentRunSummary, DailyRunStats, RunRepository
+from app.repositories.usage import AgentUsageSummary, DailyUsage, UsageRepository
 
 router = APIRouter(
     prefix="/api/v1/metrics",
@@ -34,6 +34,48 @@ class AgentBreakdownItem(BaseModel):
     error_rate: float
     total_tokens: int
     total_cost: float | None
+
+
+MAX_SERIES_DAYS = 366
+
+
+class DailyMetricsPoint(BaseModel):
+    date: date
+    total_runs: int
+    error_count: int
+    p50_ms: float | None
+    p95_ms: float | None
+    total_tokens: int
+    total_cost: float | None
+
+
+def build_series(
+    first: date,
+    last: date,
+    runs: list[DailyRunStats],
+    usage: list[DailyUsage],
+) -> list[DailyMetricsPoint]:
+    """Um ponto por dia de first a last; dia sem dado vem zerado (latência e custo nulos)."""
+    runs_by_day = {r.day: r for r in runs}
+    usage_by_day = {u.day: u for u in usage}
+    points = []
+    day = first
+    while day <= last:
+        run = runs_by_day.get(day)
+        use = usage_by_day.get(day)
+        points.append(
+            DailyMetricsPoint(
+                date=day,
+                total_runs=run.total_runs if run else 0,
+                error_count=run.error_count if run else 0,
+                p50_ms=run.p50_ms if run else None,
+                p95_ms=run.p95_ms if run else None,
+                total_tokens=use.total_tokens if use else 0,
+                total_cost=use.total_cost if use else None,
+            )
+        )
+        day += timedelta(days=1)
+    return points
 
 
 def _parse_period(period: str) -> int:
@@ -127,3 +169,20 @@ def get_by_agent(
             )
         )
     return items
+
+
+@router.get("/timeseries", response_model=list[DailyMetricsPoint])
+def get_timeseries(
+    session: SessionDep,
+    period: str = Query(default="30d", pattern=r"^\d+d$"),  # noqa: B008
+    start: date | None = Query(default=None),  # noqa: B008
+    end: date | None = Query(default=None),  # noqa: B008
+    agent_id: UUID | None = Query(default=None),  # noqa: B008
+) -> list[DailyMetricsPoint]:
+    since, until, _ = _resolve_range(period, start, end)
+    last = (until or datetime.now(UTC)).date()
+    if (last - since.date()).days > MAX_SERIES_DAYS:
+        raise HTTPException(status_code=422, detail=f"Série limitada a {MAX_SERIES_DAYS} dias")
+    runs = RunRepository(session).daily(since=since, until=until, config_id=agent_id)
+    usage = UsageRepository(session).daily(since=since, until=until, agent_config_id=agent_id)
+    return build_series(since.date(), last, runs, usage)

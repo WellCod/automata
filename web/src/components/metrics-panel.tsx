@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { MetricsCharts } from "@/components/metrics-charts";
 import { Button } from "@/components/ui/button";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
@@ -85,6 +86,8 @@ export function MetricsPanel({ agentId }: Props) {
           <MetricCard label="Latência p95" value={formatMs(data.p95_ms)} />
         </div>
       )}
+
+      <MetricsCharts range={{ period }} agentId={agentId} />
     </div>
   );
 }

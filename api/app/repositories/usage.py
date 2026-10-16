@@ -1,9 +1,9 @@
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import Date, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.models.usage import UsageEvent
@@ -18,6 +18,13 @@ class UsageSummary:
 @dataclass
 class AgentUsageSummary:
     agent_config_id: UUID
+    total_tokens: int
+    total_cost: float | None
+
+
+@dataclass
+class DailyUsage:
+    day: date
     total_tokens: int
     total_cost: float | None
 
@@ -115,6 +122,38 @@ class UsageRepository:
         return [
             AgentUsageSummary(
                 agent_config_id=r.agent_config_id,
+                total_tokens=int(r.tokens or 0),
+                total_cost=float(r.cost) if isinstance(r.cost, Decimal) else r.cost,
+            )
+            for r in rows
+        ]
+
+    def daily(
+        self,
+        *,
+        since: datetime,
+        until: datetime | None = None,
+        agent_config_id: UUID | None = None,
+    ) -> list[DailyUsage]:
+        day = cast(func.timezone("UTC", UsageEvent.created_at), Date).label("day")
+        where_clauses = [UsageEvent.created_at >= since]
+        if until is not None:
+            where_clauses.append(UsageEvent.created_at <= until)
+        if agent_config_id is not None:
+            where_clauses.append(UsageEvent.agent_config_id == agent_config_id)
+        rows = self._session.execute(
+            select(
+                day,
+                func.sum(UsageEvent.total_tokens).label("tokens"),
+                func.sum(UsageEvent.cost).label("cost"),
+            )
+            .where(*where_clauses)
+            .group_by(day)
+            .order_by(day)
+        ).all()
+        return [
+            DailyUsage(
+                day=r.day,
                 total_tokens=int(r.tokens or 0),
                 total_cost=float(r.cost) if isinstance(r.cost, Decimal) else r.cost,
             )
