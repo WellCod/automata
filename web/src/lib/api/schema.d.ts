@@ -228,6 +228,92 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/knowledge-bases/{base_id}/contents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Contents */
+    get: operations["list_contents_api_v1_knowledge_bases__base_id__contents_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge-bases/{base_id}/contents/{content_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Content */
+    get: operations["get_content_api_v1_knowledge_bases__base_id__contents__content_id__get"];
+    put?: never;
+    post?: never;
+    /** Delete Content */
+    delete: operations["delete_content_api_v1_knowledge_bases__base_id__contents__content_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge-bases/{base_id}/contents/file": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Upload File */
+    post: operations["upload_file_api_v1_knowledge_bases__base_id__contents_file_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge-bases/{base_id}/contents/url": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Add Url */
+    post: operations["add_url_api_v1_knowledge_bases__base_id__contents_url_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge-bases/{base_id}/contents/text": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Add Text */
+    post: operations["add_text_api_v1_knowledge_bases__base_id__contents_text_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/models/capabilities": {
     parameters: {
       query?: never;
@@ -684,6 +770,13 @@ export interface components {
       /** Tools */
       tools: components["schemas"]["PendingTool"][];
     };
+    /** Body_upload_file_api_v1_knowledge_bases__base_id__contents_file_post */
+    Body_upload_file_api_v1_knowledge_bases__base_id__contents_file_post: {
+      /** File */
+      file: string;
+      /** Name */
+      name?: string | null;
+    };
     /** CapabilityFlags */
     CapabilityFlags: {
       /**
@@ -1009,6 +1102,53 @@ export interface components {
        */
       chunk_size: number;
     };
+    /** KnowledgeContentResponse */
+    KnowledgeContentResponse: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Base Id
+       * Format: uuid
+       */
+      base_id: string;
+      /** Name */
+      name: string;
+      /**
+       * Source Type
+       * @enum {string}
+       */
+      source_type: "file" | "url" | "text";
+      /** Source */
+      source: string;
+      /** Extension */
+      extension: string;
+      /** Size Bytes */
+      size_bytes: number;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "processing" | "completed" | "failed";
+      /** Status Message */
+      status_message: string | null;
+      /** Chunk Count */
+      chunk_count: number;
+      /** Created By */
+      created_by: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+    };
     /** LintWarning */
     LintWarning: {
       /** Section */
@@ -1217,6 +1357,13 @@ export interface components {
        */
       share_member_interactions: boolean;
     };
+    /** TextContentInput */
+    TextContentInput: {
+      /** Name */
+      name: string;
+      /** Text */
+      text: string;
+    };
     /** TokenResponse */
     TokenResponse: {
       /** Access Token */
@@ -1257,6 +1404,16 @@ export interface components {
       error?: string | null;
       /** Spans */
       spans?: components["schemas"]["TraceSpan"][];
+    };
+    /** UrlContentInput */
+    UrlContentInput: {
+      /**
+       * Url
+       * Format: uri
+       */
+      url: string;
+      /** Name */
+      name?: string | null;
     };
     /** UserResponse */
     UserResponse: {
@@ -1837,6 +1994,204 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_contents_api_v1_knowledge_bases__base_id__contents_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["KnowledgeContentResponse"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_content_api_v1_knowledge_bases__base_id__contents__content_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+        content_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["KnowledgeContentResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_content_api_v1_knowledge_bases__base_id__contents__content_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+        content_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  upload_file_api_v1_knowledge_bases__base_id__contents_file_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_upload_file_api_v1_knowledge_bases__base_id__contents_file_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["KnowledgeContentResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  add_url_api_v1_knowledge_bases__base_id__contents_url_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UrlContentInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["KnowledgeContentResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  add_text_api_v1_knowledge_bases__base_id__contents_text_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TextContentInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["KnowledgeContentResponse"];
+        };
       };
       /** @description Validation Error */
       422: {

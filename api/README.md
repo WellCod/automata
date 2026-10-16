@@ -104,8 +104,8 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | `metrics:read` | `GET /api/v1/configs/{id}/runs`, `GET /api/v1/configs/{id}/metrics`, `GET /api/v1/metrics/*`, `GET /api/v1/usage/rollup`, `GET /api/v1/approvals`, `GET /api/v1/runs/{run_id}/trace` (este só para o dono do run ou owner) |
 | `mcp_servers:read` | `GET /api/v1/mcp-servers`, `GET /api/v1/mcp-servers/{id}` |
 | `mcp_servers:write` | `POST`, `PUT` e `DELETE` em `/api/v1/mcp-servers` — só owner (`agent_os:admin`) |
-| `knowledge_bases:read` | `GET /api/v1/knowledge-bases`, `GET /api/v1/knowledge-bases/{id}`, `GET /api/v1/knowledge-bases/embedders` |
-| `knowledge_bases:write` | `POST`, `PUT` e `DELETE` em `/api/v1/knowledge-bases` |
+| `knowledge_bases:read` | `GET /api/v1/knowledge-bases`, `GET /api/v1/knowledge-bases/{id}`, `GET /api/v1/knowledge-bases/embedders`, `GET /api/v1/knowledge-bases/{id}/contents[/{content_id}]` |
+| `knowledge_bases:write` | `POST`, `PUT` e `DELETE` em `/api/v1/knowledge-bases`; `POST /contents/file`, `/url` e `/text` e `DELETE /contents/{content_id}` |
 | `agent_os:admin` | `POST /api/v1/auth/users`; `integrations:write` (rotas `/api/v1/integrations`) só vem pelo admin |
 
 `POST /api/v1/auth/login` e `GET /health` são públicos.
@@ -191,7 +191,14 @@ Fase 13 ([ADR-0012](../docs/adr/0012-bases-de-conhecimento.md)). Ingestão, busc
 
 - **Cadastro** (`/api/v1/knowledge-bases`): nome, slug (vira o nome da tool de busca do agente e não muda depois), descrição (o agente lê para decidir quando buscar) e tamanho de trecho (vale para novas ingestões). O embedder é escolhido na criação, com padrão em `KNOWLEDGE_DEFAULT_EMBEDDER`, e fica fixo com modelo e dimensões: trocar exige recriar a base. Criar com embedder sem chave dá 422 dizendo qual variável falta; `DEMO_REPLAY=true` libera sem chave.
 - `GET /api/v1/knowledge-bases/embedders` lista os embedders, se a chave está configurada e qual é o padrão, para o painel.
-- Cada base tem a própria tabela de vetores no schema `ai` (`kb_<id>`), criada pelo Agno na primeira ingestão. Remover a base apaga a tabela.
+- Cada base tem a própria tabela de vetores no schema `ai` (`kb_<id>`), criada pelo Agno na primeira ingestão. Remover a base apaga a tabela e os conteúdos.
+- **Conteúdo** (`/api/v1/knowledge-bases/{id}/contents`): `POST /file` (multipart, extensões de `KNOWLEDGE_ALLOWED_EXTENSIONS`, até `KNOWLEDGE_MAX_UPLOAD_MB`; 415 e 413 fora disso), `POST /url` e `POST /text` respondem 202 com o conteúdo em `processing`. Uma thread da própria API lê, quebra em trechos (recursivo, `chunk_size` da base com 10% de sobreposição), gera os embeddings e grava; o estado vira `completed` (com `chunk_count`) ou `failed` com o motivo. `GET` lista e lê o estado; `DELETE` apaga os trechos e o registro.
+- O estado fica em `knowledge_content`, não no `contents_db` do Agno. Cada trecho leva `content_id` e `source` no metadado, o que permite apagar por documento e citar a fonte.
+- O `insert` do PgVector pula em silêncio trecho cujo embedding falha. A ingestão embeda o primeiro trecho antes, para o erro real (chave inválida, cota) virar a mensagem, e confere a contagem depois: faltou trecho, apaga o que entrou e marca falha.
+- URL: checagem de SSRF dos servidores MCP (ADR-0010) ao receber e de novo a cada redirect, seguido à mão (até 3). Tipos aceitos pelo `Content-Type`: PDF, DOCX, Markdown, texto, CSV, JSON e HTML; HTML vira texto sem script, estilo, menu e rodapé.
+- Restart no meio deixa o conteúdo em `processing`; no boot, o que está assim há mais de 30 minutos vira `failed` ("reenvie").
+- Busca híbrida (vetor + full-text em português) no PgVector.
+- `DEMO_REPLAY=true` usa um embedder local por hash de palavras, sem chave nem rede. Serve para a demo e os testes, não para produção.
 
 - Postgres com a extensão `vector`: os compose e o testcontainers usam `pgvector/pgvector:pg17` (mesmo Postgres 17, volume existente continua válido). O `PgVector` do Agno roda `CREATE EXTENSION IF NOT EXISTS vector` ao criar a tabela da base, então o usuário do banco precisa poder criar extensão; em Postgres gerenciado (Railway, RDS), habilite `vector` antes.
 - Embedder por base, escolhido na criação: `voyage` (padrão, `voyage-3.5`, 1024 dimensões, lê `VOYAGE_API_KEY`) ou `openai` (lê `OPENAI_API_KEY`). A Voyage dá 200M tokens grátis por conta e cobra depois.

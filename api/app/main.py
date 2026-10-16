@@ -18,6 +18,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.agents.factory import make_agent_factory, make_team_factory
 from app.agents.registry import PublishedAgents
 from app.integrations import RevocationMiddleware, RevokedTokens
+from app.knowledge.ingest import fail_stale
 from app.logging_config import configure_logging, request_id_var
 from app.mcp_auth import JWTMCPAuth
 from app.proxy import is_https
@@ -82,6 +83,17 @@ class SyncPublishedAgentsMiddleware(BaseHTTPMiddleware):
         return response
 
 
+def _fail_stale_ingestions() -> None:
+    # banco fora do ar no boot não pode impedir a API de subir (o /health acusa)
+    try:
+        failed = fail_stale()
+    except Exception as exc:
+        logger.warning("falha ao revisar ingestões presas", extra={"error": str(exc)})
+        return
+    if failed:
+        logger.warning("ingestões interrompidas marcadas como falha", extra={"count": failed})
+
+
 def create_app(
     auto_provision_dbs: bool = True,
     enable_auth: bool = True,
@@ -119,6 +131,7 @@ def create_app(
         make_team_factory=lambda config_id: make_team_factory(config_id, db),
     )
     published.sync()
+    _fail_stale_ingestions()
     base.state.published_agents = published
     base.state.agno_db = db if settings.tracing_enabled else None
     revoked = RevokedTokens()
