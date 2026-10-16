@@ -133,7 +133,7 @@ Se uma tela parecer "espaçosa", há espaço demais.
 
 Recharts via `ChartContainer` do shadcn (`src/components/ui/chart.tsx`), em `src/components/metrics-charts.tsx`.
 
-- Séries: `--chart-1` `#14A394` e `--chart-2` `#D95926`; erro em `--chart-error` `#D03B3B`. O accent `#25E0C8`
+- Séries: `--chart-1` `#14A394` e `--chart-2` `#D95926`; erro em `--chart-error` `#D03B3B`; bloqueio por guardrail em `--chart-blocked` `#C98500`. O accent `#25E0C8`
   é claro demais para marca de dados no fundo escuro (OKLCH L 0.82, fora da faixa 0.48–0.67); as três
   cores passam no validador de paleta contra `--card` (CVD ΔE ≥ 12, contraste ≥ 3:1).
 - Um eixo por gráfico; medidas de escala diferente vão em gráficos separados.

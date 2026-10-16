@@ -26,6 +26,7 @@ interface Props {
 // Cores validadas para o fundo do card (#141414): ver DESIGN.md, seção Gráficos
 const runsConfig = {
   success: { label: "Sucesso", color: "var(--chart-1)" },
+  blocked: { label: "Bloqueado", color: "var(--chart-blocked)" },
   errors: { label: "Erro", color: "var(--chart-error)" },
 } satisfies ChartConfig;
 
@@ -81,14 +82,16 @@ function SeriesTable({ points }: { points: DailyMetricsPoint[] }) {
         <table className="w-full">
           <thead>
             <tr className="border-border bg-card border-b">
-              {["Dia", "Conversas", "Erros", "p50", "p95", "Tokens", "Custo"].map((h) => (
-                <th
-                  key={h}
-                  className="text-muted-foreground px-3 py-1.5 text-right font-medium first:text-left"
-                >
-                  {h}
-                </th>
-              ))}
+              {["Dia", "Conversas", "Erros", "Bloqueios", "p50", "p95", "Tokens", "Custo"].map(
+                (h) => (
+                  <th
+                    key={h}
+                    className="text-muted-foreground px-3 py-1.5 text-right font-medium first:text-left"
+                  >
+                    {h}
+                  </th>
+                ),
+              )}
             </tr>
           </thead>
           <tbody>
@@ -97,6 +100,7 @@ function SeriesTable({ points }: { points: DailyMetricsPoint[] }) {
                 <td className="text-foreground px-3 py-1 text-left">{dayLabel(p.date)}</td>
                 <td className="text-foreground px-3 py-1 text-right">{p.total_runs}</td>
                 <td className="text-foreground px-3 py-1 text-right">{p.error_count}</td>
+                <td className="text-foreground px-3 py-1 text-right">{p.blocked_count ?? 0}</td>
                 <td className="text-foreground px-3 py-1 text-right">
                   {p.p50_ms === null ? "—" : formatMs(p.p50_ms)}
                 </td>
@@ -157,7 +161,8 @@ export function MetricsCharts({ range, agentId }: Props) {
 
   const rows = data.map((p) => ({
     date: p.date,
-    success: p.total_runs - p.error_count,
+    success: p.total_runs - p.error_count - (p.blocked_count ?? 0),
+    blocked: p.blocked_count ?? 0,
     errors: p.error_count,
     p50: p.p50_ms,
     p95: p.p95_ms,
@@ -183,6 +188,12 @@ export function MetricsCharts({ range, agentId }: Props) {
                 dataKey="success"
                 stackId="runs"
                 fill="var(--color-success)"
+              />
+              <Bar
+                isAnimationActive={false}
+                dataKey="blocked"
+                stackId="runs"
+                fill="var(--color-blocked)"
               />
               <Bar
                 isAnimationActive={false}
