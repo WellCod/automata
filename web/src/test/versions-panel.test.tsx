@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { VersionsPanel } from "@/components/versions-panel";
@@ -77,7 +77,7 @@ describe("VersionsPanel", () => {
   });
 
   it("exibe a lista de versões", async () => {
-    render(<VersionsPanel agentId={AGENT_ID} />, { wrapper });
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v2" />, { wrapper });
     await waitFor(() => {
       expect(screen.getByText("v3")).toBeInTheDocument();
     });
@@ -86,7 +86,7 @@ describe("VersionsPanel", () => {
   });
 
   it("exibe botão publicar quando há rascunho", async () => {
-    render(<VersionsPanel agentId={AGENT_ID} />, { wrapper });
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v2" />, { wrapper });
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /publicar/i })).toBeInTheDocument();
     });
@@ -97,7 +97,7 @@ describe("VersionsPanel", () => {
       data: [mockVersions[1], mockVersions[2]],
       error: undefined,
     } as never);
-    render(<VersionsPanel agentId={AGENT_ID} />, { wrapper });
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v2" />, { wrapper });
     await waitFor(() => {
       expect(screen.getByText("v2")).toBeInTheDocument();
     });
@@ -105,25 +105,27 @@ describe("VersionsPanel", () => {
   });
 
   it("exibe diff de campos alterados no rascunho", async () => {
-    render(<VersionsPanel agentId={AGENT_ID} />, { wrapper });
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v2" />, { wrapper });
     await waitFor(() => {
       expect(screen.getByText(/modelo:/i)).toBeInTheDocument();
     });
   });
 
   it("exibe botão reverter em versão publicada anterior", async () => {
-    render(<VersionsPanel agentId={AGENT_ID} />, { wrapper });
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v2" />, { wrapper });
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /reverter/i })).toBeInTheDocument();
     });
   });
 
   it("chama publish ao clicar em publicar rascunho", async () => {
-    render(<VersionsPanel agentId={AGENT_ID} />, { wrapper });
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v2" />, { wrapper });
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /publicar/i })).toBeInTheDocument();
     });
-    await userEvent.click(screen.getByRole("button", { name: /publicar/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^publicar$/i }));
+    expect(client.POST).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: /confirmar publicação/i }));
     await waitFor(() => {
       expect(client.POST).toHaveBeenCalledWith(
         "/api/v1/configs/{config_id}/publish",
@@ -133,11 +135,13 @@ describe("VersionsPanel", () => {
   });
 
   it("chama rollback ao clicar em reverter", async () => {
-    render(<VersionsPanel agentId={AGENT_ID} />, { wrapper });
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v2" />, { wrapper });
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /reverter/i })).toBeInTheDocument();
     });
     await userEvent.click(screen.getByRole("button", { name: /reverter/i }));
+    expect(client.POST).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: /confirmar reversão/i }));
     await waitFor(() => {
       expect(client.POST).toHaveBeenCalledWith(
         "/api/v1/configs/{config_id}/rollback",
@@ -149,9 +153,35 @@ describe("VersionsPanel", () => {
     });
   });
 
+  it("cancelar a confirmação não publica", async () => {
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v2" />, { wrapper });
+    await userEvent.click(await screen.findByRole("button", { name: /^publicar$/i }));
+    await userEvent.click(screen.getByRole("button", { name: /cancelar/i }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(client.POST).not.toHaveBeenCalled();
+  });
+
+  it("avisa que alterações não salvas ficam fora da publicação", async () => {
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v2" hasUnsavedChanges />, {
+      wrapper,
+    });
+    await userEvent.click(await screen.findByRole("button", { name: /^publicar$/i }));
+    expect(screen.getByText(/alterações não salvas/i)).toBeInTheDocument();
+  });
+
+  it("usa a versão ativa do agente, não a publicada mais recente", async () => {
+    // depois de reverter para v1, v2 continua publicada mas não está ativa
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v1" />, { wrapper });
+    const v1 = (await screen.findByText("v1")).closest("li")!;
+    const v2 = screen.getByText("v2").closest("li")!;
+    expect(within(v1).getByText(/ativa/i)).toBeInTheDocument();
+    expect(within(v1).queryByRole("button", { name: /reverter/i })).not.toBeInTheDocument();
+    expect(within(v2).getByRole("button", { name: /reverter/i })).toBeInTheDocument();
+  });
+
   it("exibe estado de lista vazia", async () => {
     vi.mocked(client.GET).mockResolvedValue({ data: [], error: undefined } as never);
-    render(<VersionsPanel agentId={AGENT_ID} />, { wrapper });
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v2" />, { wrapper });
     await waitFor(() => {
       expect(screen.getByText("Nenhuma versão salva.")).toBeInTheDocument();
     });
@@ -162,7 +192,7 @@ describe("VersionsPanel", () => {
       data: undefined,
       error: { detail: "erro" },
     } as never);
-    render(<VersionsPanel agentId={AGENT_ID} />, { wrapper });
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v2" />, { wrapper });
     await waitFor(() => {
       expect(screen.getByText("Erro ao carregar versões.")).toBeInTheDocument();
     });

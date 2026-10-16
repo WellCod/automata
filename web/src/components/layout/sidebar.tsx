@@ -1,22 +1,10 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import {
-  BarChart3,
-  KeyRound,
-  LayoutGrid,
-  LogOut,
-  Moon,
-  Plug,
-  ShieldCheck,
-  Sun,
-  Users,
-} from "lucide-react";
+import { BarChart3, KeyRound, LayoutGrid, LogOut, Plug, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
-import { useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { usePendingApprovals } from "@/lib/api/approvals";
-import { useTheme } from "./theme-provider";
 
 const navItems = [
   { href: "/", label: "Agentes", icon: LayoutGrid, exact: true },
@@ -41,15 +29,8 @@ function LogoMark() {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { theme, toggle } = useTheme();
   const router = useRouter();
   const { data: pending } = usePendingApprovals();
-  const isClient = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
-  const isDark = isClient && theme === "dark";
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -95,14 +76,6 @@ export function Sidebar() {
           v0.1
         </span>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label={isDark ? "Mudar para tema claro" : "Mudar para tema escuro"}
-            className="text-muted-foreground hover:border-border hover:text-foreground focus-visible:ring-ring/50 flex h-6 w-6 items-center justify-center rounded border border-transparent transition-colors focus-visible:ring-2 focus-visible:outline-none"
-          >
-            {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-          </button>
           <button
             type="button"
             onClick={() => void handleLogout()}
