@@ -16,6 +16,7 @@ _VIEWER_SCOPES = [
     Scope.CONFIGS_READ,
     Scope.METRICS_READ,
     Scope.MCP_SERVERS_READ,
+    Scope.KNOWLEDGE_READ,
 ]
 
 ROLE_SCOPES: dict[UserRole, list[str]] = {
@@ -27,6 +28,7 @@ ROLE_SCOPES: dict[UserRole, list[str]] = {
         "sessions:write",
         Scope.CONFIGS_WRITE,
         Scope.CONFIGS_PUBLISH,
+        Scope.KNOWLEDGE_WRITE,
     ],
     UserRole.viewer: _VIEWER_SCOPES,
 }
