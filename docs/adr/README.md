@@ -37,3 +37,4 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0009](0009-superficie-de-integracao.md) | MCP server mode e REST como superfície de integração | Aceito |
 | [0010](0010-servidores-mcp-externos.md) | Servidores MCP externos como cadastro operacional, segredo cifrado e só HTTP | Aceito |
 | [0011](0011-times-versionados.md) | Times multi-agente na mesma tabela de configs, membros por referência | Aceito |
+| [0012](0012-bases-de-conhecimento.md) | Bases de conhecimento como cadastro próprio, pgvector e embeddings da Voyage | Aceito |

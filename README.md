@@ -208,6 +208,7 @@ Cada decisão relevante está documentada em [`docs/adr/`](docs/adr/) com contex
 | [ADR-0009](docs/adr/0009-superficie-de-integracao.md) | REST e MCP server mode como superfície de integração — descrição de agente vira contrato |
 | [ADR-0010](docs/adr/0010-servidores-mcp-externos.md) | Servidores MCP externos — cadastro não versionado, segredo cifrado, só HTTP e falha visível |
 | [ADR-0011](docs/adr/0011-times-versionados.md) | Times multi-agente na mesma tabela de configs, com membros seguindo a versão vigente |
+| [ADR-0012](docs/adr/0012-bases-de-conhecimento.md) | Bases de conhecimento (RAG) — cadastro não versionado, pgvector no Postgres existente e embeddings da Voyage |
 
 ---
 
@@ -291,7 +292,7 @@ web/
   src/app/      rotas e Route Handlers (BFF)
   src/components/
   src/lib/      client openapi-fetch, hooks, utils
-docs/adr/       9 Architecture Decision Records
+docs/adr/       12 Architecture Decision Records
 DEMO.md         guia de demo local sem credencial de LLM
 ```
 

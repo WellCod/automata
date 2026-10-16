@@ -786,3 +786,24 @@ Decisões em [ADR-0009](adr/0009-superficie-de-integracao.md), [ADR-0010](adr/00
 - [ ] #78 — `feat`: árvore de execução
 
 Fica para depois: workflows (condições guardadas no banco exigem `cel-python`), agendamentos (a factory recebe o run sem claims do usuário), guardrails por agente e A2A (exige `a2a-sdk` e não lista agentes de factory).
+
+---
+
+## Fase 13 — RAG (bases de conhecimento)
+
+Decisão em [ADR-0012](adr/0012-bases-de-conhecimento.md). Base de conhecimento é cadastro próprio, não versionado; o agente versiona só a ligação (`knowledge: [{base_id, max_results}]` no payload). Conteúdo e vetores no Agno (`Knowledge` + `PgVector`, tabela por base no schema `ai`), por rotas próprias em `/api/v1/knowledge-bases`. Embeddings da Voyage (`voyage-3.5`) por padrão, OpenAI como alternativa. PRs abertos contra a `main`, na ordem abaixo.
+
+- [ ] `docs(adr)`: ADR-0012 e esta seção
+- [ ] `chore(infra)`: Postgres com pgvector (`pgvector/pgvector:pg17` nos compose e nos testes), migration `CREATE EXTENSION vector`, dependências (`pgvector`, `voyageai`, `pypdf`, `python-docx`, `beautifulsoup4`) e settings (`VOYAGE_API_KEY`, embedder padrão, limites de upload)
+- [ ] `feat(api)`: cadastro de bases (`knowledge_base`, CRUD, papéis: editor escreve, viewer lê)
+- [ ] `feat(api)`: ingestão de arquivo, URL e texto em background, com status, remoção, limites e SSRF na URL
+- [ ] `feat(api)`: busca de teste na base (trechos e score, sem rodar agente)
+- [ ] `feat(api)`: agentes e times usam bases (payload, factory, uma tool por base, bloco fixo nas instruções, aviso no linter, embedder determinístico no `DEMO_REPLAY`)
+- [ ] `feat(web)`: página Conhecimento (bases, upload com arrastar e soltar, status, remoção, busca de teste)
+- [ ] `feat(web)`: seleção de bases no agente e no time, e citações no modo teste e na árvore de execução
+- [ ] `feat`: custo de embedding no metering, no estimador e no analytics
+- [ ] `test(api)`: evals de recuperação (pergunta com documento esperado entre os primeiros resultados) e seed da demo com base
+
+**Critério de aceite da fase:** subir um PDF numa base, ligar a base a um agente, publicar e ver no modo teste uma resposta que cita o documento; remover o documento e a resposta deixar de citá-lo.
+
+Fica para depois: conectores remotos (S3, SharePoint, GitHub, já no Agno), reranker, filtros escolhidos pelo modelo (`enable_agentic_knowledge_filters`), reindexação agendada de URL e worker de ingestão separado.
