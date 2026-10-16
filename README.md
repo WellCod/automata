@@ -245,7 +245,9 @@ bash scripts/bootstrap.sh   # gera chaves RSA, cria .env, instala deps e sobe o 
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
-API disponível em `http://localhost:8000`. Migrations rodam automaticamente no boot.
+API disponível em `http://localhost:8000`. Migrations rodam automaticamente no boot. A porta 8000 só é publicada pelo override de dev; em `docker-compose.yml` (produção) e `docker-compose.demo.yml` a API fica só na rede do compose e o painel fala com ela por `http://api:8000`.
+
+Painel em container, com hot-reload, em vez do terminal 2: `docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile docker-web up`.
 
 **Terminal 2 — Painel:**
 ```bash

@@ -21,7 +21,7 @@ Para desenvolvimento, a API roda em Docker junto com o banco. A partir da raiz d
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
-A API sobe em `http://localhost:8000` com hot-reload ativo. As migrations rodam automaticamente no boot via `alembic upgrade head`.
+A API sobe em `http://localhost:8000` com hot-reload ativo. As migrations rodam automaticamente no boot: o `entrypoint.sh` roda `alembic upgrade head` e depois executa o `command:` do compose (sem ele, o `CMD` da imagem: uvicorn sem reload). Fora do override de dev a porta 8000 não é publicada.
 
 Para rodar isolado (sem Docker), com banco já acessível via `DATABASE_URL`:
 
