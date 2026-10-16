@@ -6,6 +6,7 @@ import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import type { McpServer } from "@/components/mcp-tools-selector";
 import { Button } from "@/components/ui/button";
+import { PasswordInput } from "@/components/ui/password-input";
 
 const schema = z.object({
   name: z.string().min(1, "Nome obrigatório").max(255),
@@ -186,9 +187,8 @@ export function McpServerForm({ server, pending, error, onSubmit, onCancel }: Pr
                   aria-label={`Nome do header ${index + 1}`}
                   className={inputCls}
                 />
-                <input
+                <PasswordInput
                   {...form.register(`headers.${index}.value`)}
-                  type="password"
                   autoComplete="off"
                   placeholder="Bearer …"
                   aria-label={`Valor do header ${index + 1}`}

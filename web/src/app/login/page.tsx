@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { PasswordInput } from "@/components/ui/password-input";
 
 const schema = z.object({
   email: z.string().email("Email inválido"),
@@ -87,10 +88,9 @@ export default function LoginPage() {
             <label htmlFor="password" className="text-foreground text-[13px] font-medium">
               Senha
             </label>
-            <input
+            <PasswordInput
               {...form.register("password")}
               id="password"
-              type="password"
               autoComplete="current-password"
               className={inputCls}
             />
