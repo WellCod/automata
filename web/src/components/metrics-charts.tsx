@@ -74,7 +74,7 @@ function ChartFrame({ title, children }: { title: string; children: React.ReactN
 function SeriesTable({ points }: { points: DailyMetricsPoint[] }) {
   return (
     <details className="text-[13px]">
-      <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-[11px] tracking-[0.05em] uppercase">
+      <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-[11px]">
         Ver tabela
       </summary>
       <div className="border-border mt-2 max-h-72 overflow-auto rounded border">

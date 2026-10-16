@@ -14,9 +14,9 @@ interface Props {
 }
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
-  success: <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-500" />,
-  error: <XCircle className="h-3.5 w-3.5 shrink-0 text-red-400" />,
-  paused: <PauseCircle className="h-3.5 w-3.5 shrink-0 text-amber-400" />,
+  success: <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-500" />,
+  error: <XCircle className="text-destructive h-3.5 w-3.5 shrink-0" />,
+  paused: <PauseCircle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />,
   cancelled: <Ban className="text-muted-foreground h-3.5 w-3.5 shrink-0" />,
 };
 
@@ -107,7 +107,7 @@ export function RunsPanel({ agentId }: Props) {
   });
 
   if (isPending) return <p className="text-muted-foreground text-[13px]">Carregando…</p>;
-  if (isError) return <p className="text-[13px] text-red-400">Falha ao carregar execuções.</p>;
+  if (isError) return <p className="text-destructive text-[13px]">Falha ao carregar execuções.</p>;
 
   if (data.items.length === 0)
     return <p className="text-muted-foreground text-[13px]">Nenhuma execução registrada.</p>;

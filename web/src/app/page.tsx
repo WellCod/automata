@@ -72,11 +72,11 @@ function NewAgentInline({ onCancel }: { onCancel: () => void }) {
       <button
         type="button"
         onClick={onCancel}
-        className="text-muted-foreground hover:text-foreground text-[10px] tracking-[0.05em] uppercase transition-colors"
+        className="text-muted-foreground hover:text-foreground text-[11px] transition-colors"
       >
         Cancelar
       </button>
-      {mutation.isError && <span className="text-destructive text-[10px]">Erro ao criar</span>}
+      {mutation.isError && <span className="text-destructive text-[11px]">Erro ao criar</span>}
     </form>
   );
 }
