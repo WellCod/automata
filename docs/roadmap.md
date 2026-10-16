@@ -812,15 +812,15 @@ Fica para depois: conectores remotos (S3, SharePoint, GitHub, já no Agno), rera
 
 ## Fase 14 — Guardrails por agente
 
-Decisão em [ADR-0013](adr/0013-guardrails-por-agente.md). Guardrails entram no payload versionado do agente (`guardrails`), viram `pre_hooks` e `post_hooks` do Agno na factory e são implementações próprias de `BaseGuardrail`: os prontos do Agno só têm padrões dos EUA e lista de injeção em inglês. Run bloqueado ganha status `blocked` e motivo em `agent_run`, fora da taxa de falha.
+Decisão em [ADR-0013](adr/0013-guardrails-por-agente.md). Guardrails entram no payload versionado do agente (`guardrails`), viram `pre_hooks` e `post_hooks` do Agno na factory e são implementações próprias de `BaseGuardrail`: os prontos do Agno só têm padrões dos EUA e lista de injeção em inglês. Run bloqueado ganha status `blocked` e motivo em `agent_run`, fora da taxa de falha. #95 contra a `main`; #96 a #103 empilhados (base = branch do anterior), mergear na ordem com "Delete branch". O #98 e o #97 (gestão de usuários) criam migrations `0016`: o segundo a entrar vira `0017`.
 
-- [x] `docs(adr)`: ADR-0013 e esta seção
-- [x] `feat(api)`: seção `guardrails` no payload e regras de entrada — dados pessoais (CPF e CNPJ com dígito verificador, cartão com Luhn, e-mail, telefone BR; bloquear ou mascarar, mascarando também o input gravado quando bloqueia), injeção de prompt em PT e EN com termos extras, tópicos proibidos, tamanho máximo e moderação opcional da OpenAI (400 ao salvar sem `OPENAI_API_KEY`); factory aplica no agente, no líder e nos membros; mensagem de bloqueio configurável
-- [x] `feat(api)`: status `blocked` e `blocked_by` em `agent_run` (migration), tracking lendo o `error_id` do bloqueio no stream e no não-stream, analytics e métricas por agente separando bloqueio de falha
-- [x] `feat(api)`: guardrail de saída (dados pessoais e termos proibidos na resposta); troca a resposta no não-stream e marca o run no stream
-- [x] `feat(web)`: seção Guardrails na aba Configuração do agente e do time, com aviso sobre moderação e sobre saída em stream; modo teste mostra qual regra bloqueou
-- [x] `feat(web)`: bloqueios por motivo no analytics, no desempenho do agente e na lista de execuções
-- [ ] `test(api)`: evals de guardrails — casos de PII brasileira, injeção em PT e EN e falsos positivos conhecidos (número de pedido, "prompt do sistema" em contexto legítimo)
+- [x] #95 — `docs(adr)`: ADR-0013 e esta seção
+- [x] #96 — `feat(api)`: seção `guardrails` no payload e regras de entrada — dados pessoais (CPF e CNPJ com dígito verificador, cartão com Luhn, e-mail, telefone BR; bloquear ou mascarar, mascarando também o input gravado quando bloqueia), injeção de prompt em PT e EN com termos extras, tópicos proibidos, tamanho máximo e moderação opcional da OpenAI (400 ao salvar sem `OPENAI_API_KEY`); factory aplica no agente, no líder e nos membros; mensagem de bloqueio configurável
+- [x] #98 — `feat(api)`: status `blocked` e `blocked_by` em `agent_run` (migration), tracking lendo o `error_id` do bloqueio no stream e no não-stream, analytics e métricas por agente separando bloqueio de falha
+- [x] #99 — `feat(api)`: guardrail de saída (dados pessoais e termos proibidos na resposta); troca a resposta no não-stream e marca o run no stream
+- [x] #101 — `feat(web)`: seção Guardrails na aba Configuração do agente e do time, com aviso sobre moderação e sobre saída em stream; modo teste mostra qual regra bloqueou
+- [x] #102 — `feat(web)`: bloqueios por motivo no analytics, no desempenho do agente e na lista de execuções
+- [x] #103 — `test(api)`: evals de guardrails — casos de PII brasileira, injeção em PT e EN e falsos positivos conhecidos (número de pedido, "prompt do sistema" em contexto legítimo)
 
 **Critério de aceite da fase:** ligar dados pessoais em modo bloquear num agente, publicar, mandar uma mensagem com CPF válido e ver o bloqueio no modo teste com o motivo, sem token gasto, com a sessão gravada mascarada e o run contado em bloqueios, não em falhas; a mesma mensagem com um número de pedido de 11 dígitos passa.
 
