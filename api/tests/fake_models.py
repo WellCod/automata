@@ -96,3 +96,22 @@ class DelegatingModel(ReplayModel):
 
     async def ainvoke_stream(self, *args: Any, **kwargs: Any) -> Any:
         yield self._respond(*self._args(args, kwargs))
+
+
+@dataclass
+class FixedReplyModel(ReplayModel):
+    """Responde sempre o mesmo texto."""
+
+    reply: str = ""
+
+    def _respond(self) -> ModelResponse:
+        return ModelResponse(role="assistant", content=self.reply)
+
+    def invoke(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        return self._respond()
+
+    async def ainvoke(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        return self._respond()
+
+    async def ainvoke_stream(self, *args: Any, **kwargs: Any) -> Any:
+        yield self._respond()

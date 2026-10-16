@@ -1,5 +1,7 @@
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 from uuid import UUID
 
 from agno.agent import Agent
@@ -17,6 +19,7 @@ from app.agents.models_map import resolve_model
 from app.agents.tracking import TrackedAgent, TrackedTeam
 from app.db import get_engine
 from app.guardrails.input import BlockLog, input_guardrails
+from app.guardrails.output import output_guardrail
 from app.knowledge.tools import knowledge_instructions, knowledge_tool
 from app.mcp.client import build_mcp_tools
 from app.mcp.egress import EgressDenied
@@ -126,6 +129,10 @@ def build_instructions(
     return "\n\n".join(s for s in sections if s) or None
 
 
+def _post_hooks(hook: Callable[..., None] | None) -> list[Any] | None:
+    return [hook] if hook is not None else None
+
+
 def _agent_from(config_id: UUID, resolved: ResolvedVersion, *, tracked: bool) -> Agent:
     payload = resolved.payload
     cls = TrackedAgent if tracked else Agent
@@ -140,6 +147,7 @@ def _agent_from(config_id: UUID, resolved: ResolvedVersion, *, tracked: bool) ->
         instructions=build_instructions(payload, resolved.bases),
         tools=[*resolved.mcp_tools, *resolved.knowledge_tools],
         pre_hooks=list(input_guardrails(payload.guardrails, blocks)) or None,
+        post_hooks=_post_hooks(output_guardrail(payload.guardrails, blocks)),
     )
     if isinstance(agent, TrackedAgent):
         agent.automata_config_id = config_id
@@ -206,6 +214,7 @@ def make_team_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> TeamFactory:
             instructions=build_instructions(leader.payload, leader.bases),
             tools=[*leader.mcp_tools, *leader.knowledge_tools],
             pre_hooks=list(input_guardrails(leader.payload.guardrails, blocks)) or None,
+            post_hooks=_post_hooks(output_guardrail(leader.payload.guardrails, blocks)),
             members=[_agent_from(mid, m, tracked=False) for mid, m in resolved.members],
             mode=TeamMode(settings.mode),
             max_iterations=settings.max_iterations,
