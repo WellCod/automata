@@ -795,7 +795,7 @@ Decisão em [ADR-0012](adr/0012-bases-de-conhecimento.md). Base de conhecimento 
 
 - [ ] `docs(adr)`: ADR-0012 e esta seção
 - [x] `chore(infra)`: Postgres com pgvector (`pgvector/pgvector:pg17` nos compose e nos testes), migration `CREATE EXTENSION vector`, dependências (`pgvector`, `voyageai`, `pypdf`, `python-docx`, `beautifulsoup4`) e settings (`VOYAGE_API_KEY`, embedder padrão, limites de upload)
-- [ ] `feat(api)`: cadastro de bases (`knowledge_base`, CRUD, papéis: editor escreve, viewer lê)
+- [x] `feat(api)`: cadastro de bases (`knowledge_base`, CRUD, papéis: editor escreve, viewer lê)
 - [ ] `feat(api)`: ingestão de arquivo, URL e texto em background, com status, remoção, limites e SSRF na URL
 - [ ] `feat(api)`: busca de teste na base (trechos e score, sem rodar agente)
 - [ ] `feat(api)`: agentes e times usam bases (payload, factory, uma tool por base, bloco fixo nas instruções, aviso no linter, embedder determinístico no `DEMO_REPLAY`)

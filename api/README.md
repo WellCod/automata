@@ -104,6 +104,8 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | `metrics:read` | `GET /api/v1/configs/{id}/runs`, `GET /api/v1/configs/{id}/metrics`, `GET /api/v1/metrics/*`, `GET /api/v1/usage/rollup`, `GET /api/v1/approvals`, `GET /api/v1/runs/{run_id}/trace` (este só para o dono do run ou owner) |
 | `mcp_servers:read` | `GET /api/v1/mcp-servers`, `GET /api/v1/mcp-servers/{id}` |
 | `mcp_servers:write` | `POST`, `PUT` e `DELETE` em `/api/v1/mcp-servers` — só owner (`agent_os:admin`) |
+| `knowledge_bases:read` | `GET /api/v1/knowledge-bases`, `GET /api/v1/knowledge-bases/{id}`, `GET /api/v1/knowledge-bases/embedders` |
+| `knowledge_bases:write` | `POST`, `PUT` e `DELETE` em `/api/v1/knowledge-bases` |
 | `agent_os:admin` | `POST /api/v1/auth/users`; `integrations:write` (rotas `/api/v1/integrations`) só vem pelo admin |
 
 `POST /api/v1/auth/login` e `GET /health` são públicos.
@@ -115,8 +117,8 @@ Definidos em `ROLE_SCOPES` (`app/schemas/user.py`) e gravados no token no login.
 | Papel | Scopes |
 |---|---|
 | `owner` | `agent_os:admin` |
-| `editor` | tudo do viewer + `agents:run`, `teams:run`, `sessions:write`, `configs:write`, `configs:publish` |
-| `viewer` | `agents:read`, `teams:read`, `sessions:read`, `traces:read`, `configs:read`, `metrics:read`, `mcp_servers:read` |
+| `editor` | tudo do viewer + `agents:run`, `teams:run`, `sessions:write`, `configs:write`, `configs:publish`, `knowledge_bases:write` |
+| `viewer` | `agents:read`, `teams:read`, `sessions:read`, `traces:read`, `configs:read`, `metrics:read`, `mcp_servers:read`, `knowledge_bases:read` |
 
 ### Chaves
 
@@ -185,7 +187,11 @@ Tokens para sistemas externos e assistentes de IA chamarem agentes e times via R
 
 ## Bases de conhecimento (RAG)
 
-Infraestrutura da Fase 13 ([ADR-0012](../docs/adr/0012-bases-de-conhecimento.md)). O cadastro e as rotas vêm nos próximos PRs.
+Fase 13 ([ADR-0012](../docs/adr/0012-bases-de-conhecimento.md)). Ingestão, busca e uso pelos agentes vêm nos próximos PRs.
+
+- **Cadastro** (`/api/v1/knowledge-bases`): nome, slug (vira o nome da tool de busca do agente e não muda depois), descrição (o agente lê para decidir quando buscar) e tamanho de trecho (vale para novas ingestões). O embedder é escolhido na criação, com padrão em `KNOWLEDGE_DEFAULT_EMBEDDER`, e fica fixo com modelo e dimensões: trocar exige recriar a base. Criar com embedder sem chave dá 422 dizendo qual variável falta; `DEMO_REPLAY=true` libera sem chave.
+- `GET /api/v1/knowledge-bases/embedders` lista os embedders, se a chave está configurada e qual é o padrão, para o painel.
+- Cada base tem a própria tabela de vetores no schema `ai` (`kb_<id>`), criada pelo Agno na primeira ingestão. Remover a base apaga a tabela.
 
 - Postgres com a extensão `vector`: os compose e o testcontainers usam `pgvector/pgvector:pg17` (mesmo Postgres 17, volume existente continua válido). O `PgVector` do Agno roda `CREATE EXTENSION IF NOT EXISTS vector` ao criar a tabela da base, então o usuário do banco precisa poder criar extensão; em Postgres gerenciado (Railway, RDS), habilite `vector` antes.
 - Embedder por base, escolhido na criação: `voyage` (padrão, `voyage-3.5`, 1024 dimensões, lê `VOYAGE_API_KEY`) ou `openai` (lê `OPENAI_API_KEY`). A Voyage dá 200M tokens grátis por conta e cobra depois.

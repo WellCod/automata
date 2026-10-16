@@ -174,6 +174,60 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/knowledge-bases/embedders": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Embedders */
+    get: operations["list_embedders_api_v1_knowledge_bases_embedders_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge-bases": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Bases */
+    get: operations["list_bases_api_v1_knowledge_bases_get"];
+    put?: never;
+    /** Create Base */
+    post: operations["create_base_api_v1_knowledge_bases_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge-bases/{base_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Base */
+    get: operations["get_base_api_v1_knowledge_bases__base_id__get"];
+    /** Update Base */
+    put: operations["update_base_api_v1_knowledge_bases__base_id__put"];
+    post?: never;
+    /** Delete Base */
+    delete: operations["delete_base_api_v1_knowledge_bases__base_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/models/capabilities": {
     parameters: {
       query?: never;
@@ -398,6 +452,26 @@ export interface paths {
     put?: never;
     /** Login */
     post: operations["login_api_v1_auth_login_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/logout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Logout
+     * @description Revoga o token da sessão: o RevocationMiddleware passa a recusá-lo até expirar.
+     */
+    post: operations["logout_api_v1_auth_logout_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -717,6 +791,22 @@ export interface components {
       description: string;
       payload: components["schemas"]["ConfigPayload"];
     };
+    /** EmbedderInfo */
+    EmbedderInfo: {
+      /**
+       * Name
+       * @enum {string}
+       */
+      name: "voyage" | "openai";
+      /** Model */
+      model: string;
+      /** Dimensions */
+      dimensions: number;
+      /** Configured */
+      configured: boolean;
+      /** Default */
+      default: boolean;
+    };
     /** GlobalMetricsSummary */
     GlobalMetricsSummary: {
       /** Total Runs */
@@ -840,6 +930,84 @@ export interface components {
       token: string;
       /** Mcp Url */
       mcp_url: string | null;
+    };
+    /** KnowledgeBaseCreate */
+    KnowledgeBaseCreate: {
+      /** Name */
+      name: string;
+      /**
+       * Description
+       * @description Usada pelo agente para decidir quando buscar
+       * @default
+       */
+      description: string;
+      /**
+       * Chunk Size
+       * @description Vale para novas ingestões
+       * @default 2000
+       */
+      chunk_size: number;
+      /**
+       * Slug
+       * @description Nome da tool de busca; não muda depois
+       */
+      slug: string;
+      /**
+       * Embedder
+       * @description Vazio usa KNOWLEDGE_DEFAULT_EMBEDDER; não muda depois
+       */
+      embedder?: ("voyage" | "openai") | null;
+    };
+    /** KnowledgeBaseResponse */
+    KnowledgeBaseResponse: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Name */
+      name: string;
+      /** Slug */
+      slug: string;
+      /** Description */
+      description: string;
+      /** Embedder */
+      embedder: string;
+      /** Embedder Model */
+      embedder_model: string;
+      /** Dimensions */
+      dimensions: number;
+      /** Chunk Size */
+      chunk_size: number;
+      /** Updated By */
+      updated_by: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+    };
+    /** KnowledgeBaseUpdate */
+    KnowledgeBaseUpdate: {
+      /** Name */
+      name: string;
+      /**
+       * Description
+       * @description Usada pelo agente para decidir quando buscar
+       * @default
+       */
+      description: string;
+      /**
+       * Chunk Size
+       * @description Vale para novas ingestões
+       * @default 2000
+       */
+      chunk_size: number;
     };
     /** LintWarning */
     LintWarning: {
@@ -1513,6 +1681,174 @@ export interface operations {
       };
     };
   };
+  list_embedders_api_v1_knowledge_bases_embedders_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EmbedderInfo"][];
+        };
+      };
+    };
+  };
+  list_bases_api_v1_knowledge_bases_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["KnowledgeBaseResponse"][];
+        };
+      };
+    };
+  };
+  create_base_api_v1_knowledge_bases_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["KnowledgeBaseCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["KnowledgeBaseResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_base_api_v1_knowledge_bases__base_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["KnowledgeBaseResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_base_api_v1_knowledge_bases__base_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["KnowledgeBaseUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["KnowledgeBaseResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_base_api_v1_knowledge_bases__base_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   list_capabilities_api_v1_models_capabilities_get: {
     parameters: {
       query?: never;
@@ -2001,6 +2337,35 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["TokenResponse"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  logout_api_v1_auth_logout_post: {
+    parameters: {
+      query?: never;
+      header: {
+        authorization: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {

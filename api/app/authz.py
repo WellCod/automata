@@ -20,6 +20,9 @@ class Scope:
     # Define para onde a API conecta e com qual credencial: nenhum papel além do
     # owner (agent_os:admin) recebe este scope
     MCP_SERVERS_WRITE = "mcp_servers:write"
+    # Bases de conhecimento (ADR-0012): editor cria e alimenta, viewer consulta
+    KNOWLEDGE_READ = "knowledge_bases:read"
+    KNOWLEDGE_WRITE = "knowledge_bases:write"
     # Emitir token para terceiros: também só owner
     INTEGRATIONS_WRITE = "integrations:write"
 
