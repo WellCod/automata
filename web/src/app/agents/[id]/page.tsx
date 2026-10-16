@@ -2,19 +2,12 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Activity,
-  AlertTriangle,
-  ArrowLeft,
-  BarChart2,
-  FlaskConical,
-  History,
-  TrendingUp,
-} from "lucide-react";
+import { Activity, ArrowLeft, FlaskConical, History, Settings2, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod";
 import { CostPanel } from "@/components/cost-panel";
 import { LintPanel } from "@/components/lint-panel";
@@ -23,10 +16,19 @@ import { MetricsPanel } from "@/components/metrics-panel";
 import { ModelSelector } from "@/components/model-selector";
 import { RunsPanel } from "@/components/runs-panel";
 import { TestPanel } from "@/components/test-panel";
+import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VersionsPanel } from "@/components/versions-panel";
 import client from "@/lib/api/client";
 import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes";
-import { cn } from "@/lib/utils";
 import type { components } from "@/lib/api/schema.d.ts";
 
 type AgentConfigDetail = components["schemas"]["AgentConfigDetail"];
@@ -70,39 +72,14 @@ const INSTRUCTION_LABELS: Record<keyof z.infer<typeof instructionSchema>, string
 
 const EMPTY_CAPS = { extended_thinking: false, structured_output: false, vision: false };
 
-const PANEL_TABS = [
-  { id: "teste" as const, label: "Teste", icon: FlaskConical },
-  { id: "versoes" as const, label: "Versões", icon: History },
+const PAGE_TABS = [
+  { id: "config" as const, label: "Configuração", icon: Settings2 },
   { id: "runs" as const, label: "Execuções", icon: Activity },
-  { id: "metricas" as const, label: "Métricas", icon: TrendingUp },
-  { id: "custo" as const, label: "Custo", icon: BarChart2 },
-  { id: "linter" as const, label: "Linter", icon: AlertTriangle },
+  { id: "desempenho" as const, label: "Desempenho", icon: TrendingUp },
+  { id: "versoes" as const, label: "Versões", icon: History },
 ];
 
-type PanelId = (typeof PANEL_TABS)[number]["id"];
-
-function Field({
-  label,
-  error,
-  children,
-  required,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-  required?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-foreground text-[13px] font-medium">
-        {label}
-        {required && <span className="text-destructive ml-0.5">*</span>}
-      </label>
-      {children}
-      {error && <p className="text-destructive text-[11px]">{error}</p>}
-    </div>
-  );
-}
+type PageTab = (typeof PAGE_TABS)[number]["id"];
 
 const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors focus:border-accent focus:outline-none";
@@ -170,7 +147,7 @@ function TeamsUsingAgent({ agentId }: { agentId: string }) {
 
 export default function AgentEditPage() {
   const { id } = useParams<{ id: string }>();
-  const [activePanel, setActivePanel] = useState<PanelId>("teste");
+  const [tab, setTab] = useState<PageTab>("config");
   const queryClient = useQueryClient();
 
   const {
@@ -258,6 +235,10 @@ export default function AgentEditPage() {
       reset(values);
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
       void queryClient.invalidateQueries({ queryKey: ["config", id] });
+      toast.success("Rascunho salvo");
+    },
+    onError: () => {
+      toast.error("Erro ao salvar rascunho");
     },
   });
 
@@ -275,13 +256,7 @@ export default function AgentEditPage() {
       <div className="flex flex-col items-start gap-3 px-6 py-6">
         <p className="text-destructive text-[13px]">Erro ao carregar o agente.</p>
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            className="border-border text-foreground hover:border-accent hover:text-accent inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors"
-          >
-            Tentar de novo
-          </button>
+          <Button onClick={() => void refetch()}>Tentar de novo</Button>
           <Link
             href="/"
             className="border-border text-muted-foreground hover:text-foreground inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors"
@@ -326,116 +301,150 @@ export default function AgentEditPage() {
               Alterações não salvas
             </span>
           )}
-          {mutation.isSuccess && !isDirty && (
-            <span className="text-accent text-[11px] tracking-[0.05em] uppercase">Salvo</span>
-          )}
-          {mutation.isError && <span className="text-destructive text-[11px]">Erro ao salvar</span>}
-          <button
-            type="submit"
-            form="agent-form"
-            disabled={mutation.isPending}
-            className="border-foreground text-foreground hover:border-accent hover:text-accent inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
-          >
+          <Button type="submit" form="agent-form" variant="strong" disabled={mutation.isPending}>
             {mutation.isPending ? "Salvando…" : "Salvar rascunho"}
-          </button>
+          </Button>
         </div>
       </header>
 
       <div className="flex flex-1">
-        <div className="min-w-0 flex-1 px-8 py-6">
-          <form
-            id="agent-form"
-            onSubmit={form.handleSubmit((v) => mutation.mutate(v))}
-            className="mx-auto flex max-w-2xl flex-col gap-5"
-          >
-            <TeamsUsingAgent agentId={id} />
-
-            <Field label="Nome" required error={form.formState.errors.name?.message}>
-              <input {...form.register("name")} className={inputCls} />
-            </Field>
-
-            <Field label="Descrição" error={form.formState.errors.description?.message}>
-              <textarea {...form.register("description")} className={textareaCls} rows={2} />
-            </Field>
-
-            <Controller
-              name="model_id"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <ModelSelector
-                  value={field.value}
-                  capabilities={form.watch("capabilities")}
-                  onChange={(modelId, caps) => {
-                    field.onChange(modelId);
-                    form.setValue("capabilities", caps, { shouldValidate: true });
-                  }}
-                  error={fieldState.error?.message}
-                />
-              )}
-            />
-
-            <Controller
-              name="mcp_servers"
-              control={form.control}
-              render={({ field }) => (
-                <McpToolsSelector value={field.value} onChange={field.onChange} />
-              )}
-            />
-
-            <fieldset className="border-border flex flex-col gap-4 rounded border px-4 pt-3 pb-4">
-              <legend className="text-foreground px-1 text-[13px] font-medium">Instruções</legend>
-              {(Object.keys(INSTRUCTION_LABELS) as (keyof typeof INSTRUCTION_LABELS)[]).map(
-                (key) => (
-                  <Field key={key} label={INSTRUCTION_LABELS[key]}>
-                    <textarea
-                      {...form.register(`instructions.${key}`)}
-                      className={textareaCls}
-                      rows={3}
-                    />
-                  </Field>
-                ),
-              )}
-            </fieldset>
-          </form>
-        </div>
-
-        <div className="border-border bg-background w-[400px] flex-none border-l lg:sticky lg:top-11 lg:max-h-[calc(100vh-2.75rem)] lg:overflow-y-auto">
-          <div className="border-border flex border-b">
-            {PANEL_TABS.map(({ id: pid, label, icon: Icon }) => (
-              <button
-                key={pid}
-                type="button"
-                onClick={() => setActivePanel(pid)}
-                className={cn(
-                  "flex flex-1 flex-col items-center gap-1 px-1 py-2.5 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors",
-                  activePanel === pid
-                    ? "border-accent text-accent border-b"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" />
+        <Tabs
+          value={tab}
+          onValueChange={(v) => setTab(v as PageTab)}
+          className="min-w-0 flex-1 px-8 pt-2 pb-6"
+        >
+          <TabsList>
+            {PAGE_TABS.map(({ id: tid, label, icon: Icon }) => (
+              <TabsTrigger key={tid} value={tid}>
+                <Icon />
                 {label}
-              </button>
+              </TabsTrigger>
             ))}
-          </div>
+          </TabsList>
 
-          <div className="p-4">
-            {activePanel === "teste" && (
-              <TestPanel agentId={id} draftVersionId={data?.draft_version?.id} defaultOpen />
-            )}
-            {activePanel === "versoes" && (
+          {/* sempre montada: o botão do cabeçalho submete o form de qualquer aba */}
+          <TabsContent value="config" keepMounted className="pt-5">
+            <form
+              id="agent-form"
+              onSubmit={form.handleSubmit((v) => mutation.mutate(v))}
+              className="mx-auto flex max-w-2xl flex-col gap-5"
+            >
+              <TeamsUsingAgent agentId={id} />
+
+              <FieldGroup>
+                <Field data-invalid={!!form.formState.errors.name}>
+                  <FieldLabel htmlFor="agent-name" className="gap-0.5">
+                    Nome<span className="text-destructive">*</span>
+                  </FieldLabel>
+                  <input
+                    id="agent-name"
+                    {...form.register("name")}
+                    aria-invalid={!!form.formState.errors.name}
+                    className={inputCls}
+                  />
+                  <FieldError>{form.formState.errors.name?.message}</FieldError>
+                </Field>
+
+                <Field>
+                  <FieldLabel htmlFor="agent-description">Descrição</FieldLabel>
+                  <textarea
+                    id="agent-description"
+                    {...form.register("description")}
+                    className={textareaCls}
+                    rows={2}
+                  />
+                </Field>
+              </FieldGroup>
+
+              <Controller
+                name="model_id"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <ModelSelector
+                    value={field.value}
+                    capabilities={form.watch("capabilities")}
+                    onChange={(modelId, caps) => {
+                      field.onChange(modelId);
+                      form.setValue("capabilities", caps, { shouldValidate: true });
+                    }}
+                    error={fieldState.error?.message}
+                  />
+                )}
+              />
+
+              <Controller
+                name="mcp_servers"
+                control={form.control}
+                render={({ field }) => (
+                  <McpToolsSelector value={field.value} onChange={field.onChange} />
+                )}
+              />
+
+              <FieldSet className="border-border rounded border px-4 pt-3 pb-4">
+                <FieldLegend className="px-1">Instruções</FieldLegend>
+                <FieldGroup>
+                  {(Object.keys(INSTRUCTION_LABELS) as (keyof typeof INSTRUCTION_LABELS)[]).map(
+                    (key) => (
+                      <Field key={key}>
+                        <FieldLabel htmlFor={`instructions-${key}`}>
+                          {INSTRUCTION_LABELS[key]}
+                        </FieldLabel>
+                        <textarea
+                          id={`instructions-${key}`}
+                          {...form.register(`instructions.${key}`)}
+                          className={textareaCls}
+                          rows={3}
+                        />
+                      </Field>
+                    ),
+                  )}
+                </FieldGroup>
+              </FieldSet>
+
+              <section className="border-border rounded border px-4 py-3">
+                <LintPanel getPayload={getPayload} />
+              </section>
+            </form>
+          </TabsContent>
+
+          <TabsContent value="runs" className="pt-5">
+            <div className="mx-auto max-w-3xl">
+              <RunsPanel agentId={id} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="desempenho" className="pt-5">
+            <div className="mx-auto flex max-w-3xl flex-col gap-6">
+              <MetricsPanel agentId={id} />
+              <CostPanel agentId={id} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="versoes" className="pt-5">
+            <div className="mx-auto max-w-3xl">
               <VersionsPanel
                 agentId={id}
                 currentVersionId={data?.current_version?.id}
                 hasUnsavedChanges={isDirty}
               />
-            )}
-            {activePanel === "runs" && <RunsPanel agentId={id} />}
-            {activePanel === "metricas" && <MetricsPanel agentId={id} />}
-            {activePanel === "custo" && <CostPanel agentId={id} />}
-            {activePanel === "linter" && <LintPanel getPayload={getPayload} />}
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <aside
+          aria-label="Testar"
+          className="border-border bg-background w-[400px] flex-none border-l lg:sticky lg:top-11 lg:max-h-[calc(100vh-2.75rem)] lg:overflow-y-auto"
+        >
+          <div className="border-border flex h-9 items-center gap-1.5 border-b px-4">
+            <FlaskConical className="text-muted-foreground h-3.5 w-3.5" />
+            <h2 className="text-foreground text-[11px] font-medium tracking-[0.05em] uppercase">
+              Testar
+            </h2>
           </div>
-        </div>
+          <div className="p-4">
+            <TestPanel agentId={id} draftVersionId={data?.draft_version?.id} defaultOpen />
+          </div>
+        </aside>
       </div>
     </div>
   );

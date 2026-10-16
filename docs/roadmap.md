@@ -763,7 +763,7 @@ Fecha o que ficou aberto dos PRs 41 e 44.
 - [ ] #67 — `fix(api)`: registro real de runs (status de erro e duração), dono da versão no modo teste, banco fora do event loop, agente publicado sem restart, extended thinking aplicado, índices por data e gate de cobertura fora das evals noturnas
 - [x] `fix(infra)`: entrypoint com `exec "$@"`, web de dev só no override, porta 8000 fora do compose de produção
 - [x] `fix(web)`: fonte (`--font-sans` circular), tema conforme `DESIGN.md`, versão ativa no histórico, confirmação de publicar/reverter, alterações não salvas, estados de erro
-- [ ] `refactor(web)`: componentes shadcn (Button, Tabs, Field, Sonner) e nova página de edição
+- [x] `refactor(web)`: componentes shadcn (Button, Tabs, Field, Sonner) e nova página de edição
 - [ ] `feat(web)`: gráficos no analytics e no desempenho do agente
 - [x] `fix(security)` restante: argon2 contra hash fixo no login (sem enumeração por tempo), CSP no painel e HSTS no painel e na API atrás de proxy confiável, `/docs` só com `APP_ENV=development`, `.dockerignore` sem `.env`, senha do seed fora da linha de comando no `deploy.sh`, reset da demo limpando `agent_run` e as tabelas do Agno
 - [ ] revogação de token (`jti`)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { Button } from "@/components/ui/button";
 
 export default function Error({
   error,
@@ -20,13 +21,7 @@ export default function Error({
         A página falhou ao carregar.
         {error.digest && <span> Código: {error.digest}</span>}
       </p>
-      <button
-        type="button"
-        onClick={reset}
-        className="border-border text-foreground hover:border-accent hover:text-accent inline-flex h-7 items-center rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors"
-      >
-        Tentar de novo
-      </button>
+      <Button onClick={reset}>Tentar de novo</Button>
     </div>
   );
 }

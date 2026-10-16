@@ -2,6 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
 
@@ -70,7 +72,9 @@ export function VersionsPanel({ agentId, currentVersionId, hasUnsavedChanges = f
       if (res.error) throw new Error("Falha ao publicar");
       return res.data!;
     },
-    onSuccess: () => {
+    onError: () => toast.error("Erro ao publicar. Tente novamente."),
+    onSuccess: (v) => {
+      toast.success(`v${v.version_number} publicada`);
       void queryClient.invalidateQueries({ queryKey: ["versions", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["config", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
@@ -86,7 +90,9 @@ export function VersionsPanel({ agentId, currentVersionId, hasUnsavedChanges = f
       if (res.error) throw new Error("Falha ao reverter");
       return res.data!;
     },
-    onSuccess: () => {
+    onError: () => toast.error("Erro ao reverter. Tente novamente."),
+    onSuccess: (v) => {
+      toast.success(`v${v.version_number} ativa de novo`);
       void queryClient.invalidateQueries({ queryKey: ["versions", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["config", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
@@ -109,14 +115,14 @@ export function VersionsPanel({ agentId, currentVersionId, hasUnsavedChanges = f
       <div className="flex items-center justify-between">
         <h2 className="text-foreground text-[13px] font-medium">Versões</h2>
         {draft && (
-          <button
-            type="button"
+          <Button
+            variant="accent"
+            size="sm"
             onClick={() => setPending({ kind: "publish" })}
             disabled={busy || pending !== null}
-            className="border-accent text-accent hover:border-accent/70 hover:text-accent/70 inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
           >
             {publishMutation.isPending ? "Publicando…" : "Publicar"}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -137,29 +143,14 @@ export function VersionsPanel({ agentId, currentVersionId, hasUnsavedChanges = f
             </p>
           )}
           <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setPending(null)}
-              className="border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors"
-            >
+            <Button size="sm" onClick={() => setPending(null)}>
               Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={confirm}
-              className="border-accent text-accent hover:border-accent/70 hover:text-accent/70 inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors"
-            >
+            </Button>
+            <Button variant="accent" size="sm" onClick={confirm}>
               {pending.kind === "publish" ? "Confirmar publicação" : "Confirmar reversão"}
-            </button>
+            </Button>
           </div>
         </div>
-      )}
-
-      {publishMutation.isError && (
-        <p className="text-destructive text-[11px]">Erro ao publicar. Tente novamente.</p>
-      )}
-      {rollbackMutation.isError && (
-        <p className="text-destructive text-[11px]">Erro ao reverter. Tente novamente.</p>
       )}
 
       {isPending && <p className="text-muted-foreground text-[13px]">Carregando…</p>}
@@ -202,8 +193,8 @@ export function VersionsPanel({ agentId, currentVersionId, hasUnsavedChanges = f
                       </span>
                     )}
                     {v.status === "published" && v.id !== currentVersionId && (
-                      <button
-                        type="button"
+                      <Button
+                        size="xs"
                         onClick={() =>
                           setPending({
                             kind: "rollback",
@@ -212,10 +203,9 @@ export function VersionsPanel({ agentId, currentVersionId, hasUnsavedChanges = f
                           })
                         }
                         disabled={busy || pending !== null}
-                        className="border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground inline-flex h-5 items-center rounded border px-1.5 text-[10px] transition-colors disabled:opacity-40"
                       >
                         Reverter
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>

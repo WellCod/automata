@@ -7,9 +7,8 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import client from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
+import { Button } from "@/components/ui/button";
 
-const btnCls =
-  "inline-flex h-7 items-center gap-1.5 rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40";
 const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none";
 
@@ -73,20 +72,16 @@ function NewTeamForm({ onCancel }: { onCancel: () => void }) {
         </p>
       )}
       <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className={`${btnCls} border-border text-muted-foreground hover:text-foreground`}
-        >
+        <Button onClick={onCancel} variant="muted">
           Cancelar
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
           disabled={create.isPending || !name.trim() || !description.trim()}
-          className={`${btnCls} border-foreground text-foreground hover:border-accent hover:text-accent`}
+          variant="strong"
         >
           {create.isPending ? "Criando…" : "Criar"}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -114,14 +109,10 @@ export default function TeamsPage() {
             Um líder que delega a agentes especialistas.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowNew(true)}
-          className={`${btnCls} border-accent text-accent hover:border-foreground hover:text-foreground`}
-        >
+        <Button onClick={() => setShowNew(true)} variant="accent">
           <Plus className="h-3.5 w-3.5" aria-hidden />
           Novo time
-        </button>
+        </Button>
       </div>
 
       {showNew && (

@@ -79,6 +79,15 @@ Elemento mais característico da linguagem "developer tool":
 - Sem box-shadow, sem border-radius > 4px
 - Variante destrutiva: borda e texto em `--destructive`
 
+Implementação: `Button` em `src/components/ui/button.tsx` (shadcn sobre Base UI). Variantes:
+`default`, `strong` (ação principal da tela), `accent`, `muted`, `destructive`,
+`subtleDestructive` (excluir antes da confirmação) e `ghost` (ícone). Tamanhos `default` (h-7),
+`sm`, `xs` e `icon`. Seletor de opção (período, filtro) usa `accent` no item ativo e `muted`
+nos demais — nunca fundo accent.
+
+Demais componentes shadcn em uso: `Tabs` (linha inferior em accent na aba ativa), `Field`/`Label`
+(13px; erro e descrição em 11px) e `Toaster` do Sonner (feedback de salvar, publicar e reverter).
+
 ## Cards / Painéis
 
 - Borda 1px `--border`, sem sombra, radius 4px

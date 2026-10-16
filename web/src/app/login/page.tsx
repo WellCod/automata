@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { Button } from "@/components/ui/button";
 
 const schema = z.object({
   email: z.string().email("Email inválido"),
@@ -102,13 +103,14 @@ export default function LoginPage() {
 
           {serverError && <p className="text-destructive text-[11px]">{serverError}</p>}
 
-          <button
+          <Button
             type="submit"
             disabled={form.formState.isSubmitting}
-            className="border-foreground text-foreground hover:border-accent hover:text-accent mt-2 inline-flex h-8 w-full items-center justify-center rounded border text-[11px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
+            variant="strong"
+            className="mt-2 h-8 w-full"
           >
             {form.formState.isSubmitting ? "Entrando…" : "Entrar"}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

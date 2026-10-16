@@ -7,6 +7,7 @@ import { useRef, useState } from "react";
 import { AgentCard } from "@/components/agent-card";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
+import { Button } from "@/components/ui/button";
 
 type StatusFilter = components["schemas"]["ConfigPayloadStatus"] | "";
 
@@ -65,13 +66,9 @@ function NewAgentInline({ onCancel }: { onCancel: () => void }) {
         className="text-foreground placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[13px] focus:outline-none"
         disabled={mutation.isPending}
       />
-      <button
-        type="submit"
-        disabled={mutation.isPending}
-        className="border-accent text-accent hover:border-accent/70 hover:text-accent/70 inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors disabled:opacity-40"
-      >
+      <Button type="submit" disabled={mutation.isPending} variant="accent" size="sm">
         {mutation.isPending ? "Criando…" : "Criar"}
-      </button>
+      </Button>
       <button
         type="button"
         onClick={onCancel}
@@ -108,13 +105,10 @@ export default function AgentsPage() {
             </p>
           )}
         </div>
-        <button
-          onClick={() => setShowNew(true)}
-          className="border-accent text-accent hover:border-accent/70 hover:text-accent/70 inline-flex h-7 items-center gap-1.5 rounded border px-3 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors"
-        >
+        <Button onClick={() => setShowNew(true)} variant="accent">
           <Plus className="h-3.5 w-3.5" />
           Novo agente
-        </button>
+        </Button>
       </div>
 
       {showNew && (
