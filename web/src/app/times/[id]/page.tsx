@@ -243,7 +243,7 @@ export default function TeamEditPage() {
             </span>
           )}
           {save.isSuccess && !form.formState.isDirty && (
-            <span className="text-accent text-[11px] tracking-[0.05em] uppercase">Salvo</span>
+            <span className="text-accent text-[11px]">Salvo</span>
           )}
           <Button type="submit" form="team-form" disabled={save.isPending} variant="strong">
             {save.isPending ? "Salvando…" : "Salvar rascunho"}
@@ -408,7 +408,7 @@ export default function TeamEditPage() {
                 aria-selected={activePanel === pid}
                 onClick={() => setActivePanel(pid)}
                 className={cn(
-                  "flex flex-1 flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium tracking-[0.05em] uppercase transition-colors",
+                  "flex flex-1 flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium transition-colors",
                   activePanel === pid
                     ? "border-accent text-accent border-b"
                     : "text-muted-foreground hover:text-foreground",

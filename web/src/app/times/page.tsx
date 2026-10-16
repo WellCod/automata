@@ -8,6 +8,7 @@ import { useId, useState } from "react";
 import client from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/status-badge";
 
 const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none";
@@ -149,12 +150,14 @@ export default function TeamsPage() {
                 <span className="text-muted-foreground line-clamp-2 text-[13px]">
                   {team.description}
                 </span>
-                <span className="text-muted-foreground mt-auto pt-2 text-[11px] tracking-[0.05em] uppercase">
-                  {team.current_version
-                    ? `v${team.current_version.version_number} ativo`
-                    : team.draft_version
-                      ? "rascunho"
-                      : "sem versão"}
+                <span className="mt-auto pt-2">
+                  {team.current_version ? (
+                    <Badge tone="active">v{team.current_version.version_number} ativa</Badge>
+                  ) : team.draft_version ? (
+                    <Badge tone="pending">Rascunho</Badge>
+                  ) : (
+                    <Badge tone="neutral">Sem versão</Badge>
+                  )}
                 </span>
               </Link>
             </li>

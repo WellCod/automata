@@ -16,6 +16,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { usePendingApprovals } from "@/lib/api/approvals";
 import { useMe } from "@/lib/api/users";
+import { ThemeToggle } from "./theme";
 
 const navItems = [
   { href: "/", label: "Agentes", icon: LayoutGrid, exact: true },
@@ -31,11 +32,11 @@ const navItems = [
 function LogoMark() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-      <rect width="18" height="18" rx="2" fill="#25E0C8" />
-      <rect x="4" y="4" width="4" height="4" fill="#0B0B0B" />
-      <rect x="10" y="4" width="4" height="4" fill="#0B0B0B" />
-      <rect x="4" y="10" width="4" height="4" fill="#0B0B0B" />
-      <rect x="10" y="10" width="2" height="2" fill="#0B0B0B" />
+      <rect width="18" height="18" rx="4" className="fill-accent" />
+      <rect x="4" y="4" width="4" height="4" className="fill-accent-foreground" />
+      <rect x="10" y="4" width="4" height="4" className="fill-accent-foreground" />
+      <rect x="4" y="10" width="4" height="4" className="fill-accent-foreground" />
+      <rect x="10" y="10" width="2" height="2" className="fill-accent-foreground" />
     </svg>
   );
 }
@@ -76,7 +77,7 @@ export function Sidebar() {
               {label}
               {href === "/aprovacoes" && pending && pending.length > 0 && (
                 <span
-                  className="ml-auto rounded border border-amber-400/60 px-1.5 text-[11px] text-amber-400"
+                  className="ml-auto rounded border border-amber-500/50 px-1.5 text-[11px] text-amber-600 dark:text-amber-400"
                   aria-label={`${pending.length} aguardando`}
                 >
                   {pending.length}
@@ -95,6 +96,7 @@ export function Sidebar() {
           {me?.email ?? "v0.1"}
         </span>
         <div className="flex items-center gap-1">
+          <ThemeToggle />
           <button
             type="button"
             onClick={() => void handleLogout()}

@@ -272,7 +272,7 @@ export function TestPanel({
             <div
               role="alertdialog"
               aria-label="Confirmação de ferramenta"
-              className="flex flex-col gap-2 rounded border border-amber-400/60 p-3"
+              className="flex flex-col gap-2 rounded border border-amber-500/50 p-3"
             >
               <p className="text-foreground text-[13px] font-medium">
                 O agente quer executar uma ação que exige confirmação

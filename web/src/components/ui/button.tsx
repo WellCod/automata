@@ -3,29 +3,33 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
-// DESIGN.md: fundo transparente, borda 1px, texto uppercase; hover muda só borda e texto
+// DESIGN.md: texto em caixa normal; uma ação principal (azul) por tela, o resto neutro
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center gap-1.5 rounded border bg-transparent font-medium tracking-[0.05em] whitespace-nowrap uppercase transition-colors outline-none select-none focus-visible:border-accent focus-visible:text-accent disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+  "group/button inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border font-medium whitespace-nowrap transition-colors outline-none select-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
   {
     variants: {
       variant: {
-        default: "border-border text-foreground hover:border-accent hover:text-accent",
-        strong: "border-foreground text-foreground hover:border-accent hover:text-accent",
+        // secundário: contorno neutro
+        default: "border-border bg-background text-foreground hover:bg-muted",
+        // ação principal da tela
+        strong: "border-transparent bg-accent text-accent-foreground hover:bg-accent/90",
+        // criar, publicar: destaque sem competir com a principal
+        accent: "border-accent/40 bg-accent/10 text-accent hover:bg-accent/15",
+        // cancelar, editar, opções de seletor
         muted:
-          "border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground",
-        accent: "border-accent text-accent hover:border-accent/70 hover:text-accent/70",
-        destructive:
-          "border-destructive text-destructive hover:border-destructive/70 hover:text-destructive/70",
+          "border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
+        destructive: "border-transparent bg-destructive text-white hover:bg-destructive/90",
+        // excluir antes da confirmação
         subtleDestructive:
-          "border-border text-muted-foreground hover:border-destructive hover:text-destructive",
+          "border-border bg-transparent text-muted-foreground hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive",
         ghost:
-          "border-transparent text-muted-foreground normal-case tracking-normal hover:border-border hover:text-foreground",
+          "border-transparent bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
       },
       size: {
-        default: "h-7 px-3 text-[11px]",
-        sm: "h-6 px-2 text-[10px]",
-        xs: "h-5 px-1.5 text-[10px]",
-        icon: "size-6 [&_svg:not([class*='size-'])]:size-3.5",
+        default: "h-8 px-3 text-[13px]",
+        sm: "h-7 px-2.5 text-[12px]",
+        xs: "h-6 px-2 text-[12px]",
+        icon: "size-7 [&_svg:not([class*='size-'])]:size-4",
       },
     },
     defaultVariants: {
