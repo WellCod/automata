@@ -39,6 +39,14 @@ class LoginInput(BaseModel):
     password: str = Field(min_length=1)
 
 
+def _password_complexity(v: str) -> str:
+    if not any(c.isupper() for c in v):
+        raise ValueError("a senha deve conter ao menos uma letra maiúscula")
+    if not any(c.isdigit() for c in v):
+        raise ValueError("a senha deve conter ao menos um dígito")
+    return v
+
+
 class CreateUserInput(BaseModel):
     email: EmailStr
     password: str = Field(min_length=12)
@@ -47,11 +55,21 @@ class CreateUserInput(BaseModel):
     @field_validator("password")
     @classmethod
     def password_complexity(cls, v: str) -> str:
-        if not any(c.isupper() for c in v):
-            raise ValueError("a senha deve conter ao menos uma letra maiúscula")
-        if not any(c.isdigit() for c in v):
-            raise ValueError("a senha deve conter ao menos um dígito")
-        return v
+        return _password_complexity(v)
+
+
+class UpdateUserInput(BaseModel):
+    role: UserRole | None = None
+    is_active: bool | None = None
+
+
+class ResetPasswordInput(BaseModel):
+    password: str = Field(min_length=12)
+
+    @field_validator("password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return _password_complexity(v)
 
 
 class TokenResponse(BaseModel):
@@ -65,3 +83,10 @@ class UserResponse(BaseModel):
     role: UserRole
     is_active: bool
     created_at: datetime
+    last_login_at: datetime | None = None
+
+
+class MeResponse(BaseModel):
+    id: str
+    email: str | None
+    role: UserRole | None

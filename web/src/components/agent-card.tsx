@@ -20,15 +20,13 @@ function VersionSlot({ agent }: { agent: AgentConfig }) {
   if (agent.current_version) {
     return (
       <div className="flex items-baseline gap-1">
-        <span className="text-label text-[11px] font-medium tracking-[0.05em] uppercase">
-          Versão atual
-        </span>
+        <span className="text-label text-[11px] font-medium">Versão atual</span>
         <span className="text-accent text-[13px] font-medium">
           v{agent.current_version.version_number}
         </span>
         {agent.draft_version && (
-          <span className="ml-1 text-[11px] tracking-[0.05em] text-amber-400 uppercase">
-            · rascunho pendente
+          <span className="ml-1 text-[11px] text-amber-700 dark:text-amber-400">
+            · Rascunho pendente
           </span>
         )}
       </div>
@@ -37,18 +35,12 @@ function VersionSlot({ agent }: { agent: AgentConfig }) {
   if (agent.draft_version) {
     return (
       <div className="flex items-baseline gap-1">
-        <span className="text-label text-[11px] font-medium tracking-[0.05em] uppercase">
-          Rascunho
-        </span>
+        <span className="text-label text-[11px] font-medium">Rascunho</span>
         <span className="text-muted-foreground text-[13px]">sem versão publicada</span>
       </div>
     );
   }
-  return (
-    <span className="text-muted-foreground text-[11px] tracking-[0.05em] uppercase">
-      Sem versão
-    </span>
-  );
+  return <span className="text-muted-foreground text-[11px]">Sem versão</span>;
 }
 
 export function AgentCard({ agent }: Props) {
@@ -72,9 +64,7 @@ export function AgentCard({ agent }: Props) {
       {/* Body */}
       <div className="mt-2 flex flex-1 flex-col gap-2">
         <div>
-          <p className="text-label text-[11px] font-medium tracking-[0.05em] uppercase">
-            Descrição
-          </p>
+          <p className="text-label text-[11px] font-medium">Descrição</p>
           <p className="text-muted-foreground mt-0.5 line-clamp-2 text-[13px]">
             {agent.description ?? "—"}
           </p>
@@ -86,13 +76,13 @@ export function AgentCard({ agent }: Props) {
       <div className="border-border mt-3 flex items-center gap-2 border-t pt-2">
         <Link
           href={`/agents/${agent.id}?tab=test`}
-          className="border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground focus-visible:ring-ring/50 inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground focus-visible:ring-ring/50 inline-flex h-6 items-center rounded border px-2 text-[11px] font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           Chat
         </Link>
         <Link
           href={`/agents/${agent.id}`}
-          className="border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground focus-visible:ring-ring/50 inline-flex h-6 items-center rounded border px-2 text-[10px] font-medium tracking-[0.05em] uppercase transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="border-border text-muted-foreground hover:border-foreground/50 hover:text-foreground focus-visible:ring-ring/50 inline-flex h-6 items-center rounded border px-2 text-[11px] font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           Editar
         </Link>

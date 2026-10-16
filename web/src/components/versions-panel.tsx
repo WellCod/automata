@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/status-badge";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
 
@@ -25,7 +26,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_CLS: Record<string, string> = {
-  draft: "text-amber-400",
+  draft: "text-amber-600 dark:text-amber-400",
   published: "text-accent",
 };
 
@@ -138,7 +139,7 @@ export function VersionsPanel({ agentId, currentVersionId, hasUnsavedChanges = f
               : `Reverter para v${pending.versionNumber}? Ela volta a responder em produção.`}
           </p>
           {pending.kind === "publish" && hasUnsavedChanges && (
-            <p className="text-[11px] text-amber-400">
+            <p className="text-[11px] text-amber-600 dark:text-amber-400">
               Há alterações não salvas no formulário. Elas não entram na publicação.
             </p>
           )}
@@ -187,11 +188,7 @@ export function VersionsPanel({ agentId, currentVersionId, hasUnsavedChanges = f
                     <span className="text-muted-foreground text-[11px]">
                       {new Date(v.created_at).toLocaleDateString("pt-BR")}
                     </span>
-                    {v.id === currentVersionId && (
-                      <span className="text-accent text-[10px] font-medium tracking-[0.05em] uppercase">
-                        ativa
-                      </span>
-                    )}
+                    {v.id === currentVersionId && <Badge tone="active">Ativa</Badge>}
                     {v.status === "published" && v.id !== currentVersionId && (
                       <Button
                         size="xs"
