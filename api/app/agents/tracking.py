@@ -29,6 +29,7 @@ from agno.tools.mcp import MCPTools
 from sqlalchemy.orm import Session
 
 from app.db import get_engine
+from app.guardrails.input import BlockLog
 from app.mcp.client import McpUnavailable, connect_strict
 from app.repositories.run import RunRepository
 from app.repositories.usage import UsageRepository
@@ -65,6 +66,8 @@ class RunRecord:
     cost: float | None = None
     session_id: str | None = None
     pending_tools: list[dict[str, Any]] | None = None
+    blocked_by: str | None = None
+    block_detail: dict[str, Any] | None = None
 
 
 def persist(record: RunRecord) -> None:
@@ -78,6 +81,8 @@ def persist(record: RunRecord) -> None:
             error=record.error,
             session_id=record.session_id,
             pending_tools=record.pending_tools,
+            blocked_by=record.blocked_by,
+            block_detail=record.block_detail,
         )
         if record.total_tokens:
             UsageRepository(session).record_event(
@@ -124,6 +129,8 @@ class RunTracking:
 
     automata_config_id: UUID | None = None
     automata_model_id: str = ""
+    # preenchido pelos guardrails de entrada da factory
+    automata_blocks: BlockLog | None = None
     tools: Any
     id: Any
     name: Any
@@ -256,6 +263,10 @@ class RunTracking:
     ) -> RunRecord:
         assert self.automata_config_id is not None
         final_status = status or _status_of(output, None)
+        block = self.automata_blocks.last if self.automata_blocks is not None else None
+        if final_status == "error" and block is not None:
+            # guardrail barrou: não é falha do agente e não entra na taxa de erro
+            final_status, error = "blocked", block.message
         if final_status == "error" and error is None and output is not None:
             error = str(output.content) if output.content is not None else None
         metrics = output.metrics if output is not None else None
@@ -274,6 +285,8 @@ class RunTracking:
             cost=getattr(metrics, "cost", None),
             session_id=kwargs.get("session_id") or (output.session_id if output else None),
             pending_tools=_pending_tools(output),
+            blocked_by=block.rule if final_status == "blocked" and block else None,
+            block_detail=block.detail if final_status == "blocked" and block else None,
         )
 
     @staticmethod

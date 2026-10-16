@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -24,6 +24,7 @@ class AgentRunResponse(BaseModel):
     status: str
     duration_ms: int | None
     error: str | None
+    blocked_by: str | None = None
     created_at: datetime
 
 
@@ -40,19 +41,23 @@ class AgentMetricsResponse(BaseModel):
     p50_ms: float | None
     p95_ms: float | None
     period_days: int
+    blocked_runs: int = 0
+    blocked_by: dict[str, int] = {}
 
 
 def _parse_period(period: str) -> int:
     return int(period[:-1])
 
 
-def _to_metrics_response(m: RunMetrics) -> AgentMetricsResponse:
+def _to_metrics_response(m: RunMetrics, blocked_by: dict[str, int]) -> AgentMetricsResponse:
     return AgentMetricsResponse(
         total_runs=m.total_runs,
         error_rate=m.error_rate,
         p50_ms=m.p50_ms,
         p95_ms=m.p95_ms,
         period_days=m.period_days,
+        blocked_runs=m.blocked_runs,
+        blocked_by=blocked_by,
     )
 
 
@@ -67,7 +72,12 @@ def get_metrics(
         raise HTTPException(status_code=404, detail="Config não encontrada")
 
     run_repo = RunRepository(session)
-    return _to_metrics_response(run_repo.metrics(config_id, period_days=_parse_period(period)))
+    days = _parse_period(period)
+    since = datetime.now(UTC) - timedelta(days=days)
+    return _to_metrics_response(
+        run_repo.metrics(config_id, since=since, period_days=days),
+        run_repo.blocked_by_rule(since=since, config_id=config_id),
+    )
 
 
 @router.get("/{config_id}/runs", response_model=RunsPage)
@@ -93,6 +103,7 @@ def list_runs(
                 status=r.status,
                 duration_ms=r.duration_ms,
                 error=r.error,
+                blocked_by=r.blocked_by,
                 created_at=r.created_at,
             )
             for r in runs

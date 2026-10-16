@@ -21,6 +21,9 @@ router = APIRouter(
 class GlobalMetricsSummary(BaseModel):
     total_runs: int
     error_rate: float
+    # barrados por guardrail (ADR-0013), fora da taxa de erro
+    blocked_runs: int = 0
+    blocked_by: dict[str, int] = {}
     p50_ms: float | None
     p95_ms: float | None
     total_tokens: int
@@ -36,6 +39,7 @@ class AgentBreakdownItem(BaseModel):
     agent_name: str
     total_runs: int
     error_rate: float
+    blocked_runs: int = 0
     total_tokens: int
     total_cost: float | None
 
@@ -47,6 +51,7 @@ class DailyMetricsPoint(BaseModel):
     date: date
     total_runs: int
     error_count: int
+    blocked_count: int = 0
     p50_ms: float | None
     p95_ms: float | None
     total_tokens: int
@@ -72,6 +77,7 @@ def build_series(
                 date=day,
                 total_runs=run.total_runs if run else 0,
                 error_count=run.error_count if run else 0,
+                blocked_count=run.blocked_count if run else 0,
                 p50_ms=run.p50_ms if run else None,
                 p95_ms=run.p95_ms if run else None,
                 total_tokens=use.total_tokens if use else 0,
@@ -123,6 +129,8 @@ def get_summary(
     return GlobalMetricsSummary(
         total_runs=metrics.total_runs,
         error_rate=metrics.error_rate,
+        blocked_runs=metrics.blocked_runs,
+        blocked_by=run_repo.blocked_by_rule(since=since, until=until),
         p50_ms=metrics.p50_ms,
         p95_ms=metrics.p95_ms,
         total_tokens=usage.total_tokens,
@@ -171,6 +179,7 @@ def get_by_agent(
                 agent_name=names.get(agent_id, str(agent_id)[:8]),
                 total_runs=run.total_runs,
                 error_rate=run.error_count / run.total_runs if run.total_runs > 0 else 0.0,
+                blocked_runs=run.blocked_count,
                 total_tokens=usage.total_tokens,
                 total_cost=usage.total_cost,
             )
