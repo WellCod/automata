@@ -9,11 +9,13 @@ import {
   LogOut,
   Plug,
   ShieldCheck,
+  UserCog,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { usePendingApprovals } from "@/lib/api/approvals";
+import { useMe } from "@/lib/api/users";
 
 const navItems = [
   { href: "/", label: "Agentes", icon: LayoutGrid, exact: true },
@@ -23,6 +25,7 @@ const navItems = [
   { href: "/mcp", label: "Servidores MCP", icon: Plug, exact: true },
   { href: "/aprovacoes", label: "Aprovações", icon: ShieldCheck, exact: true },
   { href: "/integracoes", label: "Integrações", icon: KeyRound, exact: true },
+  { href: "/usuarios", label: "Usuários", icon: UserCog, exact: true, ownerOnly: true },
 ];
 
 function LogoMark() {
@@ -41,6 +44,9 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: pending } = usePendingApprovals();
+  const { data: me } = useMe();
+  // a API recusa quem não é owner; o item só some para não levar a uma página vazia
+  const visible = navItems.filter((item) => !item.ownerOnly || me?.role === "owner");
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -55,7 +61,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 px-3 py-2">
-        {navItems.map(({ href, label, icon: Icon, exact }) => {
+        {visible.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
             <Link
@@ -82,8 +88,11 @@ export function Sidebar() {
       </nav>
 
       <div className="border-sidebar-border flex items-center justify-between border-t px-3 py-2">
-        <span className="text-muted-foreground text-[11px] font-medium tracking-[0.05em] uppercase">
-          v0.1
+        <span
+          className="text-muted-foreground min-w-0 truncate text-[11px]"
+          title={me?.email ?? ""}
+        >
+          {me?.email ?? "v0.1"}
         </span>
         <div className="flex items-center gap-1">
           <button

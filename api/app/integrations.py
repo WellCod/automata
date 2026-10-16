@@ -6,6 +6,7 @@ com cache curto, e o middleware recusa o token antes de chegar ao Agno.
 """
 
 import logging
+import math
 import threading
 from datetime import UTC, datetime
 from time import monotonic
@@ -22,6 +23,7 @@ from starlette.responses import JSONResponse, Response
 from app.db import get_engine
 from app.models.integration import IntegrationToken
 from app.models.revoked_token import RevokedToken
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,15 @@ def integration_scopes(agent_ids: list[UUID], team_ids: list[UUID]) -> list[str]
     for team_id in team_ids:
         scopes += [f"teams:{team_id}:read", f"teams:{team_id}:run"]
     return scopes
+
+
+def _load_cutoffs() -> dict[str, float]:
+    """sub do usuário -> instante antes do qual os tokens dele não valem mais."""
+    with Session(get_engine()) as session:
+        rows = session.execute(
+            select(User.id, User.tokens_valid_after).where(User.tokens_valid_after.is_not(None))
+        )
+        return {str(r.id): r.tokens_valid_after.timestamp() for r in rows}
 
 
 def _load_revoked() -> set[str]:
@@ -53,18 +64,25 @@ class RevokedTokens:
         self._ttl = ttl_seconds
         self._lock = threading.Lock()
         self._revoked: set[str] = set()
+        self._cutoffs: dict[str, float] = {}
         self._loaded_at: float | None = None
 
-    def is_revoked(self, jti: str) -> bool:
+    def is_revoked(self, jti: str | None, sub: str | None = None, iat: float | None = None) -> bool:
         with self._lock:
             stale = self._loaded_at is None or monotonic() - self._loaded_at >= self._ttl
         if stale:
             self.refresh()
-        return jti in self._revoked
+        if jti is not None and jti in self._revoked:
+            return True
+        cutoff = self._cutoffs.get(sub) if sub else None
+        # iat é em segundos inteiros: o corte vale até o fim do segundo da mudança, para
+        # nenhum token anterior escapar (login nesse mesmo segundo precisa ser refeito)
+        return cutoff is not None and iat is not None and iat < math.ceil(cutoff)
 
     def refresh(self) -> None:
         try:
             revoked = _load_revoked()
+            cutoffs = _load_cutoffs()
         except Exception as exc:
             # Mantém a última lista e só tenta de novo após o TTL: sem isso, banco
             # fora do ar somaria um timeout de conexão a cada request com token
@@ -74,11 +92,16 @@ class RevokedTokens:
             return
         with self._lock:
             self._revoked = revoked
+            self._cutoffs = cutoffs
             self._loaded_at = monotonic()
 
     def revoke_now(self, jti: str) -> None:
         with self._lock:
             self._revoked.add(jti)
+
+    def cut_now(self, sub: str, at: float) -> None:
+        with self._lock:
+            self._cutoffs[sub] = at
 
 
 class RevocationMiddleware(BaseHTTPMiddleware):
@@ -95,7 +118,15 @@ class RevocationMiddleware(BaseHTTPMiddleware):
             except jwt.InvalidTokenError:
                 claims = {}
             jti = claims.get("jti")
-            if isinstance(jti, str) and await run_in_threadpool(self._revoked.is_revoked, jti):
+            sub = claims.get("sub")
+            iat = claims.get("iat")
+            revoked = await run_in_threadpool(
+                self._revoked.is_revoked,
+                jti if isinstance(jti, str) else None,
+                sub if isinstance(sub, str) else None,
+                float(iat) if isinstance(iat, int | float) else None,
+            )
+            if revoked:
                 return JSONResponse({"detail": "Token revogado"}, status_code=401)
         response: Response = await call_next(request)  # type: ignore[operator]
         return response
