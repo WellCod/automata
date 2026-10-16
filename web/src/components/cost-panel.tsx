@@ -58,23 +58,17 @@ export function CostPanel({ agentId }: Props) {
       {!isPending && !isError && (
         <dl className="grid grid-cols-3 gap-2">
           <div className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2">
-            <dt className="text-label text-[11px] font-medium tracking-[0.05em] uppercase">
-              Execuções
-            </dt>
+            <dt className="text-label text-[11px] font-medium">Execuções</dt>
             <dd className="text-foreground text-[13px] font-medium">{data?.run_count ?? 0}</dd>
           </div>
           <div className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2">
-            <dt className="text-label text-[11px] font-medium tracking-[0.05em] uppercase">
-              Tokens
-            </dt>
+            <dt className="text-label text-[11px] font-medium">Tokens</dt>
             <dd className="text-foreground text-[13px] font-medium">
               {formatTokens(data?.total_tokens ?? 0)}
             </dd>
           </div>
           <div className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2">
-            <dt className="text-label text-[11px] font-medium tracking-[0.05em] uppercase">
-              Custo
-            </dt>
+            <dt className="text-label text-[11px] font-medium">Custo</dt>
             <dd className="text-foreground text-[13px] font-medium">
               {formatCost(data?.cost ?? null)}
             </dd>

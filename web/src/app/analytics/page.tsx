@@ -54,11 +54,9 @@ function LoadError({ message, onRetry }: { message: string; onRetry: () => void 
 function SummaryCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="border-border bg-card flex flex-col gap-1 rounded border px-4 py-3">
-      <span className="text-muted-foreground text-[10px] font-medium tracking-[0.05em] uppercase">
-        {label}
-      </span>
+      <span className="text-muted-foreground text-[11px] font-medium">{label}</span>
       <span className="text-foreground text-[22px] leading-tight font-semibold">{value}</span>
-      {hint && <span className="text-muted-foreground text-[10px]">{hint}</span>}
+      {hint && <span className="text-muted-foreground text-[11px]">{hint}</span>}
     </div>
   );
 }
@@ -294,7 +292,7 @@ export default function AnalyticsPage() {
                     <td className="text-foreground px-4 py-2 font-medium">{row.agent_name}</td>
                     <td className="text-foreground px-4 py-2 text-right">{row.total_runs}</td>
                     <td
-                      className={`px-4 py-2 text-right ${row.error_rate > 0.1 ? "text-red-400" : "text-foreground"}`}
+                      className={`px-4 py-2 text-right ${row.error_rate > 0.1 ? "text-destructive" : "text-foreground"}`}
                     >
                       {(row.error_rate * 100).toFixed(1)}%
                     </td>

@@ -4,148 +4,112 @@ Fonte de verdade do sistema visual. Todas as decisões de estilo partem daqui.
 
 ## Tema
 
-Único tema: dark. O design é definido e testado apenas neste modo.  
-Implementação: um único bloco de tokens em `:root, .dark` com `color-scheme: dark`;
-a classe `.dark` vai fixa no `<html>` (`layout.tsx`) para as variantes `dark:` dos
-componentes shadcn. Não há alternância de tema.
+Claro e escuro, escolhidos pelo usuário no botão do rodapé da sidebar, que alterna entre claro, escuro e sistema. Sem escolha salva, segue o sistema operacional.
 
-## Tokens de cor
+Implementação:
+- Tokens do claro em `:root` e do escuro em `.dark`, em `src/app/globals.css`.
+- A escolha fica em `localStorage` (`automata-theme`). Um script no `<head>` (`src/lib/theme-script.ts`) aplica a classe `.dark` antes da hidratação, para a tela não abrir no tema errado.
+- `src/components/layout/theme.tsx` tem o hook `useTheme` e o `ThemeToggle`. O Toaster segue o tema resolvido.
 
-Definidos como CSS custom properties em `src/app/globals.css`.  
-O bloco `@theme inline` existente propaga-os para o Tailwind automaticamente.
+## Paleta: grafite e azul
 
-| Variável CSS           | Hex         | OKLCH aproximado        | Uso                                      |
-|------------------------|-------------|-------------------------|------------------------------------------|
-| `--background`         | `#0B0B0B`   | `oklch(0.08 0 0)`       | Fundo da aplicação                       |
-| `--card`               | `#141414`   | `oklch(0.12 0 0)`       | Superfície de painel / card              |
-| `--muted`              | `#1A1A1A`   | `oklch(0.15 0 0)`       | Fundo de elementos silenciados           |
-| `--input`              | `#1E1E1E`   | `oklch(0.17 0 0)`       | Fundo de campos de entrada               |
-| `--border`             | `#262626`   | `oklch(0.21 0 0)`       | Bordas 1px universais                    |
-| `--foreground`         | `#F0F0F0`   | `oklch(0.95 0 0)`       | Texto primário                           |
-| `--muted-foreground`   | `#8A8A8A`   | `oklch(0.59 0 0)`       | Texto secundário / label                 |
-| `--accent`             | `#25E0C8`   | `oklch(0.82 0.13 185)`  | Nav ativo, ícone de entidade             |
-| `--destructive`        | `#E05252`   | `oklch(0.60 0.20 25)`   | Erro / ação destrutiva                   |
-| `--primary`            | `#F0F0F0`   | `oklch(0.95 0 0)`       | Igual a foreground                       |
-| `--primary-foreground` | `#0B0B0B`   | `oklch(0.08 0 0)`       | Texto sobre fundo primário               |
-| `--ring`               | `#25E0C8`   | igual a `--accent`      | Foco (outline)                           |
-| `--sidebar`            | `#0F0F0F`   | `oklch(0.10 0 0)`       | Fundo da sidebar (ligeiramente diferente)|
-| `--sidebar-border`     | `#262626`   | igual a `--border`      | Borda direita da sidebar                 |
-| `--sidebar-primary`    | `#25E0C8`   | igual a `--accent`      | Item ativo na sidebar                    |
-| `--text-label`         | `#C49A6C`   | `oklch(0.68 0.07 55)`   | Labels de pares label/valor em cards     |
-| `--radius`             | `4px`       | —                       | Border-radius universal                  |
+Cinzas neutros (zinc) para superfícies, texto e bordas. Azul só em ação principal, foco, link e item ativo. Nada de cor decorativa.
 
-> **Accent** `#25E0C8` é a cor da marca Automata, extraída do favicon oficial.
-> Nunca usar como fundo de botão — apenas texto, ícone e borda.
+| Token | Claro | Escuro | Uso |
+|---|---|---|---|
+| `--background` | `#FFFFFF` | `#09090B` | Fundo da aplicação |
+| `--card` | `#FFFFFF` | `#18181B` | Card, painel, tabela |
+| `--sidebar` | `#FAFAFA` | `#0C0C0E` | Sidebar |
+| `--muted` | `#F4F4F5` | `#27272A` | Hover, fundos silenciados |
+| `--border` | `#E4E4E7` | `#27272A` | Bordas 1px |
+| `--input` | `#FFFFFF` | `#18181B` | Fundo de campo |
+| `--foreground` | `#09090B` | `#FAFAFA` | Texto primário |
+| `--muted-foreground` | `#71717A` | `#A1A1AA` | Texto secundário |
+| `--text-label` | `#52525B` | `#A1A1AA` | Rótulo de par rótulo/valor |
+| `--accent` | `#2563EB` | `#3B82F6` | Ação principal, foco, link, item ativo |
+| `--destructive` | `#DC2626` | `#EF4444` | Erro, ação destrutiva |
+| `--ring` | igual ao accent | igual ao accent | Anel de foco |
 
-### Verificação de contraste (WCAG AA — mínimo 4.5:1 para texto normal)
+Contraste (WCAG AA, 4.5:1 para texto): `--muted-foreground` passa nos dois modos (`#71717A` sobre branco 4.8:1; `#A1A1AA` sobre `#09090B` 7.9:1). O texto branco sobre o accent passa nos dois.
 
-| Par                                        | Ratio calculado | Resultado |
-|--------------------------------------------|-----------------|-----------|
-| `--muted-foreground` (#8A8A8A) / `--card` (#141414)       | ~5.3:1 | ✓ AA |
-| `--muted-foreground` (#8A8A8A) / `--background` (#0B0B0B) | ~5.7:1 | ✓ AA |
-| `--foreground` (#F0F0F0) / `--card` (#141414)             | ~18:1  | ✓ AAA |
-| `--text-label` (#C49A6C) / `--card` (#141414)             | ~7.2:1 | ✓ AA  |
-
-O `#8A8A8A` proposto passa AA em ambas as superfícies — nenhum ajuste necessário.
-O `#C49A6C` proposto para labels passa AA sobre o card — nenhum ajuste necessário.
+Estados com cor própria usam o par claro/escuro do Tailwind: pendente `text-amber-700` / `dark:text-amber-400`, sucesso `text-green-600` / `dark:text-green-500`. Nunca `amber-400` no claro (contraste baixo).
 
 ## Geometria
 
-- `border-radius`: **4px** em tudo. Sem pílulas, sem círculos (exceto avatar).
-- `box-shadow`: **zero**. Separação entre superfícies via borda 1px.
-- Sem gradiente, sem glassmorphism, sem backdrop-blur.
+- `--radius`: **6px**. Selos de estado são pílula (`rounded-full`).
+- Sombra só no anel de foco; separação entre superfícies por borda 1px.
+- Sem gradiente, glassmorphism ou blur.
 
 ## Tipografia
 
-Dois níveis apenas:
+Geist Sans (variável `--font-geist-sans`), sem troca de família. Texto sempre em caixa normal, só a primeira letra maiúscula. Nada de caixa alta em botão, aba ou rótulo.
 
-| Nível          | Tamanho | Classe Tailwind   | Uso                          |
-|----------------|---------|-------------------|------------------------------|
-| Corpo / label  | 13px    | `text-[13px]`     | Conteúdo, labels, metadados  |
-| Título de card | 14–15px | `text-sm`         | Cabeçalhos de painel         |
+| Nível | Tamanho | Uso |
+|---|---|---|
+| Corpo, botão, aba | 13px | Conteúdo, campos, ações |
+| Título de página e de card | 14px (`text-sm`) | Cabeçalhos |
+| Apoio | 11–12px | Metadados, dicas, selos |
 
-Hierarquia criada por cor (`--foreground` vs `--muted-foreground`), nunca por tamanho.  
-Fonte: herda do layout (Geist Sans); sem troca de família.
+Hierarquia por cor (`foreground`, `muted-foreground`, `text-label`) e peso (`font-medium`), não por tamanho.
 
 ## Botões
 
-Elemento mais característico da linguagem "developer tool":
+`Button` em `src/components/ui/button.tsx` (shadcn sobre Base UI). Uma ação principal por tela.
 
-- Fundo **transparente**
-- Borda **1px** com `--border`
-- Texto **uppercase**, `letter-spacing: 0.05em`, `font-size: 11–12px`, peso medium
-- Padding vertical: **6px** (`py-1.5`)
-- Hover: muda apenas cor de borda e texto — **nunca o fundo**
-- Sem box-shadow, sem border-radius > 4px
-- Variante destrutiva: borda e texto em `--destructive`
+| Variante | Aparência | Quando |
+|---|---|---|
+| `strong` | Azul preenchido, texto branco | Ação principal (salvar, criar, confirmar) |
+| `accent` | Azul claro com texto azul | Criar novo, publicar |
+| `default` | Contorno neutro | Ação secundária |
+| `muted` | Contorno neutro, texto secundário | Cancelar, editar, opção de seletor |
+| `destructive` | Vermelho preenchido | Confirmar exclusão |
+| `subtleDestructive` | Neutro que fica vermelho no hover | Excluir antes da confirmação |
+| `ghost` | Sem borda | Ícone, ação discreta |
 
-Implementação: `Button` em `src/components/ui/button.tsx` (shadcn sobre Base UI). Variantes:
-`default`, `strong` (ação principal da tela), `accent`, `muted`, `destructive`,
-`subtleDestructive` (excluir antes da confirmação) e `ghost` (ícone). Tamanhos `default` (h-7),
-`sm`, `xs` e `icon`. Seletor de opção (período, filtro) usa `accent` no item ativo e `muted`
-nos demais — nunca fundo accent.
+Tamanhos: `default` (h-8), `sm` (h-7), `xs` (h-6), `icon`. Seletor de opção (período, filtro) usa `accent` no item ativo e `muted` nos demais.
 
-Demais componentes shadcn em uso: `Tabs` (linha inferior em accent na aba ativa), `Field`/`Label`
-(13px; erro e descrição em 11px) e `Toaster` do Sonner (feedback de salvar, publicar e reverter).
+## Selos de estado
 
-## Cards / Painéis
+`Badge` em `src/components/ui/status-badge.tsx`: pílula de 11px com fundo leve. Tons: `active` (azul), `pending` (âmbar), `neutral` (cinza), `danger` (vermelho). Texto com primeira letra maiúscula ("Rascunho pendente", "v3 ativa").
 
-- Borda 1px `--border`, sem sombra, radius 4px
-- **Header**: ícone 16px + título + ação opcional alinhada à direita
-- **Corpo**: pares label/valor — label em `--text-label` (13px, medium), valor em
-  `--muted-foreground` (13px). Gap entre pares: 16px.
-- **Footer** (quando aplicável): separado por `border-top: 1px solid --border`,
-  contendo ações.
+## Cards e painéis
 
-### Hierarquia de texto nos cards
+- Borda 1px `--border`, radius 6px, fundo `--card`.
+- Cabeçalho: título 14px e ação opcional à direita.
+- Corpo: pares rótulo/valor, rótulo em `--text-label`, valor em `--muted-foreground`.
 
-Três níveis, diferenciados apenas por cor:
+## Abas
 
-| Nível            | Token           | Uso                              |
-|------------------|-----------------|----------------------------------|
-| Título / primário| `--foreground`  | Nome do agente, valores de destaque |
-| Label            | `--text-label`  | Labels de pares label/valor      |
-| Secundário       | `--muted-foreground` | Valores de pares, metadados |
+`Tabs` em `src/components/ui/tabs.tsx`: texto 13px; a aba ativa fica com texto primário e linha inferior azul, sem fundo.
 
 ## Navegação lateral
 
-- Largura: **200px** fixo, sem colapso animado
-- Item: ícone 16px + label 13px, altura 32px (`h-8`)
-- Grupos separados por `border-bottom: 1px solid --border`, sem título de seção
-- Item ativo: texto e ícone em `--accent`, sem fundo destacado
-- Padding horizontal: 12px (`px-3`)
+- Largura fixa de 200px, fundo `--sidebar`.
+- Item: ícone 16px e rótulo 13px, altura 32px; ativo em azul, sem fundo.
+- Rodapé: e-mail de quem está logado, seletor de tema e sair. Itens só de owner (Usuários) não aparecem para os outros papéis.
 
 ## Inputs
 
-- Fundo: `--input` (`#1E1E1E`)
-- Borda: 1px `--border`; focus: borda em `--accent`
-- Sem box-shadow
-- Radius: 4px
-- Texto: `--foreground`, placeholder: `--muted-foreground`
+Fundo `--input`, borda 1px `--border` e foco com borda azul. Placeholder em `--muted-foreground`.
 
 ## Densidade
 
-Espaçamento base: **4px**. Esta UI é densa de propósito.  
-Gap entre itens de lista: 4px. Padding interno de card: 12px.  
-Se uma tela parecer "espaçosa", há espaço demais.
+Base de 4px. O painel é denso de propósito: gap de 4px em listas e padding de 12px em card.
 
 ## Gráficos
 
 Recharts via `ChartContainer` do shadcn (`src/components/ui/chart.tsx`), em `src/components/metrics-charts.tsx`.
 
-- Séries: `--chart-1` `#14A394` e `--chart-2` `#D95926`; erro em `--chart-error` `#D03B3B`; bloqueio por guardrail em `--chart-blocked` `#C98500`. O accent `#25E0C8`
-  é claro demais para marca de dados no fundo escuro (OKLCH L 0.82, fora da faixa 0.48–0.67); as três
-  cores passam no validador de paleta contra `--card` (CVD ΔE ≥ 12, contraste ≥ 3:1).
+- Séries: `--chart-1` (azul `#2563EB` / `#3B82F6`) e `--chart-2` (laranja `#EA580C`); erro em `--chart-error` (`#DC2626` / `#EF4444`). Validadas no validador de paleta contra o `--card` de cada modo (lightness na faixa, CVD ΔE ≥ 30, contraste ≥ 3:1).
+- Bloqueio por guardrail: `--chart-blocked` (`#B45309` / `#C98500`), empilhado abaixo do sucesso em "Conversas por dia": ao lado do erro, âmbar e vermelho se confundem para daltonismo deutan. A ordem bloqueado → sucesso → erro passa no validador nos dois temas.
 - Um eixo por gráfico; medidas de escala diferente vão em gráficos separados.
-- Linha 2px sem marcadores, barra com topo arredondado em 4px, grade só horizontal.
-- Legenda sempre que houver duas séries; tooltip no hover; tabela com os mesmos dados em "Ver tabela".
+- Linha de 2px sem marcadores, barra com topo arredondado de 4px, grade só horizontal.
+- Legenda sempre que houver duas séries, tooltip no hover e tabela com os mesmos dados em "Ver tabela".
 
 ## Proibido
 
-- `box-shadow` em qualquer elemento
-- `border-radius` > 4px
-- Gradiente (`bg-gradient-*`)
-- `backdrop-blur`
-- Múltiplos tamanhos de fonte além dos dois definidos
-- Accent como fundo de botão ou surface
-- Título de seção na nav (usar borda de separação)
+- Caixa alta em texto de interface
+- Cor saturada fora de ação, foco e estado
+- Mais de uma ação principal (`strong`) por tela
+- Gradiente, glow ou blur
+- `amber-400`, `red-400` e similares claros como texto no tema claro

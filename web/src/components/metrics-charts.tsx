@@ -25,8 +25,8 @@ interface Props {
 
 // Cores validadas para o fundo do card (#141414): ver DESIGN.md, seção Gráficos
 const runsConfig = {
-  success: { label: "Sucesso", color: "var(--chart-1)" },
   blocked: { label: "Bloqueado", color: "var(--chart-blocked)" },
+  success: { label: "Sucesso", color: "var(--chart-1)" },
   errors: { label: "Erro", color: "var(--chart-error)" },
 } satisfies ChartConfig;
 
@@ -75,7 +75,7 @@ function ChartFrame({ title, children }: { title: string; children: React.ReactN
 function SeriesTable({ points }: { points: DailyMetricsPoint[] }) {
   return (
     <details className="text-[13px]">
-      <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-[11px] tracking-[0.05em] uppercase">
+      <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-[11px]">
         Ver tabela
       </summary>
       <div className="border-border mt-2 max-h-72 overflow-auto rounded border">
@@ -185,15 +185,15 @@ export function MetricsCharts({ range, agentId }: Props) {
               <ChartLegend content={<ChartLegendContent />} />
               <Bar
                 isAnimationActive={false}
-                dataKey="success"
-                stackId="runs"
-                fill="var(--color-success)"
-              />
-              <Bar
-                isAnimationActive={false}
                 dataKey="blocked"
                 stackId="runs"
                 fill="var(--color-blocked)"
+              />
+              <Bar
+                isAnimationActive={false}
+                dataKey="success"
+                stackId="runs"
+                fill="var(--color-success)"
               />
               <Bar
                 isAnimationActive={false}
