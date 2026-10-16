@@ -184,12 +184,16 @@ read -rs SEED_PASSWORD
 echo
 
 echo "  Rodando seed full (owner + 5 agentes + 500 runs)..."
-railway run --service api \
-  bash -c "SEED_OWNER_EMAIL='$SEED_EMAIL' SEED_OWNER_PASSWORD='$SEED_PASSWORD' .venv/bin/python scripts/seed.py full" \
+# Credenciais vão pelo ambiente do processo, nunca pela linha de comando:
+# não aparecem no ps nem são reinterpretadas por um shell (aspas, $, ;)
+SEED_OWNER_EMAIL="$SEED_EMAIL" SEED_OWNER_PASSWORD="$SEED_PASSWORD" \
+  railway run --service api .venv/bin/python scripts/seed.py full \
   2>/dev/null || {
     warn "Seed via railway run falhou — rode manualmente após o deploy:"
-    warn "  railway run bash -c \"SEED_OWNER_EMAIL='$SEED_EMAIL' SEED_OWNER_PASSWORD='<a senha digitada acima>' .venv/bin/python scripts/seed.py full\""
+    warn "  read -rs SEED_OWNER_PASSWORD && export SEED_OWNER_PASSWORD SEED_OWNER_EMAIL=<email>"
+    warn "  railway run --service api .venv/bin/python scripts/seed.py full"
   }
+unset SEED_PASSWORD
 
 # ─────────────────────────────────────────────────────────────────────────────
 step "7/7 · Deploy do painel no Vercel"

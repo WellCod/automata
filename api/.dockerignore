@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+.venv
+htmlcov
+.coverage
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+openapi.json
