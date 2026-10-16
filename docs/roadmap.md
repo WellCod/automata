@@ -799,7 +799,7 @@ Decisão em [ADR-0012](adr/0012-bases-de-conhecimento.md). Base de conhecimento 
 - [x] `feat(api)`: ingestão de arquivo, URL e texto em background, com status, remoção, limites e SSRF na URL
 - [x] `feat(api)`: busca de teste na base (trechos e score, sem rodar agente)
 - [x] `feat(api)`: agentes e times usam bases (payload, factory, uma tool por base, bloco fixo nas instruções, aviso no linter, embedder determinístico no `DEMO_REPLAY`)
-- [ ] `feat(web)`: página Conhecimento (bases, upload com arrastar e soltar, status, remoção, busca de teste)
+- [x] `feat(web)`: página Conhecimento (bases, upload com arrastar e soltar, status, remoção, busca de teste)
 - [ ] `feat(web)`: seleção de bases no agente e no time, e citações no modo teste e na árvore de execução
 - [ ] `feat`: custo de embedding no metering, no estimador e no analytics
 - [ ] `test(api)`: evals de recuperação (pergunta com documento esperado entre os primeiros resultados) e seed da demo com base

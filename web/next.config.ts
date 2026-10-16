@@ -32,6 +32,11 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  experimental: {
+    // o proxy guarda o corpo em memória e corta em 10 MB por padrão: upload de base de
+    // conhecimento (até KNOWLEDGE_MAX_UPLOAD_MB na API, 20 MB) chegaria truncado
+    proxyClientMaxBodySize: "25mb",
+  },
   async headers() {
     return [
       {
