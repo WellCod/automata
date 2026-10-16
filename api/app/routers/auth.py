@@ -1,10 +1,14 @@
 import logging
+from datetime import UTC, datetime
 
 import jwt
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from sqlalchemy import delete
+from sqlalchemy.dialects.postgresql import insert
 
 from app.auth import issue_token
 from app.db import SessionDep
+from app.models.revoked_token import RevokedToken
 from app.proxy import get_client_ip
 from app.repositories.user import UserRepository
 from app.schemas.user import (
@@ -56,6 +60,37 @@ def login(request: Request, body: LoginInput, session: SessionDep) -> TokenRespo
         raise HTTPException(status_code=401, detail="Credenciais inválidas") from e
     logger.info("login ok", extra={"ip": ip, "user_id": user_id, "role": user_role})
     return TokenResponse(access_token=issue_token(user_id, ROLE_SCOPES[user_role]))
+
+
+@router.post("/logout", status_code=204)
+def logout(request: Request, session: SessionDep, authorization: str = Header(...)) -> Response:
+    """Revoga o token da sessão: o RevocationMiddleware passa a recusá-lo até expirar."""
+    token = authorization.removeprefix("Bearer ")
+    settings = get_settings()
+    try:
+        payload = jwt.decode(
+            token, settings.jwt_public_key, algorithms=["RS256"], audience="automata"
+        )
+    except jwt.InvalidTokenError as e:
+        raise HTTPException(status_code=401, detail="Token inválido") from e
+    jti = payload.get("jti")
+    # token emitido antes do jti existir: não há o que revogar, expira sozinho
+    if isinstance(jti, str):
+        now = datetime.now(UTC)
+        session.execute(
+            insert(RevokedToken)
+            .values(
+                jti=jti,
+                user_id=str(payload.get("sub", "")),
+                expires_at=datetime.fromtimestamp(payload["exp"], UTC),
+            )
+            .on_conflict_do_nothing(index_elements=["jti"])
+        )
+        session.execute(delete(RevokedToken).where(RevokedToken.expires_at <= now))
+        session.commit()
+        request.app.state.revoked_tokens.revoke_now(jti)
+        logger.info("logout", extra={"user_id": payload.get("sub")})
+    return Response(status_code=204)
 
 
 @router.post("/users", response_model=UserResponse, status_code=201)

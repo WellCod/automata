@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import DateTime, Index, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.config import Base
@@ -10,6 +10,7 @@ class RevokedToken(Base):
     """jti de token de sessão revogado no logout; a linha só importa até o token expirar."""
 
     __tablename__ = "revoked_token"
+    __table_args__ = (Index("ix_revoked_token_expires_at", "expires_at"),)
 
     jti: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[str] = mapped_column(String(255), nullable=False)
