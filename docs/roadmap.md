@@ -807,3 +807,21 @@ Decisão em [ADR-0012](adr/0012-bases-de-conhecimento.md). Base de conhecimento 
 **Critério de aceite da fase:** subir um PDF numa base, ligar a base a um agente, publicar e ver no modo teste uma resposta que cita o documento; remover o documento e a resposta deixar de citá-lo.
 
 Fica para depois: conectores remotos (S3, SharePoint, GitHub, já no Agno), reranker, filtros escolhidos pelo modelo (`enable_agentic_knowledge_filters`), reindexação agendada de URL e worker de ingestão separado.
+
+---
+
+## Fase 14 — Guardrails por agente
+
+Decisão em [ADR-0013](adr/0013-guardrails-por-agente.md). Guardrails entram no payload versionado do agente (`guardrails`), viram `pre_hooks` e `post_hooks` do Agno na factory e são implementações próprias de `BaseGuardrail`: os prontos do Agno só têm padrões dos EUA e lista de injeção em inglês. Run bloqueado ganha status `blocked` e motivo em `agent_run`, fora da taxa de falha.
+
+- [ ] `docs(adr)`: ADR-0013 e esta seção
+- [ ] `feat(api)`: seção `guardrails` no payload e regras de entrada — dados pessoais (CPF e CNPJ com dígito verificador, cartão com Luhn, e-mail, telefone BR; bloquear ou mascarar, mascarando também o input gravado quando bloqueia), injeção de prompt em PT e EN com termos extras, tópicos proibidos, tamanho máximo e moderação opcional da OpenAI (400 ao salvar sem `OPENAI_API_KEY`); factory aplica no agente, no líder e nos membros; mensagem de bloqueio configurável
+- [ ] `feat(api)`: status `blocked` e `blocked_by` em `agent_run` (migration), tracking lendo o `error_id` do bloqueio no stream e no não-stream, analytics e métricas por agente separando bloqueio de falha
+- [ ] `feat(api)`: guardrail de saída (dados pessoais e termos proibidos na resposta); troca a resposta no não-stream e marca o run no stream
+- [ ] `feat(web)`: seção Guardrails na aba Configuração do agente e do time, com aviso sobre moderação e sobre saída em stream; modo teste mostra qual regra bloqueou
+- [ ] `feat(web)`: bloqueios por motivo no analytics, no desempenho do agente e na lista de execuções
+- [ ] `test(api)`: evals de guardrails — casos de PII brasileira, injeção em PT e EN e falsos positivos conhecidos (número de pedido, "prompt do sistema" em contexto legítimo)
+
+**Critério de aceite da fase:** ligar dados pessoais em modo bloquear num agente, publicar, mandar uma mensagem com CPF válido e ver o bloqueio no modo teste com o motivo, sem token gasto, com a sessão gravada mascarada e o run contado em bloqueios, não em falhas; a mesma mensagem com um número de pedido de 11 dígitos passa.
+
+Fica para depois: classificador por LLM (tópico, toxicidade, injeção) como regra opcional, padrão de guardrails da instância e guardrails nos documentos indexados pelo RAG.
