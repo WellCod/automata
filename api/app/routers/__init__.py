@@ -4,6 +4,7 @@ from app.routers.approvals import router as approvals_router
 from app.routers.configs import router as configs_router
 from app.routers.integrations import router as integrations_router
 from app.routers.knowledge_bases import router as knowledge_bases_router
+from app.routers.knowledge_contents import router as knowledge_contents_router
 from app.routers.linter import router as linter_router
 from app.routers.mcp_servers import router as mcp_servers_router
 from app.routers.metrics import router as metrics_router
@@ -19,6 +20,7 @@ PROTECTED_ROUTERS: list[APIRouter] = [
     configs_router,
     integrations_router,
     knowledge_bases_router,
+    knowledge_contents_router,
     models_router,
     linter_router,
     mcp_servers_router,

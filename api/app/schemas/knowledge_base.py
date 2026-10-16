@@ -1,7 +1,8 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
 from app.knowledge.embedders import EmbedderName
 
@@ -43,3 +44,29 @@ class EmbedderInfo(BaseModel):
     dimensions: int
     configured: bool
     default: bool
+
+
+class UrlContentInput(BaseModel):
+    url: HttpUrl
+    name: str | None = Field(default=None, max_length=255)
+
+
+class TextContentInput(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    text: str = Field(min_length=1)
+
+
+class KnowledgeContentResponse(BaseModel):
+    id: UUID
+    base_id: UUID
+    name: str
+    source_type: Literal["file", "url", "text"]
+    source: str
+    extension: str
+    size_bytes: int
+    status: Literal["processing", "completed", "failed"]
+    status_message: str | None
+    chunk_count: int
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
