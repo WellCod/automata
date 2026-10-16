@@ -766,7 +766,7 @@ Fecha o que ficou aberto dos PRs 41 e 44.
 - [x] `refactor(web)`: componentes shadcn (Button, Tabs, Field, Sonner) e nova página de edição
 - [x] `feat(web)`: gráficos no analytics e no desempenho do agente
 - [x] `fix(security)` restante: argon2 contra hash fixo no login (sem enumeração por tempo), CSP no painel e HSTS no painel e na API atrás de proxy confiável, `/docs` só com `APP_ENV=development`, `.dockerignore` sem `.env`, senha do seed fora da linha de comando no `deploy.sh`, reset da demo limpando `agent_run` e as tabelas do Agno
-- [ ] revogação de token (`jti`)
+- [x] revogação de token (`jti`): todo token leva `jti`, logout revoga a sessão (`revoked_token`) e o `demo-reset.yml` passa as credenciais pelo ambiente do SSH
 
 ---
 

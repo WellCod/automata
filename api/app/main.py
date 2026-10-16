@@ -145,6 +145,7 @@ def create_app(
     # via _require_admin que verifica JWT + scope agent_os:admin.
     outer: FastAPI = FastAPI(title="automata", **docs)  # type: ignore[arg-type]
     outer.state.rate_limiter = make_rate_limiter(settings.redis_url, limit=5, window=60)
+    outer.state.revoked_tokens = revoked
     outer.add_middleware(SyncPublishedAgentsMiddleware, published=published)
     if enable_auth:
         outer.add_middleware(RevocationMiddleware, revoked=revoked)

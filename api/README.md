@@ -128,6 +128,10 @@ A chave privada (`JWT_PRIVATE_KEY`) existe só no processo da API, que emite os 
 
 E-mail inexistente ou usuário inativo também passa pelo argon2, contra um hash fixo gerado no import de `app/services/user.py`: a latência do 401 não revela quais contas existem.
 
+### Logout
+
+Todo token emitido leva um `jti`. `POST /api/v1/auth/logout` (com o bearer da sessão) grava o `jti` em `revoked_token` até o token expirar, e o `RevocationMiddleware` passa a recusá-lo com 401, nas rotas próprias e nas do AgentOS. Os outros tokens do mesmo usuário continuam válidos. O BFF chama essa rota em `/api/auth/logout` e apaga o cookie mesmo se a API não responder. Token emitido antes do `jti` existir recebe 204 sem ser revogado e expira sozinho em até 1 h. Linhas expiradas saem da tabela a cada logout.
+
 ### HSTS
 
 `Strict-Transport-Security` vai em toda resposta servida por HTTPS. Atrás de um proxy que termina o TLS, a conexão chega em HTTP; nesse caso vale o `X-Forwarded-Proto: https`, aceito só quando o peer está em `TRUSTED_PROXIES` (mesma regra do `X-Forwarded-For`, em `app/proxy.py`).
@@ -176,7 +180,7 @@ Tokens para sistemas externos e assistentes de IA chamarem agentes e times via R
 - `POST /api/v1/integrations` recebe `{name, agent_ids, team_ids, expires_in_days}` (até 90 dias) e devolve o token **uma vez só**, junto com o `mcp_url` (`PUBLIC_BASE_URL` + `/mcp`).
 - O token carrega só `agents:<id>:read|run` e `teams:<id>:read|run` dos recursos liberados, com `sub = integration:<id>` e um `jti`. Ele lista e executa apenas esses recursos, e não acessa config, métricas nem sessões de outros. Os recursos precisam estar publicados.
 - `GET /api/v1/integrations` lista sem o token. `DELETE /api/v1/integrations/{id}` revoga.
-- Revogação: o Agno só valida assinatura e expiração, então o `RevocationMiddleware` (`app/integrations.py`) recusa com 401 o `jti` revogado antes de a request chegar a ele. No processo que revogou, vale na hora; nos outros workers, em até 30 s (cache).
+- Revogação: o Agno só valida assinatura e expiração, então o `RevocationMiddleware` (`app/integrations.py`) recusa com 401 o `jti` revogado (de integração ou de sessão encerrada no logout) antes de a request chegar a ele. No processo que revogou, vale na hora; nos outros workers, em até 30 s (cache).
 - No `/mcp`, as tools `run_agent`/`run_team` exigem os mesmos scopes por recurso da REST, e `get_agentos_config` lista só o liberado.
 
 ## Árvore de execução

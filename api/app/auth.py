@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import jwt
 
@@ -30,8 +31,7 @@ def issue_token(
         "aud": audience,
         "iat": now,
         "exp": now + timedelta(seconds=expires_in),
+        # identifica o token para revogação (logout e tokens de integração)
+        "jti": jti or uuid4().hex,
     }
-    if jti is not None:
-        # identifica o token para revogação (tokens de integração)
-        payload["jti"] = jti
     return jwt.encode(payload, settings.jwt_private_key, algorithm=_ALGORITHM)

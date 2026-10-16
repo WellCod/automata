@@ -1,4 +1,4 @@
-"""Tokens de integração e revogação por jti (ADR-0009).
+"""Tokens de integração e revogação por jti (ADR-0009), também usada no logout.
 
 O middleware do AgentOS só valida assinatura e expiração; não conhece
 revogação. RevokedTokens consulta os jti revogados ainda não expirados,
@@ -21,6 +21,7 @@ from starlette.responses import JSONResponse, Response
 
 from app.db import get_engine
 from app.models.integration import IntegrationToken
+from app.models.revoked_token import RevokedToken
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +41,11 @@ def integration_scopes(agent_ids: list[UUID], team_ids: list[UUID]) -> list[str]
 def _load_revoked() -> set[str]:
     now = datetime.now(UTC)
     with Session(get_engine()) as session:
-        stmt = select(IntegrationToken.jti).where(
+        integrations = select(IntegrationToken.jti).where(
             IntegrationToken.revoked_at.is_not(None), IntegrationToken.expires_at > now
         )
-        return set(session.scalars(stmt))
+        sessions = select(RevokedToken.jti).where(RevokedToken.expires_at > now)
+        return set(session.scalars(integrations)) | set(session.scalars(sessions))
 
 
 class RevokedTokens:

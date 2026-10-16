@@ -11,12 +11,18 @@ jobs:
     steps:
       - name: Reset via SSH
         uses: appleboy/ssh-action@v1
+        # Credenciais vão pelo ambiente da sessão SSH, nunca interpoladas no script:
+        # interpolar põe a senha no texto do comando (e quebra com aspas)
+        env:
+          SEED_OWNER_EMAIL: ${{ secrets.DEMO_OWNER_EMAIL }}
+          SEED_OWNER_PASSWORD: ${{ secrets.DEMO_OWNER_PASSWORD }}
         with:
           host: ${{ secrets.DEMO_HOST }}
           username: ${{ secrets.DEMO_USER }}
           key: ${{ secrets.DEMO_SSH_KEY }}
+          envs: SEED_OWNER_EMAIL,SEED_OWNER_PASSWORD
           script: |
             docker exec \
-              -e SEED_OWNER_EMAIL="${{ secrets.DEMO_OWNER_EMAIL }}" \
-              -e SEED_OWNER_PASSWORD="${{ secrets.DEMO_OWNER_PASSWORD }}" \
+              -e SEED_OWNER_EMAIL \
+              -e SEED_OWNER_PASSWORD \
               automata-demo-api python scripts/demo_reset.py
