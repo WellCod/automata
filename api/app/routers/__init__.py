@@ -12,6 +12,8 @@ from app.routers.models import router as models_router
 from app.routers.runs import router as runs_router
 from app.routers.traces import router as traces_router
 from app.routers.usage import router as usage_router
+from app.routers.users import me_router
+from app.routers.users import router as users_router
 
 # Rotas /api/v1 montadas dentro do AgentOS (atrás do JWT). main.py e o export
 # do OpenAPI usam a mesma lista para os tipos do painel não divergirem.
@@ -28,4 +30,6 @@ PROTECTED_ROUTERS: list[APIRouter] = [
     runs_router,
     traces_router,
     usage_router,
+    users_router,
+    me_router,
 ]

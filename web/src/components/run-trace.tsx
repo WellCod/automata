@@ -28,7 +28,7 @@ function SpanNode({ span }: { span: TraceSpan }) {
       <details className="group">
         <summary className="hover:bg-muted flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-[12px]">
           <span
-            className={`w-14 flex-none text-[10px] tracking-[0.05em] uppercase ${failed ? "text-destructive" : "text-[var(--text-label)]"}`}
+            className={`w-14 flex-none text-[11px] ${failed ? "text-destructive" : "text-[var(--text-label)]"}`}
           >
             {TYPE_LABEL[span.type] ?? span.type.toLowerCase()}
           </span>

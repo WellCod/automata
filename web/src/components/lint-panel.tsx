@@ -54,7 +54,7 @@ export function LintPanel({ getPayload }: Props) {
                   key={i}
                   className="border-border bg-card flex items-start gap-2 rounded border px-3 py-2 text-[13px]"
                 >
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
                   <div>
                     <span className="text-foreground font-medium">{w.section}</span>
                     <span className="text-muted-foreground mx-1">·</span>

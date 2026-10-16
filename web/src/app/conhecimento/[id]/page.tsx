@@ -34,7 +34,7 @@ function formatSize(bytes: number): string {
 
 function StatusBadge({ content }: { content: KnowledgeContent }) {
   if (content.status === "processing") {
-    return <span className="text-[11px] text-amber-400">processando…</span>;
+    return <span className="text-[11px] text-amber-600 dark:text-amber-400">processando…</span>;
   }
   if (content.status === "failed") {
     return <span className="text-destructive text-[11px]">falhou</span>;
@@ -492,7 +492,9 @@ function Settings({ base }: { base: KnowledgeBase }) {
       <div className="border-border flex items-center justify-between gap-2 border-t pt-4">
         {confirmDelete ? (
           <div className="flex items-center gap-2">
-            <span className="text-[13px] text-amber-400">Remove todos os documentos.</span>
+            <span className="text-[13px] text-amber-600 dark:text-amber-400">
+              Remove todos os documentos.
+            </span>
             <Button
               variant="destructive"
               onClick={() => remove.mutate()}
