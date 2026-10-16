@@ -794,7 +794,7 @@ Fica para depois: workflows (condições guardadas no banco exigem `cel-python`)
 Decisão em [ADR-0012](adr/0012-bases-de-conhecimento.md). Base de conhecimento é cadastro próprio, não versionado; o agente versiona só a ligação (`knowledge: [{base_id, max_results}]` no payload). Conteúdo e vetores no Agno (`Knowledge` + `PgVector`, tabela por base no schema `ai`), por rotas próprias em `/api/v1/knowledge-bases`. Embeddings da Voyage (`voyage-3.5`) por padrão, OpenAI como alternativa. PRs abertos contra a `main`, na ordem abaixo.
 
 - [ ] `docs(adr)`: ADR-0012 e esta seção
-- [ ] `chore(infra)`: Postgres com pgvector (`pgvector/pgvector:pg17` nos compose e nos testes), migration `CREATE EXTENSION vector`, dependências (`pgvector`, `voyageai`, `pypdf`, `python-docx`, `beautifulsoup4`) e settings (`VOYAGE_API_KEY`, embedder padrão, limites de upload)
+- [x] `chore(infra)`: Postgres com pgvector (`pgvector/pgvector:pg17` nos compose e nos testes), migration `CREATE EXTENSION vector`, dependências (`pgvector`, `voyageai`, `pypdf`, `python-docx`, `beautifulsoup4`) e settings (`VOYAGE_API_KEY`, embedder padrão, limites de upload)
 - [ ] `feat(api)`: cadastro de bases (`knowledge_base`, CRUD, papéis: editor escreve, viewer lê)
 - [ ] `feat(api)`: ingestão de arquivo, URL e texto em background, com status, remoção, limites e SSRF na URL
 - [ ] `feat(api)`: busca de teste na base (trechos e score, sem rodar agente)

@@ -34,7 +34,7 @@ def _load_script() -> ModuleType:
 
 @pytest.fixture(scope="module")
 def engine() -> Generator[Engine, None, None]:
-    with PostgresContainer("postgres:17") as pg:
+    with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         previous = os.environ.get("DATABASE_URL")
         os.environ["DATABASE_URL"] = url

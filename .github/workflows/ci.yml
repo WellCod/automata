@@ -40,8 +40,8 @@ jobs:
         working-directory: api
       - run: uv run mypy app
         working-directory: api
-      - name: cache imagem postgres para testcontainers
-        run: docker pull postgres:17
+      - name: cache imagem postgres (pgvector) para testcontainers
+        run: docker pull pgvector/pgvector:pg17
       - run: uv run pytest -m "not nightly" --cov=app --cov-report=xml
         working-directory: api
       - uses: actions/upload-artifact@v4

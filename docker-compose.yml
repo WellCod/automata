@@ -2,7 +2,7 @@
 # do compose (o painel fala com ela por http://api:8000); para expor, use proxy.
 services:
   db:
-    image: postgres:17
+    image: pgvector/pgvector:pg17
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -47,6 +47,11 @@ services:
       MCP_SECRETS_KEY: ${MCP_SECRETS_KEY:-}
       MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
+      KNOWLEDGE_DEFAULT_EMBEDDER: ${KNOWLEDGE_DEFAULT_EMBEDDER:-voyage}
+      KNOWLEDGE_MAX_UPLOAD_MB: ${KNOWLEDGE_MAX_UPLOAD_MB:-20}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
       interval: 30s
@@ -62,7 +67,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 256M
+          memory: 512M  # embedder e leitores de documento do RAG (ADR-0012)
 
   web:
     build:

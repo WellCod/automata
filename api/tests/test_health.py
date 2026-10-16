@@ -28,7 +28,7 @@ def test_health_db_unreachable() -> None:
 
 
 def test_health_db_ok() -> None:
-    with PostgresContainer("postgres:17") as pg:
+    with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         os.environ["DATABASE_URL"] = url
         get_settings.cache_clear()

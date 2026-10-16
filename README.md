@@ -183,7 +183,8 @@ O agente não é um objeto estático em código. Ele é construído por request 
 |---|---|
 | Runtime de agente | Agno 2.8.7 (AgentOS) — FastAPI integrado, JWT com scopes, traces e sessions persistidos |
 | API | Python 3.12, `uv` — lockfile determinístico, mypy strict, ruff (E/F/I/UP/B/SIM) |
-| Banco | PostgreSQL 17, Alembic — migrations isoladas das tabelas do framework |
+| Banco | PostgreSQL 17 com pgvector (imagem `pgvector/pgvector:pg17`), Alembic — migrations isoladas das tabelas do framework |
+| RAG | Knowledge do Agno com PgVector, embeddings da Voyage (`voyage-3.5`) ou OpenAI ([ADR-0012](docs/adr/0012-bases-de-conhecimento.md)) |
 | Cache / Rate limit | Redis — rate limiting distribuído com burst por IP |
 | Painel | Next.js 16, TypeScript strict, Tailwind 4, shadcn/ui |
 | Estado e fetch | TanStack Query 5, openapi-fetch — tipos gerados via openapi-typescript, nunca escritos à mão |

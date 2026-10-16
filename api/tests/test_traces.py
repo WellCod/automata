@@ -112,7 +112,7 @@ def test_spans_reais_de_time_com_tool_mcp() -> None:
     from testcontainers.postgres import PostgresContainer
 
     api_dir = Path(__file__).resolve().parent.parent
-    with PostgresContainer("postgres:17") as pg:
+    with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         env = {**os.environ, "DATABASE_URL": url, "JWT_PRIVATE_KEY": "x", "JWT_PUBLIC_KEY": "x"}
         subprocess.run(
