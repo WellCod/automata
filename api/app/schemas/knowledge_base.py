@@ -70,3 +70,16 @@ class KnowledgeContentResponse(BaseModel):
     created_by: str
     created_at: datetime
     updated_at: datetime
+
+
+class SearchInput(BaseModel):
+    query: str = Field(min_length=1, max_length=1000)
+    max_results: int = Field(default=5, ge=1, le=20)
+
+
+class SearchHit(BaseModel):
+    content_id: UUID | None
+    content_name: str | None
+    source: str | None
+    text: str
+    score: float | None = Field(description="Combina similaridade e full-text, de 0 a 1")

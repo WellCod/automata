@@ -1,4 +1,4 @@
-"""Cadastro de bases de conhecimento (ADR-0012). Conteúdo e busca vêm nos próximos PRs."""
+"""Cadastro e busca de teste das bases de conhecimento (ADR-0012)."""
 
 import logging
 from uuid import UUID, uuid4
@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.knowledge.embedders import EMBEDDERS, is_configured
+from app.knowledge.search import search_base
 from app.models.knowledge_base import KnowledgeBase
 from app.repositories.knowledge_base import KnowledgeBaseRepository
 from app.schemas.knowledge_base import (
@@ -15,6 +16,8 @@ from app.schemas.knowledge_base import (
     KnowledgeBaseCreate,
     KnowledgeBaseResponse,
     KnowledgeBaseUpdate,
+    SearchHit,
+    SearchInput,
 )
 from app.settings import get_settings
 
@@ -140,3 +143,16 @@ def delete_base(base_id: UUID, session: SessionDep) -> None:
     repo.delete(_get_or_404(repo, base_id))
     session.commit()
     logger.info("base de conhecimento removida", extra={"base_id": str(base_id)})
+
+
+@router.post("/{base_id}/search", response_model=list[SearchHit])
+def search(base_id: UUID, body: SearchInput, session: SessionDep) -> list[SearchHit]:
+    """Trechos que o agente receberia para a pergunta, sem rodar o agente."""
+    base = _get_or_404(KnowledgeBaseRepository(session), base_id)
+    try:
+        hits = search_base(base, body.query, body.max_results)
+    except Exception as exc:
+        # embedder sem chave ou fora do ar: erro de configuração, não da API
+        logger.warning("busca falhou", extra={"base_id": str(base_id), "error": str(exc)})
+        raise HTTPException(status_code=502, detail=f"Busca falhou: {exc}") from exc
+    return [SearchHit(**hit.__dict__) for hit in hits]
