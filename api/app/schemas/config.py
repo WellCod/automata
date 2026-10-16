@@ -63,6 +63,22 @@ class PiiRule(BaseModel):
     types: list[PiiType] = Field(default_factory=lambda: list(PII_TYPES))
 
 
+class OutputRule(BaseModel):
+    """Validação da resposta. No stream o texto já saiu quando ela roda (ADR-0013)."""
+
+    pii: bool = False
+    pii_types: list[PiiType] = Field(default_factory=lambda: list(PII_TYPES))
+    blocked_terms: list[str] = Field(default_factory=list, max_length=50)
+
+    @field_validator("blocked_terms")
+    @classmethod
+    def termos_validos(cls, v: list[str]) -> list[str]:
+        cleaned = [t.strip() for t in v if t.strip()]
+        if any(len(t) < 3 or len(t) > 100 for t in cleaned):
+            raise ValueError("cada termo precisa ter de 3 a 100 caracteres")
+        return cleaned
+
+
 DEFAULT_BLOCKED_MESSAGE = "Não posso ajudar com essa mensagem por aqui."
 
 
@@ -77,6 +93,7 @@ class GuardrailSettings(BaseModel):
     max_input_chars: int | None = Field(default=None, ge=50, le=100_000)
     # API de moderação da OpenAI: uma chamada por mensagem, com o texto saindo da instância
     moderation: bool = False
+    output: OutputRule = Field(default_factory=OutputRule)
     blocked_message: str = Field(default=DEFAULT_BLOCKED_MESSAGE, min_length=1, max_length=500)
 
     @field_validator("injection_extra_terms", "blocked_topics")

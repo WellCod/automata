@@ -1078,6 +1078,7 @@ export interface components {
        * @default false
        */
       moderation: boolean;
+      output?: components["schemas"]["OutputRule"];
       /**
        * Blocked Message
        * @default Não posso ajudar com essa mensagem por aqui.
@@ -1449,6 +1450,21 @@ export interface components {
       /** Email */
       email: string | null;
       role: components["schemas"]["UserRole"] | null;
+    };
+    /**
+     * OutputRule
+     * @description Validação da resposta. No stream o texto já saiu quando ela roda (ADR-0013).
+     */
+    OutputRule: {
+      /**
+       * Pii
+       * @default false
+       */
+      pii: boolean;
+      /** Pii Types */
+      pii_types?: ("cpf" | "cnpj" | "cartao" | "email" | "telefone")[];
+      /** Blocked Terms */
+      blocked_terms?: string[];
     };
     /** PendingTool */
     PendingTool: {

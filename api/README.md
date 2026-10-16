@@ -232,11 +232,13 @@ Regras por agente, no payload versionado (`guardrails`), tudo desligado por padr
 | `blocked_topics` | Termos que bloqueiam a mensagem (3 a 100 caracteres) |
 | `max_input_chars` | Tamanho máximo da mensagem (50 a 100 000) |
 | `moderation` | API de moderação da OpenAI; exige `OPENAI_API_KEY` (400 ao salvar sem ela). Uma chamada por mensagem, com o texto saindo da instância |
+| `output.pii`, `output.pii_types`, `output.blocked_terms` | Resposta com dado pessoal ou termo proibido. Vira `post_hook` (os guardrails prontos do Agno não funcionam como post_hook) |
 | `blocked_message` | O que o usuário vê quando bloqueia |
 
 - Dados pessoais rodam primeiro: o input fica mascarado mesmo quando outra regra bloqueia. O Agno grava o run bloqueado com o input, então a sessão guarda a versão mascarada.
 - Bloqueio: run com status `ERROR` e `content` igual à mensagem de bloqueio; no stream, `RunError` com `error_id` (`pii_detected`, `prompt_injection`, `off_topic`, `input_not_allowed`) e `additional_data.rule` com o motivo.
 - As regras são `BaseGuardrail` próprias (`app/guardrails/`): os guardrails prontos do Agno só têm padrões dos EUA e lista de injeção em inglês.
+- **Saída**: sem stream (integrações REST e MCP), a resposta é trocada pela mensagem de bloqueio, e a mensagem do assistente gravada na sessão também, antes de sair. **Com stream (modo teste, chat), o texto já foi entregue enquanto era gerado**: o run só fica marcado como bloqueado (`output_not_allowed`). O Agno só troca o conteúdo pela mensagem da exceção quando ele está vazio, por isso o hook troca antes de levantar.
 - Run barrado vira `status=blocked` em `agent_run`, com `blocked_by` (`pii_detected`, `prompt_injection`, `off_topic`, `input_too_long`, `moderation`) e `block_detail` (tipos de dado ou termo configurado, nunca o valor enviado). O motivo vem de um registro (`BlockLog`) que a factory liga aos guardrails e ao `TrackedAgent`/`TrackedTeam`: o `RunOutput` bloqueado só traz a mensagem. Bloqueio conta em `total_runs` e não em `error_rate`; `GET /api/v1/configs/{id}/metrics` e `/api/v1/metrics/summary` trazem `blocked_runs` e `blocked_by` (contagem por motivo), `/by-agent` traz `blocked_runs` e `/timeseries` traz `blocked_count` por dia.
 
 ## Árvore de execução
