@@ -843,6 +843,8 @@ export interface components {
       instructions?: components["schemas"]["InstructionSections"];
       /** Mcp Servers */
       mcp_servers?: components["schemas"]["McpServerBinding"][];
+      /** Knowledge */
+      knowledge?: components["schemas"]["KnowledgeBinding"][];
       capabilities?: components["schemas"]["CapabilityFlags"];
       /** Metadata */
       metadata?: {
@@ -1121,6 +1123,22 @@ export interface components {
        * @default 2000
        */
       chunk_size: number;
+    };
+    /**
+     * KnowledgeBinding
+     * @description Base de conhecimento que o agente consulta (ADR-0012). A base em si não é versionada.
+     */
+    KnowledgeBinding: {
+      /**
+       * Base Id
+       * Format: uuid
+       */
+      base_id: string;
+      /**
+       * Max Results
+       * @default 5
+       */
+      max_results: number;
     };
     /** KnowledgeContentResponse */
     KnowledgeContentResponse: {

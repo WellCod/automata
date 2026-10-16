@@ -48,6 +48,13 @@ class McpServerBinding(BaseModel):
         return self
 
 
+class KnowledgeBinding(BaseModel):
+    """Base de conhecimento que o agente consulta (ADR-0012). A base em si não é versionada."""
+
+    base_id: UUID
+    max_results: int = Field(default=5, ge=1, le=20)
+
+
 TeamModeName = Literal["coordinate", "route", "broadcast", "tasks"]
 
 
@@ -88,6 +95,7 @@ class ConfigPayload(BaseModel):
     model_id: str
     instructions: InstructionSections = Field(default_factory=InstructionSections)
     mcp_servers: list[McpServerBinding] = Field(default_factory=list)
+    knowledge: list[KnowledgeBinding] = Field(default_factory=list, max_length=10)
     capabilities: CapabilityFlags = Field(default_factory=CapabilityFlags)
     metadata: dict[str, Any] = Field(default_factory=dict)
     # Em time: modelo, instruções e MCP acima são do líder
@@ -106,6 +114,9 @@ class ConfigPayload(BaseModel):
         ids = [b.server_id for b in self.mcp_servers]
         if len(ids) != len(set(ids)):
             raise ValueError("servidor MCP repetido no agente")
+        bases = [b.base_id for b in self.knowledge]
+        if len(bases) != len(set(bases)):
+            raise ValueError("base de conhecimento repetida no agente")
         return self
 
 

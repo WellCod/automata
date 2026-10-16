@@ -3,14 +3,21 @@ from uuid import UUID
 from app.agents.capabilities import validate_capabilities
 from app.models.config import AgentConfig, AgentConfigVersion
 from app.repositories.config import ConfigRepository
+from app.repositories.knowledge_base import KnowledgeBaseRepository
 from app.repositories.mcp_server import McpServerRepository
 from app.schemas.config import ConfigKind, ConfigPayload, ConfigPayloadStatus
 
 
 class ConfigService:
-    def __init__(self, repo: ConfigRepository, servers: McpServerRepository | None = None) -> None:
+    def __init__(
+        self,
+        repo: ConfigRepository,
+        servers: McpServerRepository | None = None,
+        bases: KnowledgeBaseRepository | None = None,
+    ) -> None:
         self._repo = repo
         self._servers = servers
+        self._bases = bases
 
     def create_config(
         self, name: str, description: str, kind: ConfigKind = ConfigKind.agent
@@ -132,6 +139,7 @@ class ConfigService:
     def _validate(self, config: AgentConfig, payload: ConfigPayload) -> None:
         errors = validate_capabilities(payload.model_id, payload.capabilities)
         errors += self._mcp_errors(payload)
+        errors += self._knowledge_errors(payload)
         errors += self._team_errors(config, payload)
         if errors:
             raise ValueError("; ".join(errors))
@@ -164,6 +172,15 @@ class ConfigService:
                         f"versão fixada de '{agent.name}' não é uma versão publicada dele"
                     )
         return errors
+
+    def _knowledge_errors(self, payload: ConfigPayload) -> list[str]:
+        if not payload.knowledge:
+            return []
+        if self._bases is None:
+            raise RuntimeError("ConfigService sem KnowledgeBaseRepository para validar knowledge")
+        ids = [b.base_id for b in payload.knowledge]
+        found = {b.id for b in self._bases.get_many(ids)}
+        return [f"base de conhecimento {i} não existe" for i in ids if i not in found]
 
     def _mcp_errors(self, payload: ConfigPayload) -> list[str]:
         if not payload.mcp_servers:

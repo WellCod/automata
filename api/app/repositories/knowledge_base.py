@@ -1,8 +1,9 @@
 from uuid import UUID
 
-from sqlalchemy import select, text
+from sqlalchemy import or_, select, text
 from sqlalchemy.orm import Session
 
+from app.models.config import AgentConfig, AgentConfigVersion
 from app.models.knowledge_base import KnowledgeBase
 
 VECTOR_SCHEMA = "ai"
@@ -35,6 +36,23 @@ class KnowledgeBaseRepository:
         if exclude is not None:
             stmt = stmt.where(KnowledgeBase.id != exclude)
         return self._session.scalars(stmt).first()
+
+    def used_by(self, base_id: UUID) -> list[str]:
+        """Agentes e times cuja versão vigente ou rascunho consulta a base."""
+        stmt = (
+            select(AgentConfig.name)
+            .join(
+                AgentConfigVersion,
+                or_(
+                    AgentConfigVersion.id == AgentConfig.current_version_id,
+                    AgentConfigVersion.id == AgentConfig.draft_version_id,
+                ),
+            )
+            .where(AgentConfigVersion.payload["knowledge"].contains([{"base_id": str(base_id)}]))
+            .distinct()
+            .order_by(AgentConfig.name)
+        )
+        return list(self._session.scalars(stmt))
 
     def add(self, base: KnowledgeBase) -> KnowledgeBase:
         self._session.add(base)

@@ -223,6 +223,8 @@ export default function AgentEditPage() {
             instructions: values.instructions,
             mcp_servers: values.mcp_servers,
             capabilities: values.capabilities,
+            // o painel ainda não edita bases: preserva as ligadas pela API
+            knowledge: data?.payload?.knowledge ?? [],
             metadata: data?.payload?.metadata ?? {},
           },
         },
@@ -277,6 +279,8 @@ export default function AgentEditPage() {
       instructions: values.instructions,
       mcp_servers: values.mcp_servers,
       capabilities: values.capabilities,
+      // o painel ainda não edita bases: preserva as ligadas pela API
+      knowledge: data?.payload?.knowledge ?? [],
       metadata: data?.payload?.metadata ?? {},
     };
   };
