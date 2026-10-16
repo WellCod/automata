@@ -81,6 +81,12 @@ export function CostPanel({ agentId }: Props) {
           </div>
         </dl>
       )}
+      {data && data.embedding_tokens > 0 && (
+        <p className="text-muted-foreground text-[11px]">
+          Buscas em bases de conhecimento: {formatTokens(data.embedding_tokens)} tokens ·{" "}
+          {formatCost(data.embedding_cost ?? null)}
+        </p>
+      )}
     </div>
   );
 }

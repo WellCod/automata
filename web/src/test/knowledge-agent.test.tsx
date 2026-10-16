@@ -22,6 +22,8 @@ const rh = {
   embedder_model: "voyage-3.5",
   dimensions: 1024,
   chunk_size: 2000,
+  embedding_tokens: 1200,
+  embedding_cost: 0.000072,
   updated_by: "e",
   created_at: "2026-10-16T12:00:00Z",
   updated_at: "2026-10-16T12:00:00Z",

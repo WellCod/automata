@@ -33,6 +33,9 @@ class KnowledgeBaseResponse(BaseModel):
     embedder_model: str
     dimensions: int
     chunk_size: int
+    # ingestão e buscas desde a criação (ADR-0012)
+    embedding_tokens: int = 0
+    embedding_cost: float | None = None
     updated_by: str
     created_at: datetime
     updated_at: datetime

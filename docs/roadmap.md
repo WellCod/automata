@@ -801,7 +801,7 @@ Decisão em [ADR-0012](adr/0012-bases-de-conhecimento.md). Base de conhecimento 
 - [x] `feat(api)`: agentes e times usam bases (payload, factory, uma tool por base, bloco fixo nas instruções, aviso no linter, embedder determinístico no `DEMO_REPLAY`)
 - [x] `feat(web)`: página Conhecimento (bases, upload com arrastar e soltar, status, remoção, busca de teste)
 - [x] `feat(web)`: seleção de bases no agente e no time, e citações no modo teste e na árvore de execução
-- [ ] `feat`: custo de embedding no metering, no estimador e no analytics
+- [x] `feat`: custo de embedding no metering, no estimador e no analytics
 - [ ] `test(api)`: evals de recuperação (pergunta com documento esperado entre os primeiros resultados) e seed da demo com base
 
 **Critério de aceite da fase:** subir um PDF numa base, ligar a base a um agente, publicar e ver no modo teste uma resposta que cita o documento; remover o documento e a resposta deixar de citá-lo.

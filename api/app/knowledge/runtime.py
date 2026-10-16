@@ -1,23 +1,31 @@
 """Ligação de uma base com o Agno: PgVector por base, sem contents_db (ADR-0012)."""
 
+from typing import cast
+
 from agno.vectordb.pgvector import PgVector
 from agno.vectordb.search import SearchType
 
-from app.knowledge.embedders import build_embedder
+from app.knowledge.embedders import InputType, MeteredEmbedder, build_embedder
 from app.models.knowledge_base import KnowledgeBase
 from app.settings import get_settings
 
 VECTOR_SCHEMA = "ai"
 
 
-def vector_db_for(base: KnowledgeBase) -> PgVector:
+def vector_db_for(base: KnowledgeBase, input_type: InputType = "document") -> PgVector:
     # híbrida: vetor + full-text em português, que acha termos exatos (siglas, códigos)
     # que o embedding sozinho às vezes perde
     return PgVector(
         table_name=base.vector_table,
         schema=VECTOR_SCHEMA,
         db_url=get_settings().database_url,
-        embedder=build_embedder(base.embedder, base.embedder_model, base.dimensions),
+        embedder=MeteredEmbedder(
+            inner=build_embedder(base.embedder, base.embedder_model, base.dimensions, input_type)
+        ),
         search_type=SearchType.hybrid,
         content_language="portuguese",
     )
+
+
+def metered(vector_db: PgVector) -> MeteredEmbedder:
+    return cast(MeteredEmbedder, vector_db.embedder)
