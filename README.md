@@ -213,6 +213,7 @@ Cada decisão relevante está documentada em [`docs/adr/`](docs/adr/) com contex
 | [ADR-0010](docs/adr/0010-servidores-mcp-externos.md) | Servidores MCP externos — cadastro não versionado, segredo cifrado, só HTTP e falha visível |
 | [ADR-0011](docs/adr/0011-times-versionados.md) | Times multi-agente na mesma tabela de configs, com membros seguindo a versão vigente |
 | [ADR-0012](docs/adr/0012-bases-de-conhecimento.md) | Bases de conhecimento (RAG) — cadastro não versionado, pgvector no Postgres existente e embeddings da Voyage |
+| [ADR-0013](docs/adr/0013-guardrails-por-agente.md) | Guardrails por agente — regras de entrada e saída versionadas com o agente, CPF/CNPJ e injeção em português, bloqueio sem custo de modelo |
 
 ---
 
@@ -296,7 +297,7 @@ web/
   src/app/      rotas e Route Handlers (BFF)
   src/components/
   src/lib/      client openapi-fetch, hooks, utils
-docs/adr/       12 Architecture Decision Records
+docs/adr/       13 Architecture Decision Records
 DEMO.md         guia de demo local sem credencial de LLM
 ```
 
