@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { type KnowledgeSource, mergeSources, sourcesFromTool } from "@/lib/knowledge-sources";
 import { readSse } from "@/lib/sse";
 import { Button } from "@/components/ui/button";
 
@@ -8,6 +9,8 @@ interface ChatMessage {
   id: number;
   role: "user" | "assistant";
   content: string;
+  // documentos das bases de conhecimento consultadas para esta resposta
+  sources?: KnowledgeSource[];
 }
 
 // ToolExecution do Agno, como chega no evento RunPaused e volta no continue
@@ -42,6 +45,7 @@ interface TraceStep {
 interface ToolEventData {
   tool_name?: string | null;
   tool_args?: Record<string, unknown> | null;
+  result?: unknown;
 }
 
 function describeTool(tool: ToolEventData | undefined, names: Record<string, string>): string {
@@ -85,6 +89,18 @@ export function TestPanel({
     });
   }
 
+  function addSources(tool: ToolEventData | undefined) {
+    const found = sourcesFromTool(tool);
+    if (found.length === 0) return;
+    setMessages((prev) => {
+      const copy = [...prev];
+      const last = copy[copy.length - 1];
+      if (!last || last.role !== "assistant") return prev;
+      copy[copy.length - 1] = { ...last, sources: mergeSources(last.sources ?? [], found) };
+      return copy;
+    });
+  }
+
   async function consume(res: Response) {
     if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
     for await (const { event, data } of readSse(res.body)) {
@@ -97,11 +113,15 @@ export function TestPanel({
         if (event === "ToolCallStarted") {
           const who = memberNames[data.agent_id as string] ?? String(data.agent_name ?? "membro");
           addTrace(`${who}: ${describeTool(data.tool as ToolEventData, memberNames)}`);
+        } else if (event === "ToolCallCompleted") {
+          addSources(data.tool as ToolEventData);
         }
         continue;
       }
       if (kind === "team" && event === "TeamToolCallStarted") {
         addTrace(describeTool(data.tool as ToolEventData, memberNames));
+      } else if (event === `${prefix}ToolCallCompleted`) {
+        addSources(data.tool as ToolEventData);
       } else if (event === `${prefix}RunContent` && typeof data.content === "string") {
         appendToLast(data.content);
       } else if (event === `${prefix}RunPaused`) {
@@ -224,6 +244,16 @@ export function TestPanel({
                 >
                   {m.content || (isRunning && m.role === "assistant" ? "▍" : "")}
                 </div>
+                {m.sources && m.sources.length > 0 && (
+                  <ul aria-label="Fontes" className="flex max-w-xs flex-col gap-0.5 text-[11px]">
+                    {m.sources.map((src) => (
+                      <li key={`${src.base}|${src.documento}`} className="text-muted-foreground">
+                        <span className="text-[var(--text-label)]">fonte</span> {src.documento}
+                        {src.base && <span> · {src.base}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             ))}
           </div>

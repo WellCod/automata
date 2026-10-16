@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { CostPanel } from "@/components/cost-panel";
 import { LintPanel } from "@/components/lint-panel";
+import { KnowledgeSelector } from "@/components/knowledge-selector";
 import { McpToolsSelector } from "@/components/mcp-tools-selector";
 import { MetricsPanel } from "@/components/metrics-panel";
 import { ModelSelector } from "@/components/model-selector";
@@ -57,6 +58,9 @@ const schema = z.object({
       tools: z.array(z.string()).nullable(),
       require_confirmation: z.array(z.string()),
     }),
+  ),
+  knowledge: z.array(
+    z.object({ base_id: z.string(), max_results: z.number().int().min(1).max(20) }),
   ),
 });
 
@@ -175,6 +179,7 @@ export default function AgentEditPage() {
       capabilities: EMPTY_CAPS,
       instructions: { persona: "", situation: "", tone: "", objective: "", guardrails: "" },
       mcp_servers: [],
+      knowledge: [],
     },
   });
 
@@ -207,6 +212,10 @@ export default function AgentEditPage() {
         tools: b.tools ?? null,
         require_confirmation: b.require_confirmation ?? [],
       })),
+      knowledge: (data.payload?.knowledge ?? []).map((k) => ({
+        base_id: k.base_id,
+        max_results: k.max_results ?? 5,
+      })),
     });
   }, [data, reset]);
 
@@ -223,8 +232,7 @@ export default function AgentEditPage() {
             instructions: values.instructions,
             mcp_servers: values.mcp_servers,
             capabilities: values.capabilities,
-            // o painel ainda não edita bases: preserva as ligadas pela API
-            knowledge: data?.payload?.knowledge ?? [],
+            knowledge: values.knowledge,
             metadata: data?.payload?.metadata ?? {},
           },
         },
@@ -279,8 +287,7 @@ export default function AgentEditPage() {
       instructions: values.instructions,
       mcp_servers: values.mcp_servers,
       capabilities: values.capabilities,
-      // o painel ainda não edita bases: preserva as ligadas pela API
-      knowledge: data?.payload?.knowledge ?? [],
+      knowledge: values.knowledge,
       metadata: data?.payload?.metadata ?? {},
     };
   };
@@ -381,6 +388,14 @@ export default function AgentEditPage() {
                 control={form.control}
                 render={({ field }) => (
                   <McpToolsSelector value={field.value} onChange={field.onChange} />
+                )}
+              />
+
+              <Controller
+                name="knowledge"
+                control={form.control}
+                render={({ field }) => (
+                  <KnowledgeSelector value={field.value} onChange={field.onChange} />
                 )}
               />
 
