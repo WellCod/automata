@@ -77,6 +77,8 @@
   --chart-1: #2563eb;
   --chart-2: #ea580c;
   --chart-error: #dc2626;
+  /* bloqueio por guardrail; empilhado abaixo do sucesso para não encostar no erro */
+  --chart-blocked: #b45309;
   --chart-3: #a1a1aa;
   --chart-4: #d4d4d8;
   --chart-5: #f4f4f5;
@@ -115,6 +117,7 @@
   --chart-1: #3b82f6;
   --chart-2: #ea580c;
   --chart-error: #ef4444;
+  --chart-blocked: #c98500;
   --chart-3: #52525b;
   --chart-4: #3f3f46;
   --chart-5: #27272a;

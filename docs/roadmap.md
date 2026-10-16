@@ -819,7 +819,7 @@ Decisão em [ADR-0013](adr/0013-guardrails-por-agente.md). Guardrails entram no 
 - [x] `feat(api)`: status `blocked` e `blocked_by` em `agent_run` (migration), tracking lendo o `error_id` do bloqueio no stream e no não-stream, analytics e métricas por agente separando bloqueio de falha
 - [x] `feat(api)`: guardrail de saída (dados pessoais e termos proibidos na resposta); troca a resposta no não-stream e marca o run no stream
 - [x] `feat(web)`: seção Guardrails na aba Configuração do agente e do time, com aviso sobre moderação e sobre saída em stream; modo teste mostra qual regra bloqueou
-- [ ] `feat(web)`: bloqueios por motivo no analytics, no desempenho do agente e na lista de execuções
+- [x] `feat(web)`: bloqueios por motivo no analytics, no desempenho do agente e na lista de execuções
 - [ ] `test(api)`: evals de guardrails — casos de PII brasileira, injeção em PT e EN e falsos positivos conhecidos (número de pedido, "prompt do sistema" em contexto legítimo)
 
 **Critério de aceite da fase:** ligar dados pessoais em modo bloquear num agente, publicar, mandar uma mensagem com CPF válido e ver o bloqueio no modo teste com o motivo, sem token gasto, com a sessão gravada mascarada e o run contado em bloqueios, não em falhas; a mesma mensagem com um número de pedido de 11 dígitos passa.

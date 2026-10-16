@@ -5,6 +5,7 @@ import { useState } from "react";
 import { MetricsCharts } from "@/components/metrics-charts";
 import { Button } from "@/components/ui/button";
 import client from "@/lib/api/client";
+import { blockedHint } from "@/lib/guardrail-labels";
 import type { components } from "@/lib/api/schema.d.ts";
 
 type AgentMetricsResponse = components["schemas"]["AgentMetricsResponse"];
@@ -84,6 +85,11 @@ export function MetricsPanel({ agentId }: Props) {
           />
           <MetricCard label="Latência p50" value={formatMs(data.p50_ms)} />
           <MetricCard label="Latência p95" value={formatMs(data.p95_ms)} />
+          <MetricCard
+            label="Bloqueios"
+            value={String(data.blocked_runs ?? 0)}
+            sub={blockedHint(data.blocked_by ?? {})}
+          />
         </div>
       )}
 

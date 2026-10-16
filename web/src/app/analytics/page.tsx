@@ -6,6 +6,7 @@ import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
 import { MetricsCharts } from "@/components/metrics-charts";
 import { Button } from "@/components/ui/button";
+import { blockedHint } from "@/lib/guardrail-labels";
 
 type GlobalMetricsSummary = components["schemas"]["GlobalMetricsSummary"];
 type AgentBreakdownItem = components["schemas"]["AgentBreakdownItem"];
@@ -207,7 +208,7 @@ export default function AnalyticsPage() {
           />
         </div>
       ) : (
-        <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
           <SummaryCard
             label="Conversas"
             value={String(summary.total_runs)}
@@ -217,6 +218,11 @@ export default function AnalyticsPage() {
             label="Falhas"
             value={`${(summary.error_rate * 100).toFixed(1)}%`}
             hint="percentual de respostas com erro"
+          />
+          <SummaryCard
+            label="Bloqueios"
+            value={String(summary.blocked_runs ?? 0)}
+            hint={blockedHint(summary.blocked_by ?? {})}
           />
           <SummaryCard
             label="Tempo de resposta típico"
@@ -273,6 +279,9 @@ export default function AnalyticsPage() {
                     Conversas
                   </th>
                   <th className="text-muted-foreground px-4 py-2 text-right font-medium">Falhas</th>
+                  <th className="text-muted-foreground px-4 py-2 text-right font-medium">
+                    Bloqueios
+                  </th>
                   <th className="text-muted-foreground px-4 py-2 text-right font-medium">Tokens</th>
                   <th className="text-muted-foreground px-4 py-2 text-right font-medium">Custo</th>
                 </tr>
@@ -286,6 +295,9 @@ export default function AnalyticsPage() {
                       className={`px-4 py-2 text-right ${row.error_rate > 0.1 ? "text-destructive" : "text-foreground"}`}
                     >
                       {(row.error_rate * 100).toFixed(1)}%
+                    </td>
+                    <td className="text-foreground px-4 py-2 text-right">
+                      {row.blocked_runs ?? 0}
                     </td>
                     <td className="text-foreground px-4 py-2 text-right">
                       {formatTokens(row.total_tokens)}

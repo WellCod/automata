@@ -143,3 +143,59 @@ describe("RunsPanel", () => {
     expect(screen.getByText("Injeção de prompt")).toBeInTheDocument();
   });
 });
+
+describe("bloqueios no analytics", () => {
+  it("resume os motivos mais comuns", async () => {
+    const { blockedHint } = await import("@/lib/guardrail-labels");
+    expect(blockedHint({ off_topic: 1, pii_detected: 5, prompt_injection: 2 })).toBe(
+      "Dados pessoais 5 · Injeção de prompt 2",
+    );
+    expect(blockedHint({})).toBe("mensagens barradas por guardrail");
+  });
+
+  it("mostra o card de bloqueios separado das falhas", async () => {
+    const { default: AnalyticsPage } = await import("@/app/analytics/page");
+    vi.mocked(client.GET).mockImplementation(async (path: string) => {
+      if (path.includes("by-agent")) {
+        return {
+          data: [
+            {
+              agent_config_id: "a1",
+              agent_name: "RH",
+              total_runs: 10,
+              error_rate: 0,
+              blocked_runs: 3,
+              total_tokens: 100,
+              total_cost: 0.01,
+            },
+          ],
+          error: undefined,
+        } as never;
+      }
+      if (path.includes("timeseries")) return { data: [], error: undefined } as never;
+      return {
+        data: {
+          total_runs: 10,
+          error_rate: 0,
+          blocked_runs: 3,
+          blocked_by: { pii_detected: 3 },
+          p50_ms: 800,
+          p95_ms: 2000,
+          total_tokens: 100,
+          total_cost: 0.01,
+          period_days: 30,
+        },
+        error: undefined,
+      } as never;
+    });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <AnalyticsPage />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText("Bloqueios", { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByText("Dados pessoais 3")).toBeInTheDocument();
+    expect(await screen.findByRole("columnheader", { name: "Bloqueios" })).toBeInTheDocument();
+  });
+});

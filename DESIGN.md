@@ -101,6 +101,7 @@ Base de 4px. O painel é denso de propósito: gap de 4px em listas e padding de 
 Recharts via `ChartContainer` do shadcn (`src/components/ui/chart.tsx`), em `src/components/metrics-charts.tsx`.
 
 - Séries: `--chart-1` (azul `#2563EB` / `#3B82F6`) e `--chart-2` (laranja `#EA580C`); erro em `--chart-error` (`#DC2626` / `#EF4444`). Validadas no validador de paleta contra o `--card` de cada modo (lightness na faixa, CVD ΔE ≥ 30, contraste ≥ 3:1).
+- Bloqueio por guardrail: `--chart-blocked` (`#B45309` / `#C98500`), empilhado abaixo do sucesso em "Conversas por dia": ao lado do erro, âmbar e vermelho se confundem para daltonismo deutan. A ordem bloqueado → sucesso → erro passa no validador nos dois temas.
 - Um eixo por gráfico; medidas de escala diferente vão em gráficos separados.
 - Linha de 2px sem marcadores, barra com topo arredondado de 4px, grade só horizontal.
 - Legenda sempre que houver duas séries, tooltip no hover e tabela com os mesmos dados em "Ver tabela".

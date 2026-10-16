@@ -14,3 +14,12 @@ export function blockLabel(rule: string | null | undefined): string {
 }
 
 export const CHECK_ERROR_TYPES = new Set(["input_check_error", "output_check_error"]);
+
+// guardrail funcionando não é falha: aparece à parte, com os motivos mais comuns
+export function blockedHint(byRule: Record<string, number>): string {
+  const top = Object.entries(byRule)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([rule, n]) => `${blockLabel(rule)} ${n}`);
+  return top.length ? top.join(" · ") : "mensagens barradas por guardrail";
+}
