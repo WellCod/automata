@@ -1,7 +1,16 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { BarChart3, KeyRound, LayoutGrid, LogOut, Plug, ShieldCheck, Users } from "lucide-react";
+import {
+  BarChart3,
+  BookOpen,
+  KeyRound,
+  LayoutGrid,
+  LogOut,
+  Plug,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { usePendingApprovals } from "@/lib/api/approvals";
@@ -10,6 +19,7 @@ const navItems = [
   { href: "/", label: "Agentes", icon: LayoutGrid, exact: true },
   { href: "/times", label: "Times", icon: Users, exact: false },
   { href: "/analytics", label: "Analytics", icon: BarChart3, exact: true },
+  { href: "/conhecimento", label: "Conhecimento", icon: BookOpen, exact: false },
   { href: "/mcp", label: "Servidores MCP", icon: Plug, exact: true },
   { href: "/aprovacoes", label: "Aprovações", icon: ShieldCheck, exact: true },
   { href: "/integracoes", label: "Integrações", icon: KeyRound, exact: true },
