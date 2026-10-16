@@ -818,7 +818,7 @@ Decisão em [ADR-0013](adr/0013-guardrails-por-agente.md). Guardrails entram no 
 - [x] `feat(api)`: seção `guardrails` no payload e regras de entrada — dados pessoais (CPF e CNPJ com dígito verificador, cartão com Luhn, e-mail, telefone BR; bloquear ou mascarar, mascarando também o input gravado quando bloqueia), injeção de prompt em PT e EN com termos extras, tópicos proibidos, tamanho máximo e moderação opcional da OpenAI (400 ao salvar sem `OPENAI_API_KEY`); factory aplica no agente, no líder e nos membros; mensagem de bloqueio configurável
 - [x] `feat(api)`: status `blocked` e `blocked_by` em `agent_run` (migration), tracking lendo o `error_id` do bloqueio no stream e no não-stream, analytics e métricas por agente separando bloqueio de falha
 - [x] `feat(api)`: guardrail de saída (dados pessoais e termos proibidos na resposta); troca a resposta no não-stream e marca o run no stream
-- [ ] `feat(web)`: seção Guardrails na aba Configuração do agente e do time, com aviso sobre moderação e sobre saída em stream; modo teste mostra qual regra bloqueou
+- [x] `feat(web)`: seção Guardrails na aba Configuração do agente e do time, com aviso sobre moderação e sobre saída em stream; modo teste mostra qual regra bloqueou
 - [ ] `feat(web)`: bloqueios por motivo no analytics, no desempenho do agente e na lista de execuções
 - [ ] `test(api)`: evals de guardrails — casos de PII brasileira, injeção em PT e EN e falsos positivos conhecidos (número de pedido, "prompt do sistema" em contexto legítimo)
 
