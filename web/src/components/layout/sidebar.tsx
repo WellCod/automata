@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   UserCog,
   Users,
+  Workflow,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -21,6 +22,7 @@ import { ThemeToggle } from "./theme";
 const navItems = [
   { href: "/", label: "Agentes", icon: LayoutGrid, exact: true },
   { href: "/times", label: "Times", icon: Users, exact: false },
+  { href: "/workflows", label: "Workflows", icon: Workflow, exact: false },
   { href: "/analytics", label: "Analytics", icon: BarChart3, exact: true },
   { href: "/conhecimento", label: "Conhecimento", icon: BookOpen, exact: false },
   { href: "/mcp", label: "Servidores MCP", icon: Plug, exact: true },
