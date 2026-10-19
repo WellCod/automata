@@ -38,4 +38,4 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0010](0010-servidores-mcp-externos.md) | Servidores MCP externos como cadastro operacional, segredo cifrado e só HTTP | Aceito |
 | [0011](0011-times-versionados.md) | Times multi-agente na mesma tabela de configs, membros por referência | Aceito |
 | [0012](0012-bases-de-conhecimento.md) | Bases de conhecimento como cadastro próprio, pgvector e embeddings da Voyage | Aceito |
-| [0013](0013-guardrails-por-agente.md) | Guardrails por agente, versionados no payload, com regras brasileiras próprias | Proposto |
+| [0013](0013-guardrails-por-agente.md) | Guardrails por agente, versionados no payload, com regras brasileiras próprias | Aceito |
