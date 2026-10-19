@@ -8,6 +8,7 @@ from app.repositories.config import ConfigRepository
 from app.repositories.knowledge_base import KnowledgeBaseRepository
 from app.repositories.mcp_server import McpServerRepository
 from app.schemas.config import ConfigKind, ConfigPayload, ConfigPayloadStatus
+from app.schemas.workflow import step_nodes
 
 
 class ConfigService:
@@ -139,13 +140,76 @@ class ConfigService:
         return config
 
     def _validate(self, config: AgentConfig, payload: ConfigPayload) -> None:
-        errors = validate_capabilities(payload.model_id, payload.capabilities)
+        errors = self._model_errors(config, payload)
+        if payload.model_id is not None:
+            errors += validate_capabilities(payload.model_id, payload.capabilities)
         errors += self._mcp_errors(payload)
         errors += self._knowledge_errors(payload)
         errors += self._guardrail_errors(payload)
         errors += self._team_errors(config, payload)
+        errors += self._workflow_errors(config, payload)
         if errors:
             raise ValueError("; ".join(errors))
+
+    def _model_errors(self, config: AgentConfig, payload: ConfigPayload) -> list[str]:
+        if config.kind == ConfigKind.workflow:
+            # workflow não chama modelo: quem chama são os agentes e times das etapas
+            return ["workflow não tem modelo próprio"] if payload.model_id is not None else []
+        return ["modelo obrigatório"] if payload.model_id is None else []
+
+    def _workflow_errors(self, config: AgentConfig, payload: ConfigPayload) -> list[str]:
+        """Etapas apontam para agentes e times publicados, sem pausa humana (ADR-0014)."""
+        if config.kind != ConfigKind.workflow:
+            return ["só workflow tem seção 'workflow'"] if payload.workflow is not None else []
+        if payload.workflow is None:
+            return ["workflow precisa da seção 'workflow' com ao menos uma etapa"]
+        errors: list[str] = []
+        for step in step_nodes(payload.workflow.steps):
+            target_id = step.agent_id or step.team_id
+            assert target_id is not None
+            expected = ConfigKind.agent if step.agent_id else ConfigKind.team
+            target = self._repo.get_config(target_id)
+            if target is None or target.kind != expected:
+                rotulo = "agente" if expected == ConfigKind.agent else "time"
+                errors.append(f"etapa '{step.name}': {rotulo} {target_id} não existe")
+                continue
+            if target.current_version_id is None:
+                errors.append(f"etapa '{step.name}': '{target.name}' não tem versão publicada")
+                continue
+            version_id = step.version_id or target.current_version_id
+            version = self._repo.get_version(version_id)
+            if (
+                version is None
+                or version.config_id != target.id
+                or version.status != ConfigPayloadStatus.published
+            ):
+                errors.append(
+                    f"etapa '{step.name}': versão fixada não é uma versão publicada de "
+                    f"'{target.name}'"
+                )
+                continue
+            if self._needs_confirmation(ConfigPayload.model_validate(version.payload)):
+                errors.append(
+                    f"etapa '{step.name}': '{target.name}' tem tool com confirmação humana, "
+                    "que não é suportada em workflow"
+                )
+        return errors
+
+    def _needs_confirmation(self, payload: ConfigPayload) -> bool:
+        if any(b.require_confirmation for b in payload.mcp_servers):
+            return True
+        if payload.team is None:
+            return False
+        for member in payload.team.members:
+            agent = self._repo.get_config(member.agent_id)
+            vid = member.version_id or (agent.current_version_id if agent else None)
+            version = self._repo.get_version(vid) if vid else None
+            if version is not None and any(
+                b.require_confirmation
+                for b in ConfigPayload.model_validate(version.payload).mcp_servers
+            ):
+                return True
+        return False
 
     def _team_errors(self, config: AgentConfig, payload: ConfigPayload) -> list[str]:
         """Membros existem, são agentes publicados e a versão fixada é deles (ADR-0011)."""

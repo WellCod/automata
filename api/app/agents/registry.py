@@ -76,6 +76,9 @@ class PublishedAgents:
             for config_id, kind in published:
                 if str(config_id) in known:
                     continue
+                if kind == "workflow":
+                    # registro de workflows entra com a WorkflowFactory (ADR-0014)
+                    continue
                 if kind == "team":
                     if self._make_team_factory is None:
                         continue

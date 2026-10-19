@@ -907,11 +907,36 @@ export interface components {
        */
       vision: boolean;
     };
+    /** ConditionNode */
+    ConditionNode: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "condition";
+      /** Name */
+      name: string;
+      rule: components["schemas"]["WorkflowRule"];
+      /** Steps */
+      steps: (
+        | components["schemas"]["StepNode"]
+        | components["schemas"]["ParallelNode"]
+        | components["schemas"]["ConditionNode"]
+        | components["schemas"]["LoopNode"]
+      )[];
+      /** Else Steps */
+      else_steps?: (
+        | components["schemas"]["StepNode"]
+        | components["schemas"]["ParallelNode"]
+        | components["schemas"]["ConditionNode"]
+        | components["schemas"]["LoopNode"]
+      )[];
+    };
     /**
      * ConfigKind
      * @enum {string}
      */
-    ConfigKind: "agent" | "team";
+    ConfigKind: "agent" | "team" | "workflow";
     /**
      * ConfigPayload
      * @description Payload JSONB de uma versão de configuração.
@@ -931,7 +956,7 @@ export interface components {
        */
       schema_version: 2;
       /** Model Id */
-      model_id: string;
+      model_id?: string | null;
       instructions?: components["schemas"]["InstructionSections"];
       /** Mcp Servers */
       mcp_servers?: components["schemas"]["McpServerBinding"][];
@@ -944,6 +969,7 @@ export interface components {
         [key: string]: unknown;
       };
       team?: components["schemas"]["TeamSettings"] | null;
+      workflow?: components["schemas"]["WorkflowSettings"] | null;
     };
     /**
      * ConfigPayloadStatus
@@ -1359,6 +1385,29 @@ export interface components {
       /** Password */
       password: string;
     };
+    /** LoopNode */
+    LoopNode: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "loop";
+      /** Name */
+      name: string;
+      /** Steps */
+      steps: (
+        | components["schemas"]["StepNode"]
+        | components["schemas"]["ParallelNode"]
+        | components["schemas"]["ConditionNode"]
+        | components["schemas"]["LoopNode"]
+      )[];
+      /**
+       * Max Iterations
+       * @default 3
+       */
+      max_iterations: number;
+      until?: components["schemas"]["WorkflowRule"] | null;
+    };
     /**
      * McpServerBinding
      * @description Servidor MCP que o agente usa e quais tools dele (ADR-0010).
@@ -1465,6 +1514,18 @@ export interface components {
       pii_types?: ("cpf" | "cnpj" | "cartao" | "email" | "telefone")[];
       /** Blocked Terms */
       blocked_terms?: string[];
+    };
+    /** ParallelNode */
+    ParallelNode: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "parallel";
+      /** Name */
+      name: string;
+      /** Branches */
+      branches: components["schemas"]["StepNode"][];
     };
     /** PendingTool */
     PendingTool: {
@@ -1585,6 +1646,33 @@ export interface components {
        * @default 5
        */
       max_results: number;
+    };
+    /** StepNode */
+    StepNode: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "step";
+      /** Name */
+      name: string;
+      /** Agent Id */
+      agent_id?: string | null;
+      /** Team Id */
+      team_id?: string | null;
+      /** Version Id */
+      version_id?: string | null;
+      /**
+       * On Error
+       * @default stop
+       * @enum {string}
+       */
+      on_error: "stop" | "continue";
+      /**
+       * Max Retries
+       * @default 0
+       */
+      max_retries: number;
     };
     /** TeamMember */
     TeamMember: {
@@ -1721,6 +1809,42 @@ export interface components {
       input?: unknown;
       /** Context */
       ctx?: Record<string, never>;
+    };
+    /**
+     * WorkflowRule
+     * @description Condição avaliada em código nosso, sem CEL; texto comparado sem maiúsculas.
+     */
+    WorkflowRule: {
+      /**
+       * Kind
+       * @default always
+       * @enum {string}
+       */
+      kind: "always" | "contains" | "not_contains" | "starts_with" | "empty" | "not_empty";
+      /**
+       * Source
+       * @default previous
+       * @enum {string}
+       */
+      source: "input" | "previous";
+      /**
+       * Value
+       * @default
+       */
+      value: string;
+    };
+    /**
+     * WorkflowSettings
+     * @description Seção de workflow do payload. Só existe em config de kind=workflow.
+     */
+    WorkflowSettings: {
+      /** Steps */
+      steps: (
+        | components["schemas"]["StepNode"]
+        | components["schemas"]["ParallelNode"]
+        | components["schemas"]["ConditionNode"]
+        | components["schemas"]["LoopNode"]
+      )[];
     };
   };
   responses: never;
