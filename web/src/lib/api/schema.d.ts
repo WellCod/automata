@@ -853,6 +853,12 @@ export interface components {
       error: string | null;
       /** Blocked By */
       blocked_by?: string | null;
+      /** Steps */
+      steps?: number | null;
+      /** Total Tokens */
+      total_tokens?: number | null;
+      /** Cost */
+      cost?: number | null;
       /**
        * Created At
        * Format: date-time

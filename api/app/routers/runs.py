@@ -25,6 +25,10 @@ class AgentRunResponse(BaseModel):
     duration_ms: int | None
     error: str | None
     blocked_by: str | None = None
+    # só em run de workflow: etapas que rodaram e consumo somado delas
+    steps: int | None = None
+    total_tokens: int | None = None
+    cost: float | None = None
     created_at: datetime
 
 
@@ -87,12 +91,17 @@ def list_runs(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=200),  # noqa: B008
 ) -> RunsPage:
-    config_repo = ConfigRepository(session)
-    if config_repo.get_config(config_id) is None:
+    config = ConfigRepository(session).get_config(config_id)
+    if config is None:
         raise HTTPException(status_code=404, detail="Config não encontrada")
 
     run_repo = RunRepository(session)
     runs, total = run_repo.list_by_config(config_id, page=page, page_size=page_size)
+    # consumo do workflow é o das etapas, gravado nos agentes e times que rodaram
+    consumo: dict[str, tuple[int | None, int | None, float | None]] = {}
+    if config.kind == "workflow":
+        found = run_repo.child_consumption([r.run_id for r in runs if r.run_id])
+        consumo = {r.run_id or "": found.get(r.run_id or "", (0, 0, None)) for r in runs}
     return RunsPage(
         items=[
             AgentRunResponse(
@@ -104,6 +113,9 @@ def list_runs(
                 duration_ms=r.duration_ms,
                 error=r.error,
                 blocked_by=r.blocked_by,
+                steps=consumo.get(r.run_id or "", (None, None, None))[0],
+                total_tokens=consumo.get(r.run_id or "", (None, None, None))[1],
+                cost=consumo.get(r.run_id or "", (None, None, None))[2],
                 created_at=r.created_at,
             )
             for r in runs
