@@ -20,7 +20,8 @@ from fastapi import FastAPI  # noqa: E402
 from app.routers import PROTECTED_ROUTERS  # noqa: E402
 from app.routers.auth import router as auth_router  # noqa: E402
 
-app = FastAPI(title="automata", version="0.1.0")
+# um schema só por modelo: os recursivos do workflow geravam ConfigPayload-Input e -Output
+app = FastAPI(title="automata", version="0.1.0", separate_input_output_schemas=False)
 for router in [*PROTECTED_ROUTERS, auth_router]:
     app.include_router(router)
 

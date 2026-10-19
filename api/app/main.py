@@ -10,6 +10,8 @@ from agno.os import AgentOS
 from agno.os.config import AuthorizationConfig
 from agno.team import RemoteTeam, Team
 from agno.team.factory import TeamFactory
+from agno.workflow import RemoteWorkflow, Workflow
+from agno.workflow.factory import WorkflowFactory
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
@@ -17,6 +19,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.agents.factory import make_agent_factory, make_team_factory
 from app.agents.registry import PublishedAgents
+from app.agents.workflow_factory import make_workflow_factory
 from app.integrations import RevocationMiddleware, RevokedTokens
 from app.knowledge.ingest import fail_stale
 from app.logging_config import configure_logging, request_id_var
@@ -124,11 +127,15 @@ def create_app(
     # Lista compartilhada com o AgentOS, que a lê a cada request
     factories: AgentList = []
     teams: list[Team | RemoteTeam | TeamFactory] = []
+    # lista mutável: sem ela os.workflows fica None e o registro sem restart não pega
+    workflows: list[Workflow | RemoteWorkflow | WorkflowFactory] = []
     published = PublishedAgents(
         factories,
         lambda config_id: make_agent_factory(config_id, db),
         teams=teams,
         make_team_factory=lambda config_id: make_team_factory(config_id, db),
+        workflows=workflows,
+        make_workflow_factory=lambda config_id: make_workflow_factory(config_id, db),
     )
     published.sync()
     _fail_stale_ingestions()
@@ -144,6 +151,7 @@ def create_app(
         db=db,
         agents=factories,
         teams=teams,
+        workflows=workflows,
         base_app=base,
         auto_provision_dbs=auto_provision_dbs,
         authorization=enable_auth,

@@ -249,3 +249,30 @@ Com `TRACING_ENABLED=true` (padrão), o AgentOS grava em banco, via OpenTelemetr
 - `GET /api/v1/runs/{run_id}/trace` devolve a árvore tipada: `{trace_id, status, duration, total_spans, error_count, tree: [{type, name, duration, status, input, output, error, spans[]}]}`. Num time, a raiz é `TEAM`; abaixo dela vêm os membros (`AGENT`), as chamadas de modelo (`LLM`) e as tools (`TOOL`), inclusive as MCP.
 - O trace traz entrada e saída da conversa, então segue a regra do Agno: só o dono do run ou owner. Run sem trace (tracing desligado ou anterior a ele) dá 404.
 - A rota é própria porque as `/traces` do Agno ficam fora do OpenAPI que gera os tipos do painel.
+
+## Workflows (ADR-0014)
+
+Workflow é um config com `kind: "workflow"`, criado com `POST /api/v1/configs` e `"kind": "workflow"`. Tem rascunho, publicação, rollback e versões como agente e time. O payload não tem modelo (`model_id` fica `null`; o serviço recusa modelo em workflow e exige em agente e time). A estrutura vai na seção `workflow.steps`, uma árvore de nós com `type`:
+
+- `step`: `name`, `agent_id` **ou** `team_id`, `version_id` opcional (fixa a versão), `on_error` (`stop` para o fluxo, padrão; `continue` passa o erro adiante) e `max_retries` (0 a 3).
+- `parallel`: `name` e `branches`, de 2 a 5 etapas `step` que recebem a mesma entrada.
+- `condition`: `name`, `rule`, `steps` e `else_steps` opcional.
+- `loop`: `name`, `steps`, `max_iterations` (1 a 10) e `until` opcional (regra avaliada na saída da última etapa de cada volta).
+
+Regras (`rule`/`until`) são próprias, sem CEL:
+- `kind`: `always`, `contains`, `not_contains`, `starts_with`, `empty` ou `not_empty`;
+- `source`: `input` (mensagem original) ou `previous` (saída da etapa anterior, padrão);
+- `value`: texto comparado sem maiúsculas.
+
+Validação na escrita:
+- nomes de etapa únicos, até 3 níveis de aninhamento e 30 etapas;
+- o workflow não termina num `parallel`;
+- agentes e times existem, estão publicados e a versão fixada é publicada e deles;
+- agente (ou membro de time) com tool de confirmação humana não entra em workflow.
+
+Execução (`app/agents/workflow_factory.py`):
+- `WorkflowFactory` por request, registrada em `os.workflows` sem restart, como agentes e times. Roda em `POST /workflows/{id}/runs` e exige `workflows:run` (editor e owner); o viewer tem `workflows:read`.
+- A árvore vira `Step`, `Parallel`, `Condition` e `Loop` do Agno, montados do zero. Cada etapa ganha uma instância nova de agente ou time, e ramos paralelos não compartilham estado nem conexão MCP. O workflow recebe o `user_id` do run, que o Agno não repassa às etapas sozinho.
+- Regras viram funções avaliadas em código nosso. `previous` lê o conteúdo mais profundo da última etapa, não a frase-resumo que o Agno põe depois de um container.
+- Etapa com erro ou bloqueio de guardrail levanta `StepFailed`, e assim `on_error`/`max_retries` passam a valer. Com `stop`, o workflow termina com `status=ERROR` e o motivo no `content` (`WorkflowError` no stream), em vez do 500 que o Agno devolveria. Com `continue`, a etapa seguinte roda.
+- O run do workflow vai para `agent_run` com status, duração e erro (`TrackedWorkflow`). Cada etapa continua gravada no agente ou time que a executou.

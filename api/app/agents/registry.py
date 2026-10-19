@@ -39,6 +39,8 @@ class PublishedAgents:
         *,
         teams: list[Any] | None = None,
         make_team_factory: Callable[[UUID], Any] | None = None,
+        workflows: list[Any] | None = None,
+        make_workflow_factory: Callable[[UUID], Any] | None = None,
         ttl_seconds: float = 5.0,
         load: Callable[[], list[tuple[UUID, str]]] = published_configs,
     ) -> None:
@@ -47,6 +49,8 @@ class PublishedAgents:
         self._teams = teams if teams is not None else []
         self._make_factory = make_factory
         self._make_team_factory = make_team_factory
+        self._workflows = workflows if workflows is not None else []
+        self._make_workflow_factory = make_workflow_factory
         self._ttl = ttl_seconds
         self._load = load
         self._lock = threading.Lock()
@@ -60,6 +64,10 @@ class PublishedAgents:
     def teams(self) -> list[Any]:
         return self._teams
 
+    @property
+    def workflows(self) -> list[Any]:
+        return self._workflows
+
     def sync(self) -> int:
         """Registra factories de configs publicados que ainda não estão nas listas."""
         try:
@@ -72,9 +80,15 @@ class PublishedAgents:
             return 0
         added = 0
         with self._lock:
-            known = {str(e.id) for e in [*self._entries, *self._teams]}
+            known = {str(e.id) for e in [*self._entries, *self._teams, *self._workflows]}
             for config_id, kind in published:
                 if str(config_id) in known:
+                    continue
+                if kind == "workflow":
+                    if self._make_workflow_factory is None:
+                        continue
+                    self._workflows.append(self._make_workflow_factory(config_id))
+                    added += 1
                     continue
                 if kind == "team":
                     if self._make_team_factory is None:

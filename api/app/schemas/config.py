@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.guardrails.pii import PII_TYPES, PiiType
+from app.schemas.workflow import WorkflowSettings
 
 
 class ConfigPayloadStatus(enum.StrEnum):
@@ -16,6 +17,7 @@ class ConfigPayloadStatus(enum.StrEnum):
 class ConfigKind(enum.StrEnum):
     agent = "agent"
     team = "team"
+    workflow = "workflow"
 
 
 class InstructionSections(BaseModel):
@@ -142,7 +144,8 @@ class ConfigPayload(BaseModel):
     """
 
     schema_version: Literal[2] = 2
-    model_id: str
+    # obrigatório em agente e time (validado no serviço); workflow não tem modelo próprio
+    model_id: str | None = None
     instructions: InstructionSections = Field(default_factory=InstructionSections)
     mcp_servers: list[McpServerBinding] = Field(default_factory=list)
     knowledge: list[KnowledgeBinding] = Field(default_factory=list, max_length=10)
@@ -151,6 +154,8 @@ class ConfigPayload(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     # Em time: modelo, instruções e MCP acima são do líder
     team: TeamSettings | None = None
+    # Em workflow: árvore de etapas (ADR-0014); modelo e instruções não se aplicam
+    workflow: WorkflowSettings | None = None
 
     @model_validator(mode="before")
     @classmethod
