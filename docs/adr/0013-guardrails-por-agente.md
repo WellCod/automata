@@ -1,6 +1,6 @@
 # ADR-0013 — Guardrails por agente, versionados no payload, com regras brasileiras próprias sobre os hooks do Agno
 
-**Status:** Proposto
+**Status:** Aceito em 2026-10-19, com a Fase 14 entregue (#95–#103) (proposto em 2026-10-16)
 **Data:** 2026-10-16
 
 ## Contexto
