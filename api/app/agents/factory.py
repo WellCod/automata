@@ -140,7 +140,7 @@ def required_model(payload: ConfigPayload) -> str:
     return payload.model_id
 
 
-def _agent_from(config_id: UUID, resolved: ResolvedVersion, *, tracked: bool) -> Agent:
+def agent_from(config_id: UUID, resolved: ResolvedVersion, *, tracked: bool) -> Agent:
     payload = resolved.payload
     cls = TrackedAgent if tracked else Agent
     blocks = BlockLog()
@@ -175,7 +175,7 @@ def make_agent_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> AgentFactor
         version_id = ctx.input.version_id if isinstance(ctx.input, FactoryInput) else None
         # leitura síncrona do banco fora do event loop
         resolved = await asyncio.to_thread(load_version, config_id, version_id)
-        return _agent_from(config_id, resolved, tracked=True)
+        return agent_from(config_id, resolved, tracked=True)
 
     return AgentFactory(
         id=str(config_id),
@@ -209,28 +209,7 @@ def make_team_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> TeamFactory:
     async def build(ctx: RequestContext) -> Team:
         version_id = ctx.input.version_id if isinstance(ctx.input, FactoryInput) else None
         resolved = await asyncio.to_thread(load_team, config_id, version_id)
-        leader = resolved.leader
-        settings = leader.payload.team
-        assert settings is not None
-        blocks = BlockLog()
-        team = TrackedTeam(
-            id=str(config_id),
-            name=leader.name,
-            description=leader.description,
-            model=resolve_model(required_model(leader.payload), leader.payload.capabilities),
-            instructions=build_instructions(leader.payload, leader.bases),
-            tools=[*leader.mcp_tools, *leader.knowledge_tools],
-            pre_hooks=list(input_guardrails(leader.payload.guardrails, blocks)) or None,
-            post_hooks=_post_hooks(output_guardrail(leader.payload.guardrails, blocks)),
-            members=[_agent_from(mid, m, tracked=False) for mid, m in resolved.members],
-            mode=TeamMode(settings.mode),
-            max_iterations=settings.max_iterations,
-            share_member_interactions=settings.share_member_interactions,
-        )
-        team.automata_config_id = config_id
-        team.automata_blocks = blocks
-        team.automata_model_id = required_model(leader.payload)
-        return team
+        return team_from(config_id, resolved)
 
     return TeamFactory(
         id=str(config_id),
@@ -238,3 +217,28 @@ def make_team_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> TeamFactory:
         factory=build,
         input_schema=FactoryInput,
     )
+
+
+def team_from(config_id: UUID, resolved: ResolvedTeam) -> TrackedTeam:
+    leader = resolved.leader
+    settings = leader.payload.team
+    assert settings is not None
+    blocks = BlockLog()
+    team = TrackedTeam(
+        id=str(config_id),
+        name=leader.name,
+        description=leader.description,
+        model=resolve_model(required_model(leader.payload), leader.payload.capabilities),
+        instructions=build_instructions(leader.payload, leader.bases),
+        tools=[*leader.mcp_tools, *leader.knowledge_tools],
+        pre_hooks=list(input_guardrails(leader.payload.guardrails, blocks)) or None,
+        post_hooks=_post_hooks(output_guardrail(leader.payload.guardrails, blocks)),
+        members=[agent_from(mid, m, tracked=False) for mid, m in resolved.members],
+        mode=TeamMode(settings.mode),
+        max_iterations=settings.max_iterations,
+        share_member_interactions=settings.share_member_interactions,
+    )
+    team.automata_config_id = config_id
+    team.automata_blocks = blocks
+    team.automata_model_id = required_model(leader.payload)
+    return team

@@ -124,7 +124,7 @@ def test_agente_busca_na_base_e_ve_a_fonte(db_url: str, monkeypatch: pytest.Monk
 def test_factory_monta_tool_e_instrucao(db_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
     from uuid import UUID
 
-    from app.agents.factory import _agent_from, load_version
+    from app.agents.factory import agent_from, load_version
 
     with TestClient(_app(monkeypatch)) as client:
         base_id = _base_com_documento(client, "manual")
@@ -140,7 +140,7 @@ def test_factory_monta_tool_e_instrucao(db_url: str, monkeypatch: pytest.MonkeyP
         client.post(f"/api/v1/configs/{agent_id}/publish").raise_for_status()
 
         resolved = load_version(UUID(agent_id), None)
-        agent = _agent_from(UUID(agent_id), resolved, tracked=False)
+        agent = agent_from(UUID(agent_id), resolved, tracked=False)
         names = [getattr(t, "name", None) for t in agent.tools or []]
         assert names == ["buscar_manual"]
         assert isinstance(agent.instructions, str)

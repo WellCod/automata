@@ -270,4 +270,9 @@ Validação na escrita:
 - agentes e times existem, estão publicados e a versão fixada é publicada e deles;
 - agente (ou membro de time) com tool de confirmação humana não entra em workflow.
 
-A execução, com `WorkflowFactory`, vem nos próximos PRs da Fase 15.
+Execução (`app/agents/workflow_factory.py`):
+- `WorkflowFactory` por request, registrada em `os.workflows` sem restart, como agentes e times. Roda em `POST /workflows/{id}/runs` e exige `workflows:run` (editor e owner); o viewer tem `workflows:read`.
+- A árvore vira `Step`, `Parallel`, `Condition` e `Loop` do Agno, montados do zero. Cada etapa ganha uma instância nova de agente ou time, e ramos paralelos não compartilham estado nem conexão MCP. O workflow recebe o `user_id` do run, que o Agno não repassa às etapas sozinho.
+- Regras viram funções avaliadas em código nosso. `previous` lê o conteúdo mais profundo da última etapa, não a frase-resumo que o Agno põe depois de um container.
+- Etapa com erro ou bloqueio de guardrail levanta `StepFailed`, e assim `on_error`/`max_retries` passam a valer. Com `stop`, o workflow termina com `status=ERROR` e o motivo no `content` (`WorkflowError` no stream), em vez do 500 que o Agno devolveria. Com `continue`, a etapa seguinte roda.
+- O run do workflow vai para `agent_run` com status, duração e erro (`TrackedWorkflow`). Cada etapa continua gravada no agente ou time que a executou.

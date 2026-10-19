@@ -24,8 +24,10 @@ from agno.run.agent import RunErrorEvent, RunOutput
 from agno.run.base import RunStatus
 from agno.run.team import RunErrorEvent as TeamRunErrorEvent
 from agno.run.team import TeamRunOutput
+from agno.run.workflow import WorkflowErrorEvent, WorkflowRunOutput
 from agno.team import Team
 from agno.tools.mcp import MCPTools
+from agno.workflow import Workflow
 from sqlalchemy.orm import Session
 
 from app.db import get_engine
@@ -46,6 +48,13 @@ _STATUS = {
 _ERROR_EVENTS = {"RunError", "TeamRunError"}
 _CANCELLED_EVENTS = {"RunCancelled", "TeamRunCancelled"}
 _PAUSED_EVENTS = {"RunPaused", "TeamRunPaused"}
+
+_WORKFLOW_END_EVENTS = {
+    "WorkflowCompleted": "success",
+    "WorkflowError": "error",
+    "WorkflowCancelled": "cancelled",
+    "WorkflowPaused": "paused",
+}
 
 AnyOutput = RunOutput | TeamRunOutput
 _OUTPUT_TYPES = (RunOutput, TeamRunOutput)
@@ -121,6 +130,10 @@ def _status_of(output: AnyOutput | None, last_event: str | None) -> str:
     return "success"
 
 
+class StepFailed(RuntimeError):
+    """Etapa de workflow terminou em erro ou bloqueio (ADR-0014)."""
+
+
 class RunTracking:
     """Registro de run e conexão estrita de MCP, comum a agente e time.
 
@@ -131,6 +144,8 @@ class RunTracking:
     automata_model_id: str = ""
     # preenchido pelos guardrails de entrada da factory
     automata_blocks: BlockLog | None = None
+    # em etapa de workflow: erro ou bloqueio vira exceção, para o on_error do Agno valer
+    automata_raise_on_error: bool = False
     tools: Any
     id: Any
     name: Any
@@ -194,7 +209,9 @@ class RunTracking:
         except McpUnavailable as exc:
             coro.close()
             output = self._error_output(kwargs, str(exc))
-            await self._save(self._record(kwargs, start, output, output.run_id, "error", str(exc)))
+            record = self._record(kwargs, start, output, output.run_id, "error", str(exc))
+            await self._save(record)
+            self._fail_step(record)
             return output
         try:
             output = await coro
@@ -207,7 +224,9 @@ class RunTracking:
         finally:
             await _close_all(members)
         if isinstance(output, _OUTPUT_TYPES):
-            await self._save(self._record(kwargs, start, output, output.run_id, None, None))
+            record = self._record(kwargs, start, output, output.run_id, None, None)
+            await self._save(record)
+            self._fail_step(record)
         return output
 
     async def _track_stream(self, stream: AsyncIterator[Any], kwargs: dict[str, Any]) -> Any:
@@ -222,7 +241,9 @@ class RunTracking:
             await stream.aclose()  # type: ignore[attr-defined]
             failed = self._error_output(kwargs, str(exc))
             yield self._error_event(failed, str(exc))
-            await self._save(self._record(kwargs, start, failed, failed.run_id, "error", str(exc)))
+            record = self._record(kwargs, start, failed, failed.run_id, "error", str(exc))
+            await self._save(record)
+            self._fail_step(record)
             return
         try:
             async for event in stream:
@@ -250,7 +271,14 @@ class RunTracking:
             except Exception:
                 logger.warning("run sem saída persistida", extra={"run_id": run_id})
         status = _status_of(output, last_event)
-        await self._save(self._record(kwargs, start, output, run_id, status, None))
+        record = self._record(kwargs, start, output, run_id, status, None)
+        await self._save(record)
+        self._fail_step(record)
+
+    def _fail_step(self, record: RunRecord) -> None:
+        # No Agno, etapa cujo agente falha segue e passa o erro como entrada da próxima
+        if self.automata_raise_on_error and record.status in ("error", "blocked"):
+            raise StepFailed(record.error or record.status)
 
     def _record(
         self,
@@ -369,3 +397,103 @@ class TrackedTeam(RunTracking, Team):
             content=message,
             error_type="mcp_unavailable",
         )
+
+
+class TrackedWorkflow(Workflow):
+    """Workflow que registra o próprio run e transforma etapa que parou em run com erro.
+
+    Com on_error=fail o Agno relança a exceção da etapa sem gravar o run, e a rota
+    responde 500. Aqui a falha vira WorkflowRunOutput(status=ERROR) ou WorkflowErrorEvent
+    no stream, e o run vai para agent_run com a duração e o motivo (ADR-0014).
+    """
+
+    automata_config_id: UUID | None = None
+
+    def arun(self, *args: Any, **kwargs: Any) -> Any:
+        result = super().arun(*args, **kwargs)
+        if self.automata_config_id is None or kwargs.get("background"):
+            return result
+        if asyncio.iscoroutine(result):
+            return self._track_output(result, kwargs)
+        return self._track_stream(result, kwargs)
+
+    def _record(
+        self,
+        kwargs: dict[str, Any],
+        start: float,
+        output: WorkflowRunOutput | None,
+        run_id: str | None,
+        status: str,
+        error: str | None,
+    ) -> RunRecord:
+        assert self.automata_config_id is not None
+        return RunRecord(
+            agent_config_id=self.automata_config_id,
+            model_id="",
+            user_id=kwargs.get("user_id") or self.user_id or "anonymous",
+            run_id=run_id or (output.run_id if output is not None else None),
+            status=status,
+            duration_ms=int((monotonic() - start) * 1000),
+            error=error,
+            session_id=kwargs.get("session_id") or (output.session_id if output else None),
+        )
+
+    def _failed(
+        self, kwargs: dict[str, Any], run_id: str | None, message: str
+    ) -> WorkflowRunOutput:
+        return WorkflowRunOutput(
+            run_id=run_id or kwargs.get("run_id") or str(uuid4()),
+            workflow_id=self.id,
+            workflow_name=self.name,
+            session_id=kwargs.get("session_id"),
+            user_id=kwargs.get("user_id") or self.user_id,
+            content=message,
+            status=RunStatus.error,
+        )
+
+    async def _track_output(self, coro: Any, kwargs: dict[str, Any]) -> Any:
+        start = monotonic()
+        try:
+            output = await coro
+        except asyncio.CancelledError:
+            RunTracking._schedule(self._record(kwargs, start, None, None, "cancelled", None))
+            raise
+        except Exception as exc:
+            failed = self._failed(kwargs, None, str(exc))
+            await RunTracking._save(
+                self._record(kwargs, start, failed, failed.run_id, "error", str(exc))
+            )
+            return failed
+        status = _STATUS.get(output.status, "success") if output.status else "success"
+        error = str(output.content) if status == "error" and output.content else None
+        await RunTracking._save(self._record(kwargs, start, output, output.run_id, status, error))
+        return output
+
+    async def _track_stream(self, stream: AsyncIterator[Any], kwargs: dict[str, Any]) -> Any:
+        start = monotonic()
+        run_id: str | None = kwargs.get("run_id")
+        last_event: str | None = None
+        error: str | None = None
+        try:
+            async for event in stream:
+                run_id = getattr(event, "run_id", None) or run_id
+                name = getattr(event, "event", None)
+                if name in _WORKFLOW_END_EVENTS:
+                    last_event = name
+                    error = getattr(event, "error", None) or error
+                yield event
+        except (asyncio.CancelledError, GeneratorExit):
+            RunTracking._schedule(self._record(kwargs, start, None, run_id, "cancelled", None))
+            raise
+        except Exception as exc:
+            yield WorkflowErrorEvent(
+                workflow_id=self.id,
+                run_id=run_id,
+                session_id=kwargs.get("session_id"),
+                error=str(exc),
+                error_type="step_failed",
+            )
+            await RunTracking._save(self._record(kwargs, start, None, run_id, "error", str(exc)))
+            return
+        status = _WORKFLOW_END_EVENTS.get(last_event or "", "success")
+        await RunTracking._save(self._record(kwargs, start, None, run_id, status, error))

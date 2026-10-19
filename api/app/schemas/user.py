@@ -11,6 +11,7 @@ from app.models.user import UserRole
 _VIEWER_SCOPES = [
     "agents:read",
     "teams:read",
+    "workflows:read",
     "sessions:read",
     "traces:read",
     Scope.CONFIGS_READ,
@@ -25,6 +26,7 @@ ROLE_SCOPES: dict[UserRole, list[str]] = {
         *_VIEWER_SCOPES,
         "agents:run",
         "teams:run",
+        "workflows:run",
         "sessions:write",
         Scope.CONFIGS_WRITE,
         Scope.CONFIGS_PUBLISH,
