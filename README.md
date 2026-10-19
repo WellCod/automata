@@ -215,6 +215,7 @@ Cada decisão relevante está documentada em [`docs/adr/`](docs/adr/) com contex
 | [ADR-0011](docs/adr/0011-times-versionados.md) | Times multi-agente na mesma tabela de configs, com membros seguindo a versão vigente |
 | [ADR-0012](docs/adr/0012-bases-de-conhecimento.md) | Bases de conhecimento (RAG) — cadastro não versionado, pgvector no Postgres existente e embeddings da Voyage |
 | [ADR-0013](docs/adr/0013-guardrails-por-agente.md) | Guardrails por agente — regras de entrada e saída versionadas com o agente, CPF/CNPJ e injeção em português, bloqueio sem custo de modelo |
+| [ADR-0014](docs/adr/0014-workflows-por-etapas.md) | Workflows por etapas — sequência, paralelo, condição e loop sobre agentes publicados, regras sem CEL, etapa com erro para o fluxo |
 
 ---
 

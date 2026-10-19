@@ -39,3 +39,4 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0011](0011-times-versionados.md) | Times multi-agente na mesma tabela de configs, membros por referência | Aceito |
 | [0012](0012-bases-de-conhecimento.md) | Bases de conhecimento como cadastro próprio, pgvector e embeddings da Voyage | Aceito |
 | [0013](0013-guardrails-por-agente.md) | Guardrails por agente, versionados no payload, com regras brasileiras próprias | Aceito |
+| [0014](0014-workflows-por-etapas.md) | Workflows por etapas sobre agentes e times publicados, com regras próprias no lugar de CEL | Aceito |
