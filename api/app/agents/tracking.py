@@ -13,6 +13,7 @@ import asyncio
 import contextlib
 import logging
 from collections.abc import AsyncIterator
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import monotonic
@@ -77,6 +78,12 @@ class RunRecord:
     pending_tools: list[dict[str, Any]] | None = None
     blocked_by: str | None = None
     block_detail: dict[str, Any] | None = None
+    parent_run_id: str | None = None
+
+
+# run do workflow em andamento; etapas (inclusive ramos paralelos, que copiam o contexto)
+# gravam esse id como pai
+current_workflow_run: ContextVar[str | None] = ContextVar("current_workflow_run", default=None)
 
 
 def persist(record: RunRecord) -> None:
@@ -92,6 +99,7 @@ def persist(record: RunRecord) -> None:
             pending_tools=record.pending_tools,
             blocked_by=record.blocked_by,
             block_detail=record.block_detail,
+            parent_run_id=record.parent_run_id,
         )
         if record.total_tokens:
             UsageRepository(session).record_event(
@@ -313,6 +321,7 @@ class RunTracking:
             cost=getattr(metrics, "cost", None),
             session_id=kwargs.get("session_id") or (output.session_id if output else None),
             pending_tools=_pending_tools(output),
+            parent_run_id=current_workflow_run.get(),
             blocked_by=block.rule if final_status == "blocked" and block else None,
             block_detail=block.detail if final_status == "blocked" and block else None,
         )
@@ -410,9 +419,11 @@ class TrackedWorkflow(Workflow):
     automata_config_id: UUID | None = None
 
     def arun(self, *args: Any, **kwargs: Any) -> Any:
-        result = super().arun(*args, **kwargs)
         if self.automata_config_id is None or kwargs.get("background"):
-            return result
+            return super().arun(*args, **kwargs)
+        # run_id definido aqui: as etapas precisam dele como pai antes de o Agno gerá-lo
+        kwargs["run_id"] = kwargs.get("run_id") or str(uuid4())
+        result = super().arun(*args, **kwargs)
         if asyncio.iscoroutine(result):
             return self._track_output(result, kwargs)
         return self._track_stream(result, kwargs)
@@ -453,6 +464,7 @@ class TrackedWorkflow(Workflow):
 
     async def _track_output(self, coro: Any, kwargs: dict[str, Any]) -> Any:
         start = monotonic()
+        token = current_workflow_run.set(kwargs["run_id"])
         try:
             output = await coro
         except asyncio.CancelledError:
@@ -464,6 +476,8 @@ class TrackedWorkflow(Workflow):
                 self._record(kwargs, start, failed, failed.run_id, "error", str(exc))
             )
             return failed
+        finally:
+            current_workflow_run.reset(token)
         status = _STATUS.get(output.status, "success") if output.status else "success"
         error = str(output.content) if status == "error" and output.content else None
         await RunTracking._save(self._record(kwargs, start, output, output.run_id, status, error))
@@ -474,6 +488,8 @@ class TrackedWorkflow(Workflow):
         run_id: str | None = kwargs.get("run_id")
         last_event: str | None = None
         error: str | None = None
+        # gerador: o contexto vale enquanto ele é iterado, na task de quem consome o stream
+        current_workflow_run.set(run_id)
         try:
             async for event in stream:
                 run_id = getattr(event, "run_id", None) or run_id

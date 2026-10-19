@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from agno.models.metrics import MessageMetrics
 from agno.models.response import ModelResponse
 
 from app.agents.replay import ReplayModel
@@ -103,9 +104,14 @@ class FixedReplyModel(ReplayModel):
     """Responde sempre o mesmo texto."""
 
     reply: str = ""
+    # tokens de saída por resposta; 0 não grava usage_event
+    tokens: int = 0
 
     def _respond(self) -> ModelResponse:
-        return ModelResponse(role="assistant", content=self.reply)
+        usage = MessageMetrics(output_tokens=self.tokens, total_tokens=self.tokens)
+        return ModelResponse(
+            role="assistant", content=self.reply, response_usage=usage if self.tokens else None
+        )
 
     def invoke(self, *args: Any, **kwargs: Any) -> ModelResponse:
         return self._respond()

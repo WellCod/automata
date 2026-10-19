@@ -7,6 +7,7 @@ from sqlalchemy import Date, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.models.run import AgentRun
+from app.models.usage import UsageEvent
 
 
 @dataclass
@@ -55,6 +56,7 @@ class RunRepository:
         pending_tools: list[dict[str, Any]] | None = None,
         blocked_by: str | None = None,
         block_detail: dict[str, Any] | None = None,
+        parent_run_id: str | None = None,
     ) -> AgentRun:
         run = AgentRun(
             agent_config_id=agent_config_id,
@@ -67,6 +69,7 @@ class RunRepository:
             pending_tools=pending_tools,
             blocked_by=blocked_by,
             block_detail=block_detail,
+            parent_run_id=parent_run_id,
         )
         self._session.add(run)
         self._session.flush()
@@ -85,6 +88,7 @@ class RunRepository:
         pending_tools: list[dict[str, Any]] | None = None,
         blocked_by: str | None = None,
         block_detail: dict[str, Any] | None = None,
+        parent_run_id: str | None = None,
     ) -> AgentRun:
         """Atualiza o run de mesmo run_id (pausado e retomado) ou cria um novo."""
         existing = None
@@ -106,6 +110,7 @@ class RunRepository:
                 pending_tools=pending_tools,
                 blocked_by=blocked_by,
                 block_detail=block_detail,
+                parent_run_id=parent_run_id,
             )
         existing.status = status
         existing.error = error
@@ -117,6 +122,37 @@ class RunRepository:
             existing.duration_ms = (existing.duration_ms or 0) + duration_ms
         self._session.flush()
         return existing
+
+    def child_consumption(self, run_ids: list[str]) -> dict[str, tuple[int, int, float | None]]:
+        """run do workflow -> (etapas, tokens, custo), somando as etapas filhas."""
+        if not run_ids:
+            return {}
+        children = (
+            select(
+                AgentRun.parent_run_id.label("parent"),
+                func.count(AgentRun.id).label("steps"),
+            )
+            .where(AgentRun.parent_run_id.in_(run_ids))
+            .group_by(AgentRun.parent_run_id)
+        )
+        usage = (
+            select(
+                AgentRun.parent_run_id.label("parent"),
+                func.coalesce(func.sum(UsageEvent.total_tokens), 0).label("tokens"),
+                func.sum(UsageEvent.cost).label("cost"),
+            )
+            .join(UsageEvent, UsageEvent.run_id == AgentRun.run_id)
+            .where(AgentRun.parent_run_id.in_(run_ids))
+            .group_by(AgentRun.parent_run_id)
+        )
+        totals = {
+            r.parent: (int(r.tokens), float(r.cost) if r.cost is not None else None)
+            for r in self._session.execute(usage)
+        }
+        return {
+            r.parent: (int(r.steps), *totals.get(r.parent, (0, None)))
+            for r in self._session.execute(children)
+        }
 
     def list_paused(self, config_ids: list[UUID] | None = None) -> list[AgentRun]:
         stmt = (

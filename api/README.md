@@ -276,3 +276,5 @@ Execução (`app/agents/workflow_factory.py`):
 - Regras viram funções avaliadas em código nosso. `previous` lê o conteúdo mais profundo da última etapa, não a frase-resumo que o Agno põe depois de um container.
 - Etapa com erro ou bloqueio de guardrail levanta `StepFailed`, e assim `on_error`/`max_retries` passam a valer. Com `stop`, o workflow termina com `status=ERROR` e o motivo no `content` (`WorkflowError` no stream), em vez do 500 que o Agno devolveria. Com `continue`, a etapa seguinte roda.
 - O run do workflow vai para `agent_run` com status, duração e erro (`TrackedWorkflow`). Cada etapa continua gravada no agente ou time que a executou.
+- O `TrackedWorkflow` fixa o `run_id` antes de rodar e o publica numa `ContextVar`. Cada etapa grava esse id em `agent_run.parent_run_id` (migration 0018), inclusive ramos paralelos, cujas tasks herdam o contexto.
+- Em `GET /api/v1/configs/{id}/runs` de um workflow, cada run traz `steps`, `total_tokens` e `cost`, somados do `usage_event` das etapas filhas. O workflow não grava `usage_event` próprio, então o analytics não conta o consumo duas vezes. Em agente e time esses campos vêm `null`.

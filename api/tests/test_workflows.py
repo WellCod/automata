@@ -3,6 +3,7 @@
 import os
 from collections.abc import Generator
 from typing import Any
+from uuid import UUID
 
 import pytest
 from agno.models.response import ModelResponse
@@ -39,7 +40,7 @@ class FailingModel(ReplayModel):
 def _model(model_id: str, *_: Any, **__: Any) -> ReplayModel:
     if model_id == "gpt-4o":
         return FailingModel(id=model_id)
-    return FixedReplyModel(id=model_id, reply=REPLIES[model_id])
+    return FixedReplyModel(id=model_id, reply=REPLIES[model_id], tokens=10)
 
 
 @pytest.fixture(scope="module")
@@ -86,6 +87,28 @@ def _step(name: str, agent_id: str, **extra: Any) -> dict[str, Any]:
 
 def _runs(client: TestClient, config_id: str) -> int:
     return int(client.get(f"/api/v1/configs/{config_id}/runs").json()["total"])
+
+
+def _items(client: TestClient, config_id: str) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = client.get(f"/api/v1/configs/{config_id}/runs").json()["items"]
+    return items
+
+
+def _parent_ids(config_id: str) -> list[str | None]:
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from app.db import get_engine
+    from app.models.run import AgentRun
+
+    with Session(get_engine()) as session:
+        return list(
+            session.scalars(
+                select(AgentRun.parent_run_id)
+                .where(AgentRun.agent_config_id == UUID(config_id))
+                .order_by(AgentRun.created_at)
+            )
+        )
 
 
 def _run(client: TestClient, workflow_id: str, message: str) -> dict[str, Any]:
@@ -143,6 +166,15 @@ def test_sequencia_paralelo_e_condicao(client: TestClient) -> None:
     assert out["content"] == "revisão feita"
     for agent in (triagem, tecnica, financeira, consolida, revisao):
         assert _runs(client, agent) == 1
+        # ramos paralelos também: a task do gather herda o contexto
+        assert _parent_ids(agent) == [out["run_id"]]
+
+    # consumo do workflow é a soma das etapas, sem usage_event próprio
+    [run] = _items(client, wf)
+    assert run["run_id"] == out["run_id"]
+    assert run["steps"] == 5
+    assert run["total_tokens"] == 50
+    assert _items(client, triagem)[0]["steps"] is None
 
     out = _run(client, wf, "qual o status do pedido?")
     assert out["status"] == "COMPLETED"
@@ -208,6 +240,10 @@ def test_etapa_com_erro_para_o_fluxo(client: TestClient) -> None:
     assert "WorkflowError" in stream.text
     assert _runs(client, depois) == 0
     assert _runs(client, wf) == 2
+    # no stream o pai também chega à etapa
+    parents = _parent_ids(quebrado)
+    assert len(parents) == 2 and all(parents)
+    assert {r["run_id"] for r in _items(client, wf)} == set(parents)
 
 
 def test_etapa_marcada_para_seguir(client: TestClient) -> None:
