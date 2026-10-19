@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 14
+# Roadmap — Fases 4 a 15
 
 Plano de ação derivado de auditoria técnica e de segurança realizada em 2026-08-12.
 Ordem otimizada: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade.
@@ -575,6 +575,7 @@ if __name__ == "__main__":
 | 11 — Auditoria 2026-10-15 | #66, #67, #79–#84 | Fecha a Fase 4, runtime de agentes, infra, UI/UX, revogação por `jti` | — |
 | 12 — Multi-agente e MCP | #68–#78 | Servidores MCP, confirmação humana, times, integrações, árvore de execução | #67 |
 | 13 — RAG | #85–#94 | Bases de conhecimento com pgvector e citações | Fase 12 |
+| 15 — Workflows | #108 em diante | Etapas em sequência, paralelo, condição e loop sobre agentes e times | Fases 12 e 14 |
 | 14 — Guardrails | #95–#103 | Dados pessoais, injeção de prompt e bloqueios por agente | — |
 | Usuários e redesign | #97, #100 | Gestão de usuários, tema claro e escuro | — |
 
@@ -829,3 +830,21 @@ Decisão em [ADR-0013](adr/0013-guardrails-por-agente.md). Guardrails entram no 
 **Critério de aceite da fase:** ligar dados pessoais em modo bloquear num agente, publicar, mandar uma mensagem com CPF válido e ver o bloqueio no modo teste com o motivo, sem token gasto, com a sessão gravada mascarada e o run contado em bloqueios, não em falhas; a mesma mensagem com um número de pedido de 11 dígitos passa.
 
 Fica para depois: classificador por LLM (tópico, toxicidade, injeção) como regra opcional, padrão de guardrails da instância e guardrails nos documentos indexados pelo RAG.
+
+---
+
+## Fase 15 — Workflows por etapas
+
+Decisão em [ADR-0014](adr/0014-workflows-por-etapas.md). Workflow é um config com `kind = "workflow"`: uma árvore de etapas (agente ou time publicado), paralelos, condições e loops, versionada como agente e time. Condições usam regras próprias (contém, não contém, começa com, vazio, sobre a mensagem ou a etapa anterior), sem CEL. Etapa com erro para o fluxo, salvo se marcada para seguir. Sequência autorizada pelo usuário: PRs empilhados (base = branch do anterior), mergear na ordem com "Delete branch".
+
+- [ ] `docs(adr)`: ADR-0014 e esta seção
+- [ ] `feat(api)`: kind workflow, seção `workflow` no payload, regras e validação na escrita
+- [ ] `feat(api)`: `WorkflowFactory`, registro sem restart e erro de etapa que para o fluxo
+- [ ] `feat(api)`: run do workflow em `agent_run`, etapas com `parent_run_id` e consumo somado
+- [ ] `feat(web)`: página Workflows com editor de etapas
+- [ ] `feat(web)`: modo teste com progresso por etapa e execuções do workflow
+- [ ] `test(api)`: evals de workflows e seed da demo
+
+**Critério de aceite da fase:** montar um workflow com triagem, um paralelo de duas análises, uma etapa de consolidação e uma condição que só roda a revisão quando a resposta menciona "reembolso"; publicar, rodar no modo teste e ver cada etapa na árvore de execução, com o run do workflow somando o consumo das etapas; um agente com erro na triagem para o fluxo e o run aparece como falha.
+
+Fica para depois: pausa humana no meio do fluxo, CEL como modo avançado, roteador e mapeamento de entrada por etapa.
