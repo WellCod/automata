@@ -18,6 +18,7 @@ _VIEWER_SCOPES = [
     Scope.METRICS_READ,
     Scope.MCP_SERVERS_READ,
     Scope.KNOWLEDGE_READ,
+    Scope.EVALS_READ,
 ]
 
 ROLE_SCOPES: dict[UserRole, list[str]] = {
@@ -31,6 +32,8 @@ ROLE_SCOPES: dict[UserRole, list[str]] = {
         Scope.CONFIGS_WRITE,
         Scope.CONFIGS_PUBLISH,
         Scope.KNOWLEDGE_WRITE,
+        Scope.EVALS_WRITE,
+        Scope.EVALS_RUN,
     ],
     UserRole.viewer: _VIEWER_SCOPES,
 }

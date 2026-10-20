@@ -9,7 +9,7 @@ MAX_STEPS = 30
 MAX_DEPTH = 3
 
 RuleKind = Literal["always", "contains", "not_contains", "starts_with", "empty", "not_empty"]
-_NEEDS_VALUE = {"contains", "not_contains", "starts_with"}
+NEEDS_VALUE = {"contains", "not_contains", "starts_with"}
 
 
 class WorkflowRule(BaseModel):
@@ -22,7 +22,7 @@ class WorkflowRule(BaseModel):
 
     @model_validator(mode="after")
     def valor_quando_precisa(self) -> "WorkflowRule":
-        if self.kind in _NEEDS_VALUE and not self.value.strip():
+        if self.kind in NEEDS_VALUE and not self.value.strip():
             raise ValueError(f"regra '{self.kind}' precisa de um texto")
         return self
 

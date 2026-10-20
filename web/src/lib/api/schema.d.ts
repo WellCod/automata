@@ -139,6 +139,42 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/configs/{config_id}/eval-cases": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Cases */
+    get: operations["list_cases_api_v1_configs__config_id__eval_cases_get"];
+    put?: never;
+    /** Create Case */
+    post: operations["create_case_api_v1_configs__config_id__eval_cases_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/configs/{config_id}/eval-cases/{case_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Update Case */
+    put: operations["update_case_api_v1_configs__config_id__eval_cases__case_id__put"];
+    post?: never;
+    /** Delete Case */
+    delete: operations["delete_case_api_v1_configs__config_id__eval_cases__case_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/integrations": {
     parameters: {
       query?: never;
@@ -1052,6 +1088,56 @@ export interface components {
       /** Default */
       default: boolean;
     };
+    /** EvalCaseInput */
+    EvalCaseInput: {
+      /** Name */
+      name: string;
+      /** Input */
+      input: string;
+      /** Checks */
+      checks: (
+        | components["schemas"]["TextCheck"]
+        | components["schemas"]["ToolsCheck"]
+        | components["schemas"]["JudgeCheck"]
+      )[];
+    };
+    /** EvalCaseResponse */
+    EvalCaseResponse: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Agent Config Id
+       * Format: uuid
+       */
+      agent_config_id: string;
+      /** Name */
+      name: string;
+      /** Input */
+      input: string;
+      /** Checks */
+      checks: (
+        | components["schemas"]["TextCheck"]
+        | components["schemas"]["ToolsCheck"]
+        | components["schemas"]["JudgeCheck"]
+      )[];
+      /** Position */
+      position: number;
+      /** Updated By */
+      updated_by: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+    };
     /** GlobalMetricsSummary */
     GlobalMetricsSummary: {
       /** Total Runs */
@@ -1223,6 +1309,30 @@ export interface components {
       token: string;
       /** Mcp Url */
       mcp_url: string | null;
+    };
+    /**
+     * JudgeCheck
+     * @description Critério avaliado por um modelo juiz (AgentAsJudgeEval do Agno).
+     */
+    JudgeCheck: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "judge";
+      /** Criteria */
+      criteria: string;
+      /**
+       * Mode
+       * @default binary
+       * @enum {string}
+       */
+      mode: "binary" | "numeric";
+      /**
+       * Threshold
+       * @default 7
+       */
+      threshold: number;
     };
     /** KnowledgeBaseCreate */
     KnowledgeBaseCreate: {
@@ -1714,6 +1824,27 @@ export interface components {
        */
       share_member_interactions: boolean;
     };
+    /**
+     * TextCheck
+     * @description Regra sobre a resposta, a mesma dos workflows; "sempre" não entra, passaria sem checar.
+     */
+    TextCheck: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "text";
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "contains" | "not_contains" | "starts_with" | "empty" | "not_empty";
+      /**
+       * Value
+       * @default
+       */
+      value: string;
+    };
     /** TextContentInput */
     TextContentInput: {
       /** Name */
@@ -1730,6 +1861,24 @@ export interface components {
        * @default bearer
        */
       token_type: string;
+    };
+    /**
+     * ToolsCheck
+     * @description Tools que o run precisa chamar (ReliabilityEval do Agno).
+     */
+    ToolsCheck: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "tools";
+      /** Tools */
+      tools: string[];
+      /**
+       * Allow Additional
+       * @default true
+       */
+      allow_additional: boolean;
     };
     /** TraceSpan */
     TraceSpan: {
@@ -2143,6 +2292,138 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["AgentConfigVersionSummary"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_cases_api_v1_configs__config_id__eval_cases_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvalCaseResponse"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_case_api_v1_configs__config_id__eval_cases_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["EvalCaseInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvalCaseResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_case_api_v1_configs__config_id__eval_cases__case_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+        case_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["EvalCaseInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvalCaseResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_case_api_v1_configs__config_id__eval_cases__case_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+        case_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {
