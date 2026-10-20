@@ -70,7 +70,15 @@ describe("estrutura do workflow", () => {
 
 describe("WorkflowEditor", () => {
   beforeEach(() => {
-    vi.mocked(client.GET).mockImplementation(async (_path: string, init?: unknown) => {
+    vi.mocked(client.GET).mockImplementation(async (path: string, init?: unknown) => {
+      if (path === "/api/v1/configs/{config_id}/versions") {
+        const versions = [
+          { id: "v2", version_number: 2, status: "published" },
+          { id: "v1", version_number: 1, status: "published" },
+          { id: "v3", version_number: 3, status: "draft" },
+        ];
+        return { data: versions, error: undefined } as never;
+      }
       const kind = (init as { params: { query: { kind: string } } }).params.query.kind;
       const items =
         kind === "agent"
@@ -112,6 +120,28 @@ describe("WorkflowEditor", () => {
       steps: [{ name: "etapa 2", agent_id: "a2" }],
     });
     expect(screen.queryByLabelText("Pendências")).toBeNull();
+  });
+
+  it("fixa a versão publicada da etapa e solta ao trocar o executor", async () => {
+    const onValue = vi.fn();
+    const user = userEvent.setup();
+    render(<Harness onValue={onValue} />, { wrapper });
+
+    await user.click(screen.getByRole("button", { name: "Etapa" }));
+    await screen.findByRole("option", { name: "Triagem" });
+    await user.selectOptions(screen.getByLabelText("Quem executa etapa"), "agent:a1");
+    await screen.findByRole("option", { name: "Fixar v1" });
+    expect(screen.queryByRole("option", { name: "Fixar v3" })).toBeNull();
+
+    await user.selectOptions(screen.getByLabelText("Versão de etapa"), "v1");
+    expect(last(onValue)[0]).toMatchObject({ agent_id: "a1", version_id: "v1" });
+
+    await user.selectOptions(screen.getByLabelText("Versão de etapa"), "");
+    expect(last(onValue)[0]).toMatchObject({ version_id: null });
+
+    await user.selectOptions(screen.getByLabelText("Versão de etapa"), "v2");
+    await user.selectOptions(screen.getByLabelText("Quem executa etapa"), "agent:a2");
+    expect(last(onValue)[0]).toMatchObject({ agent_id: "a2", version_id: null });
   });
 
   it("paralelo tem de 2 a 5 ramos e só aceita etapas", async () => {
