@@ -835,13 +835,13 @@ Fica para depois: classificador por LLM (tópico, toxicidade, injeção) como re
 
 ## Fase 15 — Workflows por etapas
 
-Decisão em [ADR-0014](adr/0014-workflows-por-etapas.md). Workflow é um config com `kind = "workflow"`: uma árvore de etapas (agente ou time publicado), paralelos, condições e loops, versionada como agente e time. Condições usam regras próprias (contém, não contém, começa com, vazio, sobre a mensagem ou a etapa anterior), sem CEL. Etapa com erro para o fluxo, salvo se marcada para seguir. Sequência autorizada pelo usuário: PRs empilhados (base = branch do anterior), mergear na ordem com "Delete branch".
+Decisão em [ADR-0014](adr/0014-workflows-por-etapas.md). Workflow é um config com `kind = "workflow"`: uma árvore de etapas (agente ou time publicado), paralelos, condições e loops, versionada como agente e time. Condições usam regras próprias (contém, não contém, começa com, vazio, sobre a mensagem ou a etapa anterior), sem CEL. Etapa com erro para o fluxo, salvo se marcada para seguir. Sequência autorizada pelo usuário.
 
-- [ ] `docs(adr)`: ADR-0014 e esta seção
-- [ ] `feat(api)`: kind workflow, seção `workflow` no payload, regras e validação na escrita
-- [ ] `feat(api)`: `WorkflowFactory`, registro sem restart e erro de etapa que para o fluxo
-- [ ] `feat(api)`: run do workflow em `agent_run`, etapas com `parent_run_id` e consumo somado
-- [ ] `feat(web)`: página Workflows com editor de etapas
+- [x] #108 — `docs(adr)`: ADR-0014 e esta seção
+- [x] #109 — `feat(api)`: kind workflow, seção `workflow` no payload, regras e validação na escrita
+- [x] #110 — `feat(api)`: `WorkflowFactory`, registro sem restart e erro de etapa que para o fluxo
+- [x] #111 — `feat(api)`: run do workflow em `agent_run`, etapas com `parent_run_id` e consumo somado
+- [x] `feat(web)`: página Workflows com editor de etapas. Lista e criação em `/workflows`; o editor monta a árvore (etapa, paralelo de 2 a 5 ramos, condição com então e senão, repetição com limite e regra de parada), só oferece contêiner onde o aninhamento ainda cabe e avisa antes de salvar o que a API recusaria. A versão fixada por etapa é preservada, mas ainda não tem seletor
 - [ ] `feat(web)`: modo teste com progresso por etapa e execuções do workflow
 - [ ] `test(api)`: evals de workflows e seed da demo
 
