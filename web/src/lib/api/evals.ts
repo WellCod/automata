@@ -7,9 +7,10 @@ import { type EvalCaseInput, runActive } from "@/lib/eval-checks";
 
 const path = (configId: string) => ({ params: { path: { config_id: configId } } });
 
-export function useEvalCases(configId: string) {
+export function useEvalCases(configId: string, enabled = true) {
   return useQuery({
     queryKey: ["eval-cases", configId],
+    enabled,
     queryFn: async () => {
       const res = await client.GET("/api/v1/configs/{config_id}/eval-cases", path(configId));
       if (res.error) throw new Error("Falha ao carregar casos");
@@ -47,9 +48,10 @@ export function useEvalRun(configId: string, runId: string | null) {
   });
 }
 
-export function useEvalSettings(configId: string) {
+export function useEvalSettings(configId: string, enabled = true) {
   return useQuery({
     queryKey: ["eval-settings", configId],
+    enabled,
     queryFn: async () => {
       const res = await client.GET("/api/v1/configs/{config_id}/eval-settings", path(configId));
       if (res.error) throw new Error("Falha ao carregar configuração da suíte");

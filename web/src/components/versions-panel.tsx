@@ -6,6 +6,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/status-badge";
 import client from "@/lib/api/client";
+import { apiErrorMessage } from "@/lib/api/errors";
+import { useEvalCases, useEvalSettings } from "@/lib/api/evals";
+import { type EvalSettings, runActive } from "@/lib/eval-checks";
 import type { components } from "@/lib/api/schema.d.ts";
 
 type AgentConfigVersionDetail = components["schemas"]["AgentConfigVersionDetail"];
@@ -16,6 +19,35 @@ interface Props {
   // versão em produção vem do detalhe do agente: depois de um rollback ela não é a publicada mais recente
   currentVersionId?: string | null;
   hasUnsavedChanges?: boolean;
+  // agente e time têm suíte de testes (ADR-0015); workflow ainda não
+  suite?: boolean;
+}
+
+function SuiteStatus({ settings, cases }: { settings: EvalSettings | undefined; cases: number }) {
+  if (!settings || (cases === 0 && !settings.require_passing_evals)) return null;
+  const blocked = settings.require_passing_evals && !settings.can_publish;
+  const run = settings.draft_run;
+  let text = "A suíte ainda não rodou no rascunho atual.";
+  if (run && runActive(run)) text = "A suíte está rodando no rascunho atual…";
+  else if (run?.status === "failed") text = "A última execução da suíte no rascunho falhou.";
+  else if (run) text = `Suíte no rascunho: ${run.passed} de ${run.total} passaram.`;
+  const green = run?.status === "completed" && run.passed === run.total && run.total > 0;
+  return (
+    <div
+      role="status"
+      aria-label="Suíte do rascunho"
+      className="border-border rounded border px-3 py-2 text-[12px]"
+    >
+      <p className={green ? "text-green-600 dark:text-green-500" : "text-muted-foreground"}>
+        {text}
+      </p>
+      {blocked && (
+        <p className="text-destructive mt-0.5">
+          Publicação bloqueada pelo gate: {settings.reason}. Rode a suíte na aba Testes.
+        </p>
+      )}
+    </div>
+  );
 }
 
 type Pending = { kind: "publish" } | { kind: "rollback"; versionId: string; versionNumber: number };
@@ -46,9 +78,17 @@ function diffPayload(a: ConfigPayload, b: ConfigPayload): string[] {
   return diffs;
 }
 
-export function VersionsPanel({ agentId, currentVersionId, hasUnsavedChanges = false }: Props) {
+export function VersionsPanel({
+  agentId,
+  currentVersionId,
+  hasUnsavedChanges = false,
+  suite = false,
+}: Props) {
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<Pending | null>(null);
+  const { data: settings } = useEvalSettings(agentId, suite);
+  const { data: cases = [] } = useEvalCases(agentId, suite);
+  const blocked = suite && !!settings?.require_passing_evals && !settings.can_publish;
 
   const {
     data: versions,
@@ -70,15 +110,18 @@ export function VersionsPanel({ agentId, currentVersionId, hasUnsavedChanges = f
       const res = await client.POST("/api/v1/configs/{config_id}/publish", {
         params: { path: { config_id: agentId } },
       });
-      if (res.error) throw new Error("Falha ao publicar");
+      // o 409 do gate explica por que não publicou
+      if (res.error)
+        throw new Error(apiErrorMessage(res.error, "Erro ao publicar. Tente novamente."));
       return res.data!;
     },
-    onError: () => toast.error("Erro ao publicar. Tente novamente."),
+    onError: (error) => toast.error(error.message),
     onSuccess: (v) => {
       toast.success(`v${v.version_number} publicada`);
       void queryClient.invalidateQueries({ queryKey: ["versions", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["config", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
+      void queryClient.invalidateQueries({ queryKey: ["eval-settings", agentId] });
     },
   });
 
@@ -120,12 +163,14 @@ export function VersionsPanel({ agentId, currentVersionId, hasUnsavedChanges = f
             variant="accent"
             size="sm"
             onClick={() => setPending({ kind: "publish" })}
-            disabled={busy || pending !== null}
+            disabled={busy || pending !== null || blocked}
           >
             {publishMutation.isPending ? "Publicando…" : "Publicar"}
           </Button>
         )}
       </div>
+
+      {suite && draft && <SuiteStatus settings={settings} cases={cases.length} />}
 
       {pending && (
         <div
