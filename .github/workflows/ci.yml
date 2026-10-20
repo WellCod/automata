@@ -91,18 +91,57 @@ jobs:
       - run: pnpm --filter web exec playwright install --with-deps chromium
       - run: pnpm --filter web test:e2e
 
+  # Imagens de produção: o dev usa o override com código montado e não as exercita.
+  api-image:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          load: true
+          tags: automata-api:ci
+          cache-from: type=gha,scope=api-image
+          cache-to: type=gha,mode=max,scope=api-image
+      - name: fixtures do replay estão na imagem
+        run: docker run --rm --entrypoint test automata-api:ci -f fixtures/default.json
+
+  web-image:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: web/Dockerfile
+          load: true
+          tags: automata-web:ci
+          cache-from: type=gha,scope=web-image
+          cache-to: type=gha,mode=max,scope=web-image
+      - name: sobe a imagem e checa /login e o css
+        run: |
+          docker run -d --name web -p 3000:3000 -e AUTOMATA_API_URL=http://localhost:8000 automata-web:ci
+          for _ in $(seq 1 30); do
+            curl -fsS -o /tmp/login.html http://localhost:3000/login && break
+            sleep 1
+          done
+          css=$(grep -o '/_next/static/[^"]*\.css' /tmp/login.html | head -1)
+          if [[ -z "$css" ]] || ! curl -fsS -o /dev/null "http://localhost:3000$css"; then
+            docker logs web
+            exit 1
+          fi
+
   gate:
-    needs: [api, web, e2e]
+    needs: [api, web, e2e, api-image, web-image]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: falha se api, web ou e2e falharam ou foram cancelados
-        run: |
-          if [[ "${{ needs.api.result }}" == "failure" || \
-                "${{ needs.api.result }}" == "cancelled" || \
-                "${{ needs.web.result }}" == "failure" || \
-                "${{ needs.web.result }}" == "cancelled" || \
-                "${{ needs.e2e.result }}" == "failure" || \
-                "${{ needs.e2e.result }}" == "cancelled" ]]; then
-            exit 1
-          fi
+      - name: falha se algum job falhou ou foi cancelado
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

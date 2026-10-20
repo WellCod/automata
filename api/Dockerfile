@@ -17,6 +17,7 @@ COPY --from=builder /app/.venv /app/.venv
 COPY app/ app/
 COPY alembic/ alembic/
 COPY alembic.ini alembic.ini
+COPY fixtures/ fixtures/
 COPY scripts/ scripts/
 COPY entrypoint.sh entrypoint.sh
 
