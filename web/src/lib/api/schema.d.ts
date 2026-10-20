@@ -175,6 +175,41 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/configs/{config_id}/eval-runs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Runs */
+    get: operations["list_runs_api_v1_configs__config_id__eval_runs_get"];
+    put?: never;
+    /** Start Run */
+    post: operations["start_run_api_v1_configs__config_id__eval_runs_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/configs/{config_id}/eval-runs/{run_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Run */
+    get: operations["get_run_api_v1_configs__config_id__eval_runs__run_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/integrations": {
     parameters: {
       query?: never;
@@ -1137,6 +1172,142 @@ export interface components {
        * Format: date-time
        */
       updated_at: string;
+    };
+    /** EvalResultResponse */
+    EvalResultResponse: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Case Id */
+      case_id: string | null;
+      /** Case Name */
+      case_name: string;
+      /** Position */
+      position: number;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "passed" | "failed" | "error" | "not_evaluated";
+      /** Checks */
+      checks: {
+        [key: string]: unknown;
+      }[];
+      /** Output */
+      output: string | null;
+      /** Tools Called */
+      tools_called: string[];
+      /** Duration Ms */
+      duration_ms: number | null;
+      /** Error */
+      error: string | null;
+      /** Session Id */
+      session_id: string | null;
+    };
+    /** EvalRunCreate */
+    EvalRunCreate: {
+      /** Version Id */
+      version_id?: string | null;
+    };
+    /** EvalRunDetail */
+    EvalRunDetail: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Agent Config Id
+       * Format: uuid
+       */
+      agent_config_id: string;
+      /**
+       * Version Id
+       * Format: uuid
+       */
+      version_id: string;
+      /** Version Number */
+      version_number: number;
+      /** Version Status */
+      version_status: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "queued" | "running" | "completed" | "failed";
+      /** Total */
+      total: number;
+      /** Passed */
+      passed: number;
+      /** Failed */
+      failed: number;
+      /** Not Evaluated */
+      not_evaluated: number;
+      /** Error */
+      error: string | null;
+      /** Started By */
+      started_by: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Started At */
+      started_at: string | null;
+      /** Finished At */
+      finished_at: string | null;
+      /** Results */
+      results: components["schemas"]["EvalResultResponse"][];
+    };
+    /** EvalRunSummary */
+    EvalRunSummary: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Agent Config Id
+       * Format: uuid
+       */
+      agent_config_id: string;
+      /**
+       * Version Id
+       * Format: uuid
+       */
+      version_id: string;
+      /** Version Number */
+      version_number: number;
+      /** Version Status */
+      version_status: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "queued" | "running" | "completed" | "failed";
+      /** Total */
+      total: number;
+      /** Passed */
+      passed: number;
+      /** Failed */
+      failed: number;
+      /** Not Evaluated */
+      not_evaluated: number;
+      /** Error */
+      error: string | null;
+      /** Started By */
+      started_by: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Started At */
+      started_at: string | null;
+      /** Finished At */
+      finished_at: string | null;
     };
     /** GlobalMetricsSummary */
     GlobalMetricsSummary: {
@@ -2424,6 +2595,104 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_runs_api_v1_configs__config_id__eval_runs_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvalRunSummary"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  start_run_api_v1_configs__config_id__eval_runs_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["EvalRunCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvalRunSummary"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_run_api_v1_configs__config_id__eval_runs__run_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+        run_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvalRunDetail"];
+        };
       };
       /** @description Validation Error */
       422: {

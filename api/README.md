@@ -109,8 +109,9 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | `mcp_servers:write` | `POST`, `PUT` e `DELETE` em `/api/v1/mcp-servers` — só owner (`agent_os:admin`) |
 | `knowledge_bases:read` | `GET /api/v1/knowledge-bases`, `GET /api/v1/knowledge-bases/{id}`, `GET /api/v1/knowledge-bases/embedders`, `GET /api/v1/knowledge-bases/{id}/contents[/{content_id}]`, `POST /api/v1/knowledge-bases/{id}/search` |
 | `knowledge_bases:write` | `POST`, `PUT` e `DELETE` em `/api/v1/knowledge-bases`; `POST /contents/file`, `/url` e `/text` e `DELETE /contents/{content_id}` |
-| `evals:read` | `GET /api/v1/configs/{id}/eval-cases` |
+| `evals:read` | `GET /api/v1/configs/{id}/eval-cases`, `GET /api/v1/configs/{id}/eval-runs[/{run_id}]` |
 | `evals:write` | `POST`, `PUT` e `DELETE` em `/api/v1/configs/{id}/eval-cases` |
+| `evals:run` | `POST /api/v1/configs/{id}/eval-runs` |
 | `users:admin` | `/api/v1/users` (listar, criar, alterar papel e situação, redefinir senha, remover) — só owner (`agent_os:admin`) |
 | `agent_os:admin` | `POST /api/v1/auth/users`; `integrations:write` (rotas `/api/v1/integrations`) só vem pelo admin |
 
@@ -292,4 +293,20 @@ Um caso tem `name` (único na config, até 80 caracteres), `input` (até 4000) e
 - `judge`: `criteria` (10 a 1000 caracteres), `mode` (`binary` ou `numeric`) e `threshold` (1 a 10, só no numérico). No máximo uma por caso.
 
 O limite de uma checagem de tools e uma de juiz por caso vem do `Case` do runner de suíte do Agno, que tem um campo para cada. Workflow ainda não tem suíte (422), e são até 50 casos por config. Viewer lê (`evals:read`); editor cria, edita e apaga (`evals:write`).
+
+### Execução da suíte
+
+`POST /api/v1/configs/{id}/eval-runs` com `version_id` opcional cria um `eval_run` (migration 0020) e responde 202. Sem `version_id`, testa o rascunho, se houver; senão, a vigente. A versão precisa ser da própria config. Uma execução por config por vez (409), e a suíte precisa ter ao menos um caso.
+
+A execução roda em background (`app/evals/runner.py`):
+- Cada caso gravado vira um `Case` do `agno.eval.suite` e roda com `arun_cases`, um por vez, com timeout de 120 s.
+- Cada caso ganha um agente ou time novo, montado por `agent_from` ou `team_from` a partir da versão pedida.
+- Checagens de texto viram um `Scorer` próprio (`TextScorer`, as mesmas regras dos workflows); as de tools vão para o `expected_tool_calls`.
+- Juiz ainda não roda: a checagem aparece com `passed: null` e o motivo. Caso só com juiz fica `not_evaluated` sem rodar o agente.
+- O `on_case_end` grava cada `eval_result` (status `passed`, `failed`, `error` ou `not_evaluated`, checagens com detalhe, resposta, tools chamadas, duração) assim que o caso termina. A execução guarda uma cópia dos casos como estavam.
+- Execução presa em `queued`/`running` quando a API reinicia vira `failed` no boot.
+
+Os runs dos casos passam pelo `RunTracking` com a `ContextVar` `current_eval_run`, que grava `agent_run.eval_run_id`, `usage_event.eval_run_id` e, como `user_id`, quem disparou a suíte (o runner do Agno não passa `user_id`). Esses runs ficam fora do histórico de execuções, das aprovações pendentes, das métricas por agente e globais, da série diária, dos bloqueios e do uso no analytics. O rollup de metering (`/api/v1/usage/rollup`) continua contando o custo deles, porque é gasto real.
+
+`GET /api/v1/configs/{id}/eval-runs` lista as 20 últimas; `GET .../eval-runs/{run_id}` traz os resultados por caso.
 

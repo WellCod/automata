@@ -57,6 +57,7 @@ class RunRepository:
         blocked_by: str | None = None,
         block_detail: dict[str, Any] | None = None,
         parent_run_id: str | None = None,
+        eval_run_id: UUID | None = None,
     ) -> AgentRun:
         run = AgentRun(
             agent_config_id=agent_config_id,
@@ -70,6 +71,7 @@ class RunRepository:
             blocked_by=blocked_by,
             block_detail=block_detail,
             parent_run_id=parent_run_id,
+            eval_run_id=eval_run_id,
         )
         self._session.add(run)
         self._session.flush()
@@ -89,6 +91,7 @@ class RunRepository:
         blocked_by: str | None = None,
         block_detail: dict[str, Any] | None = None,
         parent_run_id: str | None = None,
+        eval_run_id: UUID | None = None,
     ) -> AgentRun:
         """Atualiza o run de mesmo run_id (pausado e retomado) ou cria um novo."""
         existing = None
@@ -111,6 +114,7 @@ class RunRepository:
                 blocked_by=blocked_by,
                 block_detail=block_detail,
                 parent_run_id=parent_run_id,
+                eval_run_id=eval_run_id,
             )
         existing.status = status
         existing.error = error
@@ -157,7 +161,11 @@ class RunRepository:
     def list_paused(self, config_ids: list[UUID] | None = None) -> list[AgentRun]:
         stmt = (
             select(AgentRun)
-            .where(AgentRun.status == "paused", AgentRun.pending_tools.is_not(None))
+            .where(
+                AgentRun.status == "paused",
+                AgentRun.pending_tools.is_not(None),
+                AgentRun.eval_run_id.is_(None),
+            )
             .order_by(AgentRun.created_at.desc())
         )
         if config_ids is not None:
@@ -171,7 +179,9 @@ class RunRepository:
         page: int = 1,
         page_size: int = 50,
     ) -> tuple[list[AgentRun], int]:
-        base = select(AgentRun).where(AgentRun.agent_config_id == config_id)
+        base = select(AgentRun).where(
+            AgentRun.agent_config_id == config_id, AgentRun.eval_run_id.is_(None)
+        )
         total: int = self._session.execute(
             select(func.count()).select_from(base.subquery())
         ).scalar_one()
@@ -199,6 +209,7 @@ class RunRepository:
         base_filter = [
             AgentRun.agent_config_id == config_id,
             AgentRun.created_at >= since,
+            AgentRun.eval_run_id.is_(None),
         ]
         if until is not None:
             base_filter.append(AgentRun.created_at <= until)
@@ -244,7 +255,7 @@ class RunRepository:
     ) -> list[AgentRunSummary]:
         if since is None:
             since = datetime.now(UTC) - timedelta(days=period_days)
-        where_clauses = [AgentRun.created_at >= since]
+        where_clauses = [AgentRun.created_at >= since, AgentRun.eval_run_id.is_(None)]
         if until is not None:
             where_clauses.append(AgentRun.created_at <= until)
         rows = self._session.execute(
@@ -277,7 +288,7 @@ class RunRepository:
     ) -> RunMetrics:
         if since is None:
             since = datetime.now(UTC) - timedelta(days=period_days)
-        where_clauses = [AgentRun.created_at >= since]
+        where_clauses = [AgentRun.created_at >= since, AgentRun.eval_run_id.is_(None)]
         if until is not None:
             where_clauses.append(AgentRun.created_at <= until)
 
@@ -322,7 +333,7 @@ class RunRepository:
     ) -> list[DailyRunStats]:
         """Runs por dia (UTC); dias sem run não aparecem."""
         day = cast(func.timezone("UTC", AgentRun.created_at), Date).label("day")
-        where_clauses = [AgentRun.created_at >= since]
+        where_clauses = [AgentRun.created_at >= since, AgentRun.eval_run_id.is_(None)]
         if until is not None:
             where_clauses.append(AgentRun.created_at <= until)
         if config_id is not None:
@@ -359,7 +370,11 @@ class RunRepository:
         until: datetime | None = None,
         config_id: UUID | None = None,
     ) -> dict[str, int]:
-        where = [AgentRun.status == "blocked", AgentRun.created_at >= since]
+        where = [
+            AgentRun.status == "blocked",
+            AgentRun.created_at >= since,
+            AgentRun.eval_run_id.is_(None),
+        ]
         if until is not None:
             where.append(AgentRun.created_at <= until)
         if config_id is not None:

@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.eval import EvalCase
+from app.models.eval import EvalCase, EvalResult, EvalRun
 
 
 class EvalCaseRepository:
@@ -49,3 +49,38 @@ class EvalCaseRepository:
     def delete(self, case: EvalCase) -> None:
         self._session.delete(case)
         self._session.flush()
+
+
+class EvalRunRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def add(self, run: EvalRun) -> EvalRun:
+        self._session.add(run)
+        self._session.flush()
+        return run
+
+    def get(self, config_id: UUID, run_id: UUID) -> EvalRun | None:
+        run = self._session.get(EvalRun, run_id)
+        return run if run is not None and run.agent_config_id == config_id else None
+
+    def active(self, config_id: UUID) -> EvalRun | None:
+        stmt = select(EvalRun).where(
+            EvalRun.agent_config_id == config_id, EvalRun.status.in_(("queued", "running"))
+        )
+        return self._session.scalars(stmt).first()
+
+    def list_by_config(self, config_id: UUID, limit: int = 20) -> list[EvalRun]:
+        stmt = (
+            select(EvalRun)
+            .where(EvalRun.agent_config_id == config_id)
+            .order_by(EvalRun.created_at.desc())
+            .limit(limit)
+        )
+        return list(self._session.scalars(stmt))
+
+    def results(self, run_id: UUID) -> list[EvalResult]:
+        stmt = (
+            select(EvalResult).where(EvalResult.eval_run_id == run_id).order_by(EvalResult.position)
+        )
+        return list(self._session.scalars(stmt))

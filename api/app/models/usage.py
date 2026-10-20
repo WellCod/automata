@@ -13,6 +13,7 @@ class UsageEvent(Base):
     __table_args__ = (
         Index("ix_usage_event_period_agent_config_id", "period", "agent_config_id"),
         Index("ix_usage_event_created_at", "created_at"),
+        Index("ix_usage_event_eval_run_id", "eval_run_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -30,6 +31,10 @@ class UsageEvent(Base):
     output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     cost: Mapped[float | None] = mapped_column(Numeric(14, 8), nullable=True)
+    # run de caso de teste (ADR-0015): custo de teste, separado
+    eval_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("eval_run.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

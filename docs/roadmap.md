@@ -860,7 +860,7 @@ Decisão em [ADR-0015](adr/0015-evals-por-agente.md). Cada agente e time ganha u
 
 - [x] #118 — `docs(adr)`: ADR-0015 e esta seção
 - [x] `feat(api)`: casos de teste por config, checagens validadas na escrita e CRUD em `/api/v1/configs/{id}/eval-cases`. Tabela `eval_case` (migration 0019), scopes `evals:read`, `evals:write` e `evals:run`
-- [ ] `feat(api)`: execução da suíte em background com o runner do Agno, resultado por caso e runs de eval marcados fora do analytics
+- [x] `feat(api)`: execução da suíte em background com o runner do Agno, resultado por caso e runs de eval marcados fora do analytics. Tabelas `eval_run` e `eval_result` e `eval_run_id` em `agent_run` e `usage_event` (migration 0020)
 - [ ] `feat(api)`: juiz com modelo escolhido e medido, custo da execução e checagem de juiz "não avaliada" no modo demo
 - [ ] `feat(api)`: comparação entre versões e gate de publicação por suíte verde
 - [ ] `feat(web)`: aba Testes no agente e no time, com casos, execução, resultado por caso e regressões
