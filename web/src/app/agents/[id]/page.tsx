@@ -2,7 +2,15 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, ArrowLeft, FlaskConical, History, Settings2, TrendingUp } from "lucide-react";
+import {
+  Activity,
+  ArrowLeft,
+  FlaskConical,
+  History,
+  ListChecks,
+  Settings2,
+  TrendingUp,
+} from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -10,6 +18,7 @@ import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { CostPanel } from "@/components/cost-panel";
+import { EvalSuitePanel } from "@/components/eval-suite-panel";
 import { LintPanel } from "@/components/lint-panel";
 import {
   DEFAULT_GUARDRAILS,
@@ -89,6 +98,7 @@ const PAGE_TABS = [
   { id: "config" as const, label: "Configuração", icon: Settings2 },
   { id: "runs" as const, label: "Execuções", icon: Activity },
   { id: "desempenho" as const, label: "Desempenho", icon: TrendingUp },
+  { id: "testes" as const, label: "Testes", icon: ListChecks },
   { id: "versoes" as const, label: "Versões", icon: History },
 ];
 
@@ -441,6 +451,16 @@ export default function AgentEditPage() {
             <div className="mx-auto flex max-w-3xl flex-col gap-6">
               <MetricsPanel agentId={id} />
               <CostPanel agentId={id} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="testes" className="pt-5">
+            <div className="mx-auto max-w-3xl">
+              <EvalSuitePanel
+                configId={id}
+                draftVersion={data?.draft_version}
+                currentVersion={data?.current_version}
+              />
             </div>
           </TabsContent>
 
