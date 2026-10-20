@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -37,6 +37,11 @@ class EvalRun(Base):
     """Execução da suíte contra uma versão exata do agente ou time."""
 
     __tablename__ = "eval_run"
+    __table_args__ = (
+        Index("ix_eval_run_config_created", "agent_config_id", "created_at"),
+        Index("ix_eval_run_version", "version_id"),
+        Index("ix_eval_run_status", "status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     agent_config_id: Mapped[uuid.UUID] = mapped_column(
@@ -65,6 +70,7 @@ class EvalRun(Base):
 
 class EvalResult(Base):
     __tablename__ = "eval_result"
+    __table_args__ = (Index("ix_eval_result_run", "eval_run_id", "position"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     eval_run_id: Mapped[uuid.UUID] = mapped_column(
