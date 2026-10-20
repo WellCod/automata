@@ -123,3 +123,47 @@ def test_seed_cria_base_de_exemplo_e_reset_apaga_vetores(
         assert conn.execute(text("SELECT to_regclass(:t)"), {"t": f"ai.{table}"}).scalar() is None
     with Session(engine) as session:
         assert session.scalar(select(func.count()).select_from(KnowledgeBase)) == 0
+
+
+def test_seed_cria_workflow_de_exemplo_sem_runs_falsos(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.models.config import AgentConfig, AgentConfigVersion
+    from app.schemas.workflow import WorkflowSettings, step_nodes
+
+    monkeypatch.setenv("SEED_OWNER_EMAIL", "owner@demo.com")
+    monkeypatch.setenv("SEED_OWNER_PASSWORD", "Senha123!")
+    with Session(engine) as session:
+        seed_demo(session)
+        seed_demo(session)  # idempotente
+        seed_analytics(session, n_runs=50)
+
+    with Session(engine) as session:
+        [workflow] = session.scalars(
+            select(AgentConfig).where(AgentConfig.kind == "workflow")
+        ).all()
+        version = session.get(AgentConfigVersion, workflow.current_version_id)
+        assert version is not None
+        settings = WorkflowSettings.model_validate(version.payload["workflow"])
+        agents = {
+            a.id: a.name
+            for a in session.scalars(select(AgentConfig).where(AgentConfig.kind == "agent"))
+        }
+        assert [(s.name, agents[s.agent_id]) for s in step_nodes(settings.steps)] == [  # type: ignore[index]
+            ("triagem", "Atendimento ao Cliente"),
+            ("técnica", "Suporte Técnico"),
+            ("financeira", "Analista Financeiro"),
+            ("consolidação", "Atendimento ao Cliente"),
+            ("revisão", "Analista Financeiro"),
+        ]
+        # workflow não ganha runs nem consumo inventados: o dele é a soma das etapas
+        for model in (AgentRun, UsageEvent):
+            assert (
+                session.scalar(
+                    select(func.count())
+                    .select_from(model)
+                    .where(model.agent_config_id == workflow.id)
+                )
+                == 0
+            )
+        assert session.scalar(select(func.count()).select_from(AgentRun)) == 50
