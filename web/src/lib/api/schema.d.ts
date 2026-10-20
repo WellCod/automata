@@ -193,6 +193,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/configs/{config_id}/eval-runs/compare": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Compare Runs
+     * @description Caso a caso entre duas execuções; tipicamente a vigente (base) e o rascunho (target).
+     */
+    get: operations["compare_runs_api_v1_configs__config_id__eval_runs_compare_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/configs/{config_id}/eval-runs/{run_id}": {
     parameters: {
       query?: never;
@@ -203,6 +223,24 @@ export interface paths {
     /** Get Run */
     get: operations["get_run_api_v1_configs__config_id__eval_runs__run_id__get"];
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/configs/{config_id}/eval-settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Eval Settings */
+    get: operations["read_eval_settings_api_v1_configs__config_id__eval_settings_get"];
+    /** Update Settings */
+    put: operations["update_settings_api_v1_configs__config_id__eval_settings_put"];
     post?: never;
     delete?: never;
     options?: never;
@@ -984,6 +1022,22 @@ export interface components {
        */
       vision: boolean;
     };
+    /** CaseComparison */
+    CaseComparison: {
+      /** Case Id */
+      case_id: string | null;
+      /** Case Name */
+      case_name: string;
+      /** Base Status */
+      base_status: ("passed" | "failed" | "error" | "not_evaluated") | null;
+      /** Target Status */
+      target_status: ("passed" | "failed" | "error" | "not_evaluated") | null;
+      /**
+       * Change
+       * @enum {string}
+       */
+      change: "regression" | "fix" | "same" | "new" | "removed";
+    };
     /** ConditionNode */
     ConditionNode: {
       /**
@@ -1173,6 +1227,17 @@ export interface components {
        */
       updated_at: string;
     };
+    /** EvalComparison */
+    EvalComparison: {
+      base: components["schemas"]["EvalRunSummary"];
+      target: components["schemas"]["EvalRunSummary"];
+      /** Cases */
+      cases: components["schemas"]["CaseComparison"][];
+      /** Regressions */
+      regressions: number;
+      /** Fixes */
+      fixes: number;
+    };
     /** EvalResultResponse */
     EvalResultResponse: {
       /**
@@ -1322,6 +1387,23 @@ export interface components {
       started_at: string | null;
       /** Finished At */
       finished_at: string | null;
+    };
+    /** EvalSettings */
+    EvalSettings: {
+      /** Require Passing Evals */
+      require_passing_evals: boolean;
+      /** Draft Version Id */
+      draft_version_id: string | null;
+      draft_run: components["schemas"]["EvalRunSummary"] | null;
+      /** Can Publish */
+      can_publish: boolean;
+      /** Reason */
+      reason: string | null;
+    };
+    /** EvalSettingsInput */
+    EvalSettingsInput: {
+      /** Require Passing Evals */
+      require_passing_evals: boolean;
     };
     /** GlobalMetricsSummary */
     GlobalMetricsSummary: {
@@ -2694,6 +2776,40 @@ export interface operations {
       };
     };
   };
+  compare_runs_api_v1_configs__config_id__eval_runs_compare_get: {
+    parameters: {
+      query: {
+        base: string;
+        target: string;
+      };
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvalComparison"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   get_run_api_v1_configs__config_id__eval_runs__run_id__get: {
     parameters: {
       query?: never;
@@ -2713,6 +2829,72 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["EvalRunDetail"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  read_eval_settings_api_v1_configs__config_id__eval_settings_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvalSettings"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_settings_api_v1_configs__config_id__eval_settings_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["EvalSettingsInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvalSettings"];
         };
       };
       /** @description Validation Error */

@@ -862,7 +862,7 @@ Decisão em [ADR-0015](adr/0015-evals-por-agente.md). Cada agente e time ganha u
 - [x] `feat(api)`: casos de teste por config, checagens validadas na escrita e CRUD em `/api/v1/configs/{id}/eval-cases`. Tabela `eval_case` (migration 0019), scopes `evals:read`, `evals:write` e `evals:run`
 - [x] `feat(api)`: execução da suíte em background com o runner do Agno, resultado por caso e runs de eval marcados fora do analytics. Tabelas `eval_run` e `eval_result` e `eval_run_id` em `agent_run` e `usage_event` (migration 0020)
 - [x] `feat(api)`: juiz com modelo escolhido e medido, custo da execução e checagem de juiz "não avaliada" no modo demo. O medidor embrulha o `ainvoke` do modelo do juiz; `eval_run` ganha `judge_model`, `total_tokens` e `cost` (migration 0021), e o resumo do analytics ganha `eval_tokens` e `eval_cost`
-- [ ] `feat(api)`: comparação entre versões e gate de publicação por suíte verde
+- [x] `feat(api)`: comparação entre versões e gate de publicação por suíte verde. Comparação caso a caso em `/eval-runs/compare`; flag `require_passing_evals` no `agent_config` (migration 0022) e configuração em `/eval-settings`; rollback fica fora do gate
 - [ ] `feat(web)`: aba Testes no agente e no time, com casos, execução, resultado por caso e regressões
 - [ ] `feat(web)`: publicação mostra o resultado da suíte e respeita o gate
 - [ ] `test(api)`: evals da avaliação (scorer de texto e montagem dos casos) e suíte de exemplo no seed da demo

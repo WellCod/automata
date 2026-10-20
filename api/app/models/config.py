@@ -1,7 +1,18 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    false,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -57,6 +68,10 @@ class AgentConfig(Base):
         UUID(as_uuid=True),
         ForeignKey("agent_config_version.id", use_alter=True, name="fk_draft_version"),
         nullable=True,
+    )
+    # gate de publicação (ADR-0015): fora da versão, como os casos de teste
+    require_passing_evals: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=false(), default=False
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

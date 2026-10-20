@@ -8,6 +8,7 @@ from app.agents.capabilities import get_capabilities
 from app.agents.models_map import demo_replay
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
+from app.evals.gate import draft_verdict, latest_run
 from app.evals.runner import execute
 from app.models.config import AgentConfig
 from app.models.eval import EvalCase, EvalResult, EvalRun
@@ -15,12 +16,16 @@ from app.repositories.config import ConfigRepository
 from app.repositories.eval import EvalCaseRepository, EvalRunRepository
 from app.schemas.eval import (
     MAX_CASES,
+    CaseComparison,
     EvalCaseInput,
     EvalCaseResponse,
+    EvalComparison,
     EvalResultResponse,
     EvalRunCreate,
     EvalRunDetail,
     EvalRunSummary,
+    EvalSettings,
+    EvalSettingsInput,
 )
 
 router = APIRouter(
@@ -249,6 +254,60 @@ def list_runs(config_id: UUID, session: SessionDep) -> list[EvalRunSummary]:
     return [_summary(session, r) for r in EvalRunRepository(session).list_by_config(config_id)]
 
 
+def _change(base: str | None, target: str | None) -> str:
+    if base is None:
+        return "new"
+    if target is None:
+        return "removed"
+    if base == "passed" and target != "passed":
+        return "regression"
+    if base != "passed" and target == "passed":
+        return "fix"
+    return "same"
+
+
+@runs_router.get("/compare", response_model=EvalComparison)
+def compare_runs(config_id: UUID, base: UUID, target: UUID, session: SessionDep) -> EvalComparison:
+    """Caso a caso entre duas execuções; tipicamente a vigente (base) e o rascunho (target)."""
+    _config_or_404(session, config_id)
+    repo = EvalRunRepository(session)
+    runs = {
+        key: repo.get(config_id, run_id) for key, run_id in (("base", base), ("target", target))
+    }
+    if runs["base"] is None or runs["target"] is None:
+        raise HTTPException(status_code=404, detail="Execução não encontrada")
+
+    def keyed(run: EvalRun) -> dict[str, EvalResult]:
+        # pelo id do caso; caso apagado depois da execução cai para o nome
+        return {str(r.case_id or r.case_name): r for r in repo.results(run.id)}
+
+    before, after = keyed(runs["base"]), keyed(runs["target"])
+    order = list(after) + [k for k in before if k not in after]
+    cases = []
+    for key in order:
+        b, a = before.get(key), after.get(key)
+        ref = a or b
+        assert ref is not None
+        cases.append(
+            CaseComparison.model_validate(
+                {
+                    "case_id": ref.case_id,
+                    "case_name": ref.case_name,
+                    "base_status": b.status if b else None,
+                    "target_status": a.status if a else None,
+                    "change": _change(b.status if b else None, a.status if a else None),
+                }
+            )
+        )
+    return EvalComparison(
+        base=_summary(session, runs["base"]),
+        target=_summary(session, runs["target"]),
+        cases=cases,
+        regressions=sum(1 for c in cases if c.change == "regression"),
+        fixes=sum(1 for c in cases if c.change == "fix"),
+    )
+
+
 @runs_router.get("/{run_id}", response_model=EvalRunDetail)
 def get_run(config_id: UUID, run_id: UUID, session: SessionDep) -> EvalRunDetail:
     _config_or_404(session, config_id)
@@ -258,3 +317,37 @@ def get_run(config_id: UUID, run_id: UUID, session: SessionDep) -> EvalRunDetail
         raise HTTPException(status_code=404, detail="Execução não encontrada")
     summary = _summary(session, run)
     return EvalRunDetail(**summary.model_dump(), results=[_result(r) for r in repo.results(run.id)])
+
+
+settings_router = APIRouter(
+    prefix="/api/v1/configs/{config_id}/eval-settings",
+    tags=["evals"],
+    dependencies=[Depends(require_scopes(Scope.EVALS_READ))],
+)
+
+
+def _settings(session: SessionDep, config: AgentConfig) -> EvalSettings:
+    run = latest_run(session, config)
+    verdict = draft_verdict(session, config)
+    return EvalSettings(
+        require_passing_evals=config.require_passing_evals,
+        draft_version_id=config.draft_version_id,
+        draft_run=_summary(session, run) if run else None,
+        can_publish=verdict.ok or not config.require_passing_evals,
+        reason=verdict.reason,
+    )
+
+
+@settings_router.get("", response_model=EvalSettings)
+def read_eval_settings(config_id: UUID, session: SessionDep) -> EvalSettings:
+    return _settings(session, _config_or_404(session, config_id))
+
+
+@settings_router.put("", response_model=EvalSettings, dependencies=_WRITE)
+def update_settings(config_id: UUID, body: EvalSettingsInput, session: SessionDep) -> EvalSettings:
+    config = _config_or_404(session, config_id)
+    _testable(config)
+    config.require_passing_evals = body.require_passing_evals
+    session.commit()
+    session.refresh(config)
+    return _settings(session, config)

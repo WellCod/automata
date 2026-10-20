@@ -147,3 +147,36 @@ class EvalResultResponse(BaseModel):
 
 class EvalRunDetail(EvalRunSummary):
     results: list[EvalResultResponse]
+
+
+class EvalSettingsInput(BaseModel):
+    require_passing_evals: bool
+
+
+class EvalSettings(BaseModel):
+    require_passing_evals: bool
+    draft_version_id: UUID | None
+    # última execução no rascunho atual, se houver
+    draft_run: EvalRunSummary | None
+    # se o gate liberaria publicar agora; sem gate ligado, sempre true
+    can_publish: bool
+    reason: str | None
+
+
+CaseChange = Literal["regression", "fix", "same", "new", "removed"]
+
+
+class CaseComparison(BaseModel):
+    case_id: UUID | None
+    case_name: str
+    base_status: EvalResultStatus | None
+    target_status: EvalResultStatus | None
+    change: CaseChange
+
+
+class EvalComparison(BaseModel):
+    base: EvalRunSummary
+    target: EvalRunSummary
+    cases: list[CaseComparison]
+    regressions: int
+    fixes: int

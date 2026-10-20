@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
+from app.evals.gate import draft_verdict
 from app.models.config import AgentConfig, AgentConfigVersion
 from app.repositories.config import ConfigRepository
 from app.repositories.knowledge_base import KnowledgeBaseRepository
@@ -158,6 +159,14 @@ def publish_draft(
     config_id: UUID, session: SessionDep, request: Request
 ) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
+    config = repo.get_config(config_id)
+    if config is not None and config.require_passing_evals:
+        verdict = draft_verdict(session, config)
+        if not verdict.ok:
+            # rollback não passa por aqui: voltar para uma versão já publicada segue livre
+            raise HTTPException(
+                status_code=409, detail=f"Publicação exige a suíte verde: {verdict.reason}"
+            )
     service = ConfigService(repo, McpServerRepository(session), KnowledgeBaseRepository(session))
     try:
         version = service.publish(config_id=config_id, author="panel")

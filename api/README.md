@@ -109,8 +109,8 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | `mcp_servers:write` | `POST`, `PUT` e `DELETE` em `/api/v1/mcp-servers` — só owner (`agent_os:admin`) |
 | `knowledge_bases:read` | `GET /api/v1/knowledge-bases`, `GET /api/v1/knowledge-bases/{id}`, `GET /api/v1/knowledge-bases/embedders`, `GET /api/v1/knowledge-bases/{id}/contents[/{content_id}]`, `POST /api/v1/knowledge-bases/{id}/search` |
 | `knowledge_bases:write` | `POST`, `PUT` e `DELETE` em `/api/v1/knowledge-bases`; `POST /contents/file`, `/url` e `/text` e `DELETE /contents/{content_id}` |
-| `evals:read` | `GET /api/v1/configs/{id}/eval-cases`, `GET /api/v1/configs/{id}/eval-runs[/{run_id}]` |
-| `evals:write` | `POST`, `PUT` e `DELETE` em `/api/v1/configs/{id}/eval-cases` |
+| `evals:read` | `GET /api/v1/configs/{id}/eval-cases`, `GET /api/v1/configs/{id}/eval-runs[/{run_id}]`, `GET .../eval-runs/compare`, `GET /api/v1/configs/{id}/eval-settings` |
+| `evals:write` | `POST`, `PUT` e `DELETE` em `/api/v1/configs/{id}/eval-cases`; `PUT /api/v1/configs/{id}/eval-settings` |
 | `evals:run` | `POST /api/v1/configs/{id}/eval-runs` |
 | `users:admin` | `/api/v1/users` (listar, criar, alterar papel e situação, redefinir senha, remover) — só owner (`agent_os:admin`) |
 | `agent_os:admin` | `POST /api/v1/auth/users`; `integrations:write` (rotas `/api/v1/integrations`) só vem pelo admin |
@@ -313,4 +313,15 @@ Os runs dos casos passam pelo `RunTracking` com a `ContextVar` `current_eval_run
 `GET /api/v1/configs/{id}/eval-runs` lista as 20 últimas; `GET .../eval-runs/{run_id}` traz os resultados por caso.
 
 No `GET /api/v1/metrics/summary`, `eval_tokens` e `eval_cost` trazem o consumo das suítes no período, fora do `total_cost` das conversas.
+
+### Comparação e gate de publicação
+
+`GET /api/v1/configs/{id}/eval-runs/compare?base=<run>&target=<run>` compara duas execuções caso a caso, pelo id do caso, ou pelo nome quando o caso foi apagado. Cada caso sai como `regression` (passava e deixou de passar), `fix`, `same`, `new` ou `removed`, com a contagem de regressões e correções. O uso típico é a vigente como base e o rascunho como alvo.
+
+O gate é a flag `agent_config.require_passing_evals` (migration 0022), fora da versão, como os casos:
+- `PUT /api/v1/configs/{id}/eval-settings` liga e desliga.
+- `GET` devolve a flag, a última execução no rascunho atual, se publicar está liberado (`can_publish`) e o motivo.
+- Com a flag ligada, `POST /api/v1/configs/{id}/publish` responde 409 até que a última execução no `draft_version_id` atual esteja concluída com todos os casos aprovados. Caso não avaliado não conta como aprovado.
+- Como cada rascunho salvo é uma versão nova, editar o rascunho invalida o resultado anterior sem precisar de hash.
+- Rollback não passa pelo gate: voltar para uma versão já publicada segue livre, porque é a saída de emergência.
 
