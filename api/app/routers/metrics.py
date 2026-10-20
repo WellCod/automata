@@ -31,6 +31,9 @@ class GlobalMetricsSummary(BaseModel):
     # embeddings de bases de conhecimento: ingestão e buscas (ADR-0012), fora do total_cost
     embedding_tokens: int = 0
     embedding_cost: float | None = None
+    # suítes de teste (ADR-0015): casos e juiz, fora do total_cost
+    eval_tokens: int = 0
+    eval_cost: float | None = None
     period_days: int
 
 
@@ -125,6 +128,7 @@ def get_summary(
     usage_repo = UsageRepository(session)
     usage = usage_repo.usage_summary(since=since, until=until, period_days=period_days)
     embeddings = EmbeddingUsageRepository(session).summary(since=since, until=until)
+    evals = usage_repo.eval_summary(since=since, until=until)
 
     return GlobalMetricsSummary(
         total_runs=metrics.total_runs,
@@ -137,6 +141,8 @@ def get_summary(
         total_cost=usage.total_cost,
         embedding_tokens=embeddings.tokens,
         embedding_cost=embeddings.cost,
+        eval_tokens=evals.total_tokens,
+        eval_cost=evals.total_cost,
         period_days=period_days,
     )
 

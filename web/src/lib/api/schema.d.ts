@@ -1210,6 +1210,8 @@ export interface components {
     EvalRunCreate: {
       /** Version Id */
       version_id?: string | null;
+      /** Judge Model */
+      judge_model?: string | null;
     };
     /** EvalRunDetail */
     EvalRunDetail: {
@@ -1247,6 +1249,12 @@ export interface components {
       not_evaluated: number;
       /** Error */
       error: string | null;
+      /** Judge Model */
+      judge_model: string | null;
+      /** Total Tokens */
+      total_tokens: number;
+      /** Cost */
+      cost: number | null;
       /** Started By */
       started_by: string;
       /**
@@ -1297,6 +1305,12 @@ export interface components {
       not_evaluated: number;
       /** Error */
       error: string | null;
+      /** Judge Model */
+      judge_model: string | null;
+      /** Total Tokens */
+      total_tokens: number;
+      /** Cost */
+      cost: number | null;
       /** Started By */
       started_by: string;
       /**
@@ -1342,6 +1356,13 @@ export interface components {
       embedding_tokens: number;
       /** Embedding Cost */
       embedding_cost?: number | null;
+      /**
+       * Eval Tokens
+       * @default 0
+       */
+      eval_tokens: number;
+      /** Eval Cost */
+      eval_cost?: number | null;
       /** Period Days */
       period_days: number;
     };

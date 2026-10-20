@@ -13,22 +13,27 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from agno.eval.suite import Case, CaseResult, arun_cases
+from agno.eval.suite import Case, CaseResult, JudgeMode, arun_cases
 from agno.scorer.base import Score
-from sqlalchemy import update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
+from app.agents import models_map
 from app.agents.factory import agent_from, load_team, load_version, team_from
 from app.agents.tracking import EvalContext, current_eval_run
 from app.agents.workflow_factory import rule_matches
 from app.db import get_engine
+from app.evals.judge import JudgeUsage, metered
 from app.models.eval import EvalResult, EvalRun
+from app.models.usage import UsageEvent
+from app.repositories.usage import UsageRepository
 from app.schemas.eval import EvalCaseInput, JudgeCheck, TextCheck, ToolsCheck
 
 logger = logging.getLogger(__name__)
 
 CASE_TIMEOUT_S = 120
-JUDGE_NOT_EVALUATED = "juiz não configurado nesta execução"
+JUDGE_IN_DEMO = "modo demo: o juiz não roda com respostas gravadas"
+JUDGE_WITHOUT_MODEL = "execução sem modelo de juiz"
 
 
 def _text(content: Any) -> str:
@@ -80,15 +85,22 @@ def _split(spec: EvalCaseInput) -> tuple[list[TextCheck], ToolsCheck | None, Jud
 
 
 def plan_case(
-    position: int, snapshot: dict[str, Any], config_id: UUID, kind: str, version_id: UUID
+    position: int,
+    snapshot: dict[str, Any],
+    config_id: UUID,
+    kind: str,
+    version_id: UUID,
+    judge_unavailable: str | None = JUDGE_WITHOUT_MODEL,
 ) -> PlannedCase:
+    """`judge_unavailable` é o motivo de o juiz não rodar; None quando há juiz."""
     spec = EvalCaseInput.model_validate(snapshot)
     text, tools, judge = _split(spec)
     skipped: dict[str, str] = {}
-    if judge is not None:
-        skipped["judge"] = JUDGE_NOT_EVALUATED
+    use_judge = judge is not None and judge_unavailable is None
+    if judge is not None and judge_unavailable is not None:
+        skipped["judge"] = judge_unavailable
     case_id = UUID(snapshot["id"]) if snapshot.get("id") else None
-    if not text and tools is None:
+    if not text and tools is None and not use_judge:
         # o Case do Agno recusa caso sem checagem; nada roda e o caso fica não avaliado
         return PlannedCase(position, case_id, spec.name, spec, None, skipped)
     # instância nova por caso: casos não compartilham sessão, estado nem conexão MCP
@@ -104,6 +116,9 @@ def plan_case(
         expected_tool_calls=tuple(tools.tools) if tools else None,
         allow_additional_tool_calls=tools.allow_additional if tools else True,
         scorer=TextScorer(text) if text else None,
+        criteria=judge.criteria if judge is not None and use_judge else None,
+        judge_mode=JudgeMode(judge.mode) if judge is not None else JudgeMode.BINARY,
+        judge_threshold=judge.threshold if judge is not None else 7,
         **target,
     )
     return PlannedCase(position, case_id, spec.name, spec, agno_case, skipped)
@@ -178,7 +193,37 @@ def _save_result(run_id: UUID, row: EvalResult) -> None:
         session.commit()
 
 
-def _load(run_id: UUID) -> tuple[UUID, str, UUID, str, list[dict[str, Any]]]:
+def _record_judge(
+    run_id: UUID, config_id: UUID, actor: str, model_id: str, usage: JudgeUsage
+) -> None:
+    if not usage.total_tokens:
+        return
+    with Session(get_engine()) as session:
+        UsageRepository(session).record_event(
+            agent_config_id=config_id,
+            user_id=actor,
+            model_id=model_id,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            total_tokens=usage.total_tokens,
+            cost=usage.cost,
+            eval_run_id=run_id,
+        )
+        session.commit()
+
+
+def _consumption(run_id: UUID) -> tuple[int, float | None]:
+    """Casos e juiz: tudo que a execução gravou em usage_event."""
+    with Session(get_engine()) as session:
+        row = session.execute(
+            select(
+                func.coalesce(func.sum(UsageEvent.total_tokens), 0), func.sum(UsageEvent.cost)
+            ).where(UsageEvent.eval_run_id == run_id)
+        ).one()
+        return int(row[0]), float(row[1]) if row[1] is not None else None
+
+
+def _load(run_id: UUID) -> tuple[UUID, str, UUID, str, list[dict[str, Any]], str | None]:
     from app.models.config import AgentConfig
 
     with Session(get_engine()) as session:
@@ -187,17 +232,37 @@ def _load(run_id: UUID) -> tuple[UUID, str, UUID, str, list[dict[str, Any]]]:
             raise LookupError(f"eval_run {run_id} não existe")
         config = session.get(AgentConfig, run.agent_config_id)
         assert config is not None
-        return run.agent_config_id, config.kind, run.version_id, run.started_by, list(run.cases)
+        return (
+            run.agent_config_id,
+            config.kind,
+            run.version_id,
+            run.started_by,
+            list(run.cases),
+            run.judge_model,
+        )
 
 
 async def execute(run_id: UUID) -> None:
     """Roda a suíte em background; qualquer falha fora dos casos marca a execução como falha."""
     try:
-        config_id, kind, version_id, actor, snapshots = await asyncio.to_thread(_load, run_id)
+        config_id, kind, version_id, actor, snapshots, judge_model = await asyncio.to_thread(
+            _load, run_id
+        )
         await asyncio.to_thread(_set, run_id, status="running", started_at=datetime.now(UTC))
+        judge: Any = None
+        usage = JudgeUsage()
+        unavailable: str | None = None
+        if models_map.demo_replay():
+            unavailable = JUDGE_IN_DEMO
+        elif judge_model is None:
+            unavailable = JUDGE_WITHOUT_MODEL
+        else:
+            # sempre um modelo nosso: sem judge_model o Agno cairia num modelo da OpenAI
+            judge, usage = metered(models_map.resolve_model(judge_model))
         planned = await asyncio.to_thread(
             lambda: [
-                plan_case(i, snap, config_id, kind, version_id) for i, snap in enumerate(snapshots)
+                plan_case(i, snap, config_id, kind, version_id, unavailable)
+                for i, snap in enumerate(snapshots)
             ]
         )
     except Exception as exc:
@@ -226,7 +291,12 @@ async def execute(run_id: UUID) -> None:
                 await asyncio.to_thread(_save_result, run_id, row)
         runnable = [p.agno_case for p in planned if p.agno_case is not None]
         if runnable:
-            await arun_cases(runnable, default_timeout=CASE_TIMEOUT_S, on_case_end=on_case_end)
+            await arun_cases(
+                runnable,
+                default_timeout=CASE_TIMEOUT_S,
+                judge_model=judge,
+                on_case_end=on_case_end,
+            )
     except Exception as exc:
         logger.exception("suíte falhou", extra={"eval_run_id": str(run_id)})
         await asyncio.to_thread(
@@ -235,11 +305,16 @@ async def execute(run_id: UUID) -> None:
         return
     finally:
         current_eval_run.reset(token)
+        if judge_model is not None:
+            await asyncio.to_thread(_record_judge, run_id, config_id, actor, judge_model, usage)
 
+    total_tokens, cost = await asyncio.to_thread(_consumption, run_id)
     await asyncio.to_thread(
         _set,
         run_id,
         status="completed",
+        total_tokens=total_tokens,
+        cost=cost,
         total=len(planned),
         passed=statuses.count("passed"),
         failed=statuses.count("failed") + statuses.count("error"),

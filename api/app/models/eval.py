@@ -2,7 +2,17 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -58,6 +68,10 @@ class EvalRun(Base):
     # caso cujas checagens não puderam rodar (juiz no modo demo, por exemplo)
     not_evaluated: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    judge_model: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # soma do usage_event da execução: casos e juiz
+    total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cost: Mapped[float | None] = mapped_column(Numeric(14, 8), nullable=True)
     # cópia dos casos como estavam: o resultado continua legível depois de editar o caso
     cases: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
     started_by: Mapped[str] = mapped_column(String(255), nullable=False)

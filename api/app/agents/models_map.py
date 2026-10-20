@@ -20,6 +20,11 @@ _SUPPORTED: dict[str, type[Model]] = {
 _THINKING_BUDGET_TOKENS = 4096
 
 
+def demo_replay() -> bool:
+    """Modo demo: respostas gravadas no lugar do provedor (ADR-0008)."""
+    return os.environ.get("DEMO_REPLAY", "").lower() in ("1", "true")
+
+
 def resolve_model(model_id: str, capabilities: CapabilityFlags | None = None) -> Model:
     """Constrói instância de Model por request.
 
@@ -32,7 +37,7 @@ def resolve_model(model_id: str, capabilities: CapabilityFlags | None = None) ->
     De `capabilities`, só extended_thinking muda o modelo. Visão depende só do
     modelo e structured_output exige um output_schema, que o config ainda não tem.
     """
-    if os.environ.get("DEMO_REPLAY", "").lower() in ("1", "true"):
+    if demo_replay():
         from app.agents.replay import ReplayModel
 
         return ReplayModel(id=model_id)
