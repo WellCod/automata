@@ -575,9 +575,11 @@ if __name__ == "__main__":
 | 11 — Auditoria 2026-10-15 | #66, #67, #79–#84 | Fecha a Fase 4, runtime de agentes, infra, UI/UX, revogação por `jti` | — |
 | 12 — Multi-agente e MCP | #68–#78 | Servidores MCP, confirmação humana, times, integrações, árvore de execução | #67 |
 | 13 — RAG | #85–#94 | Bases de conhecimento com pgvector e citações | Fase 12 |
-| 15 — Workflows | #108 em diante | Etapas em sequência, paralelo, condição e loop sobre agentes e times | Fases 12 e 14 |
 | 14 — Guardrails | #95–#103 | Dados pessoais, injeção de prompt e bloqueios por agente | — |
 | Usuários e redesign | #97, #100 | Gestão de usuários, tema claro e escuro | — |
+| 15 — Workflows | #108–#114 | Etapas em sequência, paralelo, condição e loop sobre agentes e times | Fases 12 e 14 |
+
+Todas as fases acima estão na `main` (estado em 2026-10-20).
 
 ---
 
@@ -841,9 +843,9 @@ Decisão em [ADR-0014](adr/0014-workflows-por-etapas.md). Workflow é um config 
 - [x] #109 — `feat(api)`: kind workflow, seção `workflow` no payload, regras e validação na escrita
 - [x] #110 — `feat(api)`: `WorkflowFactory`, registro sem restart e erro de etapa que para o fluxo
 - [x] #111 — `feat(api)`: run do workflow em `agent_run`, etapas com `parent_run_id` e consumo somado
-- [x] `feat(web)`: página Workflows com editor de etapas. Lista e criação em `/workflows`; o editor monta a árvore (etapa, paralelo de 2 a 5 ramos, condição com então e senão, repetição com limite e regra de parada), só oferece contêiner onde o aninhamento ainda cabe e avisa antes de salvar o que a API recusaria. Cada etapa escolhe entre a versão vigente e uma versão publicada fixa do agente ou time; trocar o executor solta a versão fixada
-- [x] `feat(web)`: modo teste com progresso por etapa e execuções do workflow. O painel lê o stream do AgentOS (`StepStarted`/`StepCompleted`, `*ExecutionStarted/Completed` dos contêineres, `RunStarted` e `RunError` com `step_name`) e mostra cada etapa com quem respondeu, a saída, o resultado da condição, a volta da repetição e a etapa que falhou ou foi bloqueada. O `nested_depth` do Agno vem 0 dentro de paralelo, então a indentação sai da pilha de contêineres abertos. As execuções do workflow mostram etapas, tokens e custo somados
-- [x] `test(api)`: evals de workflows e seed da demo. `test_evals_workflows.py` cobre regras com textos reais (inclusive os limites de negação e flexão), condição depois de paralelo, parada de repetição e estrutura. O seed cria o workflow do critério de aceite sobre os agentes da demo; o `seed_analytics` deixa workflows de fora, porque o consumo deles é o das etapas
+- [x] #112 — `feat(web)`: página Workflows com editor de etapas. Lista e criação em `/workflows`; o editor monta a árvore (etapa, paralelo de 2 a 5 ramos, condição com então e senão, repetição com limite e regra de parada), só oferece contêiner onde o aninhamento ainda cabe e avisa antes de salvar o que a API recusaria. Cada etapa escolhe entre a versão vigente e uma versão publicada fixa do agente ou time; trocar o executor solta a versão fixada
+- [x] #113 — `feat(web)`: modo teste com progresso por etapa e execuções do workflow. O painel lê o stream do AgentOS (`StepStarted`/`StepCompleted`, `*ExecutionStarted/Completed` dos contêineres, `RunStarted` e `RunError` com `step_name`) e mostra cada etapa com quem respondeu, a saída, o resultado da condição, a volta da repetição e a etapa que falhou ou foi bloqueada. O `nested_depth` do Agno vem 0 dentro de paralelo, então a indentação sai da pilha de contêineres abertos. As execuções do workflow mostram etapas, tokens e custo somados
+- [x] #114 — `test(api)`: evals de workflows e seed da demo. `test_evals_workflows.py` cobre regras com textos reais (inclusive os limites de negação e flexão), condição depois de paralelo, parada de repetição e estrutura. O seed cria o workflow do critério de aceite sobre os agentes da demo; o `seed_analytics` deixa workflows de fora, porque o consumo deles é o das etapas
 
 **Critério de aceite da fase:** montar um workflow com triagem, um paralelo de duas análises, uma etapa de consolidação e uma condição que só roda a revisão quando a resposta menciona "reembolso"; publicar, rodar no modo teste e ver cada etapa na árvore de execução, com o run do workflow somando o consumo das etapas; um agente com erro na triagem para o fluxo e o run aparece como falha.
 

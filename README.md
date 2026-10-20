@@ -3,309 +3,364 @@
 [![CI](https://github.com/WellCod/automata/actions/workflows/ci.yml/badge.svg)](https://github.com/WellCod/automata/actions/workflows/ci.yml)
 [![Publish](https://github.com/WellCod/automata/actions/workflows/publish.yml/badge.svg)](https://github.com/WellCod/automata/actions/workflows/publish.yml)
 
-Plataforma de operação de agentes de IA em produção — versionamento imutável de configuração, rollback em um clique, troca de modelo sem reescrita de prompt, estimativa de custo antes de publicar e painel analítico com latência p50/p95 por agente.
+Plataforma para operar agentes de IA em produção. Com ela, quem não programa cria, versiona, testa e publica agentes, times multi-agente e workflows. Também liga bases de conhecimento (RAG), ferramentas via MCP e guardrails, e acompanha execução, latência e custo de cada um.
+
+O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é a camada de produto em volta: configuração versionada em banco próprio, validação antes de publicar, rastreamento de cada execução, segurança e painel.
+
+![Workflow com etapas em paralelo e condição](docs/img/workflow.png)
+
+| | |
+|---|---|
+| **Backend** | Python 3.12 · FastAPI · Agno 2.8.7 · PostgreSQL 17 + pgvector · Redis · Alembic |
+| **Frontend** | Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · TanStack Query |
+| **Qualidade** | mypy strict · ruff · ~270 testes pytest (testcontainers) · 117 testes Vitest · Playwright · evals |
+| **Decisões** | 14 ADRs com contexto, alternativas descartadas e gatilho de reversão |
+
+---
+
+## Sumário
+
+- [O problema](#o-problema)
+- [O que a plataforma faz](#o-que-a-plataforma-faz)
+- [Arquitetura](#arquitetura)
+- [Como funciona por dentro](#como-funciona-por-dentro)
+- [Segurança](#segurança)
+- [Qualidade e testes](#qualidade-e-testes)
+- [Decisões de arquitetura](#decisões-de-arquitetura)
+- [Rodando local](#rodando-local)
+- [Estrutura do repositório](#estrutura-do-repositório)
 
 ---
 
 ## O problema
 
-Colocar um agente de IA em produção é simples. Operar quarenta, com equipes diferentes editando prompts, é outro problema.
+Colocar um agente de IA em produção é simples. Operar quarenta, com equipes diferentes editando prompts, é outro problema:
 
-**Prompt sem histórico.** Alguém ajusta uma instrução às 18h, a qualidade cai — e não há caminho de volta. O prompt estava num campo de texto que foi sobrescrito.
+- **Prompt sem histórico.** Alguém ajusta uma instrução às 18h, a qualidade cai e não há caminho de volta.
+- **Troca de modelo quebra comportamento em silêncio.** Instruções acopladas a um provider degradam ao migrar de modelo sem gerar erro.
+- **Custo opaco até a fatura chegar.** Sem estimativa antes de publicar, um prompt longo vezes o volume mensal estoura o orçamento.
+- **Configuração e prompt divergem.** O prompt cita uma ferramenta que não está habilitada. Isso não falha no deploy, falha na conversa com o cliente.
+- **Dado sensível e abuso.** CPF colado no chat vai para o provedor e para o log, e "ignore as instruções anteriores" funciona.
 
-**Troca de modelo quebra comportamento silenciosamente.** Instruções acopladas a um provider específico (blocos de raciocínio, formato JSON sem markdown) degradam ao migrar de modelo sem gerar erro visível.
-
-**Custo opaco até a fatura chegar.** Sem estimativa antes de publicar, um prompt de três mil tokens multiplicado pelo volume mensal pode estourar o contrato sem nenhum alerta.
-
-**Configuração e prompt divergem.** O prompt menciona uma ferramenta que não está habilitada no agente. Isso não falha no deploy — falha na conversa com o usuário, dias depois.
-
-Automata trata esses quatro problemas como requisito de produto, não como disciplina de quem edita.
+O Automata trata esses pontos como requisito de produto, não como disciplina de quem edita.
 
 ---
 
-## Telas
+## O que a plataforma faz
 
-Painel rodando com o seed de demonstração — cinco agentes publicados e 500
-execuções distribuídas em 90 dias, tudo sintético.
+### Agentes com versão, teste e rollback
 
-### Configuração do agente
+Cada agente é uma configuração versionada: modelo, instruções em seções (persona, situação, tom, objetivo, limites), ferramentas, bases de conhecimento, guardrails e capabilities. Publicar cria uma versão imutável; rollback move um ponteiro. O modo teste roda a versão publicada ou o rascunho, sem publicar.
 
-Versão ativa marcada no topo, instruções em campos separados em vez de um
-textão e linter junto da configuração. A página tem abas para Configuração,
-Execuções, Desempenho (métricas e custo) e Versões; o modo teste fica fixo ao
-lado, visível em qualquer aba.
+![Configuração de um agente com o modo teste ao lado](docs/img/agente.png)
 
-![Configuração de um agente](docs/img/agente.png)
+Antes de salvar, a API recusa o que quebraria em produção:
+- capability que o modelo não suporta (pensamento estendido em modelo sem thinking);
+- tool de servidor MCP que não existe mais;
+- base de conhecimento apagada;
+- instrução acoplada a um provider.
 
-### Agentes
+Enquanto se edita, o painel mostra o **linter de prompt** e a **estimativa de custo** por mensagem e por volume mensal.
 
 ![Lista de agentes](docs/img/agentes.png)
 
-### Analytics
+### Times multi-agente
 
-Conversas, taxa de falha, latência típica e de pico, tokens e custo estimado,
-com gráficos diários de conversas (sucesso e erro), tempo de resposta e custo.
-A aba Desempenho de cada agente mostra os mesmos gráficos filtrados por ele.
+Um líder com modelo e instruções próprias coordena agentes publicados. Quatro modos, mapeados para o `TeamMode` do Agno:
 
-![Painel de analytics](docs/img/analytics.png)
-
----
-
-## Demo
-
-**Sem credencial de LLM.** O modo `DEMO_REPLAY=true` substitui o provider real por respostas pré-gravadas em `api/fixtures/`. Versionamento, rollback, modo teste e analytics funcionam completamente offline.
-
-```bash
-# 1. Sobe com replay (--build -V recria imagem e venv da API se as dependências mudaram)
-DEMO_REPLAY=true docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build -V
-
-# 2. Seed: owner + 5 agentes publicados + 500 runs históricos (90 dias)
-# Defina a senha do owner — ela não fica escrita em lugar nenhum
-read -rsp "Senha do owner: " SEED_OWNER_PASSWORD; echo
-
-docker exec \
-  -e SEED_OWNER_EMAIL="admin@exemplo.com" \
-  -e SEED_OWNER_PASSWORD="$SEED_OWNER_PASSWORD" \
-  automata-api-1 bash -c "cd /app && .venv/bin/python scripts/seed.py full"
-
-# 3. Painel
-pnpm --filter web dev   # http://localhost:3000
-```
-
-Login: o e-mail e a senha definidos no passo 2.
-
-O seed `full` gera uma base de conhecimento de exemplo ligada ao agente de atendimento, o workflow "Atendimento com triagem" (triagem, análises técnica e financeira em paralelo, consolidação e revisão financeira quando a mensagem fala em reembolso) e 5 agentes com perfis distintos (Analista Financeiro em `claude-opus-4-7`, Redator em `claude-sonnet-4-6`, Atendimento e Suporte em `claude-haiku-4-5`, Assistente de Código em `claude-sonnet-4-6`) e distribui 500 execuções nos últimos 90 dias com latências, taxas de erro e custos proporcionais ao modelo de cada agente. O painel de analytics reflete dados realistas desde o primeiro acesso.
-
-Guia completo em [`DEMO.md`](DEMO.md).
-
-
----
-
-## O que está implementado
-
-### Gestão de configuração
-
-| Funcionalidade | Detalhe |
+| Modo | Como o líder trabalha |
 |---|---|
-| **Versionamento imutável** | Publicar cria uma `AgentConfigVersion` e move um ponteiro. A versão anterior nunca é alterada. |
-| **Rollback em um clique** | Mover o ponteiro para qualquer versão anterior — sem redeploy, sem reescrita. |
-| **Diff visual entre versões** | Comparação lado a lado de instruções, modelo e capabilities entre versões. |
-| **Factory por request** | O agente é reconstruído a partir da versão vigente em cada chamada — editar comportamento não exige redeploy. |
-| **Modo teste** | Chat integrado no painel executa o agente na versão de rascunho, sem publicar. |
+| **Coordenar** | Divide a tarefa, delega a quem precisar e junta as respostas |
+| **Rotear** | Escolhe um membro e devolve a resposta dele sem reescrever (handoff) |
+| **Consultar todos** | A mesma tarefa vai a todos os membros, e o líder consolida |
+| **Tarefas** | Monta uma lista de tarefas e acompanha até concluir |
 
-### Qualidade antes de publicar
+A delegação é feita por tool call do próprio líder (`delegate_task_to_member`). A **descrição** de cada agente é o que o líder lê para decidir a quem passar o caso, por isso ela é obrigatória e aparece no painel como contrato. Cada membro segue a versão vigente ou fica fixado numa versão. O modo teste mostra o rastro: a quem o líder delegou e que tools o membro chamou.
 
-| Funcionalidade | Detalhe |
-|---|---|
-| **Workflows** | Etapas em ordem fixa sobre agentes e times publicados: sequência, paralelo, condição (contém, não contém, começa com, vazio) e loop. Etapa com erro para o fluxo, salvo se marcada para seguir. Editor visual em `/workflows`, modo teste com progresso por etapa e consumo somado das etapas ([ADR-0014](docs/adr/0014-workflows-por-etapas.md)). |
-| **Times multi-agente** | Um líder que coordena, roteia, consulta todos ou gerencia tarefas entre agentes publicados. O time é versionado como agente. O modo teste mostra o rastro da delegação: a quem o líder delegou e que tools o membro chamou ([ADR-0011](docs/adr/0011-times-versionados.md)). |
-| **Ferramentas via MCP** | Catálogo de servidores MCP (`/mcp`) com credenciais cifradas e teste de conexão. Em cada agente, escolhe-se quais servidores e quais tools ele usa, e quais pedem confirmação. Servidor fora do ar faz o run falhar com o motivo, em vez de o agente responder sem as tools ([ADR-0010](docs/adr/0010-servidores-mcp-externos.md)). |
-| **Bases de conhecimento (RAG)** | Página Conhecimento: bases com PDF, DOCX, Markdown, texto, CSV, JSON ou páginas web, enviados por arrastar e soltar, URL ou texto colado. Estado de cada documento (processando, trechos indexados, motivo da falha) e busca de teste que mostra os trechos que o agente receberia. No agente, escolhem-se as bases e quantos trechos por busca; o modo teste e a árvore de execução mostram os documentos consultados ([ADR-0012](docs/adr/0012-bases-de-conhecimento.md)). |
-| **Guardrails por agente** | Na aba Configuração: dados pessoais (CPF, CNPJ, cartão, e-mail e telefone, mascarar ou bloquear), injeção de prompt em português e inglês, tópicos proibidos, tamanho máximo, moderação opcional da OpenAI e validação da resposta. Bloqueio não gasta token; o modo teste mostra a mensagem de bloqueio e a regra, e as execuções aparecem como bloqueadas ([ADR-0013](docs/adr/0013-guardrails-por-agente.md)). |
-| **Usuários e papéis** | Página Usuários (só owner): criar com senha temporária, trocar papel (owner, editor, leitor), desativar, redefinir senha e remover. Mudanças encerram na hora as sessões abertas da pessoa. |
-| **Tema claro e escuro** | Paleta grafite e azul, com claro, escuro ou o tema do sistema, escolhido no rodapé da sidebar e lembrado por navegador ([DESIGN.md](DESIGN.md)). |
-| **Confirmação humana** | Tools sensíveis pausam a execução até alguém aprovar ou rejeitar, no modo teste ou na página Aprovações, com nome e argumentos da ação. |
-| **Integrações** | Tokens por sistema consumidor, limitados aos agentes e times escolhidos, com validade e revogação imediata. O painel entrega a configuração pronta para Claude Desktop ou Cursor usarem os agentes via MCP. |
-| **Árvore de execução** | Cada execução abre em árvore: time → agentes → chamadas de modelo e tools, com duração, entrada, saída e erro de cada etapa. |
-| **Linter de prompt** | Detecta referências a ferramentas não habilitadas e termos acoplados a provider. Alerta inline na edição. |
-| **Estimativa de custo** | Tokens estimados, custo por mensagem e projeção por volume — visíveis enquanto se edita. |
-| **Capabilities condicionais** | Extended thinking, structured output e visão são habilitadas por modelo. O campo é desativado e explicado se o modelo escolhido não suportar. Extended thinking liga o `thinking` do Claude na execução. |
-| **Validação na escrita** | Capabilities solicitadas mas não suportadas pelo modelo bloqueiam o save — não chegam a produção. |
-| **Instructions agnósticas de provider** | Validação recusa instruções com termos acoplados a provider específico. Garantida por teste no CI ([ADR-0006](docs/adr/0006-instructions-agnosticas-de-provider.md)). |
+![Editor de time](docs/img/time.png)
 
-### Observabilidade e analytics
+### Workflows por etapas
 
-| Funcionalidade | Detalhe |
-|---|---|
-| **Painel Analytics global** | Volume de runs, tokens consumidos, custo total e latência p50/p95 — com filtro por período e intervalo de datas customizado. |
-| **Métricas por agente** | Tabela com distribuição de runs, latência mediana e taxa de erro por agente e modelo. |
-| **Histórico de execuções** | Lista de runs com status, latência, tokens e custo por execução. Atualização em tempo real via SSE. |
-| **Logging estruturado** | Todos os logs incluem `request_id` correlacionável. Formato JSON em produção. |
-| **Health check com validação de banco** | `/api/v1/health` verifica conectividade real com o Postgres antes de responder `healthy`. |
+Quando o processo é conhecido e precisa ser repetível e auditável, um líder decidindo na hora não serve. O workflow é um fluxo fixo montado num editor visual sobre agentes e times publicados:
 
-### Segurança e autenticação
+- **Etapa:** um agente ou time responde. Se falhar, para o fluxo ou segue, com até 3 tentativas.
+- **Paralelo:** de 2 a 5 ramos recebem a mesma entrada ao mesmo tempo.
+- **Condição:** regra sobre a mensagem do usuário ou a resposta anterior (contém, não contém, começa com, vazia), com então e senão.
+- **Repetição:** limite de voltas e regra de parada ("até a revisão dizer *aprovado*").
 
-| Área | Implementação |
-|---|---|
-| **JWT RS256** | Chave privada gerada localmente via OpenSSL. Nunca enviada ao browser. |
-| **BFF pattern** | Todos os requests ao AgentOS passam por Route Handlers server-side do Next.js. O token não toca o client-side. |
-| **Papéis e scopes** | `owner`, `editor`, `viewer` — toda rota, do AgentOS e própria (`/api/v1`), exige scope; viewer só lê. Tabela em [`api/README.md`](api/README.md#scopes-jwt). |
-| **Política de senha** | Comprimento mínimo, caracteres especiais, maiúscula e número — validados na API. |
-| **Headers de segurança** | `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`. `Strict-Transport-Security` na API (também atrás de proxy TLS em `TRUSTED_PROXIES`) e no painel em produção. O painel envia `Content-Security-Policy` com `frame-ancestors 'none'` e `connect-src 'self'`. |
-| **Superfície mínima** | `/docs`, `/redoc` e `/openapi.json` só com `APP_ENV=development`. Login com e-mail inexistente também roda argon2, para a latência não revelar contas. |
-| **Rate limiting** | Distribuído via Redis — login limitado por e-mail e por IP; `X-Forwarded-For` só vale de proxy em `TRUSTED_PROXIES`. |
-| **Secrets fora do bundle** | Teste no CI inspeciona o bundle compilado do Next.js à procura de padrões de chave. Build falha se encontrar. |
+O modo teste lê o stream do AgentOS e mostra cada etapa ao vivo: quem respondeu, o que respondeu, se a condição deu verdadeira, em que volta está a repetição e onde falhou. As execuções mostram o consumo somado de todas as etapas.
 
-### Confiabilidade e performance
+<p align="center"><img src="docs/img/workflow-teste.png" alt="Modo teste do workflow com progresso por etapa" width="420"></p>
 
-| Área | Implementação |
-|---|---|
-| **Pool de conexões compartilhado** | SQLAlchemy Engine criado uma vez e reusado. Configurado com `pool_size`, `max_overflow` e `pool_pre_ping`. |
-| **Índices de banco** | `agent_run(agent_config_id, created_at)`, `agent_run(created_at)`, `agent_run(run_id)`, `usage_event(period, agent_config_id)` e `usage_event(created_at)` — cobrem o histórico por agente e o analytics global. |
-| **Cache HTTP em capabilities** | Endpoint `/capabilities` retorna `Cache-Control: public, max-age=86400`. |
-| **Agentes publicados sem restart** | Publicar registra o agente no AgentOS na hora; outros workers sincronizam em até 5 s. |
-| **Execuções gravadas de verdade** | Sucesso, erro, cancelamento e pausa, com duração e consumo, inclusive em streaming. |
+### Bases de conhecimento (RAG)
+
+Bases com PDF, DOCX, Markdown, texto, CSV, JSON ou páginas web, enviados por arrastar e soltar, URL ou texto colado. O painel mostra o estado de cada documento (processando, trechos indexados, motivo da falha). A **busca de teste** mostra exatamente os trechos que o agente receberia para uma pergunta, sem rodar o agente.
+
+![Busca de teste numa base de conhecimento](docs/img/conhecimento.png)
+
+### Guardrails por agente
+
+Regras de entrada e saída versionadas junto com o agente. O bloqueio acontece antes da chamada ao modelo, então não gasta token.
+
+- **Dados pessoais:** CPF e CNPJ com dígito verificador e cartão com Luhn, para que número de pedido não seja confundido com documento. Também e-mail e telefone. Cada tipo pode ser mascarado ou bloqueado.
+- **Injeção de prompt:** detectada em português e inglês, sem diferenciar acento.
+- **Outras regras:** tópicos proibidos, tamanho máximo e moderação opcional da OpenAI.
+- **Na resposta:** dado pessoal ou termo proibido troca a resposta antes de ela sair.
+
+Execuções barradas aparecem como **bloqueadas**, com a regra, separadas de falha no analytics.
+
+<p align="center"><img src="docs/img/guardrails.png" alt="Guardrails de um agente" width="560"></p>
+
+### Ferramentas via MCP e confirmação humana
+
+Catálogo de servidores MCP externos, com credenciais cifradas e teste de conexão que descobre as tools. Em cada agente, escolhe-se quais tools ele usa e quais **pedem confirmação**. Uma tool sensível pausa a execução até alguém aprovar ou rejeitar, no modo teste ou na página Aprovações, vendo nome e argumentos da ação.
+
+O caminho inverso também existe: os próprios agentes e times ficam expostos via **MCP server mode** para Claude Desktop, Cursor e outros sistemas, com tokens de integração limitados aos agentes escolhidos e revogáveis na hora.
+
+### Analytics e rastreamento
+
+Conversas, taxa de falha, bloqueios, latência p50 e p95, tokens e custo, com gráficos diários e uso por agente. Cada execução abre como **árvore**, com time, agentes, chamadas de modelo e tools, e mostra duração, entrada, saída e erro de cada nó.
+
+![Analytics](docs/img/analytics.png)
+
+Tema claro e escuro, escolhido pelo usuário:
+
+![Analytics no tema claro](docs/img/analytics-claro.png)
 
 ---
 
 ## Arquitetura
 
-```
-┌─────────────────────────────────────────────────────┐
-│  web/  — Next.js 16, App Router, React 19           │
-│  TypeScript strict · shadcn/ui · TanStack Query 5   │
-│  Vitest · Playwright E2E · bundle secrets test       │
-└──────────────────────────┬──────────────────────────┘
-                           │  BFF: Route Handlers server-side
-                           │  (JWT RS256 — chave privada nunca
-                           │   sai do servidor)
-┌──────────────────────────┴──────────────────────────┐
-│  api/  — FastAPI, Python 3.12                       │
-│  AgentConfigVersion · factory por request           │
-│  linter · estimativa de custo · metering            │
-│  JWT RS256 · scopes · migrations próprias           │
-│  logging estruturado · health check · rate limit    │
-└──────────────────────────┬──────────────────────────┘
-                           │
-┌──────────────────────────┴──────────────────────────┐
-│  Agno 2.8.7 (AgentOS)                               │
-│  REST · sessions · traces · scopes por endpoint     │
-└──────────────────────────┬──────────────────────────┘
-                           │
-              ┌────────────┴────────────┐
-         PostgreSQL 17              Redis
-         (config + runs           (rate limiting
-          + metering)              distribuído)
+```mermaid
+flowchart LR
+    subgraph Browser
+        UI[Painel Next.js]
+    end
+    subgraph web["web/ (Next.js, server-side)"]
+        BFF["Route Handlers (BFF)<br/>cookie httpOnly → Bearer<br/>CSRF por Origin"]
+    end
+    subgraph api["api/ (FastAPI + AgentOS)"]
+        R["Rotas próprias /api/v1<br/>configs, runs, métricas,<br/>bases, MCP, usuários"]
+        OS["AgentOS (Agno)<br/>/agents /teams /workflows<br/>/mcp (server mode)"]
+        F["Factories por request<br/>agente · time · workflow"]
+        T["RunTracking<br/>agent_run · usage_event"]
+    end
+    PG[("PostgreSQL 17<br/>config versionada, runs,<br/>metering, pgvector")]
+    RD[("Redis<br/>rate limit")]
+    LLM["Provedores<br/>Anthropic · OpenAI"]
+    MCP["Servidores MCP<br/>externos"]
+    EMB["Embeddings<br/>Voyage · OpenAI"]
+
+    UI --> BFF --> R & OS
+    OS --> F --> T --> PG
+    R --> PG
+    R --> RD
+    F --> LLM & MCP & EMB
 ```
 
-O agente não é um objeto estático em código. Ele é construído por request a partir da versão publicada da configuração — isso permite editar comportamento sem redeploy e executar qualquer versão histórica em modo teste.
+O painel nunca fala direto com a API: todo acesso passa por Route Handlers server-side, e o token fica num cookie httpOnly. A API tem dois lados. As rotas próprias, em `/api/v1`, gerenciam configuração, execuções, métricas, bases, servidores MCP e usuários. As rotas do AgentOS executam agentes, times e workflows; o Automata não as modifica, só registra nelas o que foi publicado.
 
 ---
 
-## Stack
+## Como funciona por dentro
 
-| Camada | Tecnologia |
+### Configuração versionada e factory por request
+
+`agent_config` guarda os ponteiros `current_version_id` e `draft_version_id`. `agent_config_version` guarda o payload em JSONB. Agente, time e workflow usam a mesma tabela, diferenciados por `kind`.
+
+```text
+rascunho ──publicar──▶ v3 (publicada, imutável) ◀── current_version_id
+                       v2 (publicada)
+                       v1 (publicada)            rollback = mover o ponteiro
+```
+
+- **Publicar nunca faz UPDATE.** Cria uma versão nova a partir do rascunho e move o ponteiro. Rollback só aceita versão publicada do mesmo config.
+- **O payload tem `schema_version`.** Formatos antigos são convertidos na leitura, por um validator do pydantic, sem migração de dados.
+- **O agente não é um objeto em código.** `AgentFactory`, `TeamFactory` e `WorkflowFactory` do Agno reconstroem tudo a cada request a partir da versão vigente: modelo, instruções, tools MCP, buscas nas bases e guardrails como `pre_hooks` e `post_hooks`. Com `version_id` no `factory_input`, a mesma factory roda um rascunho, que é como o modo teste funciona. A versão precisa pertencer ao config, senão um rascunho de B rodaria com o custo contado em A.
+- **Publicar não exige restart.** O AgentOS lê listas mutáveis de agentes, times e workflows a cada request. Publicar registra a factory na hora, e outros workers sincronizam por um middleware com TTL de 5 s.
+
+### Rastreamento e consumo
+
+Hooks de pós-execução do Agno não rodam em erro nem em cancelamento. Por isso, o mixin `RunTracking` envolve `arun` e `acontinue_run`, nos modos coroutine e stream, e grava em `agent_run` (status, duração, erro, tools pendentes, regra de bloqueio) e em `usage_event` (tokens, custo, período) numa transação só.
+
+- **Status:** `success`, `error`, `cancelled`, `paused` (aguardando confirmação humana) e `blocked` (guardrail).
+- **Times:** só o run do time é gravado, porque o Agno já soma nele o consumo dos membros.
+- **Workflows:** o `TrackedWorkflow` fixa o `run_id` antes de rodar e o publica numa `ContextVar`. Cada etapa grava esse id como `parent_run_id`, inclusive os ramos paralelos, que rodam em tasks que herdam o contexto. O consumo do workflow é a soma das etapas, e o analytics não conta nada duas vezes.
+
+### Workflows
+
+A árvore do payload (`step`, `parallel`, `condition`, `loop`) vira `Step`, `Parallel`, `Condition` e `Loop` do Agno, montados do zero a cada request. Três decisões saíram de comportamentos do Agno ([ADR-0014](docs/adr/0014-workflows-por-etapas.md)):
+
+- **Uma instância nova por etapa.** Com a mesma instância, ramos paralelos compartilhariam estado e conexão MCP.
+- **Etapa com erro levanta `StepFailed`.** No Agno, a etapa seguinte receberia a mensagem de erro como se fosse resposta. Com a exceção, `on_error` e `max_retries` passam a valer. Quando o fluxo para, o `TrackedWorkflow` converte a falha num run com status de erro, em vez do 500 que a rota devolveria.
+- **Regras próprias em vez de CEL.** Sem o pacote `cel-python`, o Agno avalia toda expressão como `False` em silêncio. Além disso, expressão é linguagem de programação dentro de um painel para quem não programa. Depois de um paralelo, a regra lê a resposta do último ramo, não a frase-resumo que o Agno põe no lugar.
+
+Limites validados na escrita: 3 níveis de aninhamento, 30 etapas, nomes únicos e o fluxo não termina num paralelo. Agente com tool de confirmação humana não entra em workflow, porque o fluxo não pausa no meio.
+
+### RAG
+
+```mermaid
+flowchart LR
+    D[PDF · DOCX · MD · CSV<br/>JSON · URL · texto] --> C["Chunking recursivo<br/>2000 caracteres, overlap de 10%"]
+    C --> E["Embedder medido<br/>Voyage voyage-3.5 ou<br/>OpenAI text-embedding-3-small"]
+    E --> V[("PgVector<br/>tabela kb_‹id› por base<br/>busca híbrida, português")]
+    Q[Pergunta do usuário] --> A[Agente]
+    A -- "tool buscar_‹slug›" --> V
+    V -- "trechos + documento de origem" --> A
+```
+
+- **Pgvector no Postgres que já existe.** Cada base tem sua tabela vetorial, com dimensão fixada pelo embedder escolhido na criação, e busca híbrida (vetor + texto) configurada para português. Nada de serviço vetorial à parte ([ADR-0012](docs/adr/0012-bases-de-conhecimento.md)).
+- **Ingestão em background.** O estado de cada documento fica em `knowledge_content`. O primeiro trecho é embedado antes do insert, para que chave inválida ou cota estourada vire mensagem de falha legível; depois do insert, os trechos são contados. Documento preso em "processando" por mais de 30 min vira falha no boot.
+- **Uma tool por base.** O agente recebe `buscar_<slug>`, e a descrição da base diz quando usar. A tool devolve trechos com documento e fonte, e as instruções mandam citar o documento e tratar o trecho como **dado, não instrução**, uma defesa contra injeção vinda de documento.
+- **Custo de embedding no metering.** `MeteredEmbedder` conta tokens de ingestão e de busca, com um cache curto para não pagar duas vezes pela mesma consulta.
+- **Demo sem chave.** No modo replay, um embedder local determinístico indexa e busca por palavra em comum.
+
+### MCP
+
+- **Cliente de servidores externos.** Só streamable-http. Os headers de autenticação ficam cifrados com Fernet. Há proteção contra SSRF: só https, DNS resolvido e IP privado, loopback e link-local recusados, salvo hosts liberados por variável. A conexão é estrita: servidor fora do ar faz o run falhar com o motivo, em vez de o agente responder sem as tools ([ADR-0010](docs/adr/0010-servidores-mcp-externos.md)).
+- **Confirmação humana.** Tools marcadas viram `requires_confirmation_tools` no Agno. O run pausado guarda as tools pendentes em `agent_run.pending_tools`, aparece em Aprovações e continua pela rota de continue do AgentOS.
+- **Server mode.** O próprio AgentOS expõe os agentes por MCP, autenticado com JWT RS256. Tokens de integração têm `jti`, escopo por agente ou time, validade de até 90 dias e revogação imediata ([ADR-0009](docs/adr/0009-superficie-de-integracao.md)).
+
+---
+
+## Segurança
+
+| Área | Implementação |
 |---|---|
-| Runtime de agente | Agno 2.8.7 (AgentOS) — FastAPI integrado, JWT com scopes, traces e sessions persistidos |
-| API | Python 3.12, `uv` — lockfile determinístico, mypy strict, ruff (E/F/I/UP/B/SIM) |
-| Banco | PostgreSQL 17 com pgvector (imagem `pgvector/pgvector:pg17`), Alembic — migrations isoladas das tabelas do framework |
-| RAG | Knowledge do Agno com PgVector, embeddings da Voyage (`voyage-3.5`) ou OpenAI ([ADR-0012](docs/adr/0012-bases-de-conhecimento.md)) |
-| Cache / Rate limit | Redis — rate limiting distribuído com burst por IP |
-| Painel | Next.js 16, TypeScript strict, Tailwind 4, shadcn/ui |
-| Estado e fetch | TanStack Query 5, openapi-fetch — tipos gerados via openapi-typescript, nunca escritos à mão |
-| Formulários | react-hook-form + zod — habilitação condicional de campos requer schema declarativo |
-| Testes API | pytest + asyncio, testcontainers — integração sem mock de banco; evals do Agno nightly |
-| Testes Web | Vitest + Testing Library, Playwright E2E — inclui teste de secrets no bundle compilado |
-| CI/CD | GitHub Actions — cache de layers Docker, coverage gate 70%, publish para GHCR |
+| **JWT RS256** | A API assina com a chave privada, que nunca sai dela. O AgentOS valida com a pública e com `user_isolation`. O token expira em 1 h e leva `jti`. |
+| **BFF** | Cookie httpOnly e `sameSite=lax`, `secure` em produção. O proxy server-side converte o cookie em `Authorization: Bearer` e limpa a sessão no 401. Nenhum segredo vai para o bundle, e um teste no CI procura chaves no build. |
+| **CSRF** | `Origin` conferido contra `Host` em todo método que não é seguro. |
+| **Revogação** | Logout revoga o `jti`. Mudar papel, desativar ou trocar senha corta na hora as sessões da pessoa. |
+| **Papéis e scopes** | `owner`, `editor`, `viewer`. Toda rota, própria ou do AgentOS, exige scope. |
+| **Rate limit** | Login limitado por e-mail e por IP no Redis. `X-Forwarded-For` só vale vindo de proxy listado em `TRUSTED_PROXIES`. |
+| **Superfície** | Login com e-mail inexistente também roda argon2, para a latência não revelar contas. `/docs` e `/openapi.json` só em desenvolvimento. |
+| **Headers** | HSTS, CSP com `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`. |
+
+---
+
+## Qualidade e testes
+
+| Camada | Ferramenta | Cobertura |
+|---|---|---|
+| API | pytest + testcontainers | ~270 testes contra Postgres com pgvector real, sem mock de banco. Gate de cobertura de 70%. |
+| Tipos | mypy strict + plugin pydantic · ruff | Rodam em todo PR. |
+| Web | Vitest + Testing Library | 117 testes de componente e de lógica, inclusive o redutor de eventos do workflow. |
+| E2E | Playwright | Login → editar agente → publicar → rollback. |
+| Contrato | openapi-typescript | Os tipos do painel são gerados do OpenAPI da API, nunca escritos à mão. |
+
+**Evals** medem o comportamento que importa, não só se o código roda:
+
+| Eval | O que mede | Quando roda |
+|---|---|---|
+| Guardrails | 30 mensagens com a regra que deveria barrar cada uma ou nenhuma. Um terço são casos legítimos (número de pedido, "política de reembolso") que precisam passar. | Todo PR |
+| Workflows | Regras sobre respostas reais de triagem, inclusive os limites documentados (negação, flexão), condição depois de paralelo e estrutura aceita ou recusada. | Todo PR |
+| Recuperação | O documento certo volta entre os 3 primeiros trechos. A versão literal roda em todo PR; a semântica, com Voyage, roda à noite e aceita recall@3 de 80%. | PR e noturna |
+| Confiabilidade | Tool calls com LLM real. | Noturna |
+
+**CI** (GitHub Actions): filtro por caminho, jobs de API, web e e2e e um gate que falha se qualquer um falhar. Tag `v*` publica as imagens no GHCR e anexa o `openapi.json` na release.
 
 ---
 
 ## Decisões de arquitetura
 
-Cada decisão relevante está documentada em [`docs/adr/`](docs/adr/) com contexto, alternativas descartadas (e por quê) e o gatilho concreto que faria reverter. As mais relevantes para entender o desenho:
+Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alternativas descartadas e o gatilho concreto que faria reverter.
 
 | ADR | Decisão |
 |---|---|
-| [ADR-0001](docs/adr/0001-monorepo.md) | Monorepo sem ferramenta de monorepo — `uv` e `pnpm` bastam para duas aplicações em linguagens diferentes |
-| [ADR-0002](docs/adr/0002-config-em-banco-proprio.md) | Config em banco próprio — por que não usar o editor visual do framework como fonte da verdade |
-| [ADR-0003](docs/adr/0003-single-tenant.md) | Deploy single-tenant — por que uma instância por cliente, e a assimetria que torna difícil desfazer |
-| [ADR-0005](docs/adr/0005-auth-jwt-proprio.md) | Auth JWT RS256 próprio — a chave de assinatura nunca sai do servidor |
-| [ADR-0006](docs/adr/0006-instructions-agnosticas-de-provider.md) | Instructions agnósticas de provider — a regra que sustenta a promessa de trocar modelo |
-| [ADR-0009](docs/adr/0009-superficie-de-integracao.md) | REST e MCP server mode como superfície de integração — descrição de agente vira contrato |
-| [ADR-0010](docs/adr/0010-servidores-mcp-externos.md) | Servidores MCP externos — cadastro não versionado, segredo cifrado, só HTTP e falha visível |
-| [ADR-0011](docs/adr/0011-times-versionados.md) | Times multi-agente na mesma tabela de configs, com membros seguindo a versão vigente |
-| [ADR-0012](docs/adr/0012-bases-de-conhecimento.md) | Bases de conhecimento (RAG) — cadastro não versionado, pgvector no Postgres existente e embeddings da Voyage |
-| [ADR-0013](docs/adr/0013-guardrails-por-agente.md) | Guardrails por agente — regras de entrada e saída versionadas com o agente, CPF/CNPJ e injeção em português, bloqueio sem custo de modelo |
-| [ADR-0014](docs/adr/0014-workflows-por-etapas.md) | Workflows por etapas — sequência, paralelo, condição e loop sobre agentes publicados, regras sem CEL, etapa com erro para o fluxo |
+| [0001](docs/adr/0001-monorepo.md) | Monorepo sem ferramenta de monorepo: `uv` e `pnpm` bastam |
+| [0002](docs/adr/0002-config-em-banco-proprio.md) | Configuração em banco próprio, não no editor do framework |
+| [0003](docs/adr/0003-single-tenant.md) | Uma instância por cliente, e a assimetria que torna difícil desfazer |
+| [0004](docs/adr/0004-painel-proprio.md) | Painel próprio; o Control Plane do Agno só como ferramenta interna |
+| [0005](docs/adr/0005-auth-jwt-proprio.md) | JWT RS256 próprio; a chave de assinatura nunca sai do servidor |
+| [0006](docs/adr/0006-instructions-agnosticas-de-provider.md) | Instruções sem termos de provider, a regra que sustenta trocar de modelo |
+| [0007](docs/adr/0007-licenciamento.md) | Código aberto sob AGPL-3.0 com licença comercial paralela |
+| [0008](docs/adr/0008-demo-com-respostas-gravadas.md) | Demo pública com respostas gravadas, sem chave de LLM |
+| [0009](docs/adr/0009-superficie-de-integracao.md) | REST e MCP server mode como superfície de integração |
+| [0010](docs/adr/0010-servidores-mcp-externos.md) | Servidores MCP externos: segredo cifrado, só HTTP, falha visível |
+| [0011](docs/adr/0011-times-versionados.md) | Times na mesma tabela de configs, membros seguindo a versão vigente |
+| [0012](docs/adr/0012-bases-de-conhecimento.md) | RAG com pgvector no Postgres existente e embeddings da Voyage |
+| [0013](docs/adr/0013-guardrails-por-agente.md) | Guardrails versionados com o agente, bloqueio sem custo de modelo |
+| [0014](docs/adr/0014-workflows-por-etapas.md) | Workflows por etapas com regras sem CEL e etapa com erro que para o fluxo |
 
----
-
-## Testes
-
-```bash
-# API — suite completa (sem LLM real, usa testcontainers)
-cd api && uv run pytest -m "not nightly"
-
-# API — evals de confiabilidade com LLM real (nightly no CI)
-cd api && uv run pytest -m nightly   # requer ANTHROPIC_API_KEY
-
-# Web — unitários e de componente
-pnpm --filter web test
-
-# Web — E2E (fluxo: login → editar agente → publicar → rollback)
-pnpm --filter web test:e2e
-```
-
-Coverage gate: 70% no CI. O build falha se cair abaixo.
+O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 
 ---
 
 ## Rodando local
 
-**Pré-requisitos:** Docker Desktop, Node.js 22+, pnpm 11+, Python 3.12+, `uv`, `openssl`
+**Pré-requisitos:** Docker Desktop, Node.js 22+, pnpm, Python 3.12+, `uv` e `openssl`.
 
 ```bash
 git clone https://github.com/WellCod/automata.git
 cd automata
-bash scripts/bootstrap.sh   # gera chaves RSA, cria .env, instala deps e sobe o banco
+bash scripts/bootstrap.sh   # gera chaves RSA, cria .env, instala dependências e sobe o banco
 ```
 
-**Terminal 1 — API:**
+### Demo sem chave de LLM
+
+Com `DEMO_REPLAY=true`, o modelo é trocado por respostas gravadas em `api/fixtures/` e as bases usam um embedder local. Edição, versões, modo teste, workflows e analytics funcionam sem chave nenhuma.
+
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up
-```
+# API em modo replay (--build -V recria imagem e venv se as dependências mudaram)
+DEMO_REPLAY=true docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build -V
 
-API disponível em `http://localhost:8000`. Migrations rodam automaticamente no boot. A porta 8000 só é publicada pelo override de dev; em `docker-compose.yml` (produção) e `docker-compose.demo.yml` a API fica só na rede do compose e o painel fala com ela por `http://api:8000`.
-
-Depois de um `git pull` que mexe em `api/pyproject.toml` ou `api/uv.lock`, recrie a API com `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build -V api`. O override monta um volume anônimo em `/app/.venv` e, sem `-V`, o container reaproveita o venv antigo mesmo com a imagem nova: a API cai no boot com `ImportError` da dependência nova.
-
-Para o modo replay sem chave de LLM, prefixe o comando com `DEMO_REPLAY=true` (ver [Demo](#demo)).
-
-Painel em container, com hot-reload, em vez do terminal 2: `docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile docker-web up`.
-
-**Terminal 2 — Painel:**
-```bash
-pnpm --filter web dev   # http://localhost:3000
-```
-
-**Seed:**
-```bash
-# Mínimo: só cria o owner
-# Defina a senha do owner — ela não fica escrita em lugar nenhum
+# Seed: owner, 5 agentes, base de conhecimento, workflow de exemplo e 500 execuções em 90 dias
 read -rsp "Senha do owner: " SEED_OWNER_PASSWORD; echo
-
-docker exec \
-  -e SEED_OWNER_EMAIL="admin@exemplo.com" \
-  -e SEED_OWNER_PASSWORD="$SEED_OWNER_PASSWORD" \
-  automata-api-1 bash -c "cd /app && .venv/bin/python scripts/seed.py minimal"
-
-# Demo completo: 5 agentes + 500 runs históricos
-# Defina a senha do owner — ela não fica escrita em lugar nenhum
-read -rsp "Senha do owner: " SEED_OWNER_PASSWORD; echo
-
 docker exec \
   -e SEED_OWNER_EMAIL="admin@exemplo.com" \
   -e SEED_OWNER_PASSWORD="$SEED_OWNER_PASSWORD" \
   automata-api-1 bash -c "cd /app && .venv/bin/python scripts/seed.py full"
+
+# Painel
+pnpm --filter web dev   # http://localhost:3000
+```
+
+Guia completo, com o que o seed cria e como as fixtures funcionam, em [`DEMO.md`](DEMO.md).
+
+### Desenvolvimento
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up   # API em :8000, migrations no boot
+pnpm --filter web dev                                                 # painel em :3000
+```
+
+A porta 8000 só é publicada pelo override de dev. Em produção, a API fica na rede do compose e o painel fala com ela por `http://api:8000`. Depois de um `git pull` que mexa em `api/uv.lock`, recrie a API com `--build -V`. Sem o `-V`, o volume anônimo do venv mantém as dependências antigas.
+
+### Testes
+
+```bash
+cd api && uv run pytest -m "not nightly"   # API, com testcontainers
+cd api && uv run pytest -m nightly         # evals com LLM real (ANTHROPIC_API_KEY)
+pnpm --filter web test                     # Vitest
+pnpm --filter web test:e2e                 # Playwright
 ```
 
 ---
 
-## Estrutura
+## Estrutura do repositório
 
 ```
 api/
-  app/          aplicação FastAPI
-  alembic/      migrations do banco próprio
-  fixtures/     respostas pré-gravadas para DEMO_REPLAY=true
-  scripts/      seed (minimal|demo|full), export_openapi
-  tests/        pytest: integração + evals nightly
+  app/
+    agents/       factories, rastreamento, workflows, modelos, replay
+    guardrails/   regras de entrada e saída
+    knowledge/    embedders, ingestão, tools de busca
+    mcp/          cliente MCP, proteção de saída (SSRF)
+    routers/      rotas próprias /api/v1
+    services/     regras de negócio e validação na escrita
+  alembic/        18 migrations
+  fixtures/       respostas gravadas do modo replay
+  tests/          pytest, integração e evals
 web/
-  src/app/      rotas e Route Handlers (BFF)
-  src/components/
-  src/lib/      client openapi-fetch, hooks, utils
-docs/adr/       13 Architecture Decision Records
-DEMO.md         guia de demo local sem credencial de LLM
+  src/app/        páginas e Route Handlers (BFF)
+  src/components/ editor de workflow, modo teste, painéis
+  src/lib/        client gerado do OpenAPI, SSE, progresso do workflow
+  e2e/            Playwright
+docs/
+  adr/            14 Architecture Decision Records
+  roadmap.md      fases, auditorias e critérios de aceite
+DESIGN.md         sistema visual do painel
+DEMO.md           demo local sem chave de LLM
 ```
 
 ---
@@ -314,6 +369,4 @@ DEMO.md         guia de demo local sem credencial de LLM
 
 Ver [`LICENSE`](LICENSE). Justificativa em [ADR-0007](docs/adr/0007-licenciamento.md).
 
----
-
-Construído sobre [Agno](https://github.com/agno-agi/agno). Nenhum dado de produção, prompt real ou identificação de cliente consta neste repositório.
+Construído sobre o [Agno](https://github.com/agno-agi/agno). Nenhum dado de produção, prompt real ou identificação de cliente consta neste repositório; os prints usam o seed de demonstração.

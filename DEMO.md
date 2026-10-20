@@ -28,7 +28,7 @@ pnpm --filter web dev
 ## Populando com dados de demonstração
 
 ```bash
-# Cria owner, 5 agentes publicados e 500 runs históricos (90 dias)
+# Cria owner, 5 agentes, base de conhecimento, workflow de exemplo e 500 runs históricos (90 dias)
 # Defina a senha do owner — ela não fica escrita em lugar nenhum
 read -rsp "Senha do owner: " SEED_OWNER_PASSWORD; echo
 
@@ -57,6 +57,10 @@ Cada agente tem instruções completas (persona, objetivo, tom, guardrails) e es
 ### Base de conhecimento
 
 A base **Políticas de atendimento** (troca e devolução, prazos de entrega, garantia, formas de pagamento; documentos fictícios) vem indexada e ligada ao **Atendimento ao Cliente**, que busca nela com `buscar_politicas_atendimento`. Com `DEMO_REPLAY=true` a indexação usa o embedder local por hash de palavras, sem chave; a busca de teste da página Conhecimento funciona, mas acha por palavra em comum, não por sentido. As respostas do agente continuam vindo das fixtures, então o modo teste não mostra fontes na demo.
+
+### Workflow de exemplo
+
+**Atendimento com triagem** junta os agentes acima num fluxo fixo: triagem (Atendimento ao Cliente), análises técnica (Suporte Técnico) e financeira (Analista Financeiro) em paralelo, consolidação (Atendimento) e uma condição que só roda a revisão financeira quando a mensagem fala em "reembolso". Na aba **Teste** do workflow, mande uma mensagem com "reembolso" e outra sem: a revisão roda numa e é pulada na outra. A aba **Execuções** mostra quantas etapas rodaram e o consumo somado delas.
 
 ### Histórico de execuções
 
@@ -89,7 +93,7 @@ Para adicionar respostas: edite o arquivo JSON correspondente ao `model_id` do a
 3. Envie qualquer mensagem
 4. A resposta virá do arquivo de fixture — sem latência de rede, sem custo
 
-Para ver uma resposta diferente, envie outra mensagem. O modelo cicla pelas respostas na ordem do JSON.
+Para ver uma resposta diferente, envie outra mensagem. O modelo cicla pelas respostas na ordem do JSON, uma fila por modelo, sem olhar a pergunta: a resposta pode não ter a ver com o que foi perguntado. O contador zera quando a API reinicia.
 
 ## Variáveis de ambiente relevantes
 
