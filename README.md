@@ -3,7 +3,7 @@
 [![CI](https://github.com/WellCod/automata/actions/workflows/ci.yml/badge.svg)](https://github.com/WellCod/automata/actions/workflows/ci.yml)
 [![Publish](https://github.com/WellCod/automata/actions/workflows/publish.yml/badge.svg)](https://github.com/WellCod/automata/actions/workflows/publish.yml)
 
-Plataforma para operar agentes de IA em produção. Com ela, quem não programa cria, versiona, testa e publica agentes, times multi-agente e workflows. Também liga bases de conhecimento (RAG), ferramentas via MCP e guardrails, e acompanha execução, latência e custo de cada um.
+Plataforma para operar agentes de IA em produção. Com ela, quem não programa cria, versiona, testa e publica agentes, times multi-agente e workflows. Também liga bases de conhecimento (RAG), ferramentas via MCP e guardrails, roda suítes de teste por agente antes de publicar e acompanha execução, latência e custo de cada um.
 
 O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é a camada de produto em volta: configuração versionada em banco próprio, validação antes de publicar, rastreamento de cada execução, segurança e painel.
 
@@ -13,7 +13,7 @@ O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é
 |---|---|
 | **Backend** | Python 3.12 · FastAPI · Agno 2.8.7 · PostgreSQL 17 + pgvector · Redis · Alembic |
 | **Frontend** | Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · TanStack Query |
-| **Qualidade** | mypy strict · ruff · ~270 testes pytest (testcontainers) · 117 testes Vitest · Playwright · evals |
+| **Qualidade** | mypy strict · ruff · ~290 testes pytest (testcontainers) · 126 testes Vitest · Playwright · evals |
 | **Decisões** | 15 ADRs com contexto, alternativas descartadas e gatilho de reversão |
 
 ---
@@ -110,6 +110,14 @@ Regras de entrada e saída versionadas junto com o agente. O bloqueio acontece a
 Execuções barradas aparecem como **bloqueadas**, com a regra, separadas de falha no analytics.
 
 <p align="center"><img src="docs/img/guardrails.png" alt="Guardrails de um agente" width="560"></p>
+
+### Testes por agente antes de publicar
+
+Cada agente e time tem uma suíte de casos: uma mensagem e o que precisa ser verdade na resposta. As checagens são três: texto (contém, não contém, começa com), tools que precisam ser chamadas (a busca na base certa, a tool MCP esperada) e um critério avaliado por um modelo juiz, binário ou nota com limiar. A suíte roda contra o rascunho ou a vigente, mostra o resultado caso a caso e compara as duas versões, apontando o que passou a falhar.
+
+Com o **gate** ligado, publicar exige a suíte verde no rascunho atual. Editar o rascunho invalida o resultado. Os casos ficam fora da versão: um rascunho que muda o prompt não consegue afrouxar o próprio teste.
+
+<p align="center"><img src="docs/img/testes.png" alt="Aba Testes de um agente com resultado por caso e comparação entre versões" width="600"></p>
 
 ### Ferramentas via MCP e confirmação humana
 
@@ -215,6 +223,15 @@ flowchart LR
 - **Custo de embedding no metering.** `MeteredEmbedder` conta tokens de ingestão e de busca, com um cache curto para não pagar duas vezes pela mesma consulta.
 - **Demo sem chave.** No modo replay, um embedder local determinístico indexa e busca por palavra em comum.
 
+### Evals por agente
+
+Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`), que roda um por vez com timeout e checa tools esperadas (`ReliabilityEval`), critério do juiz (`AgentAsJudgeEval`) e um `Scorer` próprio para as regras de texto ([ADR-0015](docs/adr/0015-evals-por-agente.md)).
+
+- **Mesmo agente de produção.** Cada caso ganha uma instância nova, montada pela mesma factory dos runs reais a partir da versão testada: mesmas tools, bases e guardrails. A execução é em background, e cada resultado é gravado assim que o caso termina.
+- **Runs de teste não são conversas.** Uma `ContextVar` marca `agent_run.eval_run_id` e `usage_event.eval_run_id`. Esses runs ficam fora do histórico, das aprovações e das métricas; o custo continua no metering, separado como custo de testes.
+- **Juiz com modelo nosso e medido.** Sem modelo explícito, o Agno cairia num modelo da OpenAI. O modelo do juiz é escolhido entre os que têm saída estruturada e embrulhado num medidor que soma os tokens dele no consumo da execução. No modo demo, o juiz aparece como "não avaliado" em vez de fingir aprovação.
+- **Gate sem hash.** Cada rascunho salvo já é uma versão nova, então o resultado vale para aquele `version_id` e nenhum outro. Caso não avaliado não conta como aprovado, e rollback segue livre.
+
 ### MCP
 
 - **Cliente de servidores externos.** Só streamable-http. Os headers de autenticação ficam cifrados com Fernet. Há proteção contra SSRF: só https, DNS resolvido e IP privado, loopback e link-local recusados, salvo hosts liberados por variável. A conexão é estrita: servidor fora do ar faz o run falhar com o motivo, em vez de o agente responder sem as tools ([ADR-0010](docs/adr/0010-servidores-mcp-externos.md)).
@@ -242,9 +259,9 @@ flowchart LR
 
 | Camada | Ferramenta | Cobertura |
 |---|---|---|
-| API | pytest + testcontainers | ~270 testes contra Postgres com pgvector real, sem mock de banco. Gate de cobertura de 70%. |
+| API | pytest + testcontainers | ~290 testes contra Postgres com pgvector real, sem mock de banco. Gate de cobertura de 70%. |
 | Tipos | mypy strict + plugin pydantic · ruff | Rodam em todo PR. |
-| Web | Vitest + Testing Library | 117 testes de componente e de lógica, inclusive o redutor de eventos do workflow. |
+| Web | Vitest + Testing Library | 126 testes de componente e de lógica, inclusive o redutor de eventos do workflow e a suíte de testes. |
 | E2E | Playwright | Login → editar agente → publicar → rollback. |
 | Contrato | openapi-typescript | Os tipos do painel são gerados do OpenAPI da API, nunca escritos à mão. |
 
@@ -254,10 +271,11 @@ flowchart LR
 |---|---|---|
 | Guardrails | 30 mensagens com a regra que deveria barrar cada uma ou nenhuma. Um terço são casos legítimos (número de pedido, "política de reembolso") que precisam passar. | Todo PR |
 | Workflows | Regras sobre respostas reais de triagem, inclusive os limites documentados (negação, flexão), condição depois de paralelo e estrutura aceita ou recusada. | Todo PR |
+| Suíte de testes | Scorer de texto sobre respostas reais, montagem do `Case` do Agno (juiz só com modelo, nunca no modo demo), tradução do resultado do runner, veredito do gate (não avaliado trava) e comparação entre execuções. | Todo PR |
 | Recuperação | O documento certo volta entre os 3 primeiros trechos. A versão literal roda em todo PR; a semântica, com Voyage, roda à noite e aceita recall@3 de 80%. | PR e noturna |
 | Confiabilidade | Tool calls com LLM real. | Noturna |
 
-**CI** (GitHub Actions): filtro por caminho, jobs de API, web e e2e e um gate que falha se qualquer um falhar. Tag `v*` publica as imagens no GHCR e anexa o `openapi.json` na release.
+**CI** (GitHub Actions): filtro por caminho, jobs de API, web e e2e, montagem das imagens de produção da API e do painel e um gate que falha se qualquer um falhar. Tag `v*` publica as imagens no GHCR e anexa o `openapi.json` na release.
 
 ---
 
@@ -305,7 +323,7 @@ Com `DEMO_REPLAY=true`, o modelo é trocado por respostas gravadas em `api/fixtu
 # API em modo replay (--build -V recria imagem e venv se as dependências mudaram)
 DEMO_REPLAY=true docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build -V
 
-# Seed: owner, 5 agentes, base de conhecimento, workflow de exemplo e 500 execuções em 90 dias
+# Seed: owner, 5 agentes, base de conhecimento, workflow, suíte de testes e 500 execuções em 90 dias
 read -rsp "Senha do owner: " SEED_OWNER_PASSWORD; echo
 docker exec \
   -e SEED_OWNER_EMAIL="admin@exemplo.com" \
@@ -344,17 +362,18 @@ pnpm --filter web test:e2e                 # Playwright
 api/
   app/
     agents/       factories, rastreamento, workflows, modelos, replay
+    evals/        runner da suíte, juiz medido e gate de publicação
     guardrails/   regras de entrada e saída
     knowledge/    embedders, ingestão, tools de busca
     mcp/          cliente MCP, proteção de saída (SSRF)
     routers/      rotas próprias /api/v1
     services/     regras de negócio e validação na escrita
-  alembic/        18 migrations
+  alembic/        22 migrations
   fixtures/       respostas gravadas do modo replay
   tests/          pytest, integração e evals
 web/
   src/app/        páginas e Route Handlers (BFF)
-  src/components/ editor de workflow, modo teste, painéis
+  src/components/ editor de workflow, suíte de testes, modo teste, painéis
   src/lib/        client gerado do OpenAPI, SSE, progresso do workflow
   e2e/            Playwright
 docs/
