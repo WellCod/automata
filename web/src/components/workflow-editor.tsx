@@ -62,6 +62,48 @@ function executorKey(step: StepNode): string {
   return "";
 }
 
+function StepVersion({
+  configId,
+  value,
+  onChange,
+  label,
+}: {
+  configId: string;
+  value: string | null;
+  onChange: (versionId: string | null) => void;
+  label: string;
+}) {
+  const { data: versions } = useQuery({
+    queryKey: ["versions", configId],
+    queryFn: async () => {
+      const res = await client.GET("/api/v1/configs/{config_id}/versions", {
+        params: { path: { config_id: configId } },
+      });
+      if (res.error) throw new Error("Falha ao carregar versões");
+      return res.data!;
+    },
+  });
+  const published = (versions ?? []).filter((v) => v.status === "published");
+  // fixada numa versão que deixou de ser publicada: a API recusa ao salvar
+  const stale = value != null && versions != null && !published.some((v) => v.id === value);
+  return (
+    <select
+      aria-label={`Versão de ${label}`}
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value || null)}
+      className={inputCls}
+    >
+      <option value="">Versão vigente</option>
+      {stale && <option value={value}>Versão fixada indisponível</option>}
+      {published.map((v) => (
+        <option key={v.id} value={v.id}>
+          Fixar v{v.version_number}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function StepFields({
   node,
   onChange,
@@ -111,6 +153,14 @@ function StepFields({
             ))}
         </optgroup>
       </select>
+      {key !== "" && (
+        <StepVersion
+          configId={key.slice(key.indexOf(":") + 1)}
+          value={node.version_id ?? null}
+          onChange={(version_id) => onChange({ ...node, version_id })}
+          label={node.name}
+        />
+      )}
       <select
         aria-label={`Se ${node.name} falhar`}
         value={node.on_error}
@@ -133,7 +183,6 @@ function StepFields({
           className={`${inputCls} w-14`}
         />
       </label>
-      {node.version_id && <span className="text-muted-foreground text-[11px]">versão fixada</span>}
     </div>
   );
 }
