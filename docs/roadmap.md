@@ -842,7 +842,7 @@ Decisão em [ADR-0014](adr/0014-workflows-por-etapas.md). Workflow é um config 
 - [x] #110 — `feat(api)`: `WorkflowFactory`, registro sem restart e erro de etapa que para o fluxo
 - [x] #111 — `feat(api)`: run do workflow em `agent_run`, etapas com `parent_run_id` e consumo somado
 - [x] `feat(web)`: página Workflows com editor de etapas. Lista e criação em `/workflows`; o editor monta a árvore (etapa, paralelo de 2 a 5 ramos, condição com então e senão, repetição com limite e regra de parada), só oferece contêiner onde o aninhamento ainda cabe e avisa antes de salvar o que a API recusaria. A versão fixada por etapa é preservada, mas ainda não tem seletor
-- [ ] `feat(web)`: modo teste com progresso por etapa e execuções do workflow
+- [x] `feat(web)`: modo teste com progresso por etapa e execuções do workflow. O painel lê o stream do AgentOS (`StepStarted`/`StepCompleted`, `*ExecutionStarted/Completed` dos contêineres, `RunStarted` e `RunError` com `step_name`) e mostra cada etapa com quem respondeu, a saída, o resultado da condição, a volta da repetição e a etapa que falhou ou foi bloqueada. O `nested_depth` do Agno vem 0 dentro de paralelo, então a indentação sai da pilha de contêineres abertos. As execuções do workflow mostram etapas, tokens e custo somados
 - [ ] `test(api)`: evals de workflows e seed da demo
 
 **Critério de aceite da fase:** montar um workflow com triagem, um paralelo de duas análises, uma etapa de consolidação e uma condição que só roda a revisão quando a resposta menciona "reembolso"; publicar, rodar no modo teste e ver cada etapa na árvore de execução, com o run do workflow somando o consumo das etapas; um agente com erro na triagem para o fluxo e o run aparece como falha.

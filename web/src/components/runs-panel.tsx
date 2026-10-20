@@ -53,6 +53,23 @@ function formatDate(iso: string): string {
   });
 }
 
+// run de workflow: o consumo é a soma das etapas, gravadas nos agentes e times
+export function workflowUsage(run: AgentRunResponse): string {
+  const steps = run.steps ?? 0;
+  const parts = [`${steps} etapa${steps === 1 ? "" : "s"}`];
+  parts.push(`${(run.total_tokens ?? 0).toLocaleString("pt-BR")} tokens`);
+  if (run.cost != null) {
+    parts.push(
+      run.cost.toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 4,
+      }),
+    );
+  }
+  return parts.join(" · ");
+}
+
 function RunItem({ run }: { run: AgentRunResponse }) {
   const icon = STATUS_ICON[run.status] ?? (
     <Activity className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
@@ -90,6 +107,11 @@ function RunItem({ run }: { run: AgentRunResponse }) {
           <span className="text-muted-foreground text-[11px]">{formatDate(run.created_at)}</span>
         </div>
       </button>
+      {run.steps != null && (
+        <p className="text-muted-foreground text-[11px]" aria-label="Consumo das etapas">
+          {workflowUsage(run)}
+        </p>
+      )}
       {run.error && (
         <p
           title={run.error}

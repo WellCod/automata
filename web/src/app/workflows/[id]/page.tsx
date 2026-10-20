@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, ArrowLeft, History } from "lucide-react";
+import { Activity, ArrowLeft, FlaskConical, History } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useId, useState } from "react";
@@ -11,6 +11,7 @@ import { z } from "zod";
 import { RunsPanel } from "@/components/runs-panel";
 import { VersionsPanel } from "@/components/versions-panel";
 import { WorkflowEditor } from "@/components/workflow-editor";
+import { WorkflowTestPanel } from "@/components/workflow-test-panel";
 import client from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
 import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes";
@@ -28,6 +29,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 const PANEL_TABS = [
+  { id: "teste" as const, label: "Teste", icon: FlaskConical },
   { id: "versoes" as const, label: "Versões", icon: History },
   { id: "runs" as const, label: "Execuções", icon: Activity },
 ];
@@ -40,7 +42,7 @@ export default function WorkflowEditPage() {
   const { id } = useParams<{ id: string }>();
   const fieldId = useId();
   const queryClient = useQueryClient();
-  const [activePanel, setActivePanel] = useState<PanelId>("versoes");
+  const [activePanel, setActivePanel] = useState<PanelId>("teste");
 
   const { data, isPending } = useQuery({
     queryKey: ["config", id],
@@ -208,6 +210,10 @@ export default function WorkflowEditPage() {
             ))}
           </div>
           <div className="p-4" role="tabpanel">
+            {/* o teste fica montado: trocar de aba não apaga o progresso */}
+            <div hidden={activePanel !== "teste"}>
+              <WorkflowTestPanel workflowId={id} draftVersionId={data?.draft_version?.id} />
+            </div>
             {activePanel === "versoes" && (
               <VersionsPanel
                 agentId={id}
