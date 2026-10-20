@@ -5,6 +5,7 @@ import os
 import random
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
@@ -23,10 +24,12 @@ from app.repositories.knowledge_base import KnowledgeBaseRepository
 from app.repositories.user import UserRepository
 from app.schemas.config import (
     CapabilityFlags,
+    ConfigKind,
     ConfigPayload,
     InstructionSections,
     KnowledgeBinding,
 )
+from app.schemas.workflow import WorkflowSettings
 from app.services.config import ConfigService
 from app.services.user import UserService
 from app.settings import get_settings
@@ -161,6 +164,29 @@ _DEMO_AGENTS: list[dict] = [  # type: ignore[type-arg]
     },
 ]
 
+# critério de aceite da Fase 15: triagem, duas análises em paralelo, consolidação e
+# revisão financeira só quando a mensagem fala em reembolso. Etapas por nome de agente.
+_WORKFLOW_NAME = "Atendimento com triagem"
+_WORKFLOW_DESCRIPTION = "Use para pedidos de cliente que precisam de análise técnica e financeira"
+_WORKFLOW_STEPS: list[dict[str, Any]] = [
+    {"type": "step", "name": "triagem", "agent": "Atendimento ao Cliente"},
+    {
+        "type": "parallel",
+        "name": "análises",
+        "branches": [
+            {"type": "step", "name": "técnica", "agent": "Suporte Técnico"},
+            {"type": "step", "name": "financeira", "agent": "Analista Financeiro"},
+        ],
+    },
+    {"type": "step", "name": "consolidação", "agent": "Atendimento ao Cliente"},
+    {
+        "type": "condition",
+        "name": "se reembolso",
+        "rule": {"kind": "contains", "source": "input", "value": "reembolso"},
+        "steps": [{"type": "step", "name": "revisão", "agent": "Analista Financeiro"}],
+    },
+]
+
 _MODEL_PRICING: dict[str, tuple[float, float]] = {
     "claude-opus-4-7": (0.015, 0.075),
     "claude-sonnet-4-6": (0.003, 0.015),
@@ -270,6 +296,43 @@ def seed_demo(session: Session) -> None:
         logger.info("agente criado e publicado: %s", agent_def["name"])
 
     seed_knowledge(session)
+    seed_workflow(session)
+
+
+def _resolve_agents(node: dict[str, Any], ids: dict[str, uuid.UUID]) -> dict[str, Any]:
+    if node["type"] == "step":
+        return {
+            "type": "step",
+            "name": node["name"],
+            "agent_id": ids[node["agent"]],
+            "on_error": "stop",
+        }
+    out = {k: v for k, v in node.items() if k not in ("steps", "branches")}
+    for key in ("steps", "branches"):
+        if key in node:
+            out[key] = [_resolve_agents(child, ids) for child in node[key]]
+    return out
+
+
+def seed_workflow(session: Session) -> None:
+    """Workflow de exemplo sobre os agentes da demo (ADR-0014)."""
+    email = os.environ["SEED_OWNER_EMAIL"]
+    config_svc = ConfigService(ConfigRepository(session))
+    existing, _ = config_svc.list_configs(q=_WORKFLOW_NAME)
+    if any(c.name == _WORKFLOW_NAME for c in existing):
+        logger.info("workflow já existe: %s", _WORKFLOW_NAME)
+        return
+    agents, _ = config_svc.list_configs(kind=ConfigKind.agent, page_size=100)
+    ids = {a.name: a.id for a in agents if a.current_version_id is not None}
+    steps = [_resolve_agents(node, ids) for node in _WORKFLOW_STEPS]
+    config = config_svc.create_config(
+        name=_WORKFLOW_NAME, description=_WORKFLOW_DESCRIPTION, kind=ConfigKind.workflow
+    )
+    payload = ConfigPayload(workflow=WorkflowSettings.model_validate({"steps": steps}))
+    config_svc.save_draft(config.id, payload, author=email)
+    config_svc.publish(config.id, author=email)
+    session.commit()
+    logger.info("workflow criado e publicado: %s", _WORKFLOW_NAME)
 
 
 _KNOWLEDGE_AGENT = "Atendimento ao Cliente"
@@ -356,6 +419,9 @@ def seed_analytics(session: Session, n_runs: int = 500) -> None:
     for config in configs:
         if config.current_version_id is None or config.current_version is None:
             continue
+        # workflow não tem modelo: o consumo dele é o das etapas (ADR-0014)
+        if config.kind == ConfigKind.workflow:
+            continue
         model_id = config.current_version.payload.get("model_id", "claude-haiku-4-5")
         agent_info.append({"config_id": config.id, "name": config.name, "model_id": model_id})
 
@@ -430,6 +496,6 @@ def seed_analytics(session: Session, n_runs: int = 500) -> None:
 
 
 def seed_full(session: Session) -> None:
-    """Seed completo para portfólio: owner + 5 agentes publicados + 500 runs históricos."""
+    """Seed completo para portfólio: owner, 5 agentes, workflow de exemplo e 500 runs."""
     seed_demo(session)
     seed_analytics(session)
