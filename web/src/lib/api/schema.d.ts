@@ -1824,6 +1824,7 @@ export interface components {
        * @default 2000
        */
       chunk_size: number;
+      retrieval?: components["schemas"]["RetrievalSettings"] | null;
       /**
        * Slug
        * @description Nome da tool de busca; não muda depois
@@ -1856,6 +1857,7 @@ export interface components {
       dimensions: number;
       /** Chunk Size */
       chunk_size: number;
+      retrieval: components["schemas"]["RetrievalSettings"];
       /**
        * Embedding Tokens
        * @default 0
@@ -1892,6 +1894,7 @@ export interface components {
        * @default 2000
        */
       chunk_size: number;
+      retrieval?: components["schemas"]["RetrievalSettings"] | null;
     };
     /**
      * KnowledgeBinding
@@ -2147,6 +2150,33 @@ export interface components {
     ResetPasswordInput: {
       /** Password */
       password: string;
+    };
+    /**
+     * RetrievalSettings
+     * @description Estratégia de busca da base (ADR-0017): vale para todos os agentes que a usam.
+     */
+    RetrievalSettings: {
+      /**
+       * Reranker
+       * @default none
+       * @enum {string}
+       */
+      reranker: "none" | "mmr" | "recency";
+      /**
+       * Mmr Lambda
+       * @default 0.5
+       */
+      mmr_lambda: number;
+      /**
+       * Recency Half Life Days
+       * @default 30
+       */
+      recency_half_life_days: number;
+      /**
+       * Recency Weight
+       * @default 0.3
+       */
+      recency_weight: number;
     };
     /** RollbackInput */
     RollbackInput: {

@@ -911,7 +911,7 @@ Fica para depois: aviso de regressão por webhook ou e-mail, suíte em workflow,
 Decisão em [ADR-0017](adr/0017-estrategia-de-recuperacao.md). Cada base de conhecimento ganha uma estratégia de busca, com o reranker do Agno (diversidade por MMR ou recência) e o HyDE com modelo nosso e medido. A busca de teste compara com e sem a estratégia, e os evals de recuperação medem cada uma.
 
 - [ ] #143 — `docs(adr)`: ADR-0017 e esta seção
-- [ ] `feat(api)`: estratégia de recuperação por base com MMR e recência. `retrieval` no `knowledge_base` (migration 0028), busca com lote maior de candidatos e reordenação contra a pergunta original
+- [x] `feat(api)`: estratégia de recuperação por base com MMR e recência. `retrieval` no `knowledge_base` (migration 0028), busca com lote maior de candidatos e reordenação contra a pergunta original
 - [ ] `feat(api)`: HyDE com modelo escolhido e medido. Medidor também no `invoke` síncrono, `usage_event` do agente pelo `RunContext` da tool, desligado no modo demo
 - [ ] `feat(api)`: busca de teste compara com e sem a estratégia da base
 - [ ] `feat(web)`: estratégia de busca na página da base e comparação lado a lado na busca de teste

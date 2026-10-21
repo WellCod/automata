@@ -12,7 +12,9 @@ from app.settings import get_settings
 VECTOR_SCHEMA = "ai"
 
 
-def vector_db_for(base: KnowledgeBase, input_type: InputType = "document") -> PgVector:
+def vector_db_for(
+    base: KnowledgeBase, input_type: InputType = "document", *, with_dates: bool = False
+) -> PgVector:
     # híbrida: vetor + full-text em português, que acha termos exatos (siglas, códigos)
     # que o embedding sozinho às vezes perde
     return PgVector(
@@ -24,6 +26,8 @@ def vector_db_for(base: KnowledgeBase, input_type: InputType = "document") -> Pg
         ),
         search_type=SearchType.hybrid,
         content_language="portuguese",
+        # a data da linha vai no meta_data do trecho: só quando o reranker de recência pede
+        return_updated_at=with_dates,
     )
 
 

@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import DateTime, Integer, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, Integer, String, Text, func, text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.config import Base
@@ -26,6 +27,10 @@ class KnowledgeBase(Base):
     chunk_size: Mapped[int] = mapped_column(Integer, nullable=False, default=2000)
     # tabela do PgVector no schema "ai"; criada pelo Agno na primeira ingestão
     vector_table: Mapped[str] = mapped_column(String(63), nullable=False, unique=True)
+    # estratégia de busca (ADR-0017), validada por RetrievalSettings; vazio = busca simples
+    retrieval: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
+    )
     updated_by: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
