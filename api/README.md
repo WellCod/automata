@@ -407,6 +407,13 @@ Cada envio (`app/evals/webhook.py`) leva:
 
 Na entrega, são até 3 tentativas, com timeout de 10 s e espera de 1 s e 5 s. Uma resposta 4xx não é repetida. O resultado fica em `webhook_last_status` e `webhook_last_at`.
 
+Depois de cada execução agendada, `app/evals/notify.py` compara com a agendada anterior (concluída ou com falha) e só avisa quando o estado muda:
+- verde para caso que passava e falhou: `suite.regressed`, com `regressions`;
+- verde para falha sem regressão, ou primeira agendada já falhando: `suite.failing`;
+- falhando para verde: `suite.recovered`.
+
+Estado igual não avisa. Execução manual ou por token não avisa. O corpo traz `config_id`, `config_name`, `run_id`, `previous_run_id`, `passed`, `total` e `regressions`. O poller roda o aviso depois da execução, e falha no aviso nunca afeta a suíte.
+
 ### Estado da suíte
 
 `GET /api/v1/eval-status` (`evals:read`) devolve, para cada config que já rodou a suíte, o estado pela execução mais recente (`app/evals/compare.py`):

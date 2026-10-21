@@ -20,6 +20,7 @@ from agno.scheduler.cron import compute_next_run, validate_cron_expr, validate_t
 from sqlalchemy.orm import Session
 
 from app.db import get_engine
+from app.evals.notify import notify_after
 from app.evals.runner import execute
 from app.evals.service import EvalRunRefused, create_run
 from app.models.eval import EvalSchedule
@@ -91,13 +92,19 @@ def poll_once(now: datetime | None = None) -> list[UUID]:
     return started
 
 
+async def _run_and_notify(run_id: UUID) -> None:
+    await execute(run_id)
+    # o aviso só sai em mudança de estado e nunca levanta (ADR-0018)
+    await asyncio.to_thread(notify_after, run_id)
+
+
 async def run_forever(poll_seconds: int = POLL_SECONDS) -> None:
     tasks: set[asyncio.Task[None]] = set()
     while True:
         try:
             for run_id in await asyncio.to_thread(poll_once):
                 logger.info("suíte agendada iniciada", extra={"eval_run_id": str(run_id)})
-                task = asyncio.create_task(execute(run_id))
+                task = asyncio.create_task(_run_and_notify(run_id))
                 tasks.add(task)
                 task.add_done_callback(tasks.discard)
         except Exception as exc:
