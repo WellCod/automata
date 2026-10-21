@@ -9,6 +9,7 @@ from agno.agent.factory import AgentFactory
 from agno.compaction.compaction import Compaction
 from agno.db.base import AsyncBaseDb, BaseDb
 from agno.factory.utils import FactoryValidationError, RequestContext
+from agno.guardrails.base import BaseGuardrail
 from agno.team import Team, TeamMode
 from agno.team.factory import TeamFactory
 from agno.tools.function import Function
@@ -18,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.agents.models_map import resolve_model
 from app.agents.tracking import TrackedAgent, TrackedTeam
+from app.budget import BudgetGuardrail, hard_limit
 from app.db import get_engine
 from app.guardrails.input import BlockLog, input_guardrails
 from app.guardrails.output import output_guardrail
@@ -44,6 +46,8 @@ class ResolvedVersion:
     mcp_tools: list[MCPTools] = field(default_factory=list)
     bases: list[KnowledgeBase] = field(default_factory=list)
     knowledge_tools: list[Function] = field(default_factory=list)
+    # limite do mês com bloqueio ligado (ADR-0021); fora da versão, lido do config
+    budget_limit_usd: float | None = None
 
 
 def load_version(config_id: UUID, version_id: UUID | None) -> ResolvedVersion:
@@ -75,6 +79,7 @@ def load_version(config_id: UUID, version_id: UUID | None) -> ResolvedVersion:
             mcp_tools=_mcp_tools_for(session, payload),
             bases=[b for b, _ in bases],
             knowledge_tools=[knowledge_tool(b, n, config_id) for b, n in bases],
+            budget_limit_usd=hard_limit(config),
         )
 
 
@@ -151,6 +156,17 @@ def compaction_for(settings: ConversationSettings) -> Compaction | None:
     )
 
 
+def pre_hooks_for(
+    config_id: UUID, resolved: ResolvedVersion, blocks: BlockLog, *, budget: bool
+) -> list[Any] | None:
+    # orçamento antes dos guardrails: estourado, nem a moderação (que sai da API) roda
+    hooks: list[BaseGuardrail] = []
+    if budget and resolved.budget_limit_usd is not None:
+        hooks.append(BudgetGuardrail(config_id, resolved.budget_limit_usd, blocks))
+    hooks.extend(input_guardrails(resolved.payload.guardrails, blocks))
+    return hooks or None
+
+
 def required_model(payload: ConfigPayload) -> str:
     # o serviço exige modelo em agente e time; versão gravada sem ele é dado inválido
     if payload.model_id is None:
@@ -171,7 +187,8 @@ def agent_from(config_id: UUID, resolved: ResolvedVersion, *, tracked: bool) -> 
         model=resolve_model(required_model(payload), payload.capabilities),
         instructions=build_instructions(payload, resolved.bases),
         tools=[*resolved.mcp_tools, *resolved.knowledge_tools],
-        pre_hooks=list(input_guardrails(payload.guardrails, blocks)) or None,
+        # membro de time não tem orçamento próprio: o consumo dele conta no time
+        pre_hooks=pre_hooks_for(config_id, resolved, blocks, budget=tracked),
         post_hooks=_post_hooks(output_guardrail(payload.guardrails, blocks)),
         # o histórico sai do banco da sessão, que o AgentFactory injeta no agente
         add_history_to_context=True,
@@ -254,7 +271,7 @@ def team_from(config_id: UUID, resolved: ResolvedTeam) -> TrackedTeam:
         model=resolve_model(required_model(leader.payload), leader.payload.capabilities),
         instructions=build_instructions(leader.payload, leader.bases),
         tools=[*leader.mcp_tools, *leader.knowledge_tools],
-        pre_hooks=list(input_guardrails(leader.payload.guardrails, blocks)) or None,
+        pre_hooks=pre_hooks_for(config_id, leader, blocks, budget=True),
         post_hooks=_post_hooks(output_guardrail(leader.payload.guardrails, blocks)),
         members=[agent_from(mid, m, tracked=False) for mid, m in resolved.members],
         mode=TeamMode(settings.mode),

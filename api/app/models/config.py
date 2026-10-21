@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
@@ -8,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     false,
@@ -71,6 +73,14 @@ class AgentConfig(Base):
     )
     # gate de publicação (ADR-0015): fora da versão, como os casos de teste
     require_passing_evals: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=false(), default=False
+    )
+    # orçamento mensal (ADR-0021): operação, fora da versão; vazio = sem orçamento
+    budget_monthly_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    budget_alert_percent: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="80", default=80
+    )
+    budget_hard_stop: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=false(), default=False
     )
     created_at: Mapped[datetime] = mapped_column(

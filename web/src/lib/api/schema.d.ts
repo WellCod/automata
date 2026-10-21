@@ -16,6 +16,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/configs/{config_id}/budget": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Budget */
+    get: operations["read_budget_api_v1_configs__config_id__budget_get"];
+    /** Update Budget */
+    put: operations["update_budget_api_v1_configs__config_id__budget_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/configs": {
     parameters: {
       query?: never;
@@ -1143,6 +1161,38 @@ export interface components {
       file: string;
       /** Name */
       name?: string | null;
+    };
+    /** BudgetInput */
+    BudgetInput: {
+      /** Monthly Usd */
+      monthly_usd?: number | null;
+      /**
+       * Alert Percent
+       * @default 80
+       */
+      alert_percent: number;
+      /**
+       * Hard Stop
+       * @default false
+       */
+      hard_stop: boolean;
+    };
+    /** BudgetResponse */
+    BudgetResponse: {
+      /** Monthly Usd */
+      monthly_usd: number | null;
+      /** Alert Percent */
+      alert_percent: number;
+      /** Hard Stop */
+      hard_stop: boolean;
+      /** Period */
+      period: string;
+      /** Spent Usd */
+      spent_usd: number;
+      /** Percent */
+      percent: number | null;
+      /** Level */
+      level: ("ok" | "warning" | "exceeded") | null;
     };
     /** CapabilityFlags */
     CapabilityFlags: {
@@ -2689,6 +2739,72 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ApprovalItem"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  read_budget_api_v1_configs__config_id__budget_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BudgetResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_budget_api_v1_configs__config_id__budget_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BudgetInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BudgetResponse"];
         };
       };
       /** @description Validation Error */
