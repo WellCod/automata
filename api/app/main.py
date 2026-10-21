@@ -7,7 +7,7 @@ from agno.agent.protocol import AgentProtocol
 from agno.agent.remote import RemoteAgent
 from agno.db.postgres import PostgresDb
 from agno.os import AgentOS
-from agno.os.config import AuthorizationConfig
+from agno.os.config import AuthorizationConfig, MCPConfig
 from agno.team import RemoteTeam, Team
 from agno.team.factory import TeamFactory
 from agno.workflow import RemoteWorkflow, Workflow
@@ -168,7 +168,8 @@ def create_app(
         auto_provision_dbs=auto_provision_dbs,
         authorization=enable_auth,
         authorization_config=auth_config,
-        mcp=enable_mcp_server,
+        # sem o server card público da v3 (GET /mcp): nada em /mcp responde sem token
+        mcp=MCPConfig(default_tools=True, server_card=False) if enable_mcp_server else False,
         mcp_auth=mcp_auth,
         tracing=settings.tracing_enabled,
     ).get_app()
