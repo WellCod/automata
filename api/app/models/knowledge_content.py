@@ -15,6 +15,8 @@ class KnowledgeContent(Base):
     __table_args__ = (
         Index("ix_knowledge_content_base_created", "base_id", "created_at"),
         Index("ix_knowledge_content_status", "status"),
+        # um arquivo da origem é um conteúdo só por conector (ADR-0024)
+        Index("ix_knowledge_content_connector_path", "connector_id", "external_path", unique=True),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -45,7 +47,9 @@ class KnowledgeContent(Base):
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # só URL: baixa de novo nesse intervalo e reindexa se o hash mudou
     refresh_every_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    next_refresh_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_refresh_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
