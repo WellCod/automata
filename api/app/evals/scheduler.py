@@ -19,6 +19,7 @@ from uuid import UUID
 from agno.scheduler.cron import compute_next_run, validate_cron_expr, validate_timezone
 from sqlalchemy.orm import Session
 
+from app import alerts
 from app.db import get_engine
 from app.evals.notify import notify_after
 from app.evals.runner import execute
@@ -109,4 +110,6 @@ async def run_forever(poll_seconds: int = POLL_SECONDS) -> None:
                 task.add_done_callback(tasks.discard)
         except Exception as exc:
             logger.warning("falha no agendamento da suíte", extra={"error": str(exc)})
+        # orçamento e pico de erro dos destinos de aviso (ADR-0021), no mesmo minuto
+        await asyncio.to_thread(alerts.poll_once)
         await asyncio.sleep(poll_seconds)

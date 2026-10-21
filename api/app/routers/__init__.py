@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.routers.alerts import router as alerts_router
 from app.routers.approvals import router as approvals_router
 from app.routers.budget import router as budget_router
 from app.routers.configs import router as configs_router
@@ -24,6 +25,7 @@ from app.routers.users import router as users_router
 # Rotas /api/v1 montadas dentro do AgentOS (atrás do JWT). main.py e o export
 # do OpenAPI usam a mesma lista para os tipos do painel não divergirem.
 PROTECTED_ROUTERS: list[APIRouter] = [
+    alerts_router,
     approvals_router,
     budget_router,
     configs_router,
