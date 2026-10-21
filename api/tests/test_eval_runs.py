@@ -17,7 +17,7 @@ from app.agents.replay import ReplayModel
 from app.evals.runner import TextScorer
 from app.schemas.eval import TextCheck
 from app.settings import get_settings
-from tests.fake_models import FixedReplyModel
+from tests.fake_models import CountingModel, FixedReplyModel
 
 REPLY = "Prazo de troca: 30 dias corridos a partir do recebimento."
 
@@ -33,6 +33,9 @@ def _model(model_id: str, *_: Any, **__: Any) -> ReplayModel:
     # versão "piorada" para os testes de regressão: troca o modelo e perde o prazo
     if model_id == "claude-sonnet-4-6":
         return FixedReplyModel(id=model_id, reply="Não sei informar.", tokens=10)
+    # responde quantas mensagens do usuário recebeu: mostra se o contexto chegou
+    if model_id == "gpt-4o":
+        return CountingModel(id=model_id)
     return FixedReplyModel(id=model_id, reply=REPLY, tokens=10)
 
 
@@ -379,3 +382,48 @@ def test_alvo_invalido_e_recusado(client: TestClient) -> None:
     _case(client, unpublished, "prazo", [{"type": "text", "kind": "contains", "value": "30"}])
     resp = _start(client, unpublished, target="current")
     assert resp.json()["detail"] == "Config sem versão publicada para testar"
+
+
+def test_caso_com_contexto_roda_os_turnos_anteriores_na_mesma_sessao(client: TestClient) -> None:
+    body = {"name": "com contexto", "description": "Use para com contexto"}
+    agent = str(client.post("/api/v1/configs", json={**body, "kind": "agent"}).json()["id"])
+    client.put(
+        f"/api/v1/configs/{agent}/draft", json={**body, "payload": {"model_id": "gpt-4o"}}
+    ).raise_for_status()
+    client.post(f"/api/v1/configs/{agent}/publish").raise_for_status()
+
+    saved = client.post(
+        f"/api/v1/configs/{agent}/eval-cases",
+        json={
+            "name": "lembra do pedido",
+            "context": ["oi", "meu pedido é o 123"],
+            "input": "qual era o pedido?",
+            "checks": [{"type": "text", "kind": "contains", "value": "mensagens: 3"}],
+        },
+    )
+    assert saved.status_code == 201, saved.text
+    assert saved.json()["context"] == ["oi", "meu pedido é o 123"]
+    _case(
+        client,
+        agent,
+        "sem contexto",
+        [{"type": "text", "kind": "contains", "value": "mensagens: 1"}],
+    )
+    too_long = client.post(
+        f"/api/v1/configs/{agent}/eval-cases",
+        json={
+            "name": "contexto demais",
+            "context": ["x"] * 6,
+            "input": "y",
+            "checks": [{"type": "text", "kind": "not_empty"}],
+        },
+    )
+    assert too_long.status_code == 422
+
+    run = _start(client, agent).json()
+    run = client.get(f"/api/v1/configs/{agent}/eval-runs/{run['id']}").json()
+    assert (run["status"], run["passed"], run["total"]) == ("completed", 2, 2), run
+    by_name = {r["case_name"]: r for r in run["results"]}
+    assert by_name["lembra do pedido"]["output"] == "mensagens: 3"
+    # os turnos de contexto também são runs de teste: ficam fora das conversas
+    assert client.get(f"/api/v1/configs/{agent}/runs").json()["total"] == 0

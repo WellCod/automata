@@ -36,7 +36,7 @@ Verificado no Agno 3.1.8 instalado (a atualização entra antes desta fase) e no
 
 **Regressão agendada vira sinal no painel.** Cada execução agendada é comparada com a anterior do mesmo agendamento, com a comparação caso a caso da Fase 16. A lista de agentes e times e a aba Testes mostram o estado da suíte (verde, falhando, regrediu, sem execução). Avisos por webhook ou e-mail ficam para depois.
 
-**Caso com turnos anteriores.** Um caso pode trazer até cinco mensagens de contexto antes da mensagem avaliada. Na execução, o `setup` do `Case` roda essas mensagens no mesmo `session_id`, com o mesmo agente, e só a resposta da última passa pelas checagens. O contexto conta no timeout do caso, porque roda dentro do mesmo limite, e o consumo dele entra no custo da execução. Sem contexto, o caso continua de uma mensagem, como na Fase 16.
+**Caso com turnos anteriores.** Um caso pode trazer até cinco mensagens de contexto antes da mensagem avaliada. Na execução, o `setup` do `Case` roda essas mensagens no mesmo `session_id`, com o mesmo agente, e só a resposta da última passa pelas checagens. O `setup` do Agno roda fora do timeout do caso, então cada mensagem de contexto tem limite próprio de 60 s, e o consumo dela entra no custo da execução. Sem contexto, o caso continua de uma mensagem, como na Fase 16.
 
 **Caso a partir de conversa real, sempre revisado antes de salvar.** No histórico de execuções e na árvore de execução, um run de conversa ganha a ação "Virar caso de teste". A API lê o run em `agno_runs`, monta uma sugestão e não grava nada: entrada do usuário, até cinco mensagens anteriores da mesma sessão como contexto, checagem de tools com as tools que o run de fato chamou, `not_empty` e, se houver modelo de juiz, um critério de rascunho a partir da resposta original. O formulário de caso abre preenchido, e salvar usa o `POST` de casos que já existe, com `source_run_id` para registrar de onde veio.
 
@@ -60,7 +60,8 @@ Verificado no Agno 3.1.8 instalado (a atualização entra antes desta fase) e no
 - Token com acesso à suíte pode gerar custo enquanto não for revogado. A emissão mostra isso, a execução registra qual token disparou e a rota recusa nova execução enquanto houver uma em andamento.
 - A sugestão de caso depende do run guardado pelo Agno em `agno_runs`. Run apagado não gera sugestão, e a interface diz isso.
 - Mascarar PII troca valores por rótulos (`[CPF removido]`, `[e-mail removido]`). Um caso que dependia do valor exato precisa ser ajustado à mão.
-- Caso com contexto custa mais: cada mensagem anterior é um run do modelo. O limite de cinco mensagens e o timeout do caso seguram isso.
+- Caso com contexto custa mais: cada mensagem anterior é um run do modelo. O limite de cinco mensagens e o de 60 s por mensagem seguram isso.
+- O contexto só funciona se o agente levar o histórico da sessão ao modelo. O factory não ligava isso (`add_history_to_context`), e as conversas reais também não tinham memória. A correção entra nesta fase.
 - O runner da suíte passa a depender de dois campos da v3 (`setup` e `session_id` do `Case`). Esta fase só começa depois da atualização para a 3.1.x.
 - Duas migrations: origem e alvo no `eval_run`, `context` e `source_run_id` no `eval_case`; tabela `eval_schedule`.
 

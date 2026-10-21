@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from agno.eval.suite import Case, CaseResult, JudgeMode, arun_cases
 from agno.scorer.base import Score
@@ -22,7 +22,7 @@ from app.agents import models_map
 from app.agents.factory import agent_from, load_team, load_version, team_from
 from app.agents.tracking import EvalContext, current_eval_run
 from app.agents.workflow_factory import rule_matches
-from app.db import get_engine
+from app.db import get_db, get_engine
 from app.evals.judge import JudgeUsage, metered
 from app.models.eval import EvalResult, EvalRun
 from app.models.usage import UsageEvent
@@ -32,6 +32,8 @@ from app.schemas.eval import EvalCaseInput, JudgeCheck, TextCheck, ToolsCheck
 logger = logging.getLogger(__name__)
 
 CASE_TIMEOUT_S = 120
+# cada mensagem de contexto roda no setup do Case, que fica fora do timeout do caso
+CONTEXT_TIMEOUT_S = 60
 JUDGE_IN_DEMO = "modo demo: o juiz não roda com respostas gravadas"
 JUDGE_WITHOUT_MODEL = "execução sem modelo de juiz"
 
@@ -91,6 +93,7 @@ def plan_case(
     kind: str,
     version_id: UUID,
     judge_unavailable: str | None = JUDGE_WITHOUT_MODEL,
+    actor: str = "eval",
 ) -> PlannedCase:
     """`judge_unavailable` é o motivo de o juiz não rodar; None quando há juiz."""
     spec = EvalCaseInput.model_validate(snapshot)
@@ -104,11 +107,13 @@ def plan_case(
         # o Case do Agno recusa caso sem checagem; nada roda e o caso fica não avaliado
         return PlannedCase(position, case_id, spec.name, spec, None, skipped)
     # instância nova por caso: casos não compartilham sessão, estado nem conexão MCP
-    target: dict[str, Any]
-    if kind == "team":
-        target = {"team": team_from(config_id, load_team(config_id, version_id))}
-    else:
-        target = {"agent": agent_from(config_id, load_version(config_id, version_id), tracked=True)}
+    runner: Any = (
+        team_from(config_id, load_team(config_id, version_id))
+        if kind == "team"
+        else agent_from(config_id, load_version(config_id, version_id), tracked=True)
+    )
+    target = {"team" if kind == "team" else "agent": runner}
+    session_args = _context_args(runner, spec.context, actor)
     agno_case = Case(
         name=spec.name,
         input=spec.input,
@@ -119,9 +124,32 @@ def plan_case(
         criteria=judge.criteria if judge is not None and use_judge else None,
         judge_mode=JudgeMode(judge.mode) if judge is not None else JudgeMode.BINARY,
         judge_threshold=judge.threshold if judge is not None else 7,
+        user_id=actor,
+        **session_args,
         **target,
     )
     return PlannedCase(position, case_id, spec.name, spec, agno_case, skipped)
+
+
+def _context_args(runner: Any, context: list[str], actor: str) -> dict[str, Any]:
+    """Sessão própria do caso, com os turnos anteriores rodados no `setup` do Case.
+
+    O histórico sai do banco da sessão: o agente da suíte não passa pelo AgentFactory,
+    que injetaria o banco, então ele entra aqui. Só a resposta a `input` é checada.
+    """
+    if not context:
+        return {}
+    runner.db = get_db()
+    session_id = f"eval-{uuid4().hex}"
+
+    async def setup() -> None:
+        for message in context:
+            await asyncio.wait_for(
+                runner.arun(message, session_id=session_id, user_id=actor, stream=False),
+                CONTEXT_TIMEOUT_S,
+            )
+
+    return {"session_id": session_id, "setup": setup}
 
 
 def result_from(planned: PlannedCase, result: CaseResult | None) -> EvalResult:
@@ -261,7 +289,7 @@ async def execute(run_id: UUID) -> None:
             judge, usage = metered(models_map.resolve_model(judge_model))
         planned = await asyncio.to_thread(
             lambda: [
-                plan_case(i, snap, config_id, kind, version_id, unavailable)
+                plan_case(i, snap, config_id, kind, version_id, unavailable, actor)
                 for i, snap in enumerate(snapshots)
             ]
         )

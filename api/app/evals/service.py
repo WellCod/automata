@@ -89,7 +89,13 @@ def create_run(
             status="queued",
             total=len(cases),
             cases=[
-                {"id": str(c.id), "name": c.name, "input": c.input, "checks": c.checks}
+                {
+                    "id": str(c.id),
+                    "name": c.name,
+                    "input": c.input,
+                    "context": c.context,
+                    "checks": c.checks,
+                }
                 for c in cases
             ],
             judge_model=body.judge_model,
