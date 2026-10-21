@@ -15,6 +15,8 @@ class KnowledgeContent(Base):
     __table_args__ = (
         Index("ix_knowledge_content_base_created", "base_id", "created_at"),
         Index("ix_knowledge_content_status", "status"),
+        # um arquivo da origem é um conteúdo só por conector (ADR-0024)
+        Index("ix_knowledge_content_connector_path", "connector_id", "external_path", unique=True),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
