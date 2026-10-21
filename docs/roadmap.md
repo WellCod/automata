@@ -585,6 +585,7 @@ if __name__ == "__main__":
 | 20 — Compactação de conversa | #154–#157 | Resumo dos turnos antigos por agente, versionado no payload | Fase 17 (#134) |
 | 21 — Fila durável | #158–#160 | Runs em background na fila durável do Agno, com Redis opcional | Fase 7 (Redis) |
 | 22 — Orçamento e alertas | #164 em diante | Custo estimado pela tabela de preços, orçamento mensal com bloqueio e destinos de aviso | Fases 19 e 21 |
+| 23 — Suíte de workflow e bloqueio | depois da 22 | Suíte de testes para workflows e caso que espera bloqueio de guardrail | Fases 14, 15 e 16 |
 
 Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
 
@@ -1002,3 +1003,21 @@ Decisão em [ADR-0021](adr/0021-orcamento-e-alertas.md). O custo passa a ser cal
 - Cinco runs com erro em 15 minutos geram um `errors.spike`.
 
 Fica para depois: conciliação com a API de uso do provedor, orçamento por usuário ou por integração e limite de custo por run.
+
+## Fase 23 — Suíte de testes para workflows e caso que espera bloqueio
+
+Decisão em [ADR-0022](adr/0022-suite-de-workflow-e-bloqueio.md). Workflow ganha suíte de testes pelo mesmo runner de agentes e times, com checagem das etapas que rodaram. Agente e time ganham caso que passa quando o guardrail barra, para a configuração de cada um ter teste.
+
+- [ ] `docs(adr)`: ADR-0022 e esta seção
+- [ ] `feat(api)`: checagem `blocked` com regra opcional, lida do registro de bloqueios do run
+- [ ] `feat(api)`: suíte para workflow com checagem de etapas, gate e agendamento
+- [ ] `feat(web)`: caso que espera bloqueio e aba de testes no workflow
+- [ ] `test(api)`: evals da checagem de bloqueio e da suíte de workflow
+
+**Critério de aceite da fase:**
+
+- Um caso `blocked` com `rule: off_topic` passa quando o tópico proibido barra e reprova quando o agente responde.
+- Um workflow com condição tem caso que reprova quando a regra da condição muda o caminho.
+- O gate de publicação barra o workflow com suíte vermelha.
+
+Fica para depois: checagem de texto numa etapa do meio do workflow e caso de workflow com turnos anteriores.
