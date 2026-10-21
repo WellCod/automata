@@ -588,6 +588,7 @@ if __name__ == "__main__":
 | 23 — Suíte de workflow e bloqueio | depois da 22 | Suíte de testes para workflows e caso que espera bloqueio de guardrail | Fases 14, 15 e 16 |
 | 24 — Revisão humana no workflow | depois da 23 | Etapa que pausa para aprovação antes de rodar ou depois da saída | Fases 12 e 15 |
 | 25 — Conectores de conhecimento | depois da 24 | GitHub, S3 e SharePoint na base, com sincronização e reindexação agendada de URL | Fases 13 e 18 |
+| 26 — Memória do usuário | depois da 25 | Fatos sobre o usuário entre sessões, por agente, com retenção, PII mascarado e exclusão | Fases 14 e 20 |
 
 Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
 
@@ -1059,3 +1060,23 @@ Decisão em [ADR-0024](adr/0024-conectores-de-conhecimento.md). A base passa a a
 - Uma URL com reindexação de 24 h que não mudou não gera consumo de embedding.
 
 Fica para depois: webhook da origem, Google Drive e GCS, e filtros por padrão de nome de arquivo.
+
+## Fase 26 — Memória do usuário entre sessões
+
+Decisão em [ADR-0025](adr/0025-memoria-do-usuario.md). O agente pode lembrar fatos sobre o usuário de uma conversa para outra, só os dele e só daquele usuário. Os dados pessoais são mascarados antes de gravar, as memórias vencem pela retenção e podem ser vistas e apagadas pelo owner e pelo próprio usuário.
+
+- [ ] `docs(adr)`: ADR-0025 e esta seção
+- [ ] `feat(api)`: memória por agente no payload, lida por usuário e agente, mascarada e fora de anônimo e da suíte
+- [ ] `feat(api)`: retenção no poller e rotas para ver e apagar memórias por agente e do próprio usuário
+- [ ] `feat(web)`: memória na configuração do agente, aba de memórias e minhas memórias
+- [ ] `test(api)`: evals da memória do usuário
+
+**Critério de aceite da fase:**
+
+- Um usuário diz o tamanho que veste numa sessão, e o agente usa isso numa sessão nova.
+- O mesmo usuário falando com outro agente com memória ligada não recebe esse fato.
+- Um CPF dito na conversa não aparece na memória gravada.
+- Memória mais velha que a retenção some na limpeza.
+- O usuário apaga as próprias memórias e o agente deixa de usá-las.
+
+Fica para depois: memória em time, tipos de máscara configuráveis por agente e exportação das memórias de um usuário.
