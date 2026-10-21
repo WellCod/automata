@@ -11,7 +11,7 @@ O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é
 
 | | |
 |---|---|
-| **Backend** | Python 3.12 · FastAPI · Agno 2.9.0 · PostgreSQL 17 + pgvector · Redis · Alembic |
+| **Backend** | Python 3.12 · FastAPI · Agno 3.1.8 · PostgreSQL 17 + pgvector · Redis · Alembic |
 | **Frontend** | Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · TanStack Query |
 | **Qualidade** | mypy strict · ruff · ~290 testes pytest (testcontainers) · 126 testes Vitest · Playwright · evals |
 | **Decisões** | 15 ADRs com contexto, alternativas descartadas e gatilho de reversão |

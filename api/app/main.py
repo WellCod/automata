@@ -168,7 +168,7 @@ def create_app(
         auto_provision_dbs=auto_provision_dbs,
         authorization=enable_auth,
         authorization_config=auth_config,
-        mcp_server=enable_mcp_server,
+        mcp=enable_mcp_server,
         mcp_auth=mcp_auth,
         tracing=settings.tracing_enabled,
     ).get_app()

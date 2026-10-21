@@ -122,7 +122,10 @@ def test_nao_stream_entrega_mensagem_de_bloqueio_e_nao_grava_o_dado(client: Test
 
     with get_engine().connect() as conn:
         stored = conn.execute(
-            text("SELECT runs::text FROM ai.agno_sessions WHERE session_id = 's-out'")
+            text(
+                "SELECT string_agg(run_data::text, ' ') FROM ai.agno_runs "
+                "WHERE session_id = 's-out'"
+            )
         ).scalar_one()
     assert CPF not in stored
 
