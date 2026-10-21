@@ -17,6 +17,7 @@ from app.schemas.knowledge_base import (
     KnowledgeBaseCreate,
     KnowledgeBaseResponse,
     KnowledgeBaseUpdate,
+    RetrievalSettings,
     SearchHit,
     SearchInput,
 )
@@ -42,6 +43,7 @@ def to_response(b: KnowledgeBase, usage: EmbeddingTotals | None = None) -> Knowl
         embedder_model=b.embedder_model,
         dimensions=b.dimensions,
         chunk_size=b.chunk_size,
+        retrieval=RetrievalSettings.model_validate(b.retrieval or {}),
         embedding_tokens=usage.tokens if usage else 0,
         embedding_cost=usage.cost if usage else None,
         updated_by=b.updated_by,
@@ -113,6 +115,7 @@ def create_base(
         embedder_model=spec.model,
         dimensions=spec.dimensions,
         chunk_size=body.chunk_size,
+        retrieval=(body.retrieval or RetrievalSettings()).model_dump(),
         vector_table=f"kb_{base_id.hex}",
         updated_by=_actor(request),
     )
@@ -137,6 +140,8 @@ def update_base(
     base.name = body.name
     base.description = body.description
     base.chunk_size = body.chunk_size
+    if body.retrieval is not None:
+        base.retrieval = body.retrieval.model_dump()
     base.updated_by = _actor(request)
     session.commit()
     session.refresh(base)

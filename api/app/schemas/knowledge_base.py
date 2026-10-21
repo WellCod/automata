@@ -9,12 +9,28 @@ from app.knowledge.embedders import EmbedderName
 _SLUG = r"^[a-z][a-z0-9_]{1,30}$"
 
 
+class RetrievalSettings(BaseModel):
+    """Estratégia de busca da base (ADR-0017): vale para todos os agentes que a usam."""
+
+    # none: busca híbrida de sempre; mmr: trechos relevantes e diferentes entre si;
+    # recency: prefere o trecho mais novo sem descartar a relevância
+    reranker: Literal["none", "mmr", "recency"] = "none"
+    # 1 só relevância, 0 só diversidade
+    mmr_lambda: float = Field(default=0.5, ge=0.0, le=1.0)
+    # idade em que o peso da recência cai pela metade
+    recency_half_life_days: float = Field(default=30.0, gt=0.0, le=3650.0)
+    # 0 só relevância, 1 só idade
+    recency_weight: float = Field(default=0.3, ge=0.0, le=1.0)
+
+
 class KnowledgeBaseUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     description: str = Field(
         default="", max_length=2000, description="Usada pelo agente para decidir quando buscar"
     )
     chunk_size: int = Field(default=2000, ge=200, le=8000, description="Vale para novas ingestões")
+    # ausente no PUT mantém a estratégia gravada; na criação vale a busca simples
+    retrieval: RetrievalSettings | None = None
 
 
 class KnowledgeBaseCreate(KnowledgeBaseUpdate):
@@ -33,6 +49,7 @@ class KnowledgeBaseResponse(BaseModel):
     embedder_model: str
     dimensions: int
     chunk_size: int
+    retrieval: RetrievalSettings
     # ingestão e buscas desde a criação (ADR-0012)
     embedding_tokens: int = 0
     embedding_cost: float | None = None
