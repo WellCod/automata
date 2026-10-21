@@ -3,7 +3,7 @@
 [![CI](https://github.com/WellCod/automata/actions/workflows/ci.yml/badge.svg)](https://github.com/WellCod/automata/actions/workflows/ci.yml)
 [![Publish](https://github.com/WellCod/automata/actions/workflows/publish.yml/badge.svg)](https://github.com/WellCod/automata/actions/workflows/publish.yml)
 
-Plataforma para operar agentes de IA em produção. Com ela, quem não programa cria, versiona, testa e publica agentes, times multi-agente e workflows. Também liga bases de conhecimento (RAG), ferramentas via MCP e guardrails, roda suítes de teste por agente antes de publicar e de forma agendada, com aviso de regressão no canal do time, e acompanha execução, latência e custo de cada um.
+Plataforma para operar agentes de IA em produção. Com ela, quem não programa cria, versiona, testa e publica agentes, times multi-agente e workflows. Também liga bases de conhecimento (RAG) que acompanham o GitHub, o S3 e o SharePoint, ferramentas via MCP, guardrails e memória do usuário entre conversas. Roda suítes de teste por agente, time e workflow antes de publicar e de forma agendada, pausa o workflow para aprovação humana onde for preciso e acompanha execução, latência e custo de cada um, com orçamento mensal e aviso no canal do time.
 
 O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é a camada de produto em volta: configuração versionada em banco próprio, validação antes de publicar, rastreamento de cada execução, segurança e painel.
 
@@ -13,7 +13,7 @@ O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é
 |---|---|
 | **Backend** | Python 3.12 · FastAPI · Agno 3.1.8 · PostgreSQL 17 + pgvector · Redis · Alembic |
 | **Frontend** | Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · TanStack Query |
-| **Qualidade** | mypy strict · ruff · ~510 testes pytest (testcontainers) · 136 testes Vitest · Playwright · evals |
+| **Qualidade** | mypy strict · ruff · ~630 testes pytest (testcontainers) · 158 testes Vitest · Playwright · evals |
 | **Decisões** | 25 ADRs com contexto, alternativas descartadas e gatilho de reversão |
 
 ---
@@ -90,7 +90,11 @@ Quando o processo é conhecido e precisa ser repetível e auditável, um líder 
 
 O modo teste lê o stream do AgentOS e mostra cada etapa ao vivo: quem respondeu, o que respondeu, se a condição deu verdadeira, em que volta está a repetição e onde falhou. As execuções mostram o consumo somado de todas as etapas.
 
-<p align="center"><img src="docs/img/workflow-teste.png" alt="Modo teste do workflow com progresso por etapa" width="420"></p>
+Uma etapa pode **pausar para revisão humana**: confirmar antes de rodar ou aprovar a saída antes da próxima etapa. A pendência aparece na página Aprovações e no próprio modo teste, com a saída a conferir. Recusar encerra o fluxo, pula a etapa ou a refaz com o motivo da recusa no contexto, e um prazo opcional cancela o que ficou parado.
+
+<p align="center"><img src="docs/img/workflow-teste.png" alt="Modo teste do workflow pausado na revisão humana da etapa de reembolso" width="420"></p>
+
+![Página Aprovações com a saída de uma etapa esperando revisão](docs/img/aprovacoes.png)
 
 ### Bases de conhecimento (RAG)
 
@@ -100,9 +104,17 @@ Bases com PDF, DOCX, Markdown, texto, CSV, JSON ou páginas web, enviados por ar
 
 Cada base escolhe como buscar: a busca simples, diversidade (MMR, para manuais longos e documentos repetidos), recência (para políticas que mudam) e, opcionalmente, HyDE, que busca com uma resposta hipotética quando a pergunta não usa as palavras do documento. A busca de teste mostra lado a lado o resultado com a estratégia e sem ela, e os tokens que o HyDE gastou.
 
+A base também acompanha a origem. Um **conector** lê um repositório do GitHub, um bucket S3 ou uma pasta do SharePoint, com a credencial cifrada. A sincronização compara pela versão de cada arquivo: arquivo novo entra, alterado é reindexado sem duplicar trecho, removido sai da base, e o que não mudou não é baixado nem cobra embedding. A sincronização pode rodar num intervalo, e uma URL pode ser baixada de novo todo dia ou toda semana, reindexando só se a página mudou.
+
+![Conector do GitHub numa base de conhecimento](docs/img/conectores.png)
+
 ### Conversas longas
 
 O agente lembra a conversa: leva ao modelo os últimos turnos da mesma sessão. Em atendimento longo, a **compactação** resume os turnos antigos quando a conversa passa de um limite em tokens. Assim, o número do pedido dito no começo continua chegando ao modelo, e o custo por turno fica limitado. A opção fica na versão do agente, desligada por padrão, com o que o resumo não pode perder escrito em português.
+
+Entre conversas, a **memória do usuário** guarda o que a pessoa contou, como o tamanho que veste ou o horário que prefere para entrega. Cada agente só lê o que ele mesmo guardou, e só para o mesmo usuário. Documento, cartão, e-mail e telefone saem mascarados antes de gravar. Conversa sem usuário identificado não gera memória, e a memória vence depois do prazo de retenção. O owner apaga tudo de um usuário num agente, para atender pedido de exclusão, e cada usuário vê e apaga as próprias.
+
+<p align="center"><img src="docs/img/memoria.png" alt="Memórias que um agente guardou, por usuário" width="600"></p>
 
 ### Guardrails por agente
 
@@ -119,7 +131,7 @@ Execuções barradas aparecem como **bloqueadas**, com a regra, separadas de fal
 
 ### Testes por agente antes de publicar
 
-Cada agente e time tem uma suíte de casos: uma mensagem e o que precisa ser verdade na resposta. As checagens são três: texto (contém, não contém, começa com), tools que precisam ser chamadas (a busca na base certa, a tool MCP esperada) e um critério avaliado por um modelo juiz, binário ou nota com limiar. A suíte roda contra o rascunho ou a vigente, mostra o resultado caso a caso e compara as duas versões, apontando o que passou a falhar.
+Cada agente, time e workflow tem uma suíte de casos: uma mensagem e o que precisa ser verdade na resposta. As checagens são texto (contém, não contém, começa com), tools que precisam ser chamadas (a busca na base certa, a tool MCP esperada), um critério avaliado por um modelo juiz, binário ou nota com limiar, e o **bloqueio esperado**: o caso passa quando o guardrail barra a mensagem, pela regra certa. No workflow, a suíte confere também as **etapas que rodaram**, que é o que pega a condição que mudou de caminho. A suíte roda contra o rascunho ou a vigente, mostra o resultado caso a caso e compara as duas versões, apontando o que passou a falhar.
 
 Com o **gate** ligado, publicar exige a suíte verde no rascunho atual. Editar o rascunho invalida o resultado. Os casos ficam fora da versão: um rascunho que muda o prompt não consegue afrouxar o próprio teste.
 
@@ -138,6 +150,10 @@ O caminho inverso também existe: os próprios agentes e times ficam expostos vi
 ### Analytics e rastreamento
 
 Conversas, taxa de falha, bloqueios, latência p50 e p95, tokens e custo, com gráficos diários e uso por agente. Cada execução abre como **árvore**, com time, agentes, chamadas de modelo e tools, e mostra duração, entrada, saída e erro de cada nó.
+
+O custo sai da tabela de preços de cada modelo quando o provedor só informa tokens, que é o caso da Anthropic e da OpenAI. Cada agente pode ter um **orçamento mensal**, com aviso num percentual e, se ligado, bloqueio dos runs seguintes quando estoura, sem chamar o modelo. Os **destinos de aviso** da instância recebem orçamento perto do limite ou estourado, pico de erro e mudança de estado das suítes agendadas, assinados com HMAC e prontos para Slack, Teams ou Discord.
+
+<p align="center"><img src="docs/img/orcamento.png" alt="Orçamento do mês no desempenho de um agente" width="600"></p>
 
 ![Analytics](docs/img/analytics.png)
 
@@ -283,8 +299,9 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 | **Rate limit** | Login limitado por e-mail e por IP no Redis. `X-Forwarded-For` só vale vindo de proxy listado em `TRUSTED_PROXIES`. |
 | **Superfície** | Login com e-mail inexistente também roda argon2, para a latência não revelar contas. `/docs` e `/openapi.json` só em desenvolvimento. |
 | **Headers** | HSTS, CSP com `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`. |
-| **Saída** | Servidores MCP e webhooks passam pelo mesmo filtro: só https, sem host que resolva para IP interno, conferido no cadastro e a cada chamada, sem seguir redirect. URLs e segredos ficam cifrados com Fernet. A telemetria do Agno fica desligada. |
+| **Saída** | Servidores MCP, webhooks, destinos de aviso e conectores de conhecimento passam pelo mesmo filtro: só https, sem host que resolva para IP interno, conferido no cadastro e a cada chamada, sem seguir redirect. URLs e segredos ficam cifrados com Fernet. A telemetria do Agno fica desligada. |
 | **Integrações** | Token de consumidor com escopo por recurso: roda só os agentes liberados e, se marcado, a suíte de testes deles, sem acesso a configuração. |
+| **Dado pessoal** | Memória do usuário mascarada antes de gravar, lida só pelo agente que guardou, com retenção e exclusão pelo owner e pelo próprio usuário. Credencial de conector e memórias de usuários finais são só do owner. |
 
 ---
 
@@ -292,9 +309,9 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 
 | Camada | Ferramenta | Cobertura |
 |---|---|---|
-| API | pytest + testcontainers | ~510 testes contra Postgres com pgvector real, sem mock de banco. Gate de cobertura de 70%. |
+| API | pytest + testcontainers | ~630 testes contra Postgres com pgvector real, sem mock de banco. Gate de cobertura de 70%. |
 | Tipos | mypy strict + plugin pydantic · ruff | Rodam em todo PR. |
-| Web | Vitest + Testing Library | 136 testes de componente e de lógica, inclusive o redutor de eventos do workflow e a suíte de testes. |
+| Web | Vitest + Testing Library | 158 testes de componente e de lógica, inclusive o redutor de eventos do workflow, a suíte de testes e a revisão humana. |
 | E2E | Playwright | Login → editar agente → publicar → rollback. |
 | Contrato | openapi-typescript | Os tipos do painel são gerados do OpenAPI da API, nunca escritos à mão. |
 
@@ -407,14 +424,14 @@ pnpm --filter web test:e2e                 # Playwright
 ```
 api/
   app/
-    agents/       factories, rastreamento, workflows, modelos, replay
-    evals/        runner da suíte, juiz, gate, agendamento, avisos e sugestão de caso
+    agents/       factories, rastreamento, workflows, modelos, memória do usuário, replay
+    evals/        runner da suíte (agente, time e workflow), juiz, gate, agendamento, avisos e sugestão de caso
     guardrails/   regras de entrada e saída
-    knowledge/    embedders, ingestão, busca com reranker e HyDE, tools
+    knowledge/    embedders, ingestão, conectores, reindexação agendada, busca com reranker e HyDE, tools
     mcp/          cliente MCP, proteção de saída (SSRF)
     routers/      rotas próprias /api/v1
     services/     regras de negócio e validação na escrita
-  alembic/        29 migrations
+  alembic/        34 migrations
   fixtures/       respostas gravadas do modo replay
   tests/          pytest, integração e evals
 web/
