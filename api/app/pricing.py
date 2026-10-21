@@ -16,6 +16,8 @@ import logging
 from dataclasses import dataclass
 from functools import lru_cache
 
+from pydantic import ValidationError
+
 from app.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -55,8 +57,16 @@ def _overrides(raw: str) -> dict[str, ModelPrice]:
         return {}
 
 
+def _raw_overrides() -> str:
+    try:
+        return get_settings().model_prices
+    except ValidationError:
+        # sem banco e chaves configurados (teste de unidade, script): só a tabela
+        return ""
+
+
 def prices() -> dict[str, ModelPrice]:
-    return {**_PRICES, **_overrides(get_settings().model_prices)}
+    return {**_PRICES, **_overrides(_raw_overrides())}
 
 
 def estimate_cost(model_id: str | None, input_tokens: int, output_tokens: int) -> float | None:
