@@ -13,6 +13,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
     true,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -33,6 +34,10 @@ class EvalCase(Base):
     )
     name: Mapped[str] = mapped_column(String(80), nullable=False)
     input: Mapped[str] = mapped_column(Text, nullable=False)
+    # mensagens anteriores, rodadas na mesma sessão antes de `input` (ADR-0016)
+    context: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
+    )
     # lista de checagens validada por EvalCaseInput (texto, tools, juiz)
     checks: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

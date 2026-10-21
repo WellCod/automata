@@ -78,6 +78,7 @@ def to_response(case: EvalCase) -> EvalCaseResponse:
             "agent_config_id": case.agent_config_id,
             "name": case.name,
             "input": case.input,
+            "context": case.context,
             "checks": case.checks,
             "position": case.position,
             "updated_by": case.updated_by,
@@ -108,6 +109,7 @@ def create_case(
             agent_config_id=config_id,
             name=body.name,
             input=body.input,
+            context=body.context,
             checks=[c.model_dump() for c in body.checks],
             position=repo.next_position(config_id),
             updated_by=_actor(request),
@@ -129,6 +131,7 @@ def update_case(
         raise HTTPException(status_code=409, detail="Já existe um caso com esse nome")
     case.name = body.name
     case.input = body.input
+    case.context = body.context
     case.checks = [c.model_dump() for c in body.checks]
     case.updated_by = _actor(request)
     session.commit()

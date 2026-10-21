@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.schemas.workflow import NEEDS_VALUE, WorkflowRule
 
+# mensagens anteriores por caso; cada uma é um run do modelo antes do turno avaliado
+MAX_CONTEXT = 5
 MAX_CASES = 50
 MAX_CHECKS = 5
 
@@ -66,6 +68,10 @@ EvalCheck = Annotated[TextCheck | ToolsCheck | JudgeCheck, Field(discriminator="
 class EvalCaseInput(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     input: str = Field(min_length=1, max_length=4000)
+    # turnos anteriores da conversa; só a resposta a `input` passa pelas checagens
+    context: list[Annotated[str, Field(min_length=1, max_length=4000)]] = Field(
+        default_factory=list, max_length=MAX_CONTEXT
+    )
     checks: list[EvalCheck] = Field(min_length=1, max_length=MAX_CHECKS)
 
     @field_validator("name")
@@ -90,6 +96,7 @@ class EvalCaseResponse(BaseModel):
     agent_config_id: UUID
     name: str
     input: str
+    context: list[str]
     checks: list[EvalCheck]
     position: int
     updated_by: str

@@ -1202,6 +1202,8 @@ export interface components {
       name: string;
       /** Input */
       input: string;
+      /** Context */
+      context?: string[];
       /** Checks */
       checks: (
         | components["schemas"]["TextCheck"]
@@ -1225,6 +1227,8 @@ export interface components {
       name: string;
       /** Input */
       input: string;
+      /** Context */
+      context: string[];
       /** Checks */
       checks: (
         | components["schemas"]["TextCheck"]

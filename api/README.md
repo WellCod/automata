@@ -298,6 +298,8 @@ Um caso tem `name` (único na config, até 80 caracteres), `input` (até 4000) e
 - `tools`: `tools` (1 a 10 nomes, como o agente expõe: `buscar_<slug>` das bases e as tools MCP com prefixo) e `allow_additional` (padrão `true`). No máximo uma por caso.
 - `judge`: `criteria` (10 a 1000 caracteres), `mode` (`binary` ou `numeric`) e `threshold` (1 a 10, só no numérico). No máximo uma por caso.
 
+Um caso pode trazer `context`, com até 5 mensagens anteriores (ADR-0016, migration 0026). Na execução, o caso ganha sessão própria (`eval-<uuid>`) e o banco do Agno, que o agente da suíte não recebe do `AgentFactory`. O `setup` do `Case` roda essas mensagens nessa sessão, uma por vez, com 60 s cada, e só a resposta a `input` passa pelas checagens. Os turnos de contexto são runs de teste como os outros: ficam fora das conversas e entram no custo da execução. Todo caso roda com `user_id` de quem disparou a suíte.
+
 O limite de uma checagem de tools e uma de juiz por caso vem do `Case` do runner de suíte do Agno, que tem um campo para cada. Workflow ainda não tem suíte (422), e são até 50 casos por config. Viewer lê (`evals:read`); editor cria, edita e apaga (`evals:write`).
 
 ### Execução da suíte
