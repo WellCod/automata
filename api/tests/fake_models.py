@@ -118,6 +118,37 @@ class CountingModel(ReplayModel):
 
 
 @dataclass
+class SummarizingModel(ReplayModel):
+    """Conversa longa de mentira: respostas grandes, um resumo no pedido de compactação.
+
+    A resposta normal diz se o resumo chegou nas mensagens, para o teste ver que o
+    começo da conversa continua chegando ao modelo depois de sair da janela.
+    """
+
+    filler: str = "lorem ipsum " * 600
+    summary: str = "RESUMO: o cliente informou o pedido 123."
+
+    def _respond(self, messages: Any) -> ModelResponse:
+        texts = [str(getattr(m, "content", "") or "") for m in messages or []]
+        usage = MessageMetrics(input_tokens=50, output_tokens=20, total_tokens=70)
+        if any("running summary of a long conversation" in t for t in texts):
+            return ModelResponse(role="assistant", content=self.summary, response_usage=usage)
+        seen = "viu-resumo" if any(self.summary in t for t in texts) else "sem-resumo"
+        return ModelResponse(
+            role="assistant", content=f"{seen} {self.filler}", response_usage=usage
+        )
+
+    def invoke(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        return self._respond(kwargs.get("messages"))
+
+    async def ainvoke(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        return self._respond(kwargs.get("messages"))
+
+    async def ainvoke_stream(self, *args: Any, **kwargs: Any) -> Any:
+        yield self._respond(kwargs.get("messages"))
+
+
+@dataclass
 class FixedReplyModel(ReplayModel):
     """Responde sempre o mesmo texto."""
 

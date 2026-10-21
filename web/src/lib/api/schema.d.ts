@@ -1215,6 +1215,7 @@ export interface components {
       knowledge?: components["schemas"]["KnowledgeBinding"][];
       guardrails?: components["schemas"]["GuardrailSettings"];
       capabilities?: components["schemas"]["CapabilityFlags"];
+      conversation?: components["schemas"]["ConversationSettings"];
       /** Metadata */
       metadata?: {
         [key: string]: unknown;
@@ -1227,6 +1228,34 @@ export interface components {
      * @enum {string}
      */
     ConfigPayloadStatus: "draft" | "published";
+    /**
+     * ConversationSettings
+     * @description Conversa longa (ADR-0019): turnos antigos viram resumo acima de um limite de tokens.
+     */
+    ConversationSettings: {
+      /**
+       * Compaction
+       * @default false
+       */
+      compaction: boolean;
+      /**
+       * Compact At Tokens
+       * @default 16000
+       */
+      compact_at_tokens: number;
+      /**
+       * Keep Recent Runs
+       * @default 3
+       */
+      keep_recent_runs: number;
+      /** Summary Instructions */
+      summary_instructions?: string | null;
+      /**
+       * Search History
+       * @default true
+       */
+      search_history: boolean;
+    };
     /** CreateConfigInput */
     CreateConfigInput: {
       /** Name */
