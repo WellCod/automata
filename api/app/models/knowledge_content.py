@@ -47,7 +47,9 @@ class KnowledgeContent(Base):
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # só URL: baixa de novo nesse intervalo e reindexa se o hash mudou
     refresh_every_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    next_refresh_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_refresh_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
