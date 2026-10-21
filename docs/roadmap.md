@@ -891,7 +891,7 @@ Pré-requisito: Agno 3.1.x (#128 e #129).
 - [x] `feat(api)`: sugestão de caso a partir de um run real. Leitura em `agno_runs`, entrada e contexto mascarados, tools chamadas e critério de rascunho, `source_run_id` no `eval_case`
 - [x] `feat(web)`: agendamento e origem das execuções na aba Testes, estado da suíte na lista, suíte na emissão de tokens de integração
 - [x] `feat(web)`: "Virar caso de teste" no histórico de execuções e na árvore de execução. Formulário de caso com mensagens anteriores, avisos e critério sugerido do juiz
-- [ ] `test(api)`: evals do agendamento, do escopo por recurso e da sugestão de caso, e exemplo de job de CI na documentação
+- [x] `test(api)`: evals do agendamento, do escopo por recurso e da sugestão de caso, e exemplo de job de CI na documentação. `test_evals_continuos.py` sem banco nem LLM; o passo de CI com `curl` e `verdict` está no README da API
 
 **Critério de aceite da fase:**
 

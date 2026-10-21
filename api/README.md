@@ -365,6 +365,30 @@ O poller fica em `app/evals/scheduler.py`:
 - Horário recusado (execução em andamento, suíte sem casos) não para o agendamento: o motivo vai para `last_error` e o próximo horário segue.
 - Desligado com `EVAL_SCHEDULER_ENABLED=false` e sempre desligado no modo demo. Os testes desligam o laço e chamam o `poll_once` direto.
 
+### Rodar a suíte no CI de quem consome o agente
+
+Com um token de integração emitido com `eval_ids`, o pipeline dispara a suíte na vigente (ou no rascunho, com `target: draft`) e lê o `verdict` até sair de `pending`. Exemplo de passo de CI, em shell:
+
+```bash
+API=https://api.suaempresa.com
+AGENTE=<config_id do agente>
+RUN=$(curl -sf -X POST "$API/api/v1/configs/$AGENTE/eval-runs" \
+  -H "Authorization: Bearer $AUTOMATA_TOKEN" -H "Content-Type: application/json" \
+  -d '{"target": "current", "judge_model": "gpt-4o-mini"}' | jq -r .id)
+for _ in $(seq 1 60); do
+  VERDICT=$(curl -sf "$API/api/v1/configs/$AGENTE/eval-runs/$RUN" \
+    -H "Authorization: Bearer $AUTOMATA_TOKEN" | jq -r .verdict)
+  [ "$VERDICT" != "pending" ] && break
+  sleep 10
+done
+echo "suíte: $VERDICT"
+[ "$VERDICT" = "passed" ]
+```
+
+- `judge_model` só é preciso quando algum caso tem juiz.
+- Execução já em andamento responde 409: o pipeline pode esperar e tentar de novo.
+- O token fica em um segredo do CI (`AUTOMATA_TOKEN`) e vale até 90 dias. Revogar no painel corta na hora.
+
 ### Estado da suíte
 
 `GET /api/v1/eval-status` (`evals:read`) devolve, para cada config que já rodou a suíte, o estado pela execução mais recente (`app/evals/compare.py`):
