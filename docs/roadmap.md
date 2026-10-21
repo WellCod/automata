@@ -584,6 +584,7 @@ if __name__ == "__main__":
 | 19 — Avisos de regressão | #149–#153 | Webhook assinado do agendamento nas mudanças de estado da suíte | Fase 17 |
 | 20 — Compactação de conversa | #154–#157 | Resumo dos turnos antigos por agente, versionado no payload | Fase 17 (#134) |
 | 21 — Fila durável | #158–#160 | Runs em background na fila durável do Agno, com Redis opcional | Fase 7 (Redis) |
+| 22 — Orçamento e alertas | #164 em diante | Custo estimado pela tabela de preços, orçamento mensal com bloqueio e destinos de aviso | Fases 19 e 21 |
 
 Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
 
@@ -979,3 +980,25 @@ Decisão em [ADR-0020](adr/0020-fila-duravel.md). Run aceito com `background=tru
 **Critério de aceite da fase:** um run em background aceito passa pela fila, termina e fica em `agent_run`. Um run cujo worker morre no meio vira falha com motivo, sem rodar de novo. Com `BACKGROUND_QUEUE_DURABLE=false`, volta às tasks em memória.
 
 Fica para depois: retry por agente marcado como idempotente, fila em banco próprio e painel da fila (`/queue/stats`).
+
+---
+
+## Fase 22 — Orçamento de custo e alertas da instância
+
+Decisão em [ADR-0021](adr/0021-orcamento-e-alertas.md). O custo passa a ser calculado pela tabela de preços quando o provedor não informa: Anthropic e OpenAI só devolvem tokens, e o custo vinha vazio com chave real. Cada agente, time e workflow pode ter um orçamento mensal, com aviso e bloqueio opcional. Destinos de aviso da instância recebem orçamento, pico de erro e eventos da suíte.
+
+- [ ] #164 — `docs(adr)`: ADR-0021 e esta seção
+- [ ] `feat(api)`: preço por modelo na matriz e custo calculado pelos tokens quando o provedor não informa, com `MODEL_PRICES` para sobrescrever
+- [ ] `feat(api)`: orçamento mensal por config com aviso e bloqueio antes do run (`budget_exceeded`)
+- [ ] `feat(api)`: destinos de aviso da instância com orçamento, pico de erro e eventos da suíte
+- [ ] `feat(web)`: orçamento no desempenho do agente e página de alertas
+- [ ] `test(api)`: evals do custo estimado, do orçamento e do pico de erro
+
+**Critério de aceite da fase:**
+
+- Um run com modelo real e sem custo informado grava custo estimado.
+- Um agente com orçamento de US$ 1 e bloqueio ligado é barrado como `blocked` (`budget_exceeded`) depois de passar do limite, sem chamar o modelo.
+- O destino da instância recebe `budget.warning` uma vez só no mês.
+- Cinco runs com erro em 15 minutos geram um `errors.spike`.
+
+Fica para depois: conciliação com a API de uso do provedor, orçamento por usuário ou por integração e limite de custo por run.

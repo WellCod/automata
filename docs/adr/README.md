@@ -46,3 +46,4 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0018](0018-avisos-de-regressao.md) | Avisos de regressão da suíte agendada por webhook assinado, só nas mudanças de estado | Aceito |
 | [0019](0019-compactacao-de-conversa.md) | Compactação de conversa por agente, versionada no payload, com limite baixo | Aceito |
 | [0020](0020-fila-duravel.md) | Fila durável do Agno para runs em background, no Postgres, com Redis opcional | Aceito |
+| [0021](0021-orcamento-e-alertas.md) | Custo pela tabela de preços, orçamento mensal por config e destinos de aviso | Proposto |
