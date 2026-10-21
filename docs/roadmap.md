@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 15
+# Roadmap — Fases 4 a 16
 
 Plano de ação derivado de auditoria técnica e de segurança realizada em 2026-08-12.
 Ordem otimizada: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade.
@@ -578,8 +578,9 @@ if __name__ == "__main__":
 | 14 — Guardrails | #95–#103 | Dados pessoais, injeção de prompt e bloqueios por agente | — |
 | Usuários e redesign | #97, #100 | Gestão de usuários, tema claro e escuro | — |
 | 15 — Workflows | #108–#114 | Etapas em sequência, paralelo, condição e loop sobre agentes e times | Fases 12 e 14 |
+| 16 — Evals no painel | #118 em diante | Casos de teste por agente e time, juiz por LLM, regressão entre versões e gate de publicação | Fases 13 e 14 |
 
-Todas as fases acima estão na `main` (estado em 2026-10-20).
+Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
 
 ---
 
@@ -850,3 +851,23 @@ Decisão em [ADR-0014](adr/0014-workflows-por-etapas.md). Workflow é um config 
 **Critério de aceite da fase:** montar um workflow com triagem, um paralelo de duas análises, uma etapa de consolidação e uma condição que só roda a revisão quando a resposta menciona "reembolso"; publicar, rodar no modo teste e ver cada etapa na árvore de execução, com o run do workflow somando o consumo das etapas; um agente com erro na triagem para o fluxo e o run aparece como falha.
 
 Fica para depois: pausa humana no meio do fluxo, CEL como modo avançado, roteador e mapeamento de entrada por etapa.
+
+---
+
+## Fase 16 — Evals por agente no painel
+
+Decisão em [ADR-0015](adr/0015-evals-por-agente.md). Cada agente e time ganha uma suíte de casos (entrada e checagens de texto, de tools chamadas e por juiz LLM), fora do payload versionado. A suíte roda em background com o runner de suíte do Agno (`agno.eval.suite`) contra qualquer versão: rascunho, vigente ou publicada. A comparação mostra regressões entre versões, e um gate opcional exige suíte verde no rascunho para publicar. Os runs de eval ficam fora das métricas de conversa, e o custo deles aparece separado.
+
+- [ ] `docs(adr)`: ADR-0015 e esta seção
+- [ ] `feat(api)`: casos de teste por config, checagens validadas na escrita e CRUD em `/api/v1/configs/{id}/eval-cases`
+- [ ] `feat(api)`: execução da suíte em background com o runner do Agno, resultado por caso e runs de eval marcados fora do analytics
+- [ ] `feat(api)`: juiz com modelo escolhido e medido, custo da execução e checagem de juiz "não avaliada" no modo demo
+- [ ] `feat(api)`: comparação entre versões e gate de publicação por suíte verde
+- [ ] `feat(web)`: aba Testes no agente e no time, com casos, execução, resultado por caso e regressões
+- [ ] `feat(web)`: publicação mostra o resultado da suíte e respeita o gate
+- [ ] `test(api)`: evals da avaliação (scorer de texto e montagem dos casos) e suíte de exemplo no seed da demo
+
+**Critério de aceite da fase:** no agente de atendimento, montar cinco casos: dois de texto, um que exige `buscar_politicas_atendimento` e dois por juiz. Rodar no rascunho e na vigente. Mudar o prompt de um jeito que quebre um caso e ver a regressão apontada caso a caso. Com o gate ligado, a publicação é recusada até a suíte passar no rascunho atual. Os runs de teste não aparecem nas conversas do analytics, e o custo deles aparece separado.
+
+Fica para depois: suíte em workflow, caso que espera bloqueio de guardrail, execução agendada, execução disparada por token de integração (CI de quem consome o agente) e geração de casos a partir de conversas reais.
+
