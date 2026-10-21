@@ -579,7 +579,7 @@ if __name__ == "__main__":
 | Usuários e redesign | #97, #100 | Gestão de usuários, tema claro e escuro | — |
 | 15 — Workflows | #108–#114 | Etapas em sequência, paralelo, condição e loop sobre agentes e times | Fases 12 e 14 |
 | 16 — Evals no painel | #118–#125 | Casos de teste por agente e time, juiz por LLM, regressão entre versões e gate de publicação | Fases 13 e 14 |
-| 17 — Evals contínuos | #127 em diante | Suíte disparada por token de integração, agendamento e casos a partir de conversas reais | Fase 16 |
+| 17 — Evals contínuos | #127, #130–#140 | Suíte disparada por token de integração, agendamento e casos a partir de conversas reais | Fase 16 |
 
 Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
 
