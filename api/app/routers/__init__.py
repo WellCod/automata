@@ -4,6 +4,7 @@ from app.routers.approvals import router as approvals_router
 from app.routers.configs import router as configs_router
 from app.routers.evals import router as evals_router
 from app.routers.evals import runs_router as eval_runs_router
+from app.routers.evals import settings_router as eval_settings_router
 from app.routers.integrations import router as integrations_router
 from app.routers.knowledge_bases import router as knowledge_bases_router
 from app.routers.knowledge_contents import router as knowledge_contents_router
@@ -24,6 +25,7 @@ PROTECTED_ROUTERS: list[APIRouter] = [
     configs_router,
     evals_router,
     eval_runs_router,
+    eval_settings_router,
     integrations_router,
     knowledge_bases_router,
     knowledge_contents_router,

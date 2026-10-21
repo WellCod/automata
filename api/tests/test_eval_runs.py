@@ -30,6 +30,9 @@ def _model(model_id: str, *_: Any, **__: Any) -> ReplayModel:
     # o juiz responde no schema binário do AgentAsJudgeEval
     if model_id == JUDGE:
         return FixedReplyModel(id=model_id, reply=VERDICT, tokens=7)
+    # versão "piorada" para os testes de regressão: troca o modelo e perde o prazo
+    if model_id == "claude-sonnet-4-6":
+        return FixedReplyModel(id=model_id, reply="Não sei informar.", tokens=10)
     return FixedReplyModel(id=model_id, reply=REPLY, tokens=10)
 
 
@@ -255,3 +258,77 @@ def test_juiz_avalia_e_consumo_da_execucao(client: TestClient) -> None:
     after = client.get("/api/v1/metrics/summary").json()
     assert after["eval_tokens"] - before["eval_tokens"] == run["total_tokens"]
     assert after["total_tokens"] == before["total_tokens"]
+
+
+def _draft(client: TestClient, config_id: str, model_id: str) -> None:
+    body = {"name": "x", "description": "Use para x", "payload": {"model_id": model_id}}
+    client.put(f"/api/v1/configs/{config_id}/draft", json=body).raise_for_status()
+
+
+PRAZO = [{"type": "text", "kind": "contains", "value": "30 dias"}]
+
+
+def test_gate_exige_suite_verde_no_rascunho_atual(client: TestClient) -> None:
+    agent = _agent(client, "com gate")
+    _case(client, agent, "prazo", PRAZO)
+    settings = f"/api/v1/configs/{agent}/eval-settings"
+    assert client.get(settings).json()["can_publish"] is True  # gate desligado
+
+    on = client.put(settings, json={"require_passing_evals": True}).json()
+    assert on["require_passing_evals"] is True
+    assert on["can_publish"] is False and on["reason"] == "não há rascunho para publicar"
+
+    _draft(client, agent, "claude-haiku-4-5")
+    status = client.get(settings).json()
+    assert status["can_publish"] is False and "não rodou" in status["reason"]
+    resp = client.post(f"/api/v1/configs/{agent}/publish")
+    assert resp.status_code == 409 and "suíte verde" in resp.json()["detail"]
+
+    run = _start(client, agent).json()
+    assert run["version_id"] == status["draft_version_id"]
+    status = client.get(settings).json()
+    assert status["can_publish"] is True and status["draft_run"]["id"] == run["id"]
+    assert client.post(f"/api/v1/configs/{agent}/publish").status_code == 201
+
+    # rascunho novo invalida o resultado; versão que reprova também não publica
+    _draft(client, agent, "claude-sonnet-4-6")
+    assert client.post(f"/api/v1/configs/{agent}/publish").status_code == 409
+    _start(client, agent)
+    status = client.get(settings).json()
+    assert status["can_publish"] is False and "1 de 1 casos" in status["reason"]
+    assert client.post(f"/api/v1/configs/{agent}/publish").status_code == 409
+
+    # rollback não passa pelo gate
+    versions = client.get(f"/api/v1/configs/{agent}/versions").json()
+    first = next(v for v in versions if v["version_number"] == 2)
+    resp = client.post(f"/api/v1/configs/{agent}/rollback", json={"version_id": first["id"]})
+    assert resp.status_code == 200, resp.text
+
+
+def test_comparacao_aponta_regressao(client: TestClient) -> None:
+    agent = _agent(client, "comparado")
+    _case(client, agent, "prazo", PRAZO)
+    _case(client, agent, "cordial", [{"type": "text", "kind": "not_contains", "value": "grosso"}])
+    current = client.get(f"/api/v1/configs/{agent}").json()["current_version"]["id"]
+    base = _start(client, agent, version_id=current).json()["id"]
+    _draft(client, agent, "claude-sonnet-4-6")
+    target = _start(client, agent).json()["id"]
+
+    resp = client.get(
+        f"/api/v1/configs/{agent}/eval-runs/compare", params={"base": base, "target": target}
+    )
+    assert resp.status_code == 200, resp.text
+    comparison = resp.json()
+    assert (comparison["regressions"], comparison["fixes"]) == (1, 0)
+    assert {c["case_name"]: c["change"] for c in comparison["cases"]} == {
+        "prazo": "regression",
+        "cordial": "same",
+    }
+    assert comparison["base"]["version_status"] == "published"
+    assert comparison["target"]["version_status"] == "draft"
+
+    other = _agent(client, "outra")
+    resp = client.get(
+        f"/api/v1/configs/{other}/eval-runs/compare", params={"base": base, "target": target}
+    )
+    assert resp.status_code == 404
