@@ -167,3 +167,21 @@ def test_seed_cria_workflow_de_exemplo_sem_runs_falsos(
                 == 0
             )
         assert session.scalar(select(func.count()).select_from(AgentRun)) == 50
+
+        # suíte de exemplo no atendimento, criada uma vez só
+        from app.models.eval import EvalCase
+
+        atendimento = session.scalars(
+            select(AgentConfig).where(AgentConfig.name == "Atendimento ao Cliente")
+        ).one()
+        cases = session.scalars(
+            select(EvalCase)
+            .where(EvalCase.agent_config_id == atendimento.id)
+            .order_by(EvalCase.position)
+        ).all()
+        assert [c.name for c in cases][:2] == [
+            "responde a saudação",
+            "não promete prazo sem confirmar",
+        ]
+        assert len(cases) == 4
+        assert {check["type"] for c in cases for check in c.checks} == {"text", "tools", "judge"}

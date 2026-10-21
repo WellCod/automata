@@ -578,7 +578,7 @@ if __name__ == "__main__":
 | 14 — Guardrails | #95–#103 | Dados pessoais, injeção de prompt e bloqueios por agente | — |
 | Usuários e redesign | #97, #100 | Gestão de usuários, tema claro e escuro | — |
 | 15 — Workflows | #108–#114 | Etapas em sequência, paralelo, condição e loop sobre agentes e times | Fases 12 e 14 |
-| 16 — Evals no painel | #118 em diante | Casos de teste por agente e time, juiz por LLM, regressão entre versões e gate de publicação | Fases 13 e 14 |
+| 16 — Evals no painel | #118–#125 | Casos de teste por agente e time, juiz por LLM, regressão entre versões e gate de publicação | Fases 13 e 14 |
 
 Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
 
@@ -865,7 +865,7 @@ Decisão em [ADR-0015](adr/0015-evals-por-agente.md). Cada agente e time ganha u
 - [x] `feat(api)`: comparação entre versões e gate de publicação por suíte verde. Comparação caso a caso em `/eval-runs/compare`; flag `require_passing_evals` no `agent_config` (migration 0022) e configuração em `/eval-settings`; rollback fica fora do gate
 - [x] `feat(web)`: aba Testes no agente e no time, com casos, execução, resultado por caso e regressões. Aba Testes no agente e Suíte no painel lateral do time; editor de casos com as três checagens, juiz entre os modelos com saída estruturada, acompanhamento da execução por polling, comparação vigente × rascunho e chave do gate
 - [x] `feat(web)`: publicação mostra o resultado da suíte e respeita o gate. A aba Versões do agente e do time resume a última execução no rascunho, desabilita Publicar quando o gate bloqueia e mostra a mensagem do 409
-- [ ] `test(api)`: evals da avaliação (scorer de texto e montagem dos casos) e suíte de exemplo no seed da demo
+- [x] `test(api)`: evals da avaliação (scorer de texto e montagem dos casos) e suíte de exemplo no seed da demo. `test_evals_suite.py` sem banco nem LLM; o seed cria quatro casos no atendimento, e o reset da demo limpa as tabelas de eval
 
 **Critério de aceite da fase:** no agente de atendimento, montar cinco casos: dois de texto, um que exige `buscar_politicas_atendimento` e dois por juiz. Rodar no rascunho e na vigente. Mudar o prompt de um jeito que quebre um caso e ver a regressão apontada caso a caso. Com o gate ligado, a publicação é recusada até a suíte passar no rascunho atual. Os runs de teste não aparecem nas conversas do analytics, e o custo deles aparece separado.
 

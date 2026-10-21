@@ -297,6 +297,7 @@ def seed_demo(session: Session) -> None:
 
     seed_knowledge(session)
     seed_workflow(session)
+    seed_evals(session)
 
 
 def _resolve_agents(node: dict[str, Any], ids: dict[str, uuid.UUID]) -> dict[str, Any]:
@@ -336,6 +337,73 @@ def seed_workflow(session: Session) -> None:
 
 
 _KNOWLEDGE_AGENT = "Atendimento ao Cliente"
+
+
+# suíte do agente de atendimento (ADR-0015). Na demo o juiz não roda e a busca na base
+# não acontece (respostas gravadas): o resultado mostra aprovado, falha e não avaliado
+_EVAL_AGENT = "Atendimento ao Cliente"
+_EVAL_CASES: list[dict[str, Any]] = [
+    {
+        "name": "responde a saudação",
+        "input": "Oi, tudo bem? Preciso de ajuda com um pedido.",
+        "checks": [{"type": "text", "kind": "not_empty"}],
+    },
+    {
+        "name": "não promete prazo sem confirmar",
+        "input": "Vocês garantem que meu pedido chega amanhã?",
+        "checks": [{"type": "text", "kind": "not_contains", "value": "garantimos"}],
+    },
+    {
+        "name": "consulta a política de troca",
+        "input": "Comprei há 10 dias e quero trocar o tamanho. Ainda dá?",
+        "checks": [
+            {"type": "tools", "tools": ["buscar_politicas_atendimento"]},
+            {"type": "text", "kind": "contains", "value": "troca"},
+        ],
+    },
+    {
+        "name": "tom cordial com cliente irritado",
+        "input": "Já é a terceira vez que meu pedido atrasa, estou cansado disso.",
+        "checks": [
+            {
+                "type": "judge",
+                "criteria": "Reconhece o problema com empatia, pede desculpas e oferece um "
+                "próximo passo concreto, sem culpar o cliente",
+            }
+        ],
+    },
+]
+
+
+def seed_evals(session: Session) -> None:
+    """Casos de teste de exemplo no agente de atendimento."""
+    from app.models.eval import EvalCase
+    from app.repositories.eval import EvalCaseRepository
+    from app.schemas.eval import EvalCaseInput
+
+    agents, _ = ConfigService(ConfigRepository(session)).list_configs(q=_EVAL_AGENT)
+    agent = next((a for a in agents if a.name == _EVAL_AGENT), None)
+    if agent is None:
+        return
+    repo = EvalCaseRepository(session)
+    if repo.count(agent.id) > 0:
+        logger.info("suíte de exemplo já existe")
+        return
+    email = os.environ["SEED_OWNER_EMAIL"]
+    for position, raw in enumerate(_EVAL_CASES):
+        case = EvalCaseInput.model_validate(raw)
+        repo.add(
+            EvalCase(
+                agent_config_id=agent.id,
+                name=case.name,
+                input=case.input,
+                checks=[c.model_dump() for c in case.checks],
+                position=position,
+                updated_by=email,
+            )
+        )
+    session.commit()
+    logger.info("suíte de exemplo criada em %s", _EVAL_AGENT)
 
 
 def seed_knowledge(session: Session) -> None:
@@ -496,6 +564,6 @@ def seed_analytics(session: Session, n_runs: int = 500) -> None:
 
 
 def seed_full(session: Session) -> None:
-    """Seed completo para portfólio: owner, 5 agentes, workflow de exemplo e 500 runs."""
+    """Seed completo para portfólio: owner, 5 agentes, base, workflow, suíte e 500 runs."""
     seed_demo(session)
     seed_analytics(session)

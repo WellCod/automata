@@ -28,7 +28,7 @@ pnpm --filter web dev
 ## Populando com dados de demonstração
 
 ```bash
-# Cria owner, 5 agentes, base de conhecimento, workflow de exemplo e 500 runs históricos (90 dias)
+# Cria owner, 5 agentes, base de conhecimento, workflow, suíte de testes e 500 runs históricos (90 dias)
 # Defina a senha do owner — ela não fica escrita em lugar nenhum
 read -rsp "Senha do owner: " SEED_OWNER_PASSWORD; echo
 
@@ -61,6 +61,10 @@ A base **Políticas de atendimento** (troca e devolução, prazos de entrega, ga
 ### Workflow de exemplo
 
 **Atendimento com triagem** junta os agentes acima num fluxo fixo: triagem (Atendimento ao Cliente), análises técnica (Suporte Técnico) e financeira (Analista Financeiro) em paralelo, consolidação (Atendimento) e uma condição que só roda a revisão financeira quando a mensagem fala em "reembolso". Na aba **Teste** do workflow, mande uma mensagem com "reembolso" e outra sem: a revisão roda numa e é pulada na outra. A aba **Execuções** mostra quantas etapas rodaram e o consumo somado delas.
+
+### Suíte de testes de exemplo
+
+O **Atendimento ao Cliente** vem com quatro casos na aba **Testes**: responde a saudação, não promete prazo sem confirmar, consulta a política de troca (tool `buscar_politicas_atendimento` e texto) e tom cordial com cliente irritado (juiz). Na demo, os dois primeiros passam, o da política falha porque as respostas gravadas não chamam a busca e o do juiz aparece como não avaliado, já que o juiz não roda sem modelo real. Rode a suíte no rascunho e na vigente para ver a comparação, e ligue o gate para ver a publicação bloqueada.
 
 ### Histórico de execuções
 
