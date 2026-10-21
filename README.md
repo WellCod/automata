@@ -14,7 +14,7 @@ O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é
 | **Backend** | Python 3.12 · FastAPI · Agno 3.1.8 · PostgreSQL 17 + pgvector · Redis · Alembic |
 | **Frontend** | Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · TanStack Query |
 | **Qualidade** | mypy strict · ruff · ~460 testes pytest (testcontainers) · 131 testes Vitest · Playwright · evals |
-| **Decisões** | 17 ADRs com contexto, alternativas descartadas e gatilho de reversão |
+| **Decisões** | 18 ADRs com contexto, alternativas descartadas e gatilho de reversão |
 
 ---
 
@@ -309,6 +309,7 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0015](docs/adr/0015-evals-por-agente.md) | Evals por agente no painel: casos fora da versão, runner de suíte do Agno e gate de publicação |
 | [0016](docs/adr/0016-evals-continuos.md) | Evals contínuos: suíte por token de integração, agendamento próprio e casos de conversas reais |
 | [0017](docs/adr/0017-estrategia-de-recuperacao.md) | Estratégia de recuperação por base: reranker do Agno (MMR, recência) e HyDE com modelo medido (proposto, Fase 18) |
+| [0018](docs/adr/0018-avisos-de-regressao.md) | Avisos de regressão por webhook assinado nas mudanças de estado da suíte agendada (proposto, Fase 19) |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 
