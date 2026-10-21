@@ -100,6 +100,24 @@ class DelegatingModel(ReplayModel):
 
 
 @dataclass
+class CountingModel(ReplayModel):
+    """Responde quantas mensagens do usuário chegaram: mostra se o histórico foi junto."""
+
+    def _respond(self, messages: Any) -> ModelResponse:
+        users = [m for m in messages or [] if getattr(m, "role", None) == "user"]
+        return ModelResponse(role="assistant", content=f"mensagens: {len(users)}")
+
+    def invoke(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        return self._respond(kwargs.get("messages"))
+
+    async def ainvoke(self, *args: Any, **kwargs: Any) -> ModelResponse:
+        return self._respond(kwargs.get("messages"))
+
+    async def ainvoke_stream(self, *args: Any, **kwargs: Any) -> Any:
+        yield self._respond(kwargs.get("messages"))
+
+
+@dataclass
 class FixedReplyModel(ReplayModel):
     """Responde sempre o mesmo texto."""
 
