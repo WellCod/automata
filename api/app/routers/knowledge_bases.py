@@ -9,7 +9,8 @@ from app.agents.capabilities import get_capabilities
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.knowledge.embedders import EMBEDDERS, is_configured
-from app.knowledge.search import search_base
+from app.knowledge.search import SearchOutcome, search_base
+from app.knowledge.search import search as run_search
 from app.models.knowledge_base import KnowledgeBase
 from app.repositories.embedding_usage import EmbeddingTotals, EmbeddingUsageRepository
 from app.repositories.knowledge_base import KnowledgeBaseRepository
@@ -19,8 +20,10 @@ from app.schemas.knowledge_base import (
     KnowledgeBaseResponse,
     KnowledgeBaseUpdate,
     RetrievalSettings,
+    SearchComparison,
     SearchHit,
     SearchInput,
+    SearchResult,
 )
 from app.settings import get_settings
 
@@ -187,3 +190,28 @@ def search(base_id: UUID, body: SearchInput, session: SessionDep) -> list[Search
         logger.warning("busca falhou", extra={"base_id": str(base_id), "error": str(exc)})
         raise HTTPException(status_code=502, detail=f"Busca falhou: {exc}") from exc
     return [SearchHit(**hit.__dict__) for hit in hits]
+
+
+def _result(outcome: SearchOutcome) -> SearchResult:
+    return SearchResult(
+        hits=[SearchHit(**hit.__dict__) for hit in outcome.hits],
+        searched=outcome.searched,
+        hyde_tokens=outcome.hyde_tokens,
+    )
+
+
+@router.post("/{base_id}/search/compare", response_model=SearchComparison)
+def compare_search(base_id: UUID, body: SearchInput, session: SessionDep) -> SearchComparison:
+    """A mesma pergunta com a estratégia da base e com a busca simples, lado a lado."""
+    base = _get_or_404(KnowledgeBaseRepository(session), base_id)
+    try:
+        with_strategy = run_search(base, body.query, body.max_results)
+        without_strategy = run_search(base, body.query, body.max_results, plain=True)
+    except Exception as exc:
+        logger.warning("busca falhou", extra={"base_id": str(base_id), "error": str(exc)})
+        raise HTTPException(status_code=502, detail=f"Busca falhou: {exc}") from exc
+    return SearchComparison(
+        with_strategy=_result(with_strategy),
+        without_strategy=_result(without_strategy),
+        retrieval=RetrievalSettings.model_validate(base.retrieval or {}),
+    )

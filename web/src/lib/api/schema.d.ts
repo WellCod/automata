@@ -416,6 +416,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/knowledge-bases/{base_id}/search/compare": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Compare Search
+     * @description A mesma pergunta com a estratégia da base e com a busca simples, lado a lado.
+     */
+    post: operations["compare_search_api_v1_knowledge_bases__base_id__search_compare_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/knowledge-bases/{base_id}/contents": {
     parameters: {
       query?: never;
@@ -2248,6 +2268,12 @@ export interface components {
       /** Page Size */
       page_size: number;
     };
+    /** SearchComparison */
+    SearchComparison: {
+      with_strategy: components["schemas"]["SearchResult"];
+      without_strategy: components["schemas"]["SearchResult"];
+      retrieval: components["schemas"]["RetrievalSettings"];
+    };
     /** SearchHit */
     SearchHit: {
       /** Content Id */
@@ -2273,6 +2299,15 @@ export interface components {
        * @default 5
        */
       max_results: number;
+    };
+    /** SearchResult */
+    SearchResult: {
+      /** Hits */
+      hits: components["schemas"]["SearchHit"][];
+      /** Searched */
+      searched: string;
+      /** Hyde Tokens */
+      hyde_tokens: number;
     };
     /** StepNode */
     StepNode: {
@@ -3567,6 +3602,41 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["SearchHit"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  compare_search_api_v1_knowledge_bases__base_id__search_compare_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SearchInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SearchComparison"];
         };
       };
       /** @description Validation Error */
