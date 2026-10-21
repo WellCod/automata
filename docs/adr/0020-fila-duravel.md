@@ -1,6 +1,6 @@
 # ADR-0020 — Fila durável do Agno para runs em background, no Postgres da instância, com Redis opcional
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-10-21
 
 ## Contexto

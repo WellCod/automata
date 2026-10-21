@@ -42,7 +42,7 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0014](0014-workflows-por-etapas.md) | Workflows por etapas sobre agentes e times publicados, com regras próprias no lugar de CEL | Aceito |
 | [0015](0015-evals-por-agente.md) | Evals por agente no painel, com casos fora da versão e o runner de suíte do Agno | Aceito |
 | [0016](0016-evals-continuos.md) | Evals contínuos: disparo por token de integração, agendamento próprio e casos a partir de conversas reais | Aceito |
-| [0017](0017-estrategia-de-recuperacao.md) | Estratégia de recuperação por base com o reranker do Agno e HyDE medido | Proposto |
-| [0018](0018-avisos-de-regressao.md) | Avisos de regressão da suíte agendada por webhook assinado, só nas mudanças de estado | Proposto |
-| [0019](0019-compactacao-de-conversa.md) | Compactação de conversa por agente, versionada no payload, com limite baixo | Proposto |
-| [0020](0020-fila-duravel.md) | Fila durável do Agno para runs em background, no Postgres, com Redis opcional | Proposto |
+| [0017](0017-estrategia-de-recuperacao.md) | Estratégia de recuperação por base com o reranker do Agno e HyDE medido | Aceito |
+| [0018](0018-avisos-de-regressao.md) | Avisos de regressão da suíte agendada por webhook assinado, só nas mudanças de estado | Aceito |
+| [0019](0019-compactacao-de-conversa.md) | Compactação de conversa por agente, versionada no payload, com limite baixo | Aceito |
+| [0020](0020-fila-duravel.md) | Fila durável do Agno para runs em background, no Postgres, com Redis opcional | Aceito |

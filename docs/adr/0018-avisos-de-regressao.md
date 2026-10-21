@@ -1,6 +1,6 @@
 # ADR-0018 — Avisos de regressão da suíte agendada por webhook assinado, só nas mudanças de estado
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-10-21
 
 ## Contexto
