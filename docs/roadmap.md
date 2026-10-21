@@ -582,7 +582,7 @@ if __name__ == "__main__":
 | 17 — Evals contínuos | #127, #130–#140 | Suíte disparada por token de integração, agendamento e casos a partir de conversas reais | Fase 16 |
 | 18 — Recuperação por base | #143–#148 | Reranker do Agno (MMR e recência) e HyDE medido por base de conhecimento | Fases 13 e 17 |
 | 19 — Avisos de regressão | #149–#153 | Webhook assinado do agendamento nas mudanças de estado da suíte | Fase 17 |
-| 20 — Compactação de conversa | #154 em diante | Resumo dos turnos antigos por agente, versionado no payload | Fase 17 (#134) |
+| 20 — Compactação de conversa | #154–#157 | Resumo dos turnos antigos por agente, versionado no payload | Fase 17 (#134) |
 
 Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
 
@@ -955,10 +955,10 @@ Fica para depois: e-mail, destinos de aviso por instância e outros eventos (run
 
 Decisão em [ADR-0019](adr/0019-compactacao-de-conversa.md). O agente pode compactar conversas longas: os turnos antigos viram um resumo, e o custo por turno fica limitado. A opção fica no payload versionado, desligada por padrão, com limite de 16 mil tokens e resumo pelo modelo do próprio agente.
 
-- [ ] #154 — `docs(adr)`: ADR-0019 e esta seção
+- [x] #154 — `docs(adr)`: ADR-0019 e esta seção
 - [x] `feat(api)`: seção `conversation` no payload, validada na escrita (só agente) e ligada à `Compaction` do Agno na factory
 - [x] `feat(web)`: compactação na configuração do agente, com limite e instruções do resumo
-- [ ] `test(api)`: evals da compactação, com resumo gerado acima do limite e janela de turnos sem a opção
+- [x] `test(api)`: evals da compactação, com resumo gerado acima do limite e janela de turnos sem a opção
 
 **Critério de aceite da fase:** num agente com compactação e limite baixo, uma conversa longa gera um resumo, e o número do pedido dito no primeiro turno continua chegando ao modelo depois que o turno saiu da janela. O consumo do resumo aparece no agente. Time recusa a seção.
 

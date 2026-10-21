@@ -284,6 +284,7 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 | Suíte de testes | Scorer de texto sobre respostas reais, montagem do `Case` do Agno (juiz só com modelo, nunca no modo demo), tradução do resultado do runner, veredito do gate (não avaliado trava) e comparação entre execuções. | Todo PR |
 | Evals contínuos | Validação do agendamento (cron, fuso, intervalo mínimo de 1 hora), próximo horário no fuso certo, escopo por recurso dos tokens de integração, `verdict` que o pipeline lê e montagem da sugestão de caso (máscara, tools com erro fora). | Todo PR |
 | Avisos de regressão | Transições que avisam e as que ficam em silêncio (falha seguida de falha, verde seguido de verde), assinatura HMAC conferida pelo receptor e corpo com `text` e `content`. | Todo PR |
+| Compactação | Versão sem a seção fica sem compactação, limite e turnos passados ao Agno, resumo pelo modelo do agente e limites recusados. O ponta a ponta, com o resumo chegando ao modelo acima do limite, roda na suíte de runtime. | Todo PR |
 | Recuperação | O documento certo volta entre os 3 primeiros trechos. A versão literal roda em todo PR com cada estratégia de busca (simples, MMR, recência), e nenhuma pode errar. A semântica, com Voyage, roda à noite, aceita recall@3 de 80% e compara as estratégias (HyDE incluso, com chave de modelo) com a busca simples. | PR e noturna |
 | Confiabilidade | Tool calls com LLM real. | Noturna |
 
