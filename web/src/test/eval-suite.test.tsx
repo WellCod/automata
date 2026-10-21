@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EvalCaseForm } from "@/components/eval-case-form";
 import { EvalSuitePanel } from "@/components/eval-suite-panel";
+import { EvalWebhook } from "@/components/eval-webhook";
 import { RunsPanel } from "@/components/runs-panel";
 import { SuiteBadge } from "@/components/suite-badge";
 import { availableTypes, caseErrors, type EvalCheck, newCheck } from "@/lib/eval-checks";
@@ -402,5 +403,63 @@ describe("virar caso de teste", () => {
       },
     });
     await waitFor(() => expect(onDone).toHaveBeenCalled());
+  });
+});
+
+describe("EvalWebhook", () => {
+  const schedule = {
+    agent_config_id: "a1",
+    cron_expr: "0 8 * * *",
+    timezone: "America/Sao_Paulo",
+    target: "current",
+    judge_model: null,
+    enabled: true,
+    next_run_at: null,
+    last_attempt_at: null,
+    last_run_id: null,
+    last_error: null,
+    webhook_host: null,
+    webhook_last_status: null,
+    webhook_last_at: null,
+    updated_by: "u",
+    updated_at: "2026-10-21T10:00:00Z",
+  } as const;
+
+  it("mostra o segredo uma vez e testa o webhook cadastrado", async () => {
+    vi.mocked(client.PUT).mockResolvedValue({
+      data: { host: "hooks.slack.com", secret: "segredo-uma-vez" },
+      error: undefined,
+    } as never);
+    vi.mocked(client.POST).mockResolvedValue({
+      data: { status: "HTTP 200", delivered: true },
+      error: undefined,
+    } as never);
+    const user = userEvent.setup();
+    const { rerender } = render(<EvalWebhook configId="a1" schedule={schedule} />, { wrapper });
+
+    await user.type(screen.getByLabelText("URL do webhook"), "https://hooks.slack.com/services/x");
+    await user.click(screen.getByRole("button", { name: "Salvar webhook" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Segredo do webhook" });
+    expect(dialog).toHaveTextContent("segredo-uma-vez");
+    expect(vi.mocked(client.PUT).mock.calls.at(-1)![1]).toMatchObject({
+      body: { url: "https://hooks.slack.com/services/x" },
+    });
+    await user.click(screen.getByRole("button", { name: "Já guardei" }));
+    expect(screen.queryByText("segredo-uma-vez")).toBeNull();
+
+    rerender(
+      <EvalWebhook
+        configId="a1"
+        schedule={{ ...schedule, webhook_host: "hooks.slack.com", webhook_last_status: "HTTP 410" }}
+      />,
+    );
+    expect(screen.getByText("hooks.slack.com")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Último envio: HTTP 410");
+    await user.click(screen.getByRole("button", { name: "Enviar teste" }));
+    await waitFor(() =>
+      expect(vi.mocked(client.POST).mock.calls.at(-1)![0]).toBe(
+        "/api/v1/configs/{config_id}/eval-schedule/webhook/test",
+      ),
+    );
   });
 });
