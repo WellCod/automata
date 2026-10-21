@@ -566,3 +566,37 @@ def test_time_recusa_membro_invalido(
             },
         )
         assert resp.status_code == 400
+
+
+def test_conversa_leva_os_turnos_anteriores_da_sessao(
+    db_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi.testclient import TestClient
+
+    from tests.fake_models import CountingModel
+
+    model = CountingModel(id="claude-haiku-4-5")
+    with TestClient(_app_with_model(monkeypatch, model)) as client:  # type: ignore[arg-type]
+        agent = _publish(client, "agent", "memoria", {"model_id": "claude-haiku-4-5"})
+        team = _publish(
+            client,
+            "team",
+            "time com memoria",
+            {
+                "model_id": "claude-haiku-4-5",
+                "team": {"mode": "coordinate", "members": [{"agent_id": agent}]},
+            },
+        )
+        for path in (f"/agents/{agent}/runs", f"/teams/{team}/runs"):
+            replies = [
+                client.post(
+                    path, data={"message": msg, "stream": "false", "session_id": f"s-{path}"}
+                ).json()["content"]
+                for msg in ("oi", "meu pedido é o 123", "qual era o pedido?")
+            ]
+            assert replies == ["mensagens: 1", "mensagens: 2", "mensagens: 3"], path
+            # outra sessão começa do zero
+            fresh = client.post(
+                path, data={"message": "oi", "stream": "false", "session_id": f"outra-{path}"}
+            ).json()["content"]
+            assert fresh == "mensagens: 1"

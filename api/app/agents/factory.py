@@ -133,6 +133,11 @@ def _post_hooks(hook: Callable[..., None] | None) -> list[Any] | None:
     return [hook] if hook is not None else None
 
 
+# turnos anteriores da mesma sessão que vão ao modelo. O padrão do Agno é não levar
+# nenhum: sem isto, cada mensagem de uma conversa chegava sozinha
+HISTORY_RUNS = 5
+
+
 def required_model(payload: ConfigPayload) -> str:
     # o serviço exige modelo em agente e time; versão gravada sem ele é dado inválido
     if payload.model_id is None:
@@ -155,6 +160,9 @@ def agent_from(config_id: UUID, resolved: ResolvedVersion, *, tracked: bool) -> 
         tools=[*resolved.mcp_tools, *resolved.knowledge_tools],
         pre_hooks=list(input_guardrails(payload.guardrails, blocks)) or None,
         post_hooks=_post_hooks(output_guardrail(payload.guardrails, blocks)),
+        # o histórico sai do banco da sessão, que o AgentFactory injeta no agente
+        add_history_to_context=True,
+        num_history_runs=HISTORY_RUNS,
     )
     if isinstance(agent, TrackedAgent):
         agent.automata_config_id = config_id
@@ -237,6 +245,8 @@ def team_from(config_id: UUID, resolved: ResolvedTeam) -> TrackedTeam:
         mode=TeamMode(settings.mode),
         max_iterations=settings.max_iterations,
         share_member_interactions=settings.share_member_interactions,
+        add_history_to_context=True,
+        num_history_runs=HISTORY_RUNS,
     )
     team.automata_config_id = config_id
     team.automata_blocks = blocks
