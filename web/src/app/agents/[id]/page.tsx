@@ -467,6 +467,7 @@ export default function AgentEditPage() {
           <TabsContent value="versoes" className="pt-5">
             <div className="mx-auto max-w-3xl">
               <VersionsPanel
+                suite
                 agentId={id}
                 currentVersionId={data?.current_version?.id}
                 hasUnsavedChanges={isDirty}

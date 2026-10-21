@@ -451,7 +451,7 @@ export default function TeamEditPage() {
                 defaultOpen
               />
             </div>
-            {activePanel === "versoes" && <VersionsPanel agentId={id} />}
+            {activePanel === "versoes" && <VersionsPanel agentId={id} suite />}
             {activePanel === "runs" && <RunsPanel agentId={id} />}
             {activePanel === "metricas" && <MetricsPanel agentId={id} />}
             {activePanel === "suite" && (

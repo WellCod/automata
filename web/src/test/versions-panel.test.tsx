@@ -198,3 +198,60 @@ describe("VersionsPanel", () => {
     });
   });
 });
+
+describe("VersionsPanel com suíte", () => {
+  const settings = (overrides: object) => ({
+    require_passing_evals: true,
+    draft_version_id: "v3",
+    draft_run: null,
+    can_publish: false,
+    reason: "a suíte ainda não rodou no rascunho atual",
+    ...overrides,
+  });
+
+  function mockGet(evalSettings: object) {
+    vi.mocked(client.GET).mockImplementation(async (path: string) => {
+      const data: Record<string, unknown> = {
+        "/api/v1/configs/{config_id}/versions": mockVersions,
+        "/api/v1/configs/{config_id}/eval-settings": evalSettings,
+        "/api/v1/configs/{config_id}/eval-cases": [{ id: "c1" }],
+      };
+      return { data: data[path], error: undefined } as never;
+    });
+  }
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("gate bloqueia o publicar enquanto a suíte não passa no rascunho", async () => {
+    mockGet(settings({}));
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v2" suite />, { wrapper });
+    const status = await screen.findByRole("status", { name: "Suíte do rascunho" });
+    expect(status).toHaveTextContent("A suíte ainda não rodou no rascunho atual.");
+    expect(status).toHaveTextContent("Publicação bloqueada pelo gate");
+    expect(screen.getByRole("button", { name: "Publicar" })).toBeDisabled();
+  });
+
+  it("suíte verde libera e mostra o resultado", async () => {
+    mockGet(
+      settings({
+        can_publish: true,
+        reason: null,
+        draft_run: { status: "completed", passed: 3, total: 3 },
+      }),
+    );
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v2" suite />, { wrapper });
+    const status = await screen.findByRole("status", { name: "Suíte do rascunho" });
+    expect(status).toHaveTextContent("Suíte no rascunho: 3 de 3 passaram.");
+    expect(status).not.toHaveTextContent("bloqueada");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Publicar" })).toBeEnabled());
+  });
+
+  it("sem a prop suite (workflow) não consulta a suíte", async () => {
+    mockGet(settings({}));
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v2" />, { wrapper });
+    await screen.findByRole("button", { name: "Publicar" });
+    const paths = vi.mocked(client.GET).mock.calls.map((c) => c[0]);
+    expect(paths).toEqual(["/api/v1/configs/{config_id}/versions"]);
+    expect(screen.queryByRole("status", { name: "Suíte do rascunho" })).toBeNull();
+  });
+});
