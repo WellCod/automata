@@ -1,7 +1,7 @@
 """Modelo do juiz com consumo medido (ADR-0015).
 
 O `AgentAsJudgeEval` do Agno monta o agente avaliador por dentro e não devolve as
-métricas dele. O medidor embrulha o `ainvoke` da instância: no Agno 2.8.7 todo
+métricas dele. O medidor embrulha o `ainvoke` da instância: no Agno 2.9.0 todo
 provedor devolve dali um `ModelResponse` já com `response_usage`, e o retry do
 modelo chama esse mesmo método. O juiz roda sem stream, então o caminho de
 `ainvoke_stream` não é usado.
