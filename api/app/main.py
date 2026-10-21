@@ -11,7 +11,8 @@ from agno.agent.remote import RemoteAgent
 from agno.db.postgres import PostgresDb
 from agno.job_queue.config import QueueConfig
 from agno.os import AgentOS
-from agno.os.config import AuthorizationConfig, MCPConfig
+from agno.os.authz import Authorization
+from agno.os.config import MCPConfig
 from agno.team import RemoteTeam, Team
 from agno.team.factory import TeamFactory
 from agno.workflow import RemoteWorkflow, Workflow
@@ -179,13 +180,13 @@ def create_app(
         base.include_router(router)
     base.state.enforce_scopes = enable_auth
 
-    auth_config: AuthorizationConfig | None = None
-    if enable_auth:
-        auth_config = AuthorizationConfig(
-            verification_keys=[settings.jwt_public_key],
-            algorithm="RS256",
-            user_isolation=True,
-        )
+    # verificação do JWT RS256 emitido pela API; sem papéis gerenciados pelo Agno, os scopes
+    # vêm do token (ADR-0005). O AuthorizationConfig solto foi descontinuado na v3
+    authorization: Authorization | bool = (
+        Authorization(verification_keys=[settings.jwt_public_key], algorithm="RS256")
+        if enable_auth
+        else False
+    )
 
     # Lista compartilhada com o AgentOS, que a lê a cada request
     factories: AgentList = []
@@ -218,8 +219,9 @@ def create_app(
         workflows=workflows,
         base_app=base,
         auto_provision_dbs=auto_provision_dbs,
-        authorization=enable_auth,
-        authorization_config=auth_config,
+        authorization=authorization,
+        # cada usuário só vê as próprias sessões; na v3 a opção saiu do AuthorizationConfig
+        user_isolation=enable_auth,
         # sem o server card público da v3 (GET /mcp): nada em /mcp responde sem token
         mcp=MCPConfig(default_tools=True, server_card=False) if enable_mcp_server else False,
         mcp_auth=mcp_auth,
