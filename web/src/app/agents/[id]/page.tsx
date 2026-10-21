@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Brain,
   Activity,
   ArrowLeft,
   FlaskConical,
@@ -34,6 +35,13 @@ import {
 } from "@/components/conversation-editor";
 import { KnowledgeSelector } from "@/components/knowledge-selector";
 import { McpToolsSelector } from "@/components/mcp-tools-selector";
+import { MemoriesPanel } from "@/components/memories-panel";
+import {
+  DEFAULT_MEMORY,
+  type Memory,
+  MemoryEditor,
+  withMemoryDefaults,
+} from "@/components/memory-editor";
 import { MetricsPanel } from "@/components/metrics-panel";
 import { ModelSelector } from "@/components/model-selector";
 import { RunsPanel } from "@/components/runs-panel";
@@ -88,6 +96,8 @@ const schema = z.object({
   guardrails: z.custom<Guardrails>(),
   // compactação de conversa (ADR-0019), validada pela API
   conversation: z.custom<Conversation>(),
+  // memória do usuário (ADR-0025), validada pela API
+  memory: z.custom<Memory>(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -108,6 +118,7 @@ const PAGE_TABS = [
   { id: "desempenho" as const, label: "Desempenho", icon: TrendingUp },
   { id: "testes" as const, label: "Testes", icon: ListChecks },
   { id: "versoes" as const, label: "Versões", icon: History },
+  { id: "memoria" as const, label: "Memória", icon: Brain },
 ];
 
 type PageTab = (typeof PAGE_TABS)[number]["id"];
@@ -195,6 +206,7 @@ export default function AgentEditPage() {
       knowledge: [],
       guardrails: DEFAULT_GUARDRAILS,
       conversation: DEFAULT_CONVERSATION,
+      memory: DEFAULT_MEMORY,
     },
   });
 
@@ -233,6 +245,7 @@ export default function AgentEditPage() {
       })),
       guardrails: withDefaults(data.payload?.guardrails),
       conversation: withConversationDefaults(data.payload?.conversation),
+      memory: withMemoryDefaults(data.payload?.memory),
     });
   }, [data, reset]);
 
@@ -252,6 +265,7 @@ export default function AgentEditPage() {
             knowledge: values.knowledge,
             guardrails: values.guardrails,
             conversation: values.conversation,
+            memory: values.memory,
             metadata: data?.payload?.metadata ?? {},
           },
         },
@@ -309,6 +323,7 @@ export default function AgentEditPage() {
       knowledge: values.knowledge,
       guardrails: values.guardrails,
       conversation: values.conversation,
+      memory: values.memory,
       metadata: data?.payload?.metadata ?? {},
     };
   };
@@ -436,6 +451,14 @@ export default function AgentEditPage() {
                 )}
               />
 
+              <Controller
+                name="memory"
+                control={form.control}
+                render={({ field }) => (
+                  <MemoryEditor value={field.value} onChange={field.onChange} />
+                )}
+              />
+
               <FieldSet className="border-border rounded border px-4 pt-3 pb-4">
                 <FieldLegend className="px-1">Instruções</FieldLegend>
                 <FieldGroup>
@@ -502,6 +525,11 @@ export default function AgentEditPage() {
                 currentVersionId={data?.current_version?.id}
                 hasUnsavedChanges={isDirty}
               />
+            </div>
+          </TabsContent>
+          <TabsContent value="memoria" className="pt-5">
+            <div className="mx-auto max-w-3xl">
+              <MemoriesPanel agentId={id} />
             </div>
           </TabsContent>
         </Tabs>

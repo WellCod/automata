@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import {
   BarChart3,
   Bell,
+  Brain,
   BookOpen,
   KeyRound,
   LayoutGrid,
@@ -100,6 +101,14 @@ export function Sidebar() {
           {me?.email ?? "v0.1"}
         </span>
         <div className="flex items-center gap-1">
+          <Link
+            href="/minhas-memorias"
+            aria-label="Minhas memórias"
+            title="Minhas memórias"
+            className="text-muted-foreground hover:border-border hover:text-foreground focus-visible:ring-ring/50 flex h-6 w-6 items-center justify-center rounded border border-transparent transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <Brain className="h-3.5 w-3.5" />
+          </Link>
           <ThemeToggle />
           <button
             type="button"
