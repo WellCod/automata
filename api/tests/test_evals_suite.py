@@ -175,3 +175,48 @@ def test_gate_so_libera_suite_completa_e_verde(monkeypatch: pytest.MonkeyPatch) 
 )
 def test_comparacao(base: str | None, target: str | None, expected: str) -> None:
     assert change(base, target) == expected
+
+
+def _conversa(message: str, content: str = "ok", tools: list[Any] | None = None) -> Any:
+    from agno.run.agent import RunInput, RunOutput
+
+    return RunOutput(
+        run_id=str(uuid4()),
+        input=RunInput(input_content=message),
+        content=content,
+        tools=tools,
+    )
+
+
+def test_sugestao_de_caso_mascara_e_usa_so_tools_que_rodaram() -> None:
+    from agno.models.response import ToolExecution
+
+    from app.evals.suggest import suggest
+
+    tools = [
+        ToolExecution(tool_name="buscar_politicas"),
+        ToolExecution(tool_name="consultar_pedido", tool_call_error=True),
+        ToolExecution(tool_name="buscar_politicas"),
+    ]
+    run = _conversa("Meu CPF é 529.982.247-25, cadê meu pedido?", "Seu pedido sai hoje.", tools)
+    previous = [_conversa(f"mensagem {i}") for i in range(7)]
+    found = suggest(run, previous)
+
+    assert found.input == "Meu CPF é [CPF removido], cadê meu pedido?"
+    assert found.context == [f"mensagem {i}" for i in range(2, 7)]
+    # a que deu erro não conta, e repetida entra uma vez
+    assert found.checks == [
+        {"type": "text", "kind": "not_empty"},
+        {"type": "tools", "tools": ["buscar_politicas"], "allow_additional": True},
+    ]
+    assert found.judge_criteria is not None and "Seu pedido sai hoje." in found.judge_criteria
+    assert found.source_run_id == run.run_id
+    assert len(found.notes) == 2
+
+
+def test_sugestao_sem_tools_nem_resposta_fica_so_com_resposta_nao_vazia() -> None:
+    from app.evals.suggest import suggest
+
+    found = suggest(_conversa("oi", content=""), [])
+    assert found.checks == [{"type": "text", "kind": "not_empty"}]
+    assert (found.judge_criteria, found.context, found.notes) == (None, [], [])

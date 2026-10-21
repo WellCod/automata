@@ -41,6 +41,8 @@ class EvalCase(Base):
     # lista de checagens validada por EvalCaseInput (texto, tools, juiz)
     checks: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # run de conversa de onde o caso veio, quando veio de "Virar caso de teste"
+    source_run_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     updated_by: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -157,6 +157,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/configs/{config_id}/eval-cases/suggestion": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Suggest Case
+     * @description Caso a partir de uma conversa real: o formulário abre preenchido e nada é gravado.
+     */
+    get: operations["suggest_case_api_v1_configs__config_id__eval_cases_suggestion_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/configs/{config_id}/eval-cases/{case_id}": {
     parameters: {
       query?: never;
@@ -1230,6 +1250,8 @@ export interface components {
         | components["schemas"]["ToolsCheck"]
         | components["schemas"]["JudgeCheck"]
       )[];
+      /** Source Run Id */
+      source_run_id?: string | null;
     };
     /** EvalCaseResponse */
     EvalCaseResponse: {
@@ -1255,6 +1277,8 @@ export interface components {
         | components["schemas"]["ToolsCheck"]
         | components["schemas"]["JudgeCheck"]
       )[];
+      /** Source Run Id */
+      source_run_id: string | null;
       /** Position */
       position: number;
       /** Updated By */
@@ -1269,6 +1293,30 @@ export interface components {
        * Format: date-time
        */
       updated_at: string;
+    };
+    /**
+     * EvalCaseSuggestion
+     * @description Caso montado de um run real; nada é gravado até o editor salvar pelo POST de casos.
+     */
+    EvalCaseSuggestion: {
+      /** Name */
+      name: string;
+      /** Input */
+      input: string;
+      /** Context */
+      context: string[];
+      /** Checks */
+      checks: (
+        | components["schemas"]["TextCheck"]
+        | components["schemas"]["ToolsCheck"]
+        | components["schemas"]["JudgeCheck"]
+      )[];
+      /** Judge Criteria */
+      judge_criteria: string | null;
+      /** Source Run Id */
+      source_run_id: string;
+      /** Notes */
+      notes: string[];
     };
     /** EvalComparison */
     EvalComparison: {
@@ -2783,6 +2831,39 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["EvalCaseResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  suggest_case_api_v1_configs__config_id__eval_cases_suggestion_get: {
+    parameters: {
+      query: {
+        run_id: string;
+      };
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvalCaseSuggestion"];
         };
       };
       /** @description Validation Error */

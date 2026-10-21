@@ -888,7 +888,7 @@ Pré-requisito: Agno 3.1.x (#128 e #129).
 - [x] `fix(api)`: agentes e times levam ao modelo os últimos 5 turnos da sessão. O factory não ligava `add_history_to_context`, e cada mensagem de uma conversa chegava sozinha; os casos com contexto dependem disso
 - [x] `feat(api)`: casos com turnos anteriores. `context` no `eval_case` (até cinco mensagens), rodado no `setup` do `Case` no mesmo `session_id` (migration 0026), e `user_id` de quem disparou em todo caso
 - [x] `feat(api)`: estado da suíte e regressão agendada. `GET /api/v1/eval-status` com o estado de cada config (rodando, verde, falhando, regrediu) e a comparação com a execução agendada anterior
-- [ ] `feat(api)`: sugestão de caso a partir de um run real. Leitura em `agno_runs`, entrada e contexto mascarados, tools chamadas e critério de rascunho, `source_run_id` no `eval_case`
+- [x] `feat(api)`: sugestão de caso a partir de um run real. Leitura em `agno_runs`, entrada e contexto mascarados, tools chamadas e critério de rascunho, `source_run_id` no `eval_case`
 - [ ] `feat(web)`: agendamento e origem das execuções na aba Testes, estado da suíte na lista, suíte na emissão de tokens de integração
 - [ ] `feat(web)`: "Virar caso de teste" no histórico de execuções e na árvore de execução
 - [ ] `test(api)`: evals do agendamento, do escopo por recurso e da sugestão de caso, e exemplo de job de CI na documentação

@@ -73,6 +73,8 @@ class EvalCaseInput(BaseModel):
         default_factory=list, max_length=MAX_CONTEXT
     )
     checks: list[EvalCheck] = Field(min_length=1, max_length=MAX_CHECKS)
+    # preenchido pelo formulário quando o caso veio de uma conversa real
+    source_run_id: str | None = Field(default=None, max_length=255)
 
     @field_validator("name")
     @classmethod
@@ -98,6 +100,7 @@ class EvalCaseResponse(BaseModel):
     input: str
     context: list[str]
     checks: list[EvalCheck]
+    source_run_id: str | None
     position: int
     updated_by: str
     created_at: datetime
@@ -239,3 +242,17 @@ class EvalSuiteStatus(BaseModel):
     last_run: EvalRunSummary
     previous_run_id: UUID | None
     regressions: int
+
+
+class EvalCaseSuggestion(BaseModel):
+    """Caso montado de um run real; nada é gravado até o editor salvar pelo POST de casos."""
+
+    name: str
+    input: str
+    context: list[str]
+    checks: list[EvalCheck]
+    # critério de rascunho para o juiz, a partir da resposta original mascarada
+    judge_criteria: str | None
+    source_run_id: str
+    # avisos para o formulário: contexto cortado, dados mascarados
+    notes: list[str]

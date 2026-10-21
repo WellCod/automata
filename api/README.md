@@ -300,6 +300,17 @@ Um caso tem `name` (único na config, até 80 caracteres), `input` (até 4000) e
 
 Um caso pode trazer `context`, com até 5 mensagens anteriores (ADR-0016, migration 0026). Na execução, o caso ganha sessão própria (`eval-<uuid>`) e o banco do Agno, que o agente da suíte não recebe do `AgentFactory`. O `setup` do `Case` roda essas mensagens nessa sessão, uma por vez, com 60 s cada, e só a resposta a `input` passa pelas checagens. Os turnos de contexto são runs de teste como os outros: ficam fora das conversas e entram no custo da execução. Todo caso roda com `user_id` de quem disparou a suíte.
 
+`GET /api/v1/configs/{id}/eval-cases/suggestion?run_id=<run>` (ADR-0016) monta um caso a partir de uma conversa real e **não grava nada** (`app/evals/suggest.py`):
+- Lê o run em `ai.agno_runs` e os anteriores da mesma sessão.
+- A entrada é a mensagem do usuário. O contexto são até 5 mensagens anteriores.
+- Checagens: `not_empty` e, se o run chamou tools sem erro, uma de tools com elas, sem repetir. Texto da resposta não vira checagem, porque prenderia o caso à redação daquele dia.
+- `judge_criteria` traz um critério de rascunho com a resposta original como referência (até 600 caracteres), para o formulário oferecer.
+- Dados pessoais saem mascarados com todos os tipos, mesmo sem guardrail de PII no agente, e `notes` avisa quando houve máscara ou corte de contexto.
+- Pede `evals:write` e segue a regra do trace: só quem teve a conversa ou um admin.
+- Run de teste, etapa de workflow e run bloqueado dão 422. Run cuja conversa não está mais guardada dá 404.
+
+Salvar usa o `POST` de casos com `source_run_id` (migration 0027), que fica no caso para mostrar de onde veio.
+
 O limite de uma checagem de tools e uma de juiz por caso vem do `Case` do runner de suíte do Agno, que tem um campo para cada. Workflow ainda não tem suíte (422), e são até 50 casos por config. Viewer lê (`evals:read`); editor cria, edita e apaga (`evals:write`).
 
 ### Execução da suíte

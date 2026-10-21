@@ -226,3 +226,27 @@ def test_suite_de_workflow_ou_inexistente_nao_entra_no_token(client: TestClient)
         headers=_owner(),
     )
     assert resp.status_code == 400
+
+
+def test_sugestao_de_caso_so_para_quem_teve_a_conversa_ou_admin(client: TestClient) -> None:
+    from app.auth import issue_token
+    from app.models.user import UserRole
+    from app.schemas.user import ROLE_SCOPES
+
+    agent_id = _publish(client, "conversa de alguem")
+    editor = ROLE_SCOPES[UserRole.editor]
+    alice = _bearer(issue_token("editor-alice", editor))
+    bob = _bearer(issue_token("editor-bob", editor))
+    viewer = _bearer(issue_token("viewer", ROLE_SCOPES[UserRole.viewer]))
+    resp = client.post(
+        f"/agents/{agent_id}/runs", data={"message": "oi", "stream": "false"}, headers=alice
+    )
+    assert resp.status_code == 200, resp.text
+    url = f"/api/v1/configs/{agent_id}/eval-cases/suggestion"
+    params = {"run_id": resp.json()["run_id"]}
+
+    assert client.get(url, params=params, headers=alice).status_code == 200
+    assert client.get(url, params=params, headers=_owner()).status_code == 200
+    assert client.get(url, params=params, headers=bob).status_code == 403
+    # viewer não escreve caso, então nem pede sugestão
+    assert client.get(url, params=params, headers=viewer).status_code == 403
