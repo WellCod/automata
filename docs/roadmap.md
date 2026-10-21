@@ -957,7 +957,7 @@ Decisão em [ADR-0019](adr/0019-compactacao-de-conversa.md). O agente pode compa
 
 - [ ] #154 — `docs(adr)`: ADR-0019 e esta seção
 - [x] `feat(api)`: seção `conversation` no payload, validada na escrita (só agente) e ligada à `Compaction` do Agno na factory
-- [ ] `feat(web)`: compactação na configuração do agente, com limite e instruções do resumo
+- [x] `feat(web)`: compactação na configuração do agente, com limite e instruções do resumo
 - [ ] `test(api)`: evals da compactação, com resumo gerado acima do limite e janela de turnos sem a opção
 
 **Critério de aceite da fase:** num agente com compactação e limite baixo, uma conversa longa gera um resumo, e o número do pedido dito no primeiro turno continua chegando ao modelo depois que o turno saiu da janela. O consumo do resumo aparece no agente. Time recusa a seção.

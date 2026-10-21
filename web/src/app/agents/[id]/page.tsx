@@ -26,6 +26,12 @@ import {
   GuardrailsEditor,
   withDefaults,
 } from "@/components/guardrails-editor";
+import {
+  type Conversation,
+  ConversationEditor,
+  DEFAULT_CONVERSATION,
+  withConversationDefaults,
+} from "@/components/conversation-editor";
 import { KnowledgeSelector } from "@/components/knowledge-selector";
 import { McpToolsSelector } from "@/components/mcp-tools-selector";
 import { MetricsPanel } from "@/components/metrics-panel";
@@ -80,6 +86,8 @@ const schema = z.object({
   ),
   // validado pela API (ADR-0013); o editor só monta o objeto
   guardrails: z.custom<Guardrails>(),
+  // compactação de conversa (ADR-0019), validada pela API
+  conversation: z.custom<Conversation>(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -186,6 +194,7 @@ export default function AgentEditPage() {
       mcp_servers: [],
       knowledge: [],
       guardrails: DEFAULT_GUARDRAILS,
+      conversation: DEFAULT_CONVERSATION,
     },
   });
 
@@ -223,6 +232,7 @@ export default function AgentEditPage() {
         max_results: k.max_results ?? 5,
       })),
       guardrails: withDefaults(data.payload?.guardrails),
+      conversation: withConversationDefaults(data.payload?.conversation),
     });
   }, [data, reset]);
 
@@ -241,6 +251,7 @@ export default function AgentEditPage() {
             capabilities: values.capabilities,
             knowledge: values.knowledge,
             guardrails: values.guardrails,
+            conversation: values.conversation,
             metadata: data?.payload?.metadata ?? {},
           },
         },
@@ -297,6 +308,7 @@ export default function AgentEditPage() {
       capabilities: values.capabilities,
       knowledge: values.knowledge,
       guardrails: values.guardrails,
+      conversation: values.conversation,
       metadata: data?.payload?.metadata ?? {},
     };
   };
@@ -413,6 +425,14 @@ export default function AgentEditPage() {
                 control={form.control}
                 render={({ field }) => (
                   <GuardrailsEditor value={field.value} onChange={field.onChange} />
+                )}
+              />
+
+              <Controller
+                name="conversation"
+                control={form.control}
+                render={({ field }) => (
+                  <ConversationEditor value={field.value} onChange={field.onChange} />
                 )}
               />
 

@@ -100,6 +100,10 @@ Bases com PDF, DOCX, Markdown, texto, CSV, JSON ou páginas web, enviados por ar
 
 Cada base escolhe como buscar: a busca simples, diversidade (MMR, para manuais longos e documentos repetidos), recência (para políticas que mudam) e, opcionalmente, HyDE, que busca com uma resposta hipotética quando a pergunta não usa as palavras do documento. A busca de teste mostra lado a lado o resultado com a estratégia e sem ela, e os tokens que o HyDE gastou.
 
+### Conversas longas
+
+O agente lembra a conversa: leva ao modelo os últimos turnos da mesma sessão. Em atendimento longo, a **compactação** resume os turnos antigos quando a conversa passa de um limite em tokens. Assim, o número do pedido dito no começo continua chegando ao modelo, e o custo por turno fica limitado. A opção fica na versão do agente, desligada por padrão, com o que o resumo não pode perder escrito em português.
+
 ### Guardrails por agente
 
 Regras de entrada e saída versionadas junto com o agente. O bloqueio acontece antes da chamada ao modelo, então não gasta token.
