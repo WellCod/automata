@@ -12,7 +12,7 @@ from sqlalchemy import text
 from testcontainers.postgres import PostgresContainer
 
 from alembic import command
-from app.main import QUEUE_MAX_ATTEMPTS, QUEUE_TIMEOUT_S, background_queue
+from app.background import QUEUE_MAX_ATTEMPTS, QUEUE_TIMEOUT_S, background_queue
 from app.settings import Settings, get_settings
 
 
