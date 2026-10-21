@@ -1,6 +1,6 @@
 # ADR-0019 — Compactação de conversa por agente, versionada no payload, com limite baixo e resumo pelo modelo do agente
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-10-21
 
 ## Contexto

@@ -1,6 +1,6 @@
 # ADR-0017 — Estratégia de recuperação por base: reranker do Agno e HyDE com modelo nosso e medido
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-10-21
 
 ## Contexto
