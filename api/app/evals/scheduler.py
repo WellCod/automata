@@ -13,6 +13,7 @@ rotas próprias e o vínculo de origem só aceita run de agente, time ou workflo
 
 import asyncio
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -24,6 +25,8 @@ from app.db import get_engine
 from app.evals.notify import notify_after
 from app.evals.runner import execute
 from app.evals.service import EvalRunRefused, create_run
+from app.knowledge import schedule as knowledge_schedule
+from app.knowledge.connector_sync import sync
 from app.models.eval import EvalSchedule
 from app.repositories.config import ConfigRepository
 from app.repositories.eval import EvalScheduleRepository
@@ -99,6 +102,14 @@ async def _run_and_notify(run_id: UUID) -> None:
     await asyncio.to_thread(notify_after, run_id)
 
 
+async def _in_thread(fn: Callable[[UUID], object], item: UUID) -> None:
+    # cada um grava o próprio resultado; aqui só não deixa a exceção sumir no loop
+    try:
+        await asyncio.to_thread(fn, item)
+    except Exception as exc:
+        logger.warning("reindexação agendada falhou", extra={"id": str(item), "error": str(exc)})
+
+
 async def run_forever(poll_seconds: int = POLL_SECONDS) -> None:
     tasks: set[asyncio.Task[None]] = set()
     while True:
@@ -112,4 +123,15 @@ async def run_forever(poll_seconds: int = POLL_SECONDS) -> None:
             logger.warning("falha no agendamento da suíte", extra={"error": str(exc)})
         # orçamento e pico de erro dos destinos de aviso (ADR-0021), no mesmo minuto
         await asyncio.to_thread(alerts.poll_once)
+        # conectores e URLs com reindexação vencida (ADR-0024)
+        try:
+            connectors, urls = await asyncio.to_thread(knowledge_schedule.claim_due)
+            jobs = [_in_thread(sync, cid) for cid in connectors]
+            jobs += [_in_thread(knowledge_schedule.refresh_url, uid) for uid in urls]
+            for job in jobs:
+                task = asyncio.create_task(job)
+                tasks.add(task)
+                task.add_done_callback(tasks.discard)
+        except Exception as exc:
+            logger.warning("falha na reindexação agendada", extra={"error": str(exc)})
         await asyncio.sleep(poll_seconds)

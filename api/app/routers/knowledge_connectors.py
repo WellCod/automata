@@ -12,6 +12,7 @@ from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.knowledge.connector_sync import selectable, source_of, sync
 from app.knowledge.ingest import remove_chunks
+from app.knowledge.schedule import next_at
 from app.knowledge.sources import SourceError
 from app.mcp.egress import EgressDenied, check_url
 from app.models.knowledge_base import KnowledgeBase
@@ -70,6 +71,8 @@ def _response(session: Session, c: KnowledgeConnector) -> ConnectorResponse:
         last_message=c.last_message,
         last_summary=c.last_summary,
         last_sync_at=c.last_sync_at,
+        sync_every_hours=c.sync_every_hours,
+        next_sync_at=c.next_sync_at,
         content_count=int(count or 0),
         created_by=c.created_by,
         created_at=c.created_at,
@@ -136,6 +139,8 @@ def create_connector(
         settings=settings,
         secret_encrypted=sealed,
         created_by=str(getattr(request.state, "user_id", None) or "panel"),
+        sync_every_hours=body.sync_every_hours,
+        next_sync_at=next_at(body.sync_every_hours),
     )
     session.add(connector)
     session.commit()
@@ -157,6 +162,9 @@ def update_connector(
         connector.secret_encrypted = sealed
     connector.name = body.name
     connector.settings = settings
+    if body.sync_every_hours != connector.sync_every_hours:
+        connector.sync_every_hours = body.sync_every_hours
+        connector.next_sync_at = next_at(body.sync_every_hours)
     session.commit()
     session.refresh(connector)
     return _response(session, connector)

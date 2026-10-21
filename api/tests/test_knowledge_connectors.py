@@ -30,6 +30,8 @@ class FakeGitHub:
 
     def __init__(self) -> None:
         self.files: dict[str, str] = {}
+        # página servida em /pagina, para a reindexação de URL
+        self.page = ""
         self.auth: list[str | None] = []
         self.downloads: list[str] = []
         fake = self
@@ -38,6 +40,9 @@ class FakeGitHub:
             def do_GET(self) -> None:  # noqa: N802
                 fake.auth.append(self.headers.get("Authorization"))
                 url = urlsplit(self.path)
+                if url.path == "/pagina":
+                    self._send(200, fake.page.encode(), "text/plain")
+                    return
                 if url.path == "/repos/acme/docs/git/trees/main":
                     tree = [
                         {
@@ -59,8 +64,9 @@ class FakeGitHub:
                         return
                 self._send(404, b"{}")
 
-            def _send(self, status: int, body: bytes) -> None:
+            def _send(self, status: int, body: bytes, ctype: str = "application/json") -> None:
                 self.send_response(status)
+                self.send_header("Content-Type", ctype)
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
@@ -388,3 +394,101 @@ def test_arquivo_fora_do_suportado_ou_grande_fica_de_fora() -> None:
     ]
     chosen, skipped = selectable(files, max_bytes=1_000)
     assert [f.path for f in chosen] == ["a.md"] and skipped == 3
+
+
+def _overdue(model: Any, row_id: str, column: str) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import update
+
+    from app.db import get_engine
+
+    with Session(get_engine()) as session:
+        session.execute(
+            update(model)
+            .where(model.id == UUID(row_id))
+            .values({column: datetime.now(UTC) - timedelta(minutes=1)})
+        )
+        session.commit()
+
+
+def test_url_reindexa_no_intervalo_so_quando_muda(
+    client: TestClient, base_id: str, github: FakeGitHub
+) -> None:
+    from app.knowledge import schedule
+    from app.models.knowledge_content import KnowledgeContent
+
+    github.page = "Horário de atendimento: das 8h às 18h."
+    created = client.post(
+        f"/api/v1/knowledge-bases/{base_id}/contents/url",
+        json={"url": f"{github.url}/pagina", "name": "Horário", "refresh_every_hours": 24},
+    ).json()
+    content = client.get(f"/api/v1/knowledge-bases/{base_id}/contents/{created['id']}").json()
+    assert content["status"] == "completed" and content["refresh_every_hours"] == 24
+    assert content["next_refresh_at"] is not None
+
+    # venceu, a página é a mesma: nada de embedding
+    _overdue(KnowledgeContent, created["id"], "next_refresh_at")
+    tokens = _embedding_tokens(base_id)
+    _, urls = schedule.claim_due()
+    assert urls == [UUID(created["id"])]
+    assert schedule.refresh_url(UUID(created["id"])) is False
+    assert _embedding_tokens(base_id) == tokens
+    # o próximo horário foi marcado na reivindicação: não volta no minuto seguinte
+    assert schedule.claim_due()[1] == []
+
+    github.page = "Horário de atendimento: das 9h às 20h, inclusive sábado."
+    _overdue(KnowledgeContent, created["id"], "next_refresh_at")
+    _, urls = schedule.claim_due()
+    assert schedule.refresh_url(urls[0]) is True
+    found = client.post(
+        f"/api/v1/knowledge-bases/{base_id}/search", json={"query": "horário de atendimento"}
+    ).json()
+    texts = " ".join(hit["text"] for hit in found)
+    assert "20h" in texts and "18h" not in texts
+
+    # desligar a reindexação; arquivo e texto não têm intervalo
+    off = client.put(
+        f"/api/v1/knowledge-bases/{base_id}/contents/{created['id']}/schedule",
+        json={"refresh_every_hours": None},
+    ).json()
+    assert off["refresh_every_hours"] is None and off["next_refresh_at"] is None
+    text = client.post(
+        f"/api/v1/knowledge-bases/{base_id}/contents/text", json={"name": "nota", "text": "oi"}
+    ).json()
+    resp = client.put(
+        f"/api/v1/knowledge-bases/{base_id}/contents/{text['id']}/schedule",
+        json={"refresh_every_hours": 24},
+    )
+    assert resp.status_code == 422
+
+
+def test_conector_sincroniza_no_intervalo(
+    client: TestClient, base_id: str, github: FakeGitHub
+) -> None:
+    from app.knowledge import schedule
+    from app.knowledge.connector_sync import sync
+    from app.models.knowledge_connector import KnowledgeConnector
+
+    github.files = {"docs/troca.md": "Troca em 30 dias."}
+    connector = client.post(
+        f"/api/v1/knowledge-bases/{base_id}/connectors",
+        json={
+            "kind": "github",
+            "name": "Agendado",
+            "settings": {"repo": "acme/docs", "path": "docs", "api_url": github.url},
+            "sync_every_hours": 6,
+        },
+    ).json()
+    assert connector["sync_every_hours"] == 6 and connector["next_sync_at"] is not None
+    assert schedule.claim_due()[0] == []
+
+    _overdue(KnowledgeConnector, connector["id"], "next_sync_at")
+    connectors, _ = schedule.claim_due()
+    assert connectors == [UUID(connector["id"])]
+    claimed = client.get(f"/api/v1/knowledge-bases/{base_id}/connectors").json()[0]
+    assert claimed["last_status"] == "running"
+    sync(connectors[0])
+    done = client.get(f"/api/v1/knowledge-bases/{base_id}/connectors").json()[0]
+    assert done["last_status"] == "ok" and done["last_summary"]["added"] == 1
+    assert schedule.claim_due()[0] == []

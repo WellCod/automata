@@ -21,10 +21,16 @@ from app.authz import Scope, require_scopes
 from app.db import SessionDep, get_engine
 from app.knowledge.fetch import FetchFailed, fetch_url
 from app.knowledge.ingest import CONTENT_TYPES, ingest, remove_chunks
+from app.knowledge.schedule import next_at, refresh_url
 from app.mcp.egress import EgressDenied, check_url
 from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_content import KnowledgeContent
-from app.schemas.knowledge_base import KnowledgeContentResponse, TextContentInput, UrlContentInput
+from app.schemas.knowledge_base import (
+    ContentScheduleInput,
+    KnowledgeContentResponse,
+    TextContentInput,
+    UrlContentInput,
+)
 from app.settings import get_settings
 
 router = APIRouter(
@@ -54,6 +60,8 @@ def to_response(c: KnowledgeContent) -> KnowledgeContentResponse:
         updated_at=c.updated_at,
         connector_id=c.connector_id,
         external_path=c.external_path,
+        refresh_every_hours=c.refresh_every_hours,
+        next_refresh_at=c.next_refresh_at,
     )
 
 
@@ -200,6 +208,8 @@ def add_url(
             extension="html",
             status="processing",
             created_by=_actor(request),
+            refresh_every_hours=body.refresh_every_hours,
+            next_refresh_at=next_at(body.refresh_every_hours),
         ),
     )
     background.add_task(_ingest_url, content.id, url)
@@ -232,6 +242,40 @@ def add_text(
         ),
     )
     background.add_task(ingest, content.id, data)
+    return to_response(content)
+
+
+@router.put("/{content_id}/schedule", response_model=KnowledgeContentResponse, dependencies=_WRITE)
+def update_schedule(
+    base_id: UUID, content_id: UUID, body: ContentScheduleInput, session: SessionDep
+) -> KnowledgeContentResponse:
+    """Intervalo de reindexação de uma URL; vazio desliga."""
+    content = _content_or_404(session, base_id, content_id)
+    if content.source_type != "url":
+        raise HTTPException(status_code=422, detail="Só conteúdo de URL é reindexado no intervalo")
+    content.refresh_every_hours = body.refresh_every_hours
+    content.next_refresh_at = next_at(body.refresh_every_hours)
+    session.commit()
+    session.refresh(content)
+    return to_response(content)
+
+
+@router.post(
+    "/{content_id}/refresh",
+    response_model=KnowledgeContentResponse,
+    status_code=202,
+    dependencies=_WRITE,
+)
+def refresh_content(
+    base_id: UUID, content_id: UUID, session: SessionDep, background: BackgroundTasks
+) -> KnowledgeContentResponse:
+    """Baixa a URL agora; só reindexa se o conteúdo mudou."""
+    content = _content_or_404(session, base_id, content_id)
+    if content.source_type != "url":
+        raise HTTPException(status_code=422, detail="Só conteúdo de URL é baixado de novo")
+    if content.status == "processing":
+        raise HTTPException(status_code=409, detail="Conteúdo em processamento")
+    background.add_task(refresh_url, content.id)
     return to_response(content)
 
 

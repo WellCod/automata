@@ -57,6 +57,8 @@ class ConnectorInput(BaseModel):
     settings: dict[str, Any]
     # None mantém o segredo salvo; {} apaga
     secret: dict[str, Annotated[str, Field(max_length=4000)]] | None = None
+    # vazio = só manual
+    sync_every_hours: int | None = Field(default=None, ge=1, le=168)
 
 
 class ConnectorResponse(BaseModel):
@@ -71,6 +73,8 @@ class ConnectorResponse(BaseModel):
     last_message: str | None
     last_summary: dict[str, Any] | None
     last_sync_at: datetime | None
+    sync_every_hours: int | None
+    next_sync_at: datetime | None
     content_count: int
     created_by: str
     created_at: datetime
