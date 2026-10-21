@@ -587,6 +587,7 @@ if __name__ == "__main__":
 | 22 — Orçamento e alertas | #164 em diante | Custo estimado pela tabela de preços, orçamento mensal com bloqueio e destinos de aviso | Fases 19 e 21 |
 | 23 — Suíte de workflow e bloqueio | depois da 22 | Suíte de testes para workflows e caso que espera bloqueio de guardrail | Fases 14, 15 e 16 |
 | 24 — Revisão humana no workflow | depois da 23 | Etapa que pausa para aprovação antes de rodar ou depois da saída | Fases 12 e 15 |
+| 25 — Conectores de conhecimento | depois da 24 | GitHub, S3 e SharePoint na base, com sincronização e reindexação agendada de URL | Fases 13 e 18 |
 
 Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
 
@@ -1040,3 +1041,21 @@ Decisão em [ADR-0023](adr/0023-revisao-humana-no-workflow.md). Uma etapa pode p
 - Revisão em ramo paralelo ou em laço é recusada na escrita.
 
 Fica para depois: editar a saída na aprovação, revisão por volta de laço e revisão em ramo paralelo.
+
+## Fase 25 — Conectores de conhecimento e reindexação agendada
+
+Decisão em [ADR-0024](adr/0024-conectores-de-conhecimento.md). A base passa a acompanhar a origem: conectores de GitHub, S3 e SharePoint sincronizam pela versão remota, e conteúdo de URL pode ser baixado de novo num intervalo, reindexando só o que mudou.
+
+- [ ] `docs(adr)`: ADR-0024 e esta seção
+- [ ] `feat(api)`: conectores de GitHub, S3 e SharePoint com credencial cifrada, teste e sincronização pela versão remota
+- [ ] `feat(api)`: sincronização agendada de conector e reindexação agendada de URL no poller
+- [ ] `feat(web)`: conectores e reindexação na página da base
+- [ ] `test(api)`: evals da sincronização e da reindexação
+
+**Critério de aceite da fase:**
+
+- Um conector de GitHub ingere os arquivos `.md` de uma pasta, e um arquivo alterado no repositório é reindexado na próxima sincronização sem duplicar trechos.
+- Um arquivo removido da origem sai da base.
+- Uma URL com reindexação de 24 h que não mudou não gera consumo de embedding.
+
+Fica para depois: webhook da origem, Google Drive e GCS, e filtros por padrão de nome de arquivo.
