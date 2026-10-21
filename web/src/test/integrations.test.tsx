@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import IntegrationsPage from "@/app/integracoes/page";
@@ -41,6 +41,7 @@ describe("integrações", () => {
         name: "zendesk",
         agent_ids: ["a1"],
         team_ids: [],
+        eval_ids: [],
         created_by: "owner",
         created_at: "2026-10-15T00:00:00Z",
         expires_at: "2026-11-14T00:00:00Z",
@@ -56,12 +57,19 @@ describe("integrações", () => {
     const emitir = screen.getByRole("button", { name: "Emitir token" });
     expect(emitir).toBeDisabled();
     await user.type(screen.getByLabelText("Sistema consumidor"), "zendesk");
-    await user.click(await screen.findByRole("checkbox", { name: "Cobrança" }));
+    const agentes = await screen.findByRole("group", { name: "Agentes" });
+    await user.click(await within(agentes).findByRole("checkbox", { name: "Cobrança" }));
     await user.click(emitir);
 
     await waitFor(() => expect(client.POST).toHaveBeenCalled());
     expect(vi.mocked(client.POST).mock.calls[0][1]).toEqual({
-      body: { name: "zendesk", agent_ids: ["a1"], team_ids: [], expires_in_days: 30 },
+      body: {
+        name: "zendesk",
+        agent_ids: ["a1"],
+        team_ids: [],
+        eval_ids: [],
+        expires_in_days: 30,
+      },
     });
     const dialog = await screen.findByRole("alertdialog", { name: /token emitido/i });
     expect(dialog).toHaveTextContent("jwt-secreto");
@@ -69,5 +77,36 @@ describe("integrações", () => {
 
     await user.click(screen.getByRole("button", { name: "Já copiei" }));
     expect(screen.queryByText("jwt-secreto")).not.toBeInTheDocument();
+  });
+
+  it("token só de suíte para o CI de quem consome o agente", async () => {
+    vi.mocked(client.POST).mockResolvedValue({
+      data: {
+        id: "i2",
+        name: "ci",
+        agent_ids: [],
+        team_ids: [],
+        eval_ids: ["a1"],
+        created_by: "owner",
+        created_at: "2026-10-21T00:00:00Z",
+        expires_at: "2026-11-20T00:00:00Z",
+        revoked_at: null,
+        token: "jwt-ci",
+        mcp_url: null,
+      },
+      error: undefined,
+    } as never);
+    const user = userEvent.setup();
+    render(<IntegrationsPage />, { wrapper });
+
+    await user.type(screen.getByLabelText("Sistema consumidor"), "ci");
+    const suite = await screen.findByRole("group", { name: "Suíte de testes (CI)" });
+    await user.click(await within(suite).findByRole("checkbox", { name: "Cobrança" }));
+    await user.click(screen.getByRole("button", { name: "Emitir token" }));
+
+    await waitFor(() => expect(client.POST).toHaveBeenCalled());
+    expect(vi.mocked(client.POST).mock.calls.at(-1)![1]).toMatchObject({
+      body: { agent_ids: [], team_ids: [], eval_ids: ["a1"] },
+    });
   });
 });

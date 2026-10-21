@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import client from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
+import { useSuiteStatus } from "@/lib/api/evals";
+import { SuiteBadge } from "@/components/suite-badge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/status-badge";
 
@@ -90,6 +92,7 @@ function NewTeamForm({ onCancel }: { onCancel: () => void }) {
 
 export default function TeamsPage() {
   const [showNew, setShowNew] = useState(false);
+  const { data: suites } = useSuiteStatus();
   const { data, isPending, isError } = useQuery({
     queryKey: ["configs", "teams"],
     queryFn: async () => {
@@ -150,7 +153,7 @@ export default function TeamsPage() {
                 <span className="text-muted-foreground line-clamp-2 text-[13px]">
                   {team.description}
                 </span>
-                <span className="mt-auto pt-2">
+                <span className="mt-auto flex flex-wrap gap-1 pt-2">
                   {team.current_version ? (
                     <Badge tone="active">v{team.current_version.version_number} ativa</Badge>
                   ) : team.draft_version ? (
@@ -158,6 +161,7 @@ export default function TeamsPage() {
                   ) : (
                     <Badge tone="neutral">Sem versão</Badge>
                   )}
+                  <SuiteBadge status={suites?.get(team.id)} />
                 </span>
               </Link>
             </li>

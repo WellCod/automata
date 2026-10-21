@@ -85,3 +85,28 @@ export const CHANGE_LABEL: Record<EvalComparison["cases"][number]["change"], str
 export function runActive(run: Pick<EvalRunSummary, "status"> | undefined): boolean {
   return run?.status === "queued" || run?.status === "running";
 }
+
+export type EvalSchedule = Schemas["EvalScheduleResponse"];
+export type EvalScheduleInput = Schemas["EvalScheduleInput"];
+export type EvalSuiteStatus = Schemas["EvalSuiteStatus"];
+
+export const TRIGGER_LABEL: Record<EvalRunSummary["trigger"], string> = {
+  manual: "manual",
+  integration: "integração",
+  schedule: "agendada",
+};
+
+export const SUITE_STATE_LABEL: Record<EvalSuiteStatus["state"], string> = {
+  running: "Suíte rodando",
+  passing: "Suíte verde",
+  failing: "Suíte falhando",
+  regressed: "Suíte regrediu",
+};
+
+// frequências prontas; o cron livre fica como avançado. Intervalo mínimo da API: 1 hora
+export const SCHEDULE_PRESETS: { label: string; cron: string }[] = [
+  { label: "A cada 6 horas", cron: "0 */6 * * *" },
+  { label: "Todo dia às 8h", cron: "0 8 * * *" },
+  { label: "Dias úteis às 8h", cron: "0 8 * * 1-5" },
+  { label: "Toda segunda às 8h", cron: "0 8 * * 1" },
+];

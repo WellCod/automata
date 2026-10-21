@@ -28,6 +28,20 @@ function usePublished(kind: "agent" | "team") {
   });
 }
 
+// a suíte pode rodar no rascunho: entram agentes e times com qualquer status
+function useTestable(kind: "agent" | "team") {
+  return useQuery({
+    queryKey: ["configs", "testable", kind],
+    queryFn: async () => {
+      const res = await client.GET("/api/v1/configs", {
+        params: { query: { kind, page_size: 100 } },
+      });
+      if (res.error) throw new Error("Falha ao carregar");
+      return res.data!.items;
+    },
+  });
+}
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR");
 }
@@ -90,6 +104,10 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
   const [days, setDays] = useState(30);
   const [agentIds, setAgentIds] = useState<string[]>([]);
   const [teamIds, setTeamIds] = useState<string[]>([]);
+  const [evalIds, setEvalIds] = useState<string[]>([]);
+  const { data: testableAgents } = useTestable("agent");
+  const { data: testableTeams } = useTestable("team");
+  const testable = [...(testableAgents ?? []), ...(testableTeams ?? [])];
 
   const issue = useMutation({
     mutationFn: async () => {
@@ -98,6 +116,7 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
           name: name.trim(),
           agent_ids: agentIds,
           team_ids: teamIds,
+          eval_ids: evalIds,
           expires_in_days: days,
         },
       });
@@ -108,6 +127,7 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
       setName("");
       setAgentIds([]);
       setTeamIds([]);
+      setEvalIds([]);
       void queryClient.invalidateQueries({ queryKey: ["integrations"] });
       onIssued(issued);
     },
@@ -117,7 +137,7 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
     set(on ? [...list, value] : list.filter((v) => v !== value));
   }
 
-  const nothingSelected = agentIds.length === 0 && teamIds.length === 0;
+  const nothingSelected = agentIds.length === 0 && teamIds.length === 0 && evalIds.length === 0;
 
   return (
     <form
@@ -192,6 +212,27 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
         </fieldset>
       </div>
 
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className="text-foreground mb-1 text-[13px] font-medium">
+          Suíte de testes (CI)
+        </legend>
+        <p className="text-muted-foreground text-[11px]">
+          O token roda e lê o resultado da suíte destes agentes e times, para o pipeline de quem os
+          consome. Cada execução gasta tokens até o token ser revogado; casos e gate continuam só no
+          painel.
+        </p>
+        {testable.map((c) => (
+          <label key={c.id} className="flex items-center gap-2 text-[13px]">
+            <input
+              type="checkbox"
+              checked={evalIds.includes(c.id)}
+              onChange={(e) => toggle(evalIds, setEvalIds, c.id, e.target.checked)}
+            />
+            <span className="text-foreground">{c.name}</span>
+          </label>
+        ))}
+      </fieldset>
+
       {issue.isError && (
         <p className="text-destructive text-[13px]" role="alert">
           {issue.error.message}
@@ -225,6 +266,7 @@ function IntegrationRow({ item, names }: { item: Integration; names: Record<stri
   const expired = new Date(item.expires_at) < new Date();
   const status = item.revoked_at ? "revogado" : expired ? "expirado" : "ativo";
   const resources = [...item.agent_ids, ...item.team_ids].map((i) => names[i] ?? i);
+  const suites = item.eval_ids.map((i) => names[i] ?? i);
 
   return (
     <li className="border-border bg-card flex flex-wrap items-center justify-between gap-3 rounded border px-4 py-3">
@@ -237,9 +279,16 @@ function IntegrationRow({ item, names }: { item: Integration; names: Record<stri
             {status}
           </span>
         </span>
-        <span className="text-muted-foreground text-[13px]">
-          Pode chamar: {resources.join(", ")}
-        </span>
+        {resources.length > 0 && (
+          <span className="text-muted-foreground text-[13px]">
+            Pode chamar: {resources.join(", ")}
+          </span>
+        )}
+        {suites.length > 0 && (
+          <span className="text-muted-foreground text-[13px]">
+            Roda a suíte de: {suites.join(", ")}
+          </span>
+        )}
         <span className="text-muted-foreground text-[11px]">
           emitido por {item.created_by} em {formatDate(item.created_at)} · expira em{" "}
           {formatDate(item.expires_at)}
@@ -270,8 +319,8 @@ function IntegrationRow({ item, names }: { item: Integration; names: Record<stri
 
 export default function IntegrationsPage() {
   const [issued, setIssued] = useState<Issued | null>(null);
-  const { data: agents } = usePublished("agent");
-  const { data: teams } = usePublished("team");
+  const { data: agents } = useTestable("agent");
+  const { data: teams } = useTestable("team");
   const names = Object.fromEntries(
     [...(agents ?? []), ...(teams ?? [])].map((c) => [c.id, c.name]),
   );

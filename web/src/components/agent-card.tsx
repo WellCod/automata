@@ -1,11 +1,13 @@
 import { ArrowUpRight, Bot, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import type { components } from "@/lib/api/schema.d.ts";
+import { SuiteBadge } from "@/components/suite-badge";
 
 type AgentConfig = components["schemas"]["AgentConfigResponse"];
 
 interface Props {
   agent: AgentConfig;
+  suite?: components["schemas"]["EvalSuiteStatus"];
 }
 
 function IconMark() {
@@ -43,7 +45,7 @@ function VersionSlot({ agent }: { agent: AgentConfig }) {
   return <span className="text-muted-foreground text-[11px]">Sem versão</span>;
 }
 
-export function AgentCard({ agent }: Props) {
+export function AgentCard({ agent, suite }: Props) {
   return (
     <article className="border-border bg-card hover:border-foreground/20 flex flex-col rounded border p-3 transition-colors">
       {/* Header */}
@@ -70,6 +72,11 @@ export function AgentCard({ agent }: Props) {
           </p>
         </div>
         <VersionSlot agent={agent} />
+        {suite && (
+          <div>
+            <SuiteBadge status={suite} />
+          </div>
+        )}
       </div>
 
       {/* Footer */}

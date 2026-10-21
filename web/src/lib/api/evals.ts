@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import client from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
-import { type EvalCaseInput, runActive } from "@/lib/eval-checks";
+import { type EvalCaseInput, type EvalScheduleInput, runActive } from "@/lib/eval-checks";
 
 const path = (configId: string) => ({ params: { path: { config_id: configId } } });
 
@@ -56,6 +56,33 @@ export function useEvalSettings(configId: string, enabled = true) {
       const res = await client.GET("/api/v1/configs/{config_id}/eval-settings", path(configId));
       if (res.error) throw new Error("Falha ao carregar configuração da suíte");
       return res.data!;
+    },
+  });
+}
+
+export function useEvalSchedule(configId: string) {
+  return useQuery({
+    queryKey: ["eval-schedule", configId],
+    queryFn: async () => {
+      const res = await client.GET("/api/v1/configs/{config_id}/eval-schedule", path(configId));
+      if (res.error) {
+        // suíte sem agendamento responde 404
+        if (res.response?.status === 404) return null;
+        throw new Error("Falha ao carregar o agendamento");
+      }
+      return res.data ?? null;
+    },
+  });
+}
+
+// estado da suíte de cada config que já rodou, para as listas de agentes e times
+export function useSuiteStatus() {
+  return useQuery({
+    queryKey: ["eval-status"],
+    queryFn: async () => {
+      const res = await client.GET("/api/v1/eval-status");
+      if (res.error) throw new Error("Falha ao carregar o estado das suítes");
+      return new Map((res.data ?? []).map((s) => [s.config_id, s]));
     },
   });
 }
@@ -130,5 +157,25 @@ export function useEvalMutations(configId: string) {
     onSuccess: () => refresh("eval-settings"),
   });
 
-  return { saveCase, deleteCase, startRun, updateSettings };
+  const saveSchedule = useMutation({
+    mutationFn: async (body: EvalScheduleInput) => {
+      const res = await client.PUT("/api/v1/configs/{config_id}/eval-schedule", {
+        ...path(configId),
+        body,
+      });
+      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar o agendamento"));
+      return res.data!;
+    },
+    onSuccess: () => refresh("eval-schedule"),
+  });
+
+  const deleteSchedule = useMutation({
+    mutationFn: async () => {
+      const res = await client.DELETE("/api/v1/configs/{config_id}/eval-schedule", path(configId));
+      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao remover o agendamento"));
+    },
+    onSuccess: () => refresh("eval-schedule"),
+  });
+
+  return { saveCase, deleteCase, startRun, updateSettings, saveSchedule, deleteSchedule };
 }
