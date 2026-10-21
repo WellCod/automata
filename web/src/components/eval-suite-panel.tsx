@@ -27,6 +27,7 @@ import {
   runActive,
   TRIGGER_LABEL,
 } from "@/lib/eval-checks";
+import { blockLabel } from "@/lib/guardrail-labels";
 import { Button } from "@/components/ui/button";
 import { Badge, type BadgeTone } from "@/components/ui/status-badge";
 
@@ -96,6 +97,12 @@ function checkSummary(check: EvalResult["checks"][number]): string {
     return rules.map((r) => `${r.passed === false ? "✗" : "✓"} ${r.kind} "${r.value}"`).join(" · ");
   }
   if (type === "tools") return `esperadas: ${((check.expected as string[]) ?? []).join(", ")}`;
+  if (type === "blocked") {
+    const expected = check.rule ? blockLabel(String(check.rule)) : "qualquer regra";
+    return check.blocked_by
+      ? `esperado: ${expected} · barrou: ${blockLabel(String(check.blocked_by))}`
+      : `esperado: ${expected} · respondeu sem bloquear`;
+  }
   const score = check.score != null ? ` · nota ${String(check.score)}` : "";
   return `${String(check.reason ?? "")}${score}`;
 }
