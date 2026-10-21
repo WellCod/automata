@@ -479,3 +479,56 @@ def test_caso_a_partir_de_conversa_real(client: TestClient) -> None:
         f"/api/v1/configs/{agent}/eval-cases/suggestion", params={"run_id": eval_run_id}
     )
     assert from_eval.status_code == 422
+
+
+def test_caso_que_espera_bloqueio(client: TestClient) -> None:
+    body = {"name": "com guardrail", "description": "Use para com guardrail"}
+    agent = str(client.post("/api/v1/configs", json={**body, "kind": "agent"}).json()["id"])
+    guardrails = {"blocked_topics": ["frete"], "blocked_message": "Não falo disso por aqui."}
+    client.put(
+        f"/api/v1/configs/{agent}/draft",
+        json={**body, "payload": {"model_id": "claude-haiku-4-5", "guardrails": guardrails}},
+    ).raise_for_status()
+
+    def case(name: str, text: str, checks: list[dict[str, Any]]) -> int:
+        return client.post(
+            f"/api/v1/configs/{agent}/eval-cases",
+            json={"name": name, "input": text, "checks": checks},
+        ).status_code
+
+    assert (
+        case("barra frete", "Quanto custa o frete?", [{"type": "blocked", "rule": "off_topic"}])
+        == 201
+    )
+    assert case("barra qualquer", "E o frete?", [{"type": "blocked"}]) == 201
+    assert (
+        case("regra errada", "O frete é grátis?", [{"type": "blocked", "rule": "pii_detected"}])
+        == 201
+    )
+    assert case("responde", "Qual o prazo?", [{"type": "blocked"}]) == 201
+    # run barrado não tem resposta para checar junto
+    mixed = [{"type": "blocked"}, {"type": "text", "kind": "not_empty"}]
+    assert case("misturado", "Qual o prazo?", mixed) == 422
+    assert case("regra inventada", "x", [{"type": "blocked", "rule": "budget_exceeded"}]) == 422
+
+    run_id = _start(client, agent).json()["id"]
+    run = client.get(f"/api/v1/configs/{agent}/eval-runs/{run_id}").json()
+    assert run["status"] == "completed", run
+    by_name = {r["case_name"]: r for r in run["results"]}
+    assert by_name["barra frete"]["status"] == "passed"
+    assert by_name["barra frete"]["checks"] == [
+        {"type": "blocked", "passed": True, "rule": "off_topic", "blocked_by": "off_topic"}
+    ]
+    assert by_name["barra qualquer"]["status"] == "passed"
+    assert by_name["regra errada"]["status"] == "failed"
+    assert by_name["regra errada"]["checks"][0]["blocked_by"] == "off_topic"
+    answered = by_name["responde"]
+    assert answered["status"] == "failed"
+    assert answered["checks"][0] == {
+        "type": "blocked",
+        "passed": False,
+        "rule": None,
+        "blocked_by": None,
+    }
+    assert answered["output"] == REPLY
+    assert (run["passed"], run["failed"]) == (2, 2)

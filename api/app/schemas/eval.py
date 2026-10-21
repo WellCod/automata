@@ -62,7 +62,27 @@ class JudgeCheck(BaseModel):
     threshold: int = Field(default=7, ge=1, le=10)
 
 
-EvalCheck = Annotated[TextCheck | ToolsCheck | JudgeCheck, Field(discriminator="type")]
+# regras de guardrail que um caso pode esperar (ADR-0022); orçamento não é comportamento
+BlockRule = Literal[
+    "pii_detected",
+    "prompt_injection",
+    "off_topic",
+    "input_too_long",
+    "moderation",
+    "output_not_allowed",
+]
+
+
+class BlockedCheck(BaseModel):
+    """O run precisa ser barrado por guardrail; com `rule`, por essa regra (ADR-0022)."""
+
+    type: Literal["blocked"] = "blocked"
+    rule: BlockRule | None = None
+
+
+EvalCheck = Annotated[
+    TextCheck | ToolsCheck | JudgeCheck | BlockedCheck, Field(discriminator="type")
+]
 
 
 class EvalCaseInput(BaseModel):
@@ -90,6 +110,9 @@ class EvalCaseInput(BaseModel):
         for kind in ("tools", "judge"):
             if sum(1 for c in self.checks if c.type == kind) > 1:
                 raise ValueError(f"no máximo uma checagem do tipo {kind} por caso")
+        # run barrado não tem resposta para comparar, julgar ou conferir tools
+        if any(c.type == "blocked" for c in self.checks) and len(self.checks) > 1:
+            raise ValueError("caso que espera bloqueio não leva outras checagens")
         return self
 
 

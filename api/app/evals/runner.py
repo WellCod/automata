@@ -22,13 +22,15 @@ from app.agents import models_map
 from app.agents.factory import agent_from, load_team, load_version, team_from
 from app.agents.tracking import EvalContext, current_eval_run
 from app.agents.workflow_factory import rule_matches
+from app.budget import RULE_BUDGET
 from app.db import get_db, get_engine
 from app.evals.judge import JudgeUsage, metered
+from app.guardrails.input import BlockLog
 from app.models.eval import EvalResult, EvalRun
 from app.models.usage import UsageEvent
 from app.pricing import cost_or_estimate
 from app.repositories.usage import UsageRepository
-from app.schemas.eval import EvalCaseInput, JudgeCheck, TextCheck, ToolsCheck
+from app.schemas.eval import BlockedCheck, EvalCaseInput, JudgeCheck, TextCheck, ToolsCheck
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +69,13 @@ class TextScorer:
         )
 
 
+class AnsweredScorer:
+    """Caso que espera bloqueio: o Agno só chama o scorer em run completo, que é o que reprova."""
+
+    async def ascore(self, run: Any, expected: Any = None) -> Score:
+        return Score(value=0.0, passed=False, reason="respondeu sem bloquear")
+
+
 @dataclass
 class PlannedCase:
     """Caso gravado mais o que o runner do Agno consegue avaliar dele."""
@@ -78,6 +87,8 @@ class PlannedCase:
     agno_case: Case | None
     # checagens que não rodam nesta execução, com o motivo
     skipped: dict[str, str]
+    # bloqueios do run do caso, para a checagem `blocked` (ADR-0022)
+    blocks: BlockLog | None = None
 
 
 def _split(spec: EvalCaseInput) -> tuple[list[TextCheck], ToolsCheck | None, JudgeCheck | None]:
@@ -85,6 +96,10 @@ def _split(spec: EvalCaseInput) -> tuple[list[TextCheck], ToolsCheck | None, Jud
     tools = next((c for c in spec.checks if isinstance(c, ToolsCheck)), None)
     judge = next((c for c in spec.checks if isinstance(c, JudgeCheck)), None)
     return text, tools, judge
+
+
+def _blocked(spec: EvalCaseInput) -> BlockedCheck | None:
+    return next((c for c in spec.checks if isinstance(c, BlockedCheck)), None)
 
 
 def plan_case(
@@ -99,12 +114,13 @@ def plan_case(
     """`judge_unavailable` é o motivo de o juiz não rodar; None quando há juiz."""
     spec = EvalCaseInput.model_validate(snapshot)
     text, tools, judge = _split(spec)
+    blocked = _blocked(spec)
     skipped: dict[str, str] = {}
     use_judge = judge is not None and judge_unavailable is None
     if judge is not None and judge_unavailable is not None:
         skipped["judge"] = judge_unavailable
     case_id = UUID(snapshot["id"]) if snapshot.get("id") else None
-    if not text and tools is None and not use_judge:
+    if not text and tools is None and not use_judge and blocked is None:
         # o Case do Agno recusa caso sem checagem; nada roda e o caso fica não avaliado
         return PlannedCase(position, case_id, spec.name, spec, None, skipped)
     # instância nova por caso: casos não compartilham sessão, estado nem conexão MCP
@@ -121,7 +137,7 @@ def plan_case(
         timeout_seconds=CASE_TIMEOUT_S,
         expected_tool_calls=tuple(tools.tools) if tools else None,
         allow_additional_tool_calls=tools.allow_additional if tools else True,
-        scorer=TextScorer(text) if text else None,
+        scorer=AnsweredScorer() if blocked is not None else TextScorer(text) if text else None,
         criteria=judge.criteria if judge is not None and use_judge else None,
         judge_mode=JudgeMode(judge.mode) if judge is not None else JudgeMode.BINARY,
         judge_threshold=judge.threshold if judge is not None else 7,
@@ -129,7 +145,8 @@ def plan_case(
         **session_args,
         **target,
     )
-    return PlannedCase(position, case_id, spec.name, spec, agno_case, skipped)
+    blocks = getattr(runner, "automata_blocks", None)
+    return PlannedCase(position, case_id, spec.name, spec, agno_case, skipped, blocks)
 
 
 def _context_args(runner: Any, context: list[str], actor: str) -> dict[str, Any]:
@@ -149,6 +166,10 @@ def _context_args(runner: Any, context: list[str], actor: str) -> dict[str, Any]
                 runner.arun(message, session_id=session_id, user_id=actor, stream=False),
                 CONTEXT_TIMEOUT_S,
             )
+        # bloqueio num turno anterior não é o do turno avaliado
+        blocks = getattr(runner, "automata_blocks", None)
+        if blocks is not None:
+            blocks.blocks.clear()
 
     return {"session_id": session_id, "setup": setup}
 
@@ -186,6 +207,9 @@ def result_from(planned: PlannedCase, result: CaseResult | None) -> EvalResult:
                 "reason": (result.judge_reason if result else None) or planned.skipped.get("judge"),
             }
         )
+    blocked = _blocked(planned.spec)
+    if blocked is not None:
+        return _blocked_result(planned, blocked, result)
     if result is None or result.skipped:
         status = "not_evaluated"
     elif result.error or result.timed_out:
@@ -201,6 +225,38 @@ def result_from(planned: PlannedCase, result: CaseResult | None) -> EvalResult:
         position=planned.position,
         status=status,
         checks=checks,
+        output=result.output if result else None,
+        tools_called=list(result.tools_called) if result else [],
+        duration_ms=int(result.duration_seconds * 1000) if result else None,
+        error=error,
+        session_id=(result.session_id or None) if result else None,
+    )
+
+
+def _blocked_result(
+    planned: PlannedCase, check: BlockedCheck, result: CaseResult | None
+) -> EvalResult:
+    """O bloqueio chega ao Agno como run com erro; o veredito vem do registro de bloqueios."""
+    last = planned.blocks.last if planned.blocks is not None else None
+    rule = last.rule if last is not None and last.rule != RULE_BUDGET else None
+    error: str | None = None
+    if rule is not None:
+        passed: bool | None = check.rule is None or rule == check.rule
+        status = "passed" if passed else "failed"
+    elif result is None or result.skipped:
+        passed, status = None, "not_evaluated"
+    elif result.timed_out or (result.error and result.score is None):
+        # caiu sem bloquear e sem responder: falha da execução, não do guardrail
+        passed, status = None, "error"
+        error = "tempo esgotado" if result.timed_out and not result.error else result.error
+    else:
+        passed, status = False, "failed"
+    return EvalResult(
+        case_id=planned.case_id,
+        case_name=planned.name,
+        position=planned.position,
+        status=status,
+        checks=[{"type": "blocked", "passed": passed, "rule": check.rule, "blocked_by": rule}],
         output=result.output if result else None,
         tools_called=list(result.tools_called) if result else [],
         duration_ms=int(result.duration_seconds * 1000) if result else None,

@@ -1317,6 +1317,28 @@ export interface components {
       /** Tools */
       tools: components["schemas"]["PendingTool"][];
     };
+    /**
+     * BlockedCheck
+     * @description O run precisa ser barrado por guardrail; com `rule`, por essa regra (ADR-0022).
+     */
+    BlockedCheck: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "blocked";
+      /** Rule */
+      rule?:
+        | (
+            | "pii_detected"
+            | "prompt_injection"
+            | "off_topic"
+            | "input_too_long"
+            | "moderation"
+            | "output_not_allowed"
+          )
+        | null;
+    };
     /** Body_upload_file_api_v1_knowledge_bases__base_id__contents_file_post */
     Body_upload_file_api_v1_knowledge_bases__base_id__contents_file_post: {
       /** File */
@@ -1571,6 +1593,7 @@ export interface components {
         | components["schemas"]["TextCheck"]
         | components["schemas"]["ToolsCheck"]
         | components["schemas"]["JudgeCheck"]
+        | components["schemas"]["BlockedCheck"]
       )[];
       /** Source Run Id */
       source_run_id?: string | null;
@@ -1598,6 +1621,7 @@ export interface components {
         | components["schemas"]["TextCheck"]
         | components["schemas"]["ToolsCheck"]
         | components["schemas"]["JudgeCheck"]
+        | components["schemas"]["BlockedCheck"]
       )[];
       /** Source Run Id */
       source_run_id: string | null;
@@ -1632,6 +1656,7 @@ export interface components {
         | components["schemas"]["TextCheck"]
         | components["schemas"]["ToolsCheck"]
         | components["schemas"]["JudgeCheck"]
+        | components["schemas"]["BlockedCheck"]
       )[];
       /** Judge Criteria */
       judge_criteria: string | null;
