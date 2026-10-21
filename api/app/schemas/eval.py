@@ -227,3 +227,15 @@ class EvalScheduleResponse(BaseModel):
     last_error: str | None
     updated_by: str
     updated_at: datetime
+
+
+SuiteStateName = Literal["running", "passing", "failing", "regressed"]
+
+
+class EvalSuiteStatus(BaseModel):
+    config_id: UUID
+    # regressed: a execução agendada mais recente perdeu caso que passava na agendada anterior
+    state: SuiteStateName
+    last_run: EvalRunSummary
+    previous_run_id: UUID | None
+    regressions: int

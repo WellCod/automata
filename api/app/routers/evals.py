@@ -1,5 +1,6 @@
 """Casos de teste e execução da suíte por agente e time (ADR-0015)."""
 
+from dataclasses import asdict
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -7,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 
 from app.authz import Scope, require_resource_scope, require_scopes
 from app.db import SessionDep
+from app.evals.compare import compare, suite_states
 from app.evals.gate import draft_verdict, latest_run
 from app.evals.runner import execute
 from app.evals.scheduler import next_run, validate
@@ -29,6 +31,7 @@ from app.schemas.eval import (
     EvalScheduleResponse,
     EvalSettings,
     EvalSettingsInput,
+    EvalSuiteStatus,
     EvalTrigger,
     EvalVerdict,
 )
@@ -237,54 +240,18 @@ def list_runs(config_id: UUID, session: SessionDep) -> list[EvalRunSummary]:
     return [_summary(session, r) for r in EvalRunRepository(session).list_by_config(config_id)]
 
 
-def _change(base: str | None, target: str | None) -> str:
-    if base is None:
-        return "new"
-    if target is None:
-        return "removed"
-    if base == "passed" and target != "passed":
-        return "regression"
-    if base != "passed" and target == "passed":
-        return "fix"
-    return "same"
-
-
 @runs_router.get("/compare", response_model=EvalComparison)
 def compare_runs(config_id: UUID, base: UUID, target: UUID, session: SessionDep) -> EvalComparison:
     """Caso a caso entre duas execuções; tipicamente a vigente (base) e o rascunho (target)."""
     _config_or_404(session, config_id)
     repo = EvalRunRepository(session)
-    runs = {
-        key: repo.get(config_id, run_id) for key, run_id in (("base", base), ("target", target))
-    }
-    if runs["base"] is None or runs["target"] is None:
+    before, after = repo.get(config_id, base), repo.get(config_id, target)
+    if before is None or after is None:
         raise HTTPException(status_code=404, detail="Execução não encontrada")
-
-    def keyed(run: EvalRun) -> dict[str, EvalResult]:
-        # pelo id do caso; caso apagado depois da execução cai para o nome
-        return {str(r.case_id or r.case_name): r for r in repo.results(run.id)}
-
-    before, after = keyed(runs["base"]), keyed(runs["target"])
-    order = list(after) + [k for k in before if k not in after]
-    cases = []
-    for key in order:
-        b, a = before.get(key), after.get(key)
-        ref = a or b
-        assert ref is not None
-        cases.append(
-            CaseComparison.model_validate(
-                {
-                    "case_id": ref.case_id,
-                    "case_name": ref.case_name,
-                    "base_status": b.status if b else None,
-                    "target_status": a.status if a else None,
-                    "change": _change(b.status if b else None, a.status if a else None),
-                }
-            )
-        )
+    cases = [CaseComparison.model_validate(asdict(c)) for c in compare(repo, before, after)]
     return EvalComparison(
-        base=_summary(session, runs["base"]),
-        target=_summary(session, runs["target"]),
+        base=_summary(session, before),
+        target=_summary(session, after),
         cases=cases,
         regressions=sum(1 for c in cases if c.change == "regression"),
         fixes=sum(1 for c in cases if c.change == "fix"),
@@ -415,3 +382,25 @@ def delete_schedule(config_id: UUID, session: SessionDep) -> Response:
         repo.delete(schedule)
         session.commit()
     return Response(status_code=204)
+
+
+status_router = APIRouter(
+    prefix="/api/v1/eval-status",
+    tags=["evals"],
+    dependencies=[Depends(require_scopes(Scope.EVALS_READ))],
+)
+
+
+@status_router.get("", response_model=list[EvalSuiteStatus])
+def list_suite_status(session: SessionDep) -> list[EvalSuiteStatus]:
+    """Estado da suíte de cada config que já rodou: para a lista de agentes e times."""
+    return [
+        EvalSuiteStatus(
+            config_id=st.config_id,
+            state=st.state,
+            last_run=_summary(session, st.last_run),
+            previous_run_id=st.previous_run_id,
+            regressions=st.regressions,
+        )
+        for st in suite_states(session)
+    ]

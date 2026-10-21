@@ -354,3 +354,13 @@ O poller fica em `app/evals/scheduler.py`:
 - Horário recusado (execução em andamento, suíte sem casos) não para o agendamento: o motivo vai para `last_error` e o próximo horário segue.
 - Desligado com `EVAL_SCHEDULER_ENABLED=false` e sempre desligado no modo demo. Os testes desligam o laço e chamam o `poll_once` direto.
 
+### Estado da suíte
+
+`GET /api/v1/eval-status` (`evals:read`) devolve, para cada config que já rodou a suíte, o estado pela execução mais recente (`app/evals/compare.py`):
+- `running` enquanto ela roda;
+- `passing` com todos os casos aprovados;
+- `failing` no resto;
+- `regressed` quando a execução mais recente é agendada e perdeu caso que passava na agendada anterior.
+
+Cada item traz `regressions`, `previous_run_id` e o resumo da última execução. O painel usa isso na lista de agentes e times e abre a comparação com `base=previous_run_id`. Regressão só é calculada entre execuções agendadas, que têm a mesma origem e o mesmo alvo. Entre uma manual no rascunho e uma agendada na vigente, a diferença não diz nada. A comparação caso a caso saiu do router para o mesmo módulo e serve às duas telas.
+

@@ -16,8 +16,8 @@ from agno.agent import Agent
 from agno.eval.suite import CaseResult, JudgeMode
 
 from app.evals import gate, runner
+from app.evals.compare import change
 from app.evals.runner import JUDGE_IN_DEMO, JUDGE_WITHOUT_MODEL, TextScorer, plan_case, result_from
-from app.routers.evals import _change
 from app.schemas.eval import TextCheck
 from tests.fake_models import FixedReplyModel
 
@@ -161,7 +161,7 @@ def test_gate_so_libera_suite_completa_e_verde(monkeypatch: pytest.MonkeyPatch) 
 
 
 @pytest.mark.parametrize(
-    ("base", "target", "change"),
+    ("base", "target", "expected"),
     [
         ("passed", "failed", "regression"),
         ("passed", "error", "regression"),
@@ -173,5 +173,5 @@ def test_gate_so_libera_suite_completa_e_verde(monkeypatch: pytest.MonkeyPatch) 
         ("passed", None, "removed"),
     ],
 )
-def test_comparacao(base: str | None, target: str | None, change: str) -> None:
-    assert _change(base, target) == change
+def test_comparacao(base: str | None, target: str | None, expected: str) -> None:
+    assert change(base, target) == expected
