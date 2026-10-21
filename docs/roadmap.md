@@ -579,6 +579,7 @@ if __name__ == "__main__":
 | Usuários e redesign | #97, #100 | Gestão de usuários, tema claro e escuro | — |
 | 15 — Workflows | #108–#114 | Etapas em sequência, paralelo, condição e loop sobre agentes e times | Fases 12 e 14 |
 | 16 — Evals no painel | #118–#125 | Casos de teste por agente e time, juiz por LLM, regressão entre versões e gate de publicação | Fases 13 e 14 |
+| 17 — Evals contínuos | #127 em diante | Suíte disparada por token de integração, agendamento e casos a partir de conversas reais | Fase 16 |
 
 Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
 
@@ -871,3 +872,28 @@ Decisão em [ADR-0015](adr/0015-evals-por-agente.md). Cada agente e time ganha u
 
 Fica para depois: suíte em workflow, caso que espera bloqueio de guardrail, execução agendada, execução disparada por token de integração (CI de quem consome o agente) e geração de casos a partir de conversas reais.
 
+
+---
+
+## Fase 17 — Evals contínuos
+
+Decisão em [ADR-0016](adr/0016-evals-continuos.md). A suíte da Fase 16 deixa de depender do botão Rodar: tokens de integração disparam e consultam a suíte dos agentes e times liberados, um agendamento por config roda a suíte contra a vigente, e conversas reais viram casos de teste revisados, com dados pessoais mascarados. Regressão agendada aparece na lista de agentes e na aba Testes.
+
+- [ ] `docs(adr)`: ADR-0016 e esta seção
+- [ ] `feat(api)`: origem e alvo por apelido na execução da suíte. `trigger` e `target` no `eval_run`, `verdict` no resumo
+- [ ] `feat(api)`: tokens de integração disparam e consultam a suíte. Escopos `evals:<id>:run` e `evals:<id>:read` por config na emissão, checagem por recurso nas rotas de execução
+- [ ] `feat(api)`: agendamento da suíte com poller próprio. Tabela `eval_schedule`, cron e fuso com `agno.scheduler.cron`, reivindicação com `SKIP LOCKED`, intervalo mínimo de 1 hora, desligado no modo demo
+- [ ] `feat(api)`: estado da suíte e regressão agendada. Comparação com a execução agendada anterior e estado da suíte na lista de configs
+- [ ] `feat(api)`: sugestão de caso a partir de um run real. Entrada mascarada, tools chamadas e critério de rascunho, `source_run_id` no `eval_case`
+- [ ] `feat(web)`: agendamento e origem das execuções na aba Testes, estado da suíte na lista, suíte na emissão de tokens de integração
+- [ ] `feat(web)`: "Virar caso de teste" no histórico de execuções e na árvore de execução
+- [ ] `test(api)`: evals do agendamento, do escopo por recurso e da sugestão de caso, e exemplo de job de CI na documentação
+
+**Critério de aceite da fase:**
+
+- Um token de integração liberado só para o agente de atendimento dispara a suíte na vigente e lê `verdict` até a execução terminar. O mesmo token recebe 403 na suíte de outro agente e na edição de casos.
+- Um agendamento diário roda sozinho, com origem "agendada", e duas réplicas da API não duplicam a execução.
+- Com uma mudança na base de conhecimento que quebra um caso, a execução agendada seguinte aparece como regressão na lista de agentes.
+- Uma conversa com CPF no histórico vira caso com `[CPF]` no lugar do número e com a tool que o run chamou já marcada.
+
+Fica para depois: aviso de regressão por webhook ou e-mail, suíte em workflow, caso que espera bloqueio de guardrail, casos de várias mensagens e geração automática de casos em lote a partir das conversas.
