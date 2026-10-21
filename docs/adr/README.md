@@ -42,3 +42,4 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0014](0014-workflows-por-etapas.md) | Workflows por etapas sobre agentes e times publicados, com regras próprias no lugar de CEL | Aceito |
 | [0015](0015-evals-por-agente.md) | Evals por agente no painel, com casos fora da versão e o runner de suíte do Agno | Aceito |
 | [0016](0016-evals-continuos.md) | Evals contínuos: disparo por token de integração, agendamento próprio e casos a partir de conversas reais | Aceito |
+| [0017](0017-estrategia-de-recuperacao.md) | Estratégia de recuperação por base com o reranker do Agno e HyDE medido | Proposto |

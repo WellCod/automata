@@ -580,6 +580,7 @@ if __name__ == "__main__":
 | 15 — Workflows | #108–#114 | Etapas em sequência, paralelo, condição e loop sobre agentes e times | Fases 12 e 14 |
 | 16 — Evals no painel | #118–#125 | Casos de teste por agente e time, juiz por LLM, regressão entre versões e gate de publicação | Fases 13 e 14 |
 | 17 — Evals contínuos | #127, #130–#140 | Suíte disparada por token de integração, agendamento e casos a partir de conversas reais | Fase 16 |
+| 18 — Recuperação por base | #143 em diante | Reranker do Agno (MMR e recência) e HyDE medido por base de conhecimento | Fases 13 e 17 |
 
 Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
 
@@ -902,3 +903,25 @@ Pré-requisito: Agno 3.1.x (#128 e #129).
 - Um caso com duas mensagens de contexto só passa se o agente usar o que foi dito antes; sem o contexto, o mesmo caso falha.
 
 Fica para depois: aviso de regressão por webhook ou e-mail, suíte em workflow, caso que espera bloqueio de guardrail e geração automática de casos em lote a partir das conversas.
+
+---
+
+## Fase 18 — Estratégia de recuperação por base
+
+Decisão em [ADR-0017](adr/0017-estrategia-de-recuperacao.md). Cada base de conhecimento ganha uma estratégia de busca, com o reranker do Agno (diversidade por MMR ou recência) e o HyDE com modelo nosso e medido. A busca de teste compara com e sem a estratégia, e os evals de recuperação medem cada uma.
+
+- [ ] #143 — `docs(adr)`: ADR-0017 e esta seção
+- [ ] `feat(api)`: estratégia de recuperação por base com MMR e recência. `retrieval` no `knowledge_base` (migration 0028), busca com lote maior de candidatos e reordenação contra a pergunta original
+- [ ] `feat(api)`: HyDE com modelo escolhido e medido. Medidor também no `invoke` síncrono, `usage_event` do agente pelo `RunContext` da tool, desligado no modo demo
+- [ ] `feat(api)`: busca de teste compara com e sem a estratégia da base
+- [ ] `feat(web)`: estratégia de busca na página da base e comparação lado a lado na busca de teste
+- [ ] `test(api)`: evals de recuperação por estratégia, literais em todo PR e semânticos à noite
+
+**Critério de aceite da fase:**
+
+- Numa base com dois documentos repetidos e um terceiro relevante, o MMR traz o terceiro para o top-3, e a busca simples não traz.
+- Numa base com a política antiga e a nova, a recência põe a nova primeiro sem tirar a antiga dos resultados.
+- Com HyDE ligado, a busca de teste mostra os tokens gastos, e a busca do agente grava o consumo no agente.
+- O recall literal não cai com nenhuma estratégia.
+
+Fica para depois: reranker por cross-encoder (Cohere, Bedrock), estratégia por agente e filtros escolhidos pelo modelo.
