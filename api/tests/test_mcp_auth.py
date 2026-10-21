@@ -52,9 +52,9 @@ def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
 def mcp_client() -> Generator[TestClient, None, None]:
     from app.main import create_app
 
-    # raise_server_exceptions=False porque o handler MCP do fastmcp lança RuntimeError
-    # quando executado sem loop async (contexto de TestClient). Isso é esperado para o
-    # terceiro teste — a verificação de auth ocorre antes do handler.
+    # sem o `with`, o lifespan não roda e o handler MCP do fastmcp lança RuntimeError:
+    # aqui só interessa a autenticação, que vem antes do handler. O protocolo de verdade,
+    # com o lifespan, está em test_mcp_server.py
     yield TestClient(
         create_app(auto_provision_dbs=False, enable_auth=True, enable_mcp_server=True),
         raise_server_exceptions=False,

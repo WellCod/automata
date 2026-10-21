@@ -1,8 +1,8 @@
 import asyncio
 import logging
 import uuid
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager, suppress
+from collections.abc import AsyncIterator, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
 
 from agno.agent import Agent
 from agno.agent.factory import AgentFactory
@@ -92,19 +92,29 @@ class SyncPublishedAgentsMiddleware(BaseHTTPMiddleware):
         return response
 
 
-@asynccontextmanager
-async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Laço das suítes agendadas. O Starlette não roda o lifespan do AgentOS montado."""
-    task: asyncio.Task[None] | None = None
-    if get_settings().eval_scheduler_enabled and not demo_replay():
-        task = asyncio.create_task(run_scheduled_evals())
-    try:
-        yield
-    finally:
-        if task is not None:
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
+def _lifespan_for(protected: FastAPI) -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
+    """Lifespan do app externo: o do AgentOS montado e o laço das suítes agendadas.
+
+    O Starlette não roda o lifespan de um app montado. Sem entrar nele aqui, o
+    servidor MCP do AgentOS (/mcp) respondia 500, "Task group is not initialized",
+    e os demais lifespans do Agno (banco, fila de background, cliente HTTP) não subiam.
+    """
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        async with protected.router.lifespan_context(protected):
+            task: asyncio.Task[None] | None = None
+            if get_settings().eval_scheduler_enabled and not demo_replay():
+                task = asyncio.create_task(run_scheduled_evals())
+            try:
+                yield
+            finally:
+                if task is not None:
+                    task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await task
+
+    return lifespan
 
 
 def _fail_stale_evals() -> None:
@@ -192,12 +202,14 @@ def create_app(
         mcp=MCPConfig(default_tools=True, server_card=False) if enable_mcp_server else False,
         mcp_auth=mcp_auth,
         tracing=settings.tracing_enabled,
+        # o lifespan agora roda: sem isto, o boot mandaria telemetria de lançamento ao Agno
+        telemetry=False,
     ).get_app()
 
     # auth_router fica fora do middleware do Agno: /login precisa ser público
     # (não tem como exigir JWT para obter JWT). O /users tem proteção própria
     # via _require_admin que verifica JWT + scope agent_os:admin.
-    outer: FastAPI = FastAPI(title="automata", lifespan=_lifespan, **docs)  # type: ignore[arg-type]
+    outer: FastAPI = FastAPI(title="automata", lifespan=_lifespan_for(protected), **docs)  # type: ignore[arg-type]
     outer.state.rate_limiter = make_rate_limiter(settings.redis_url, limit=5, window=60)
     outer.state.revoked_tokens = revoked
     outer.add_middleware(SyncPublishedAgentsMiddleware, published=published)
