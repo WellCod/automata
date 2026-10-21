@@ -48,3 +48,4 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0020](0020-fila-duravel.md) | Fila durável do Agno para runs em background, no Postgres, com Redis opcional | Aceito |
 | [0021](0021-orcamento-e-alertas.md) | Custo pela tabela de preços, orçamento mensal por config e destinos de aviso | Proposto |
 | [0022](0022-suite-de-workflow-e-bloqueio.md) | Suíte de testes para workflows e caso que espera bloqueio de guardrail | Proposto |
+| [0023](0023-revisao-humana-no-workflow.md) | Revisão humana numa etapa do workflow, antes de rodar ou depois da saída | Proposto |
