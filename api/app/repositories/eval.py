@@ -1,9 +1,10 @@
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.eval import EvalCase, EvalResult, EvalRun
+from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSchedule
 
 
 class EvalCaseRepository:
@@ -82,5 +83,33 @@ class EvalRunRepository:
     def results(self, run_id: UUID) -> list[EvalResult]:
         stmt = (
             select(EvalResult).where(EvalResult.eval_run_id == run_id).order_by(EvalResult.position)
+        )
+        return list(self._session.scalars(stmt))
+
+
+class EvalScheduleRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get(self, config_id: UUID) -> EvalSchedule | None:
+        stmt = select(EvalSchedule).where(EvalSchedule.agent_config_id == config_id)
+        return self._session.scalars(stmt).first()
+
+    def add(self, schedule: EvalSchedule) -> EvalSchedule:
+        self._session.add(schedule)
+        self._session.flush()
+        return schedule
+
+    def delete(self, schedule: EvalSchedule) -> None:
+        self._session.delete(schedule)
+
+    def claim_due(self, now: datetime, limit: int = 10) -> list[EvalSchedule]:
+        """Agendamentos vencidos, travados até o commit; outra réplica pula os travados."""
+        stmt = (
+            select(EvalSchedule)
+            .where(EvalSchedule.enabled.is_(True), EvalSchedule.next_run_at <= now)
+            .order_by(EvalSchedule.next_run_at)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
         )
         return list(self._session.scalars(stmt))

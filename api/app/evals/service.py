@@ -61,8 +61,13 @@ def create_run(
     *,
     actor: str,
     trigger: EvalTrigger,
+    commit: bool = True,
 ) -> EvalRun:
-    """Valida e grava a execução na fila; não roda nada."""
+    """Valida e grava a execução na fila; não roda nada.
+
+    `commit=False` deixa o commit para quem chama: o agendamento grava a execução e
+    o próximo horário juntos, com a linha do agendamento ainda travada.
+    """
     if config.kind == "workflow":
         # o runner de suíte do Agno roda agente ou time; workflow fica para depois
         raise EvalRunRefused(422, "Workflow ainda não tem suíte de testes")
@@ -93,6 +98,7 @@ def create_run(
             target=body.target,
         )
     )
-    session.commit()
-    session.refresh(run)
+    if commit:
+        session.commit()
+        session.refresh(run)
     return run

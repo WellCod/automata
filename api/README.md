@@ -337,3 +337,17 @@ O gate é a flag `agent_config.require_passing_evals` (migration 0022), fora da 
 - Como cada rascunho salvo é uma versão nova, editar o rascunho invalida o resultado anterior sem precisar de hash.
 - Rollback não passa pelo gate: voltar para uma versão já publicada segue livre, porque é a saída de emergência.
 
+### Agendamento
+
+`/api/v1/configs/{id}/eval-schedule` (ADR-0016, migration 0025) guarda um agendamento por config: `GET` lê, `PUT` cria ou troca e `DELETE` apaga. Ler pede `evals:read`; gravar, `evals:write`. O corpo é `{cron_expr, timezone, target, judge_model, enabled}`:
+- `timezone` padrão `America/Sao_Paulo` e `target` padrão `current`, para o agendamento seguir a vigente depois de cada publicação.
+- O cron tem 5 campos e é validado com `agno.scheduler.cron`. Cron vazio é recusado. O intervalo mínimo entre horários seguidos é 1 hora, conferido nos próximos 48 horários.
+- A gravação já recusa o que o horário recusaria: caso com juiz sem `judge_model` ou modelo sem saída estruturada. Desligado, `next_run_at` fica nulo.
+
+O poller fica em `app/evals/scheduler.py`:
+- Um laço no lifespan do app externo acorda a cada 60 s. O Starlette não roda o lifespan do AgentOS montado, por isso o laço fica no app de fora.
+- Ele reivindica os vencidos com `SELECT … FOR UPDATE SKIP LOCKED` e cria a execução pelo `create_run`, com `trigger: schedule` e `started_by: agendamento`. Grava o próximo horário e a execução no mesmo commit, com a linha ainda travada. Com duas réplicas, a segunda pula a linha travada.
+- O próximo horário é calculado a partir de agora. Se a API ficou fora do ar, a execução vencida roda uma vez só na volta.
+- Horário recusado (execução em andamento, suíte sem casos) não para o agendamento: o motivo vai para `last_error` e o próximo horário segue.
+- Desligado com `EVAL_SCHEDULER_ENABLED=false` e sempre desligado no modo demo. Os testes desligam o laço e chamam o `poll_once` direto.
+

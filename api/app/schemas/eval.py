@@ -195,3 +195,28 @@ class EvalComparison(BaseModel):
     cases: list[CaseComparison]
     regressions: int
     fixes: int
+
+
+class EvalScheduleInput(BaseModel):
+    # cron de 5 campos; o painel oferece frequências prontas e cron livre como avançado
+    cron_expr: str = Field(min_length=9, max_length=64)
+    timezone: str = Field(default="America/Sao_Paulo", max_length=64)
+    target: EvalTarget = "current"
+    judge_model: str | None = None
+    enabled: bool = True
+
+
+class EvalScheduleResponse(BaseModel):
+    agent_config_id: UUID
+    cron_expr: str
+    timezone: str
+    target: EvalTarget
+    judge_model: str | None
+    enabled: bool
+    next_run_at: datetime | None
+    last_attempt_at: datetime | None
+    last_run_id: UUID | None
+    # por que o último horário não virou execução
+    last_error: str | None
+    updated_by: str
+    updated_at: datetime

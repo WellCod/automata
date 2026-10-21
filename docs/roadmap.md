@@ -884,7 +884,7 @@ Pré-requisito: Agno 3.1.x (#128 e #129).
 - [x] #127 — `docs(adr)`: ADR-0016 e esta seção
 - [x] `feat(api)`: origem e alvo por apelido na execução da suíte. `trigger` e `target` no `eval_run` (migration 0023), `verdict` no resumo, criação em `app/evals/service.py`
 - [x] `feat(api)`: tokens de integração disparam e consultam a suíte. `eval_ids` na emissão (migration 0024) com escopos `evals:<id>:run` e `evals:<id>:read`, checagem por recurso (`require_resource_scope`) nas rotas de execução
-- [ ] `feat(api)`: agendamento da suíte com poller próprio. Tabela `eval_schedule`, cron e fuso com `agno.scheduler.cron`, reivindicação com `SKIP LOCKED`, intervalo mínimo de 1 hora, desligado no modo demo
+- [x] `feat(api)`: agendamento da suíte com poller próprio. Tabela `eval_schedule` (migration 0025), cron e fuso com `agno.scheduler.cron`, reivindicação com `SKIP LOCKED`, intervalo mínimo de 1 hora, desligado no modo demo e por `EVAL_SCHEDULER_ENABLED`
 - [ ] `feat(api)`: casos com turnos anteriores. `context` no `eval_case` (até cinco mensagens), rodado no `setup` do `Case` no mesmo `session_id`, e `user_id` do caso no lugar da troca pela `ContextVar`
 - [ ] `feat(api)`: estado da suíte e regressão agendada. Comparação com a execução agendada anterior e estado da suíte na lista de configs
 - [ ] `feat(api)`: sugestão de caso a partir de um run real. Leitura em `agno_runs`, entrada e contexto mascarados, tools chamadas e critério de rascunho, `source_run_id` no `eval_case`

@@ -1,5 +1,6 @@
 """Casos de teste e execução da suíte por agente e time (ADR-0015)."""
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
@@ -8,11 +9,12 @@ from app.authz import Scope, require_resource_scope, require_scopes
 from app.db import SessionDep
 from app.evals.gate import draft_verdict, latest_run
 from app.evals.runner import execute
-from app.evals.service import EvalRunRefused, create_run
+from app.evals.scheduler import next_run, validate
+from app.evals.service import EvalRunRefused, check_judge, create_run
 from app.models.config import AgentConfig
-from app.models.eval import EvalCase, EvalResult, EvalRun
+from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSchedule
 from app.repositories.config import ConfigRepository
-from app.repositories.eval import EvalCaseRepository, EvalRunRepository
+from app.repositories.eval import EvalCaseRepository, EvalRunRepository, EvalScheduleRepository
 from app.schemas.eval import (
     MAX_CASES,
     CaseComparison,
@@ -23,6 +25,8 @@ from app.schemas.eval import (
     EvalRunCreate,
     EvalRunDetail,
     EvalRunSummary,
+    EvalScheduleInput,
+    EvalScheduleResponse,
     EvalSettings,
     EvalSettingsInput,
     EvalTrigger,
@@ -327,3 +331,84 @@ def update_settings(config_id: UUID, body: EvalSettingsInput, session: SessionDe
     session.commit()
     session.refresh(config)
     return _settings(session, config)
+
+
+schedule_router = APIRouter(
+    prefix="/api/v1/configs/{config_id}/eval-schedule",
+    tags=["evals"],
+    dependencies=[Depends(require_scopes(Scope.EVALS_READ))],
+)
+
+
+def _schedule(s: EvalSchedule) -> EvalScheduleResponse:
+    return EvalScheduleResponse(
+        agent_config_id=s.agent_config_id,
+        cron_expr=s.cron_expr,
+        timezone=s.timezone,
+        target=s.target,
+        judge_model=s.judge_model,
+        enabled=s.enabled,
+        next_run_at=s.next_run_at,
+        last_attempt_at=s.last_attempt_at,
+        last_run_id=s.last_run_id,
+        last_error=s.last_error,
+        updated_by=s.updated_by,
+        updated_at=s.updated_at,
+    )
+
+
+@schedule_router.get("", response_model=EvalScheduleResponse)
+def read_schedule(config_id: UUID, session: SessionDep) -> EvalScheduleResponse:
+    _config_or_404(session, config_id)
+    schedule = EvalScheduleRepository(session).get(config_id)
+    if schedule is None:
+        raise HTTPException(status_code=404, detail="Suíte sem agendamento")
+    return _schedule(schedule)
+
+
+@schedule_router.put("", response_model=EvalScheduleResponse, dependencies=_WRITE)
+def save_schedule(
+    config_id: UUID, body: EvalScheduleInput, request: Request, session: SessionDep
+) -> EvalScheduleResponse:
+    config = _config_or_404(session, config_id)
+    _testable(config)
+    reason = validate(body.cron_expr, body.timezone)
+    if reason is not None:
+        raise HTTPException(status_code=422, detail=reason)
+    try:
+        # recusa já na gravação o que o horário recusaria: juiz sem modelo, modelo sem schema
+        check_judge(EvalCaseRepository(session).list_by_config(config_id), body.judge_model)
+    except EvalRunRefused as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    repo = EvalScheduleRepository(session)
+    schedule = repo.get(config_id) or repo.add(
+        EvalSchedule(
+            agent_config_id=config_id,
+            cron_expr=body.cron_expr,
+            timezone=body.timezone,
+            updated_by=_actor(request),
+        )
+    )
+    schedule.cron_expr = body.cron_expr
+    schedule.timezone = body.timezone
+    schedule.target = body.target
+    schedule.judge_model = body.judge_model
+    schedule.enabled = body.enabled
+    schedule.updated_by = _actor(request)
+    schedule.next_run_at = (
+        next_run(body.cron_expr, body.timezone, datetime.now(UTC)) if body.enabled else None
+    )
+    session.commit()
+    session.refresh(schedule)
+    return _schedule(schedule)
+
+
+@schedule_router.delete("", status_code=204, dependencies=_WRITE)
+def delete_schedule(config_id: UUID, session: SessionDep) -> Response:
+    _config_or_404(session, config_id)
+    repo = EvalScheduleRepository(session)
+    schedule = repo.get(config_id)
+    if schedule is not None:
+        repo.delete(schedule)
+        session.commit()
+    return Response(status_code=204)

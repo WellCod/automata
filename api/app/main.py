@@ -1,5 +1,8 @@
+import asyncio
 import logging
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 
 from agno.agent import Agent
 from agno.agent.factory import AgentFactory
@@ -18,9 +21,11 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.agents.factory import make_agent_factory, make_team_factory
+from app.agents.models_map import demo_replay
 from app.agents.registry import PublishedAgents
 from app.agents.workflow_factory import make_workflow_factory
 from app.evals.runner import fail_stale as fail_stale_evals
+from app.evals.scheduler import run_forever as run_scheduled_evals
 from app.integrations import RevocationMiddleware, RevokedTokens
 from app.knowledge.ingest import fail_stale
 from app.logging_config import configure_logging, request_id_var
@@ -85,6 +90,21 @@ class SyncPublishedAgentsMiddleware(BaseHTTPMiddleware):
             await run_in_threadpool(self._published.sync)
         response: Response = await call_next(request)  # type: ignore[operator]
         return response
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Laço das suítes agendadas. O Starlette não roda o lifespan do AgentOS montado."""
+    task: asyncio.Task[None] | None = None
+    if get_settings().eval_scheduler_enabled and not demo_replay():
+        task = asyncio.create_task(run_scheduled_evals())
+    try:
+        yield
+    finally:
+        if task is not None:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
 
 
 def _fail_stale_evals() -> None:
@@ -177,7 +197,7 @@ def create_app(
     # auth_router fica fora do middleware do Agno: /login precisa ser público
     # (não tem como exigir JWT para obter JWT). O /users tem proteção própria
     # via _require_admin que verifica JWT + scope agent_os:admin.
-    outer: FastAPI = FastAPI(title="automata", **docs)  # type: ignore[arg-type]
+    outer: FastAPI = FastAPI(title="automata", lifespan=_lifespan, **docs)  # type: ignore[arg-type]
     outer.state.rate_limiter = make_rate_limiter(settings.redis_url, limit=5, window=60)
     outer.state.revoked_tokens = revoked
     outer.add_middleware(SyncPublishedAgentsMiddleware, published=published)
