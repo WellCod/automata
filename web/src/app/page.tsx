@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { AgentCard } from "@/components/agent-card";
+import { useSuiteStatus } from "@/lib/api/evals";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,7 @@ export default function AgentsPage() {
     queryKey: ["configs", page, q, status],
     queryFn: () => fetchConfigs(page, q, status),
   });
+  const { data: suites } = useSuiteStatus();
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;
 
@@ -169,7 +171,7 @@ export default function AgentsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {data.items.map((agent) => (
-            <AgentCard key={agent.id} agent={agent} />
+            <AgentCard key={agent.id} agent={agent} suite={suites?.get(agent.id)} />
           ))}
         </div>
       )}

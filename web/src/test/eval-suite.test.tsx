@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EvalCaseForm } from "@/components/eval-case-form";
 import { EvalSuitePanel } from "@/components/eval-suite-panel";
+import { SuiteBadge } from "@/components/suite-badge";
 import { availableTypes, caseErrors, type EvalCheck, newCheck } from "@/lib/eval-checks";
 
 vi.mock("@/lib/api/client", () => ({
@@ -114,6 +115,9 @@ const run = (id: string, version: string, status: string, extra: object = {}) =>
   total_tokens: 1234,
   cost: 0.0021,
   started_by: "u",
+  trigger: "manual",
+  target: null,
+  verdict: "failed",
   created_at: "2026-10-20T10:00:00Z",
   started_at: null,
   finished_at: null,
@@ -220,7 +224,7 @@ describe("EvalSuitePanel", () => {
       { wrapper },
     );
     const judge = await screen.findByLabelText("Modelo do juiz");
-    await screen.findByRole("option", { name: "gpt-4o-mini" });
+    await within(judge).findByRole("option", { name: "gpt-4o-mini" });
     expect(within(judge).queryByRole("option", { name: "sem-schema" })).toBeNull();
     await user.selectOptions(judge, "gpt-4o-mini");
     await user.click(screen.getByRole("button", { name: "Rodar suíte" }));
@@ -231,5 +235,87 @@ describe("EvalSuitePanel", () => {
         body: { version_id: "v-draft", judge_model: "gpt-4o-mini" },
       }),
     );
+  });
+
+  it("agenda a suíte e marca as execuções agendadas", async () => {
+    vi.mocked(client.PUT).mockResolvedValue({
+      data: {
+        agent_config_id: "a1",
+        cron_expr: "0 8 * * 1-5",
+        timezone: "America/Sao_Paulo",
+        target: "current",
+        judge_model: "gpt-4o-mini",
+        enabled: true,
+        next_run_at: "2026-10-22T11:00:00Z",
+        last_attempt_at: null,
+        last_run_id: null,
+        last_error: null,
+        updated_by: "u",
+        updated_at: "2026-10-21T10:00:00Z",
+      },
+      error: undefined,
+    } as never);
+    const base = vi.mocked(client.GET).getMockImplementation()!;
+    vi.mocked(client.GET).mockImplementation(async (path: string, opts?: unknown) => {
+      if (path === "/api/v1/configs/{config_id}/eval-schedule")
+        return { data: undefined, error: { detail: "x" }, response: { status: 404 } } as never;
+      if (path === "/api/v1/configs/{config_id}/eval-runs")
+        return {
+          data: [run("r-sched", "v-current", "completed", { trigger: "schedule" })],
+          error: undefined,
+        } as never;
+      return (base as (...args: unknown[]) => Promise<never>)(path, opts);
+    });
+    const user = userEvent.setup();
+    render(
+      <EvalSuitePanel
+        configId="a1"
+        draftVersion={{ id: "v-draft", version_number: 3 }}
+        currentVersion={{ id: "v-current", version_number: 2 }}
+      />,
+      { wrapper },
+    );
+
+    expect(
+      await screen.findByRole("option", { name: /v2 \(publicada\).*agendada/ }),
+    ).toBeInTheDocument();
+    const section = await screen.findByRole("region", { name: "Agendamento" });
+    expect(within(section).getByText(/custa por volta de/)).toBeInTheDocument();
+    await user.selectOptions(within(section).getByLabelText("Frequência"), "0 8 * * 1-5");
+    await user.selectOptions(
+      within(section).getByLabelText("Modelo do juiz no agendamento"),
+      "gpt-4o-mini",
+    );
+    await user.click(within(section).getByRole("button", { name: "Agendar" }));
+
+    await waitFor(() =>
+      expect(client.PUT).toHaveBeenCalledWith("/api/v1/configs/{config_id}/eval-schedule", {
+        params: { path: { config_id: "a1" } },
+        body: {
+          cron_expr: "0 8 * * 1-5",
+          timezone: "America/Sao_Paulo",
+          target: "current",
+          judge_model: "gpt-4o-mini",
+          enabled: true,
+        },
+      }),
+    );
+  });
+});
+
+describe("SuiteBadge", () => {
+  it("mostra regressão com a contagem desde o último agendado", () => {
+    render(
+      <SuiteBadge
+        status={{
+          config_id: "a1",
+          state: "regressed",
+          regressions: 2,
+          previous_run_id: "r0",
+          last_run: run("r1", "v-current", "completed", { trigger: "schedule" }) as never,
+        }}
+      />,
+    );
+    expect(screen.getByText("Suíte regrediu (2 desde o último agendado)")).toBeInTheDocument();
   });
 });

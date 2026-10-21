@@ -119,6 +119,8 @@ Com o **gate** ligado, publicar exige a suíte verde no rascunho atual. Editar o
 
 <p align="center"><img src="docs/img/testes.png" alt="Aba Testes de um agente com resultado por caso e comparação entre versões" width="600"></p>
 
+A suíte também roda sem ninguém clicar. Um **agendamento** por agente roda a suíte na versão vigente e pega o que muda por fora do prompt: modelo do provedor, base reindexada, servidor MCP. A lista de agentes e times mostra o estado da suíte, e a execução agendada que perde um caso que passava aparece como regressão. Um **token de integração** pode rodar e ler a suíte de agentes escolhidos, para o CI de quem consome o agente decidir pelo `verdict`.
+
 ### Ferramentas via MCP e confirmação humana
 
 Catálogo de servidores MCP externos, com credenciais cifradas e teste de conexão que descobre as tools. Em cada agente, escolhe-se quais tools ele usa e quais **pedem confirmação**. Uma tool sensível pausa a execução até alguém aprovar ou rejeitar, no modo teste ou na página Aprovações, vendo nome e argumentos da ação.

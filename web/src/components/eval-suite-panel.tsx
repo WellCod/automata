@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, CircleSlash, Loader2, Pencil, Plus, Trash2, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { EvalCaseForm } from "@/components/eval-case-form";
+import { EvalScheduleSection } from "@/components/eval-schedule-section";
 import client from "@/lib/api/client";
 import {
   useEvalCases,
@@ -22,6 +23,7 @@ import {
   hasJudge,
   RESULT_LABEL,
   runActive,
+  TRIGGER_LABEL,
 } from "@/lib/eval-checks";
 import { Button } from "@/components/ui/button";
 import { Badge, type BadgeTone } from "@/components/ui/status-badge";
@@ -63,7 +65,9 @@ function runLabel(run: EvalRunSummary): string {
     hour: "2-digit",
     minute: "2-digit",
   });
-  return `v${run.version_number} (${kind}) · ${when}`;
+  // manual é o padrão: só agendada e integração ganham marca
+  const origin = run.trigger === "manual" ? "" : ` · ${TRIGGER_LABEL[run.trigger]}`;
+  return `v${run.version_number} (${kind}) · ${when}${origin}`;
 }
 
 function usageLine(run: EvalRunSummary): string {
@@ -387,6 +391,13 @@ export function EvalSuitePanel({ configId, draftVersion, currentVersion }: Props
           Cada caso roda o agente de verdade: os tokens contam no consumo, separados das conversas.
         </p>
       </section>
+
+      <EvalScheduleSection
+        configId={configId}
+        needsJudge={needsJudge}
+        judgeModels={judgeModels}
+        lastRun={runs.find((r) => !runActive(r))}
+      />
 
       {runs.length > 0 && (
         <section aria-label="Resultado" className="flex flex-col gap-2">
