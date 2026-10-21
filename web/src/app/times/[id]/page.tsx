@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, ArrowLeft, FlaskConical, History, TrendingUp } from "lucide-react";
+import { Activity, ArrowLeft, FlaskConical, History, ListChecks, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useId, useMemo, useState } from "react";
@@ -14,6 +14,7 @@ import {
   GuardrailsEditor,
   withDefaults,
 } from "@/components/guardrails-editor";
+import { EvalSuitePanel } from "@/components/eval-suite-panel";
 import { KnowledgeSelector } from "@/components/knowledge-selector";
 import { McpToolsSelector } from "@/components/mcp-tools-selector";
 import { MetricsPanel } from "@/components/metrics-panel";
@@ -103,6 +104,7 @@ const PANEL_TABS = [
   { id: "versoes" as const, label: "Versões", icon: History },
   { id: "runs" as const, label: "Execuções", icon: Activity },
   { id: "metricas" as const, label: "Métricas", icon: TrendingUp },
+  { id: "suite" as const, label: "Suíte", icon: ListChecks },
 ];
 type PanelId = (typeof PANEL_TABS)[number]["id"];
 
@@ -452,6 +454,13 @@ export default function TeamEditPage() {
             {activePanel === "versoes" && <VersionsPanel agentId={id} />}
             {activePanel === "runs" && <RunsPanel agentId={id} />}
             {activePanel === "metricas" && <MetricsPanel agentId={id} />}
+            {activePanel === "suite" && (
+              <EvalSuitePanel
+                configId={id}
+                draftVersion={data?.draft_version}
+                currentVersion={data?.current_version}
+              />
+            )}
           </div>
         </aside>
       </div>
