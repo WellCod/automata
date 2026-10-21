@@ -148,6 +148,11 @@ class EvalSchedule(Base):
     )
     # por que o último horário não virou execução (já rodando, sem casos, sem juiz)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # webhook de aviso (ADR-0018): URL e segredo cifrados juntos; só o host fica aberto
+    webhook_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    webhook_host: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    webhook_last_status: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    webhook_last_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_by: Mapped[str] = mapped_column(String(255), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

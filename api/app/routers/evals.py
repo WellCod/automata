@@ -9,12 +9,14 @@ from sqlalchemy import select
 
 from app.authz import Scope, require_resource_scope, require_scopes
 from app.db import SessionDep, get_db
+from app.evals import webhook
 from app.evals.compare import compare, suite_states
 from app.evals.gate import draft_verdict, latest_run
 from app.evals.runner import execute
 from app.evals.scheduler import next_run, validate
 from app.evals.service import EvalRunRefused, check_judge, create_run
 from app.evals.suggest import suggest
+from app.mcp.egress import EgressDenied
 from app.models.config import AgentConfig
 from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSchedule
 from app.models.run import AgentRun
@@ -38,7 +40,11 @@ from app.schemas.eval import (
     EvalSuiteStatus,
     EvalTrigger,
     EvalVerdict,
+    WebhookInput,
+    WebhookIssued,
+    WebhookTestResult,
 )
+from app.secrets import SecretsKeyMissing
 
 router = APIRouter(
     prefix="/api/v1/configs/{config_id}/eval-cases",
@@ -368,6 +374,9 @@ def _schedule(s: EvalSchedule) -> EvalScheduleResponse:
         last_attempt_at=s.last_attempt_at,
         last_run_id=s.last_run_id,
         last_error=s.last_error,
+        webhook_host=s.webhook_host,
+        webhook_last_status=s.webhook_last_status,
+        webhook_last_at=s.webhook_last_at,
         updated_by=s.updated_by,
         updated_at=s.updated_at,
     )
@@ -428,6 +437,64 @@ def delete_schedule(config_id: UUID, session: SessionDep) -> Response:
         repo.delete(schedule)
         session.commit()
     return Response(status_code=204)
+
+
+def _schedule_or_404(session: SessionDep, config_id: UUID) -> EvalSchedule:
+    _config_or_404(session, config_id)
+    schedule = EvalScheduleRepository(session).get(config_id)
+    if schedule is None:
+        raise HTTPException(status_code=404, detail="Crie o agendamento antes do webhook")
+    return schedule
+
+
+@schedule_router.put("/webhook", response_model=WebhookIssued, dependencies=_WRITE)
+def save_webhook(config_id: UUID, body: WebhookInput, session: SessionDep) -> WebhookIssued:
+    """Cadastra ou troca o webhook; o segredo novo é devolvido uma vez só."""
+    schedule = _schedule_or_404(session, config_id)
+    try:
+        encrypted, host, secret = webhook.seal(body.url)
+    except (EgressDenied, SecretsKeyMissing) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    schedule.webhook_encrypted = encrypted
+    schedule.webhook_host = host
+    schedule.webhook_last_status = None
+    schedule.webhook_last_at = None
+    session.commit()
+    return WebhookIssued(host=host, secret=secret)
+
+
+@schedule_router.delete("/webhook", status_code=204, dependencies=_WRITE)
+def delete_webhook(config_id: UUID, session: SessionDep) -> Response:
+    schedule = _schedule_or_404(session, config_id)
+    schedule.webhook_encrypted = None
+    schedule.webhook_host = None
+    schedule.webhook_last_status = None
+    schedule.webhook_last_at = None
+    session.commit()
+    return Response(status_code=204)
+
+
+@schedule_router.post("/webhook/test", response_model=WebhookTestResult, dependencies=_WRITE)
+def test_webhook(config_id: UUID, session: SessionDep) -> WebhookTestResult:
+    """Manda um suite.test, uma tentativa só, para conferir a integração."""
+    schedule = _schedule_or_404(session, config_id)
+    if schedule.webhook_encrypted is None:
+        raise HTTPException(status_code=404, detail="Agendamento sem webhook")
+    config = _config_or_404(session, config_id)
+    try:
+        target = webhook.unseal(schedule.webhook_encrypted)
+    except SecretsKeyMissing as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    body = webhook.body_for(
+        "suite.test",
+        {"config_id": str(config_id), "config_name": config.name},
+        f"Teste do aviso da suíte de {config.name}: o webhook está funcionando.",
+    )
+    status = webhook.deliver(target, "suite.test", body, attempts=1)
+    schedule.webhook_last_status = status
+    schedule.webhook_last_at = datetime.now(UTC)
+    session.commit()
+    return WebhookTestResult(status=status, delivered=status.startswith("HTTP 2"))
 
 
 status_router = APIRouter(

@@ -228,6 +228,10 @@ class EvalScheduleResponse(BaseModel):
     last_run_id: UUID | None
     # por que o último horário não virou execução
     last_error: str | None
+    # webhook de aviso (ADR-0018): só o host; URL e segredo não saem da API
+    webhook_host: str | None
+    webhook_last_status: str | None
+    webhook_last_at: datetime | None
     updated_by: str
     updated_at: datetime
 
@@ -256,3 +260,18 @@ class EvalCaseSuggestion(BaseModel):
     source_run_id: str
     # avisos para o formulário: contexto cortado, dados mascarados
     notes: list[str]
+
+
+class WebhookInput(BaseModel):
+    url: str = Field(min_length=8, max_length=2000)
+
+
+class WebhookIssued(BaseModel):
+    host: str
+    # mostrado uma vez: confere a assinatura X-Automata-Signature (HMAC-SHA256 do corpo)
+    secret: str
+
+
+class WebhookTestResult(BaseModel):
+    status: str
+    delivered: bool
