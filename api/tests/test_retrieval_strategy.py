@@ -153,3 +153,78 @@ def test_put_sem_estrategia_mantem_a_gravada(client: TestClient) -> None:
         json={"name": "base com mmr", "retrieval": {"reranker": "mmr", "mmr_lambda": 2}},
     )
     assert invalid.status_code == 422
+
+
+def test_hyde_busca_com_a_resposta_hipotetica_e_mede(
+    db_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.agents.models_map as models_map
+    from app.knowledge.search import Caller, search
+    from app.models.usage import UsageEvent
+    from tests.fake_models import FixedReplyModel
+
+    docs = [
+        ("uso do produto", "Dicas de uso: lave à mão e guarde em local seco depois de usar."),
+        (
+            "devolucao",
+            "Produtos utilizados não são aceitos para devolução, salvo defeito de fabricação.",
+        ),
+    ]
+    question = "posso devolver depois de usar?"
+    simple = _base(docs, {})
+    assert _names(simple, question, 1) == ["uso do produto"]
+
+    # o embedder continua o local do replay; só o modelo do HyDE responde de verdade
+    monkeypatch.setattr(models_map, "demo_replay", lambda: False)
+    monkeypatch.setattr(
+        models_map,
+        "resolve_model",
+        lambda model_id, *a, **k: FixedReplyModel(
+            id=model_id,
+            reply="Produtos utilizados não são aceitos para devolução.",
+            tokens=12,
+        ),
+    )
+    hyde = _base(docs, {"hyde": True, "hyde_model": "gpt-4o-mini"})
+    outcome = search(hyde, question, 1)
+    assert [h.content_name for h in outcome.hits] == ["devolucao"]
+    assert outcome.searched.startswith("Produtos utilizados")
+    # busca de teste: sem agente, os tokens só aparecem no resultado
+    assert outcome.hyde_tokens == 12
+
+    agent_id = uuid4()
+    with Session(get_engine()) as session:
+        from app.models.config import AgentConfig
+
+        session.add(
+            AgentConfig(id=agent_id, name=f"hyde {agent_id.hex[:6]}", description="x", kind="agent")
+        )
+        session.commit()
+    search(hyde, question, 1, caller=Caller(agent_id, "alice", "run-1"))
+    with Session(get_engine()) as session:
+        event = session.query(UsageEvent).filter(UsageEvent.agent_config_id == agent_id).one()
+    assert (event.model_id, event.total_tokens, event.user_id, event.run_id) == (
+        "gpt-4o-mini",
+        12,
+        "alice",
+        "run-1",
+    )
+
+
+def test_hyde_desligado_no_modo_demo(db_url: str) -> None:
+    from app.knowledge.search import search
+
+    base = _base(DOCS[:1], {"hyde": True, "hyde_model": "gpt-4o-mini"})
+    outcome = search(base, "prazo de troca", 1)
+    assert (outcome.searched, outcome.hyde_tokens) == ("prazo de troca", 0)
+
+
+def test_hyde_exige_modelo_da_matriz(client: TestClient) -> None:
+    body = {"name": "base hyde", "slug": "base_hyde"}
+    sem = client.post("/api/v1/knowledge-bases", json={**body, "retrieval": {"hyde": True}})
+    assert sem.status_code == 422
+    fora = client.post(
+        "/api/v1/knowledge-bases",
+        json={**body, "retrieval": {"hyde": True, "hyde_model": "modelo-inventado"}},
+    )
+    assert fora.status_code == 422

@@ -2177,6 +2177,13 @@ export interface components {
        * @default 0.3
        */
       recency_weight: number;
+      /**
+       * Hyde
+       * @default false
+       */
+      hyde: boolean;
+      /** Hyde Model */
+      hyde_model?: string | null;
     };
     /** RollbackInput */
     RollbackInput: {

@@ -30,15 +30,23 @@ class JudgeUsage:
 
 
 def metered(model: Model) -> tuple[Model, JudgeUsage]:
+    """Embrulha `ainvoke` (juiz) e `invoke` (HyDE, ADR-0017) da instância."""
     usage = JudgeUsage()
-    invoke = model.ainvoke
+    ainvoke = model.ainvoke
+    invoke = model.invoke
 
-    async def counting(*args: Any, **kwargs: Any) -> Any:
-        response = await invoke(*args, **kwargs)
+    def count(response: Any) -> Any:
         if getattr(response, "response_usage", None) is not None:
             usage.add(response.response_usage)
         return response
 
+    async def counting_async(*args: Any, **kwargs: Any) -> Any:
+        return count(await ainvoke(*args, **kwargs))
+
+    def counting(*args: Any, **kwargs: Any) -> Any:
+        return count(invoke(*args, **kwargs))
+
     # atributo da instância: se o Agno copiar o modelo, a função ainda soma no mesmo medidor
-    model.ainvoke = counting  # type: ignore[method-assign]
+    model.ainvoke = counting_async  # type: ignore[method-assign]
+    model.invoke = counting  # type: ignore[method-assign]
     return model, usage

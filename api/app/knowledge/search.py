@@ -4,15 +4,20 @@ import logging
 from dataclasses import dataclass
 from uuid import UUID
 
+from agno.knowledge.query_transformer.hyde import HyDE
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_engine
+from app.evals.judge import JudgeUsage, metered
 from app.knowledge.rerank import reranker_for
-from app.knowledge.runtime import metered, vector_db_for
+from app.knowledge.runtime import metered as metered_embedder
+from app.knowledge.runtime import vector_db_for
 from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_content import KnowledgeContent
 from app.repositories.embedding_usage import record_embedding_usage
+from app.repositories.usage import UsageRepository
+from app.schemas.knowledge_base import RetrievalSettings
 
 logger = logging.getLogger(__name__)
 
@@ -26,20 +31,82 @@ class Hit:
     score: float | None
 
 
+@dataclass
+class SearchOutcome:
+    hits: list[Hit]
+    # texto que foi de fato buscado: a resposta hipotética, com HyDE ligado
+    searched: str
+    hyde_tokens: int = 0
+
+
+@dataclass(frozen=True)
+class Caller:
+    """Run que fez a busca, para o consumo do HyDE cair no agente certo."""
+
+    agent_config_id: UUID
+    user_id: str
+    run_id: str | None = None
+
+
 def search_base(
     base: KnowledgeBase, query: str, limit: int, *, agent_config_id: UUID | None = None
 ) -> list[Hit]:
+    caller = Caller(agent_config_id, "agent") if agent_config_id else None
+    return search(base, query, limit, caller=caller).hits
+
+
+def _hyde(base: KnowledgeBase, query: str) -> tuple[str, JudgeUsage | None, str | None]:
+    """Consulta reescrita, consumo e modelo; sem HyDE ou no modo demo, a pergunta como veio."""
+    # app.agents importa a factory, que importa esta busca pela tool
+    from app.agents import models_map
+
+    settings = RetrievalSettings.model_validate(base.retrieval or {})
+    if not settings.hyde or settings.hyde_model is None or models_map.demo_replay():
+        return query, None, None
+    model, usage = metered(models_map.resolve_model(settings.hyde_model))
+    # se a chamada falha, o Agno devolve a pergunta original: busca pior, não busca nenhuma
+    return HyDE(model=model).transform(query), usage, settings.hyde_model
+
+
+def _record_hyde(caller: Caller, model_id: str, usage: JudgeUsage) -> None:
+    if not usage.total_tokens:
+        return
+    from app.agents.tracking import current_eval_run
+
+    evaluation = current_eval_run.get()
+    with Session(get_engine()) as session:
+        UsageRepository(session).record_event(
+            agent_config_id=caller.agent_config_id,
+            user_id=evaluation.actor if evaluation else caller.user_id,
+            model_id=model_id,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            total_tokens=usage.total_tokens,
+            cost=usage.cost,
+            run_id=caller.run_id,
+            eval_run_id=evaluation.eval_run_id if evaluation else None,
+        )
+        session.commit()
+
+
+def search(
+    base: KnowledgeBase, query: str, limit: int, *, caller: Caller | None = None
+) -> SearchOutcome:
+    searched, usage, hyde_model = _hyde(base, query)
+    if usage is not None and hyde_model is not None and caller is not None:
+        _record_hyde(caller, hyde_model, usage)
+    hyde_tokens = usage.total_tokens if usage is not None else 0
     reranker = reranker_for(base)
     vector_db = vector_db_for(base, "query", with_dates=reranker is not None)
     if not vector_db.table_exists():
-        return []
+        return SearchOutcome([], searched, hyde_tokens)
     # o search do PgVector engole falha do embedder e devolve vazio, que o agente
     # leria como "nada sobre isso"; embedar antes faz a falha aparecer (e o
     # MeteredEmbedder devolve o mesmo vetor ao search, sem segunda chamada)
-    embedder = metered(vector_db)
-    embedder.get_embedding_and_usage(query)
+    embedder = metered_embedder(vector_db)
+    embedder.get_embedding_and_usage(searched)
     # o reranker só resgata trecho que foi buscado: pede um lote maior e corta depois
-    docs = vector_db.search(query, limit=reranker.search_limit(limit) if reranker else limit)
+    docs = vector_db.search(searched, limit=reranker.search_limit(limit) if reranker else limit)
     if reranker is not None:
         try:
             # ordena contra a pergunta original
@@ -56,7 +123,7 @@ def search_base(
         model=base.embedder_model,
         tokens=embedder.tokens,
         kind="search",
-        agent_config_id=agent_config_id,
+        agent_config_id=caller.agent_config_id if caller else None,
     )
     ids: set[UUID] = set()
     for doc in docs:
@@ -86,4 +153,4 @@ def search_base(
                 score=float(score) if score is not None else None,
             )
         )
-    return hits
+    return SearchOutcome(hits, searched, hyde_tokens)

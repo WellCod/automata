@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.agents.capabilities import get_capabilities
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.knowledge.embedders import EMBEDDERS, is_configured
@@ -52,6 +53,15 @@ def to_response(b: KnowledgeBase, usage: EmbeddingTotals | None = None) -> Knowl
     )
 
 
+def _check_retrieval(retrieval: RetrievalSettings | None) -> None:
+    if retrieval is None or not retrieval.hyde or retrieval.hyde_model is None:
+        return
+    try:
+        get_capabilities(retrieval.hyde_model)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 def _actor(request: Request) -> str:
     return str(getattr(request.state, "user_id", None) or "panel")
 
@@ -96,6 +106,7 @@ def get_base(base_id: UUID, session: SessionDep) -> KnowledgeBaseResponse:
 def create_base(
     body: KnowledgeBaseCreate, session: SessionDep, request: Request
 ) -> KnowledgeBaseResponse:
+    _check_retrieval(body.retrieval)
     repo = KnowledgeBaseRepository(session)
     if repo.find_conflict(body.name, body.slug) is not None:
         raise HTTPException(status_code=409, detail="Já existe base com esse nome ou slug")
@@ -133,6 +144,7 @@ def create_base(
 def update_base(
     base_id: UUID, body: KnowledgeBaseUpdate, session: SessionDep, request: Request
 ) -> KnowledgeBaseResponse:
+    _check_retrieval(body.retrieval)
     repo = KnowledgeBaseRepository(session)
     base = _get_or_404(repo, base_id)
     if repo.find_conflict(body.name, exclude=base_id) is not None:
