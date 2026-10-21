@@ -15,6 +15,7 @@ from agno.db.base import AsyncBaseDb, BaseDb
 from agno.factory.utils import FactoryValidationError, RequestContext
 from agno.workflow import Condition, Loop, OnError, Parallel, Step, StepInput, StepOutput
 from agno.workflow.factory import WorkflowFactory
+from agno.workflow.types import HumanReview
 
 from app.agents.factory import (
     FactoryInput,
@@ -131,7 +132,9 @@ def _step(resolved: ResolvedStep) -> Step:
     return Step(
         name=node.name,
         max_retries=node.max_retries,
-        on_error=OnError.fail if node.on_error == "stop" else OnError.skip,
+        human_review=HumanReview(
+            on_error=OnError.fail if node.on_error == "stop" else OnError.skip
+        ),
         **kind,  # type: ignore[arg-type]
     )
 

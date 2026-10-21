@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from agno.models.metrics import MessageMetrics
+from agno.metrics import MessageMetrics
 from agno.models.response import ModelResponse
 
 from app.agents.replay import ReplayModel

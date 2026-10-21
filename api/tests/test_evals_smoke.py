@@ -30,14 +30,16 @@ def _eval(
     allow_additional: bool = False,
     expected_args: dict | None = None,
 ) -> ReliabilityResult:
-    return ReliabilityEval(
+    result = ReliabilityEval(
         agent_response=output,
         expected_tool_calls=expected,
         allow_additional_tool_calls=allow_additional,
         expected_tool_call_arguments=expected_args,
         show_spinner=False,
         telemetry=False,
-    )._evaluate()
+    ).run()
+    assert result is not None
+    return result
 
 
 # ---------------------------------------------------------------------------

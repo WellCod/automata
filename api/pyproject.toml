@@ -3,14 +3,14 @@ name = "automata-api"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "agno[os]==2.9.0",
+    "agno[os,mcp]==3.1.8",
     "anthropic>=0.40",
     "openai>=1.50",
     "psycopg[binary]>=3.2",
     "alembic>=1.14",
     "pydantic-settings>=2.7",
     "cryptography>=43.0",
-    "fastmcp>=3.4.6",
+    "fastmcp>=4.0.0",
     "argon2-cffi>=25.1.0",
     "email-validator>=2.3.0",
     "redis>=8.1.0",

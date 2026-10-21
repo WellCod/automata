@@ -9,6 +9,7 @@ from types import ModuleType
 import pytest
 from agno.db.postgres import PostgresDb
 from agno.db.schemas.memory import UserMemory
+from agno.run.agent import RunOutput
 from agno.session.agent import AgentSession
 from alembic.config import Config
 from sqlalchemy import Engine, create_engine, func, select, text
@@ -67,12 +68,16 @@ def test_reset_limpa_runs_e_tabelas_do_agno(
         seed_analytics(session, n_runs=5)
 
     agno = PostgresDb(db_url=engine.url.render_as_string(hide_password=False))
+    # na v3 os runs ficam em agno_runs, fora do JSON da sessão
+    run = RunOutput(run_id="r1", agent_id="a1", session_id="s1", user_id="u1", content="oi")
     agno.upsert_session(AgentSession(session_id="s1", agent_id="a1", user_id="u1", created_at=1))
+    agno.upsert_run(run, session_id="s1", user_id="u1", run_index=0)
     agno.upsert_user_memory(UserMemory(memory="gosta de tabelas", user_id="u1"))
     agno._get_table("traces", create_table_if_not_found=True)
     agno._get_table("spans", create_table_if_not_found=True)
     assert _count(engine, 'ai."agno_sessions"') == 1
     assert _count(engine, 'ai."agno_memories"') == 1
+    assert _count(engine, 'ai."agno_runs"') == 1
 
     truncated = _load_script().truncate_all(engine)
 
@@ -82,6 +87,7 @@ def test_reset_limpa_runs_e_tabelas_do_agno(
     assert 'ai."agno_culture"' not in truncated
     assert _count(engine, 'ai."agno_sessions"') == 0
     assert _count(engine, 'ai."agno_memories"') == 0
+    assert _count(engine, 'ai."agno_runs"') == 0
     with Session(engine) as session:
         for model in (AgentRun, UsageEvent, User):
             assert session.scalar(select(func.count()).select_from(model)) == 0

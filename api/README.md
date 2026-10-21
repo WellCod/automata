@@ -6,12 +6,12 @@ API em Python sobre o Agno AgentOS.
 
 | Pacote | Versão pinada | Licença |
 |--------|--------------|---------|
-| agno[os] | 2.9.0 | Apache 2.0 |
+| agno[os,mcp] | 3.1.8 | Apache 2.0 |
 | psycopg[binary] | ≥3.2 | LGPL-3.0 |
 | alembic | ≥1.14 | MIT |
 | pydantic-settings | ≥2.7 | MIT |
 
-A licença do Agno na versão 2.9.0 é **Apache 2.0**, confirmada em `github.com/agno-agi/agno/blob/main/LICENSE`. ADR-0007 registrava incerteza entre MPL-2.0 e Apache-2.0 — resolvida: é Apache 2.0, compatível com AGPL-3.0 para fins de distribuição.
+A licença do Agno na versão 3.1.8 é **Apache 2.0**, confirmada em `github.com/agno-agi/agno/blob/main/LICENSE`. ADR-0007 registrava incerteza entre MPL-2.0 e Apache-2.0 — resolvida: é Apache 2.0, compatível com AGPL-3.0 para fins de distribuição.
 
 ## Rodando local
 
@@ -21,7 +21,9 @@ Para desenvolvimento, a API roda em Docker junto com o banco. A partir da raiz d
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
-A API sobe em `http://localhost:8000` com hot-reload ativo e `APP_ENV=development`. As migrations rodam automaticamente no boot: o `entrypoint.sh` roda `alembic upgrade head` e depois executa o `command:` do compose (sem ele, o `CMD` da imagem: uvicorn sem reload). Fora do override de dev a porta 8000 não é publicada.
+A API sobe em `http://localhost:8000` com hot-reload ativo e `APP_ENV=development`. As migrations rodam automaticamente no boot: o `entrypoint.sh` roda `alembic upgrade head`, depois `python -m app.agno_migrations` e só então executa o `command:` do compose (sem ele, o `CMD` da imagem: uvicorn sem reload). Fora do override de dev a porta 8000 não é publicada.
+
+O Alembic cuida só das tabelas do Automata. As do Agno, no schema `ai`, têm versão própria e são migradas pelo `MigrationManager` do Agno em `app/agno_migrations.py`. Na v3, os runs saíram do JSON da sessão para `ai.agno_runs`. A migração é idempotente e não apaga nada: a coluna antiga `runs` de `ai.agno_sessions` fica como backup. Removê-la (`cleanup_legacy_runs_column`) é decisão manual, depois de conferir o histórico e ter um backup restaurável.
 
 Para rodar isolado (sem Docker), com banco já acessível via `DATABASE_URL`:
 

@@ -256,7 +256,10 @@ def test_run_bloqueado_nao_chama_o_modelo_e_grava_mascarado(
 
         with _engine() as conn:
             stored = conn.execute(
-                text("SELECT runs::text FROM ai.agno_sessions WHERE session_id = 's-guard'")
+                text(
+                    "SELECT string_agg(run_data::text, ' ') FROM ai.agno_runs "
+                    "WHERE session_id = 's-guard'"
+                )
             ).scalar_one()
         assert CPF not in stored
         assert "[CPF removido]" in stored
