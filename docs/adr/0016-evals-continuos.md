@@ -1,6 +1,6 @@
 # ADR-0016 — Evals contínuos: disparo por token de integração, agendamento próprio e casos a partir de conversas reais
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-10-21
 
 ## Contexto
