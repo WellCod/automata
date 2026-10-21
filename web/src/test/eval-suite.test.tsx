@@ -28,6 +28,16 @@ describe("checagens", () => {
     expect(availableTypes(Array.from({ length: 5 }, () => newCheck("text")))).toEqual([]);
   });
 
+  it("workflow troca tools e bloqueio por etapas", () => {
+    expect(availableTypes([], "workflow")).toEqual(["text", "judge", "steps"]);
+    expect(availableTypes([newCheck("steps")], "workflow")).toEqual(["text", "judge"]);
+    expect(availableTypes([], "team")).not.toContain("steps");
+    const base = { name: "caminho", input: "Quero reembolso" };
+    expect(caseErrors({ ...base, checks: [newCheck("steps")] })).toContain(
+      "Liste ao menos uma etapa.",
+    );
+  });
+
   it("bloqueio só entra em caso sem outra checagem", () => {
     expect(availableTypes([])).toEqual(["text", "tools", "judge", "blocked"]);
     expect(availableTypes([newCheck("text")])).not.toContain("blocked");
@@ -55,6 +65,30 @@ describe("checagens", () => {
 });
 
 describe("EvalCaseForm", () => {
+  it("caso de workflow confere as etapas e não tem conversa anterior", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    render(<EvalCaseForm kind="workflow" saving={false} onSave={onSave} onCancel={() => {}} />);
+
+    expect(screen.queryByText("Conversa antes da mensagem (opcional)")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Tools chamadas" })).toBeNull();
+    await user.type(screen.getByLabelText("Nome do caso"), "reembolso revisa");
+    await user.type(screen.getByLabelText("Mensagem de entrada"), "Quero reembolso");
+    await user.click(screen.getByRole("button", { name: "Remover checagem 1" }));
+    await user.click(screen.getByRole("button", { name: "Etapas que rodaram" }));
+    const steps = screen.getByLabelText("Etapas da checagem 1");
+    await user.type(steps, "triagem, revisao, triagem");
+    fireEvent.blur(steps);
+    await user.click(screen.getByLabelText("Reprovar se rodar outras etapas além destas"));
+    await user.click(screen.getByRole("button", { name: "Salvar caso" }));
+
+    expect(onSave).toHaveBeenCalledWith({
+      name: "reembolso revisa",
+      input: "Quero reembolso",
+      checks: [{ type: "steps", steps: ["triagem", "revisao"], exclusive: true }],
+    });
+  });
+
   it("monta o caso que espera bloqueio com a regra", async () => {
     const onSave = vi.fn();
     const user = userEvent.setup();

@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import client from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
+import { SuiteBadge } from "@/components/suite-badge";
+import { useSuiteStatus } from "@/lib/api/evals";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/status-badge";
 
@@ -90,6 +92,7 @@ function NewWorkflowForm({ onCancel }: { onCancel: () => void }) {
 
 export default function WorkflowsPage() {
   const [showNew, setShowNew] = useState(false);
+  const { data: suites } = useSuiteStatus();
   const { data, isPending, isError } = useQuery({
     queryKey: ["configs", "workflows"],
     queryFn: async () => {
@@ -150,7 +153,7 @@ export default function WorkflowsPage() {
                 <span className="text-muted-foreground line-clamp-2 text-[13px]">
                   {wf.description}
                 </span>
-                <span className="mt-auto pt-2">
+                <span className="mt-auto flex flex-wrap gap-1 pt-2">
                   {wf.current_version ? (
                     <Badge tone="active">v{wf.current_version.version_number} ativa</Badge>
                   ) : wf.draft_version ? (
@@ -158,6 +161,7 @@ export default function WorkflowsPage() {
                   ) : (
                     <Badge tone="neutral">Sem versão</Badge>
                   )}
+                  <SuiteBadge status={suites?.get(wf.id)} />
                 </span>
               </Link>
             </li>
