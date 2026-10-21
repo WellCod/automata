@@ -1,12 +1,14 @@
-"""Evals de recuperação das bases de conhecimento (ADR-0012).
+"""Evals de recuperação das bases de conhecimento (ADR-0012 e ADR-0017).
 
 Cada pergunta tem um documento que precisa voltar entre os K primeiros trechos.
-A versão literal roda em todo PR com o embedder local do replay; a semântica
-mede o embedder real e só roda na suíte noturna.
+A versão literal roda em todo PR com o embedder local do replay, com cada
+estratégia de busca: nenhuma pode piorar o óbvio. A semântica mede o embedder
+real, compara as estratégias com a busca simples e só roda na suíte noturna.
 """
 
 import os
 from collections.abc import Generator
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -41,7 +43,15 @@ def db_url() -> Generator[str, None, None]:
         get_settings.cache_clear()
 
 
-def _base_com_documentos(embedder: str) -> KnowledgeBase:
+# estratégias medidas; o HyDE entra à noite só com chave de modelo
+STRATEGIES: dict[str, dict[str, Any]] = {
+    "simples": {},
+    "mmr": {"reranker": "mmr", "mmr_lambda": 0.5},
+    "recencia": {"reranker": "recency"},
+}
+
+
+def _base_com_documentos(embedder: str, retrieval: dict[str, Any] | None = None) -> KnowledgeBase:
     spec = EMBEDDERS[embedder]  # type: ignore[index]
     base_id = uuid4()
     # sem expirar no commit: a base sai da sessão e segue usada pela busca
@@ -55,6 +65,7 @@ def _base_com_documentos(embedder: str) -> KnowledgeBase:
             dimensions=spec.dimensions,
             chunk_size=2000,
             vector_table=f"kb_{base_id.hex}",
+            retrieval=retrieval or {},
             updated_by="eval",
         )
         contents = [
@@ -89,13 +100,14 @@ def _recall(base: KnowledgeBase, kind: str | None) -> tuple[float, list[str]]:
     return 1 - len(misses) / len(questions), misses
 
 
+@pytest.mark.parametrize("strategy", list(STRATEGIES))
 def test_recuperacao_literal_com_embedder_local(
-    db_url: str, monkeypatch: pytest.MonkeyPatch
+    db_url: str, monkeypatch: pytest.MonkeyPatch, strategy: str
 ) -> None:
     monkeypatch.setenv("DEMO_REPLAY", "true")
-    base = _base_com_documentos("voyage")
+    base = _base_com_documentos("voyage", STRATEGIES[strategy])
     recall, misses = _recall(base, "literal")
-    assert recall == 1.0, misses
+    assert recall == 1.0, (strategy, misses)
 
 
 @pytest.mark.nightly
@@ -110,3 +122,25 @@ def test_recuperacao_semantica_com_voyage(db_url: str, monkeypatch: pytest.Monke
     assert recall >= 0.8, misses
     literal, misses_literal = _recall(base, "literal")
     assert literal == 1.0, misses_literal
+
+
+@pytest.mark.nightly
+def test_estrategias_semanticas_com_voyage(db_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Nenhuma estratégia pode ficar abaixo da busca simples além de uma pergunta."""
+    if not os.environ.get("VOYAGE_API_KEY"):
+        pytest.skip("VOYAGE_API_KEY não definida — pulando eval de estratégias")
+    monkeypatch.delenv("DEMO_REPLAY", raising=False)
+    get_settings.cache_clear()
+    strategies = dict(STRATEGIES)
+    # HyDE precisa de um modelo de verdade: entra só com a chave do provedor
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        strategies["hyde"] = {"hyde": True, "hyde_model": "claude-haiku-4-5"}
+    tolerance = 1 / len(demo_content.QUESTIONS)
+    results = {}
+    for name, retrieval in strategies.items():
+        results[name] = _recall(_base_com_documentos("voyage", retrieval), None)
+    # o log da suíte noturna guarda o recall de cada uma, para decidir o padrão com números
+    print({name: round(recall, 3) for name, (recall, _) in results.items()})
+    baseline = results["simples"][0]
+    for name, (recall, misses) in results.items():
+        assert recall >= baseline - tolerance, (name, recall, baseline, misses)

@@ -580,7 +580,7 @@ if __name__ == "__main__":
 | 15 — Workflows | #108–#114 | Etapas em sequência, paralelo, condição e loop sobre agentes e times | Fases 12 e 14 |
 | 16 — Evals no painel | #118–#125 | Casos de teste por agente e time, juiz por LLM, regressão entre versões e gate de publicação | Fases 13 e 14 |
 | 17 — Evals contínuos | #127, #130–#140 | Suíte disparada por token de integração, agendamento e casos a partir de conversas reais | Fase 16 |
-| 18 — Recuperação por base | #143 em diante | Reranker do Agno (MMR e recência) e HyDE medido por base de conhecimento | Fases 13 e 17 |
+| 18 — Recuperação por base | #143–#148 | Reranker do Agno (MMR e recência) e HyDE medido por base de conhecimento | Fases 13 e 17 |
 
 Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
 
@@ -915,7 +915,7 @@ Decisão em [ADR-0017](adr/0017-estrategia-de-recuperacao.md). Cada base de conh
 - [x] `feat(api)`: HyDE com modelo escolhido e medido. Medidor também no `invoke` síncrono, `usage_event` do agente pelo `RunContext` da tool, desligado no modo demo
 - [x] `feat(api)`: busca de teste compara com e sem a estratégia da base. `POST /knowledge-bases/{id}/search/compare`, com o texto buscado e os tokens do HyDE de cada lado
 - [x] `feat(web)`: estratégia de busca na página da base e comparação lado a lado na busca de teste
-- [ ] `test(api)`: evals de recuperação por estratégia, literais em todo PR e semânticos à noite
+- [x] `test(api)`: evals de recuperação por estratégia, literais em todo PR e semânticos à noite
 
 **Critério de aceite da fase:**
 

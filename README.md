@@ -279,7 +279,7 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 | Workflows | Regras sobre respostas reais de triagem, inclusive os limites documentados (negação, flexão), condição depois de paralelo e estrutura aceita ou recusada. | Todo PR |
 | Suíte de testes | Scorer de texto sobre respostas reais, montagem do `Case` do Agno (juiz só com modelo, nunca no modo demo), tradução do resultado do runner, veredito do gate (não avaliado trava) e comparação entre execuções. | Todo PR |
 | Evals contínuos | Validação do agendamento (cron, fuso, intervalo mínimo de 1 hora), próximo horário no fuso certo, escopo por recurso dos tokens de integração, `verdict` que o pipeline lê e montagem da sugestão de caso (máscara, tools com erro fora). | Todo PR |
-| Recuperação | O documento certo volta entre os 3 primeiros trechos. A versão literal roda em todo PR; a semântica, com Voyage, roda à noite e aceita recall@3 de 80%. | PR e noturna |
+| Recuperação | O documento certo volta entre os 3 primeiros trechos. A versão literal roda em todo PR com cada estratégia de busca (simples, MMR, recência), e nenhuma pode errar. A semântica, com Voyage, roda à noite, aceita recall@3 de 80% e compara as estratégias (HyDE incluso, com chave de modelo) com a busca simples. | PR e noturna |
 | Confiabilidade | Tool calls com LLM real. | Noturna |
 
 **CI** (GitHub Actions): filtro por caminho, jobs de API, web e e2e, montagem das imagens de produção da API e do painel e um gate que falha se qualquer um falhar. Tag `v*` publica as imagens no GHCR e anexa o `openapi.json` na release.
