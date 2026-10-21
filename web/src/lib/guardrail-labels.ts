@@ -6,6 +6,8 @@ export const BLOCK_LABELS: Record<string, string> = {
   input_too_long: "Mensagem longa demais",
   moderation: "Moderação",
   output_not_allowed: "Resposta barrada",
+  // orçamento do mês estourado com bloqueio ligado (ADR-0021)
+  budget_exceeded: "Orçamento do mês",
 };
 
 export function blockLabel(rule: string | null | undefined): string {
