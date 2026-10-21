@@ -21,12 +21,12 @@ No código atual:
 
 **Webhook por agendamento, assinado, disparado só quando o estado muda.** Depois de cada execução agendada, a API compara o estado com o da execução agendada anterior e só avisa nas mudanças:
 
-| Antes | Agora | Evento |
-|---|---|---|
-| verde | caso que passava falhou | `suite.regressed`, com os casos |
-| verde | falhou sem regressão (caso novo, erro da execução) | `suite.failing` |
-| sem execução anterior | falhou | `suite.failing` |
-| falhando ou regredida | verde | `suite.recovered` |
+| Antes                 | Agora                                              | Evento                          |
+| --------------------- | -------------------------------------------------- | ------------------------------- |
+| verde                 | caso que passava falhou                            | `suite.regressed`, com os casos |
+| verde                 | falhou sem regressão (caso novo, erro da execução) | `suite.failing`                 |
+| sem execução anterior | falhou                                             | `suite.failing`                 |
+| falhando ou regredida | verde                                              | `suite.recovered`               |
 
 Estado igual ao anterior não avisa: uma suíte quebrada há uma semana não manda 28 mensagens.
 
