@@ -1,7 +1,7 @@
 """Casos de teste por agente e time (ADR-0015). Ficam fora do payload versionado."""
 
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -95,3 +95,49 @@ class EvalCaseResponse(BaseModel):
     updated_by: str
     created_at: datetime
     updated_at: datetime
+
+
+EvalRunStatus = Literal["queued", "running", "completed", "failed"]
+EvalResultStatus = Literal["passed", "failed", "error", "not_evaluated"]
+
+
+class EvalRunCreate(BaseModel):
+    # sem versão: o rascunho, se houver; senão, a vigente
+    version_id: UUID | None = None
+
+
+class EvalRunSummary(BaseModel):
+    id: UUID
+    agent_config_id: UUID
+    version_id: UUID
+    version_number: int
+    version_status: str
+    status: EvalRunStatus
+    total: int
+    passed: int
+    failed: int
+    not_evaluated: int
+    error: str | None
+    started_by: str
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+
+class EvalResultResponse(BaseModel):
+    id: UUID
+    case_id: UUID | None
+    case_name: str
+    position: int
+    status: EvalResultStatus
+    # uma entrada por checagem, com "type", "passed" (null quando não rodou) e o detalhe
+    checks: list[dict[str, Any]]
+    output: str | None
+    tools_called: list[str]
+    duration_ms: int | None
+    error: str | None
+    session_id: str | None
+
+
+class EvalRunDetail(EvalRunSummary):
+    results: list[EvalResultResponse]

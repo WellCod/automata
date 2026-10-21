@@ -1,16 +1,25 @@
-"""Casos de teste por agente e time (ADR-0015)."""
+"""Casos de teste e execução da suíte por agente e time (ADR-0015)."""
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
+from app.evals.runner import execute
 from app.models.config import AgentConfig
-from app.models.eval import EvalCase
+from app.models.eval import EvalCase, EvalResult, EvalRun
 from app.repositories.config import ConfigRepository
-from app.repositories.eval import EvalCaseRepository
-from app.schemas.eval import MAX_CASES, EvalCaseInput, EvalCaseResponse
+from app.repositories.eval import EvalCaseRepository, EvalRunRepository
+from app.schemas.eval import (
+    MAX_CASES,
+    EvalCaseInput,
+    EvalCaseResponse,
+    EvalResultResponse,
+    EvalRunCreate,
+    EvalRunDetail,
+    EvalRunSummary,
+)
 
 router = APIRouter(
     prefix="/api/v1/configs/{config_id}/eval-cases",
@@ -117,3 +126,111 @@ def delete_case(config_id: UUID, case_id: UUID, session: SessionDep) -> Response
     repo.delete(_case_or_404(repo, config_id, case_id))
     session.commit()
     return Response(status_code=204)
+
+
+runs_router = APIRouter(
+    prefix="/api/v1/configs/{config_id}/eval-runs",
+    tags=["evals"],
+    dependencies=[Depends(require_scopes(Scope.EVALS_READ))],
+)
+
+
+def _summary(session: SessionDep, run: EvalRun) -> EvalRunSummary:
+    version = ConfigRepository(session).get_version(run.version_id)
+    assert version is not None
+    return EvalRunSummary(
+        id=run.id,
+        agent_config_id=run.agent_config_id,
+        version_id=run.version_id,
+        version_number=version.version_number,
+        version_status=version.status.value,
+        status=run.status,
+        total=run.total,
+        passed=run.passed,
+        failed=run.failed,
+        not_evaluated=run.not_evaluated,
+        error=run.error,
+        started_by=run.started_by,
+        created_at=run.created_at,
+        started_at=run.started_at,
+        finished_at=run.finished_at,
+    )
+
+
+def _result(r: EvalResult) -> EvalResultResponse:
+    return EvalResultResponse(
+        id=r.id,
+        case_id=r.case_id,
+        case_name=r.case_name,
+        position=r.position,
+        status=r.status,
+        checks=r.checks,
+        output=r.output,
+        tools_called=r.tools_called,
+        duration_ms=r.duration_ms,
+        error=r.error,
+        session_id=r.session_id,
+    )
+
+
+@runs_router.post(
+    "",
+    response_model=EvalRunSummary,
+    status_code=202,
+    dependencies=[Depends(require_scopes(Scope.EVALS_RUN))],
+)
+def start_run(
+    config_id: UUID,
+    body: EvalRunCreate,
+    request: Request,
+    background: BackgroundTasks,
+    session: SessionDep,
+) -> EvalRunSummary:
+    config = _config_or_404(session, config_id)
+    _testable(config)
+    version_id = body.version_id or config.draft_version_id or config.current_version_id
+    if version_id is None:
+        raise HTTPException(status_code=422, detail="Config sem versão para testar")
+    version = ConfigRepository(session).get_version(version_id)
+    if version is None or version.config_id != config_id:
+        raise HTTPException(status_code=422, detail="Versão não é desta config")
+    cases = EvalCaseRepository(session).list_by_config(config_id)
+    if not cases:
+        raise HTTPException(status_code=422, detail="Suíte sem casos")
+    runs = EvalRunRepository(session)
+    if runs.active(config_id) is not None:
+        raise HTTPException(status_code=409, detail="Já há uma execução em andamento")
+    run = runs.add(
+        EvalRun(
+            agent_config_id=config_id,
+            version_id=version_id,
+            status="queued",
+            total=len(cases),
+            cases=[
+                {"id": str(c.id), "name": c.name, "input": c.input, "checks": c.checks}
+                for c in cases
+            ],
+            started_by=_actor(request),
+        )
+    )
+    session.commit()
+    session.refresh(run)
+    background.add_task(execute, run.id)
+    return _summary(session, run)
+
+
+@runs_router.get("", response_model=list[EvalRunSummary])
+def list_runs(config_id: UUID, session: SessionDep) -> list[EvalRunSummary]:
+    _config_or_404(session, config_id)
+    return [_summary(session, r) for r in EvalRunRepository(session).list_by_config(config_id)]
+
+
+@runs_router.get("/{run_id}", response_model=EvalRunDetail)
+def get_run(config_id: UUID, run_id: UUID, session: SessionDep) -> EvalRunDetail:
+    _config_or_404(session, config_id)
+    repo = EvalRunRepository(session)
+    run = repo.get(config_id, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Execução não encontrada")
+    summary = _summary(session, run)
+    return EvalRunDetail(**summary.model_dump(), results=[_result(r) for r in repo.results(run.id)])

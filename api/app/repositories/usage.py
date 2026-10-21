@@ -56,6 +56,7 @@ class UsageRepository:
         run_id: str | None = None,
         cost: float | None = None,
         period: str | None = None,
+        eval_run_id: UUID | None = None,
     ) -> UsageEvent:
         if period is None:
             period = datetime.now(UTC).strftime("%Y%m")
@@ -69,6 +70,7 @@ class UsageRepository:
             output_tokens=output_tokens,
             total_tokens=total_tokens,
             cost=cost,
+            eval_run_id=eval_run_id,
         )
         self._session.add(event)
         self._session.flush()
@@ -83,7 +85,7 @@ class UsageRepository:
     ) -> UsageSummary:
         if since is None:
             since = datetime.now(UTC) - timedelta(days=period_days)
-        where_clauses = [UsageEvent.created_at >= since]
+        where_clauses = [UsageEvent.created_at >= since, UsageEvent.eval_run_id.is_(None)]
         if until is not None:
             where_clauses.append(UsageEvent.created_at <= until)
         row = self._session.execute(
@@ -107,7 +109,7 @@ class UsageRepository:
     ) -> list[AgentUsageSummary]:
         if since is None:
             since = datetime.now(UTC) - timedelta(days=period_days)
-        where_clauses = [UsageEvent.created_at >= since]
+        where_clauses = [UsageEvent.created_at >= since, UsageEvent.eval_run_id.is_(None)]
         if until is not None:
             where_clauses.append(UsageEvent.created_at <= until)
         rows = self._session.execute(
@@ -136,7 +138,7 @@ class UsageRepository:
         agent_config_id: UUID | None = None,
     ) -> list[DailyUsage]:
         day = cast(func.timezone("UTC", UsageEvent.created_at), Date).label("day")
-        where_clauses = [UsageEvent.created_at >= since]
+        where_clauses = [UsageEvent.created_at >= since, UsageEvent.eval_run_id.is_(None)]
         if until is not None:
             where_clauses.append(UsageEvent.created_at <= until)
         if agent_config_id is not None:

@@ -79,11 +79,23 @@ class RunRecord:
     blocked_by: str | None = None
     block_detail: dict[str, Any] | None = None
     parent_run_id: str | None = None
+    eval_run_id: UUID | None = None
 
 
 # run do workflow em andamento; etapas (inclusive ramos paralelos, que copiam o contexto)
 # gravam esse id como pai
 current_workflow_run: ContextVar[str | None] = ContextVar("current_workflow_run", default=None)
+
+
+@dataclass(frozen=True)
+class EvalContext:
+    eval_run_id: UUID
+    # o runner de suíte do Agno não passa user_id: o run fica com quem disparou a suíte
+    actor: str
+
+
+# suíte de testes em andamento (ADR-0015): o run sai das métricas de conversa
+current_eval_run: ContextVar[EvalContext | None] = ContextVar("current_eval_run", default=None)
 
 
 def persist(record: RunRecord) -> None:
@@ -100,6 +112,7 @@ def persist(record: RunRecord) -> None:
             blocked_by=record.blocked_by,
             block_detail=record.block_detail,
             parent_run_id=record.parent_run_id,
+            eval_run_id=record.eval_run_id,
         )
         if record.total_tokens:
             UsageRepository(session).record_event(
@@ -112,6 +125,7 @@ def persist(record: RunRecord) -> None:
                 total_tokens=record.total_tokens,
                 cost=record.cost,
                 period=datetime.now(UTC).strftime("%Y%m"),
+                eval_run_id=record.eval_run_id,
             )
         session.commit()
 
@@ -307,10 +321,13 @@ class RunTracking:
             error = str(output.content) if output.content is not None else None
         metrics = output.metrics if output is not None else None
         duration = getattr(metrics, "duration", None)
+        evaluation = current_eval_run.get()
         return RunRecord(
             agent_config_id=self.automata_config_id,
             model_id=self.automata_model_id,
-            user_id=kwargs.get("user_id") or "anonymous",
+            user_id=kwargs.get("user_id")
+            or (evaluation.actor if evaluation else None)
+            or "anonymous",
             run_id=run_id or (output.run_id if output is not None else None),
             status=final_status,
             duration_ms=int((duration if duration is not None else monotonic() - start) * 1000),
@@ -322,6 +339,7 @@ class RunTracking:
             session_id=kwargs.get("session_id") or (output.session_id if output else None),
             pending_tools=_pending_tools(output),
             parent_run_id=current_workflow_run.get(),
+            eval_run_id=evaluation.eval_run_id if evaluation else None,
             blocked_by=block.rule if final_status == "blocked" and block else None,
             block_detail=block.detail if final_status == "blocked" and block else None,
         )

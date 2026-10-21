@@ -18,6 +18,7 @@ class AgentRun(Base):
         Index("ix_agent_run_status", "status"),
         Index("ix_agent_run_blocked_by", "blocked_by"),
         Index("ix_agent_run_parent_run_id", "parent_run_id"),
+        Index("ix_agent_run_eval_run_id", "eval_run_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -39,6 +40,10 @@ class AgentRun(Base):
     blocked_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
     # run do workflow em que esta etapa rodou
     parent_run_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # run de caso de teste (ADR-0015): fica fora das métricas de conversa
+    eval_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("eval_run.id", ondelete="SET NULL"), nullable=True
+    )
     block_detail: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

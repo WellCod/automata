@@ -20,6 +20,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.agents.factory import make_agent_factory, make_team_factory
 from app.agents.registry import PublishedAgents
 from app.agents.workflow_factory import make_workflow_factory
+from app.evals.runner import fail_stale as fail_stale_evals
 from app.integrations import RevocationMiddleware, RevokedTokens
 from app.knowledge.ingest import fail_stale
 from app.logging_config import configure_logging, request_id_var
@@ -86,6 +87,16 @@ class SyncPublishedAgentsMiddleware(BaseHTTPMiddleware):
         return response
 
 
+def _fail_stale_evals() -> None:
+    try:
+        failed = fail_stale_evals()
+    except Exception as exc:
+        logger.warning("falha ao revisar suítes presas", extra={"error": str(exc)})
+        return
+    if failed:
+        logger.warning("suítes interrompidas marcadas como falha", extra={"count": failed})
+
+
 def _fail_stale_ingestions() -> None:
     # banco fora do ar no boot não pode impedir a API de subir (o /health acusa)
     try:
@@ -139,6 +150,7 @@ def create_app(
     )
     published.sync()
     _fail_stale_ingestions()
+    _fail_stale_evals()
     base.state.published_agents = published
     base.state.agno_db = db if settings.tracing_enabled else None
     revoked = RevokedTokens()
