@@ -7,6 +7,7 @@ export type ConditionNode = Schemas["ConditionNode"];
 export type LoopNode = Schemas["LoopNode"];
 export type WorkflowNode = StepNode | ParallelNode | ConditionNode | LoopNode;
 export type WorkflowRule = Schemas["WorkflowRule"];
+export type StepReview = Schemas["StepReview"];
 export type NodeType = WorkflowNode["type"];
 
 // mesmos limites de app/schemas/workflow.py: a API valida de novo na escrita
@@ -105,6 +106,16 @@ export function removeAt<T>(list: T[], index: number): T[] {
   return list.filter((_, i) => i !== index);
 }
 
+// revisão humana só fora de paralelo e de laço (ADR-0023); condição não conta
+export function reviewsInsideContainers(nodes: WorkflowNode[], inside = false): string[] {
+  return nodes.flatMap((n) => {
+    if (n.type === "step") return inside && n.review ? [n.name] : [];
+    if (n.type === "condition")
+      return reviewsInsideContainers([...n.steps, ...(n.else_steps ?? [])], inside);
+    return reviewsInsideContainers(children(n), true);
+  });
+}
+
 // mesmas regras estruturais da API, para avisar antes de salvar
 export function structureErrors(nodes: WorkflowNode[]): string[] {
   const errors: string[] = [];
@@ -124,6 +135,8 @@ export function structureErrors(nodes: WorkflowNode[]): string[] {
       errors.push(`Preencha o texto da regra de "${n.name}".`);
   }
   if (countSteps(nodes) > MAX_STEPS) errors.push(`No máximo ${MAX_STEPS} etapas.`);
+  for (const name of reviewsInsideContainers(nodes))
+    errors.push(`"${name}" está num paralelo ou laço: revisão humana só fora deles.`);
   if (nodes.at(-1)?.type === "parallel")
     errors.push("O workflow não pode terminar num paralelo: junte os ramos numa etapa.");
   return [...new Set(errors)];
