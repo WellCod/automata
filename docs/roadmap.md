@@ -934,7 +934,7 @@ Fica para depois: reranker por cross-encoder (Cohere, Bedrock), estratégia por 
 Decisão em [ADR-0018](adr/0018-avisos-de-regressao.md). Cada agendamento da suíte pode ter um webhook assinado, chamado só quando o estado muda: regrediu, passou a falhar ou se recuperou. O corpo traz um `text` em português, que Slack, Teams e Discord leem sem adaptador.
 
 - [ ] #149 — `docs(adr)`: ADR-0018 e esta seção
-- [ ] `feat(api)`: webhook do agendamento com URL e segredo cifrados, saída pelo `check_url` e evento de teste
+- [x] `feat(api)`: webhook do agendamento com URL e segredo cifrados, saída pelo `check_url` e evento de teste (migration 0029)
 - [ ] `feat(api)`: aviso nas mudanças de estado da suíte agendada, com assinatura HMAC e até 3 tentativas
 - [ ] `feat(web)`: webhook na seção de agendamento da aba Testes, com segredo mostrado uma vez, teste e último resultado
 - [ ] `test(api)`: evals das transições de estado e da assinatura

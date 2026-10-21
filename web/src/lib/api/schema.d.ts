@@ -269,6 +269,47 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/configs/{config_id}/eval-schedule/webhook": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Save Webhook
+     * @description Cadastra ou troca o webhook; o segredo novo é devolvido uma vez só.
+     */
+    put: operations["save_webhook_api_v1_configs__config_id__eval_schedule_webhook_put"];
+    post?: never;
+    /** Delete Webhook */
+    delete: operations["delete_webhook_api_v1_configs__config_id__eval_schedule_webhook_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/configs/{config_id}/eval-schedule/webhook/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Test Webhook
+     * @description Manda um suite.test, uma tentativa só, para conferir a integração.
+     */
+    post: operations["test_webhook_api_v1_configs__config_id__eval_schedule_webhook_test_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/configs/{config_id}/eval-settings": {
     parameters: {
       query?: never;
@@ -1576,6 +1617,12 @@ export interface components {
       last_run_id: string | null;
       /** Last Error */
       last_error: string | null;
+      /** Webhook Host */
+      webhook_host: string | null;
+      /** Webhook Last Status */
+      webhook_last_status: string | null;
+      /** Webhook Last At */
+      webhook_last_at: string | null;
       /** Updated By */
       updated_by: string;
       /**
@@ -2511,6 +2558,25 @@ export interface components {
       /** Context */
       ctx?: Record<string, never>;
     };
+    /** WebhookInput */
+    WebhookInput: {
+      /** Url */
+      url: string;
+    };
+    /** WebhookIssued */
+    WebhookIssued: {
+      /** Host */
+      host: string;
+      /** Secret */
+      secret: string;
+    };
+    /** WebhookTestResult */
+    WebhookTestResult: {
+      /** Status */
+      status: string;
+      /** Delivered */
+      delivered: boolean;
+    };
     /**
      * WorkflowRule
      * @description Condição avaliada em código nosso, sem CEL; texto comparado sem maiúsculas.
@@ -3230,6 +3296,101 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  save_webhook_api_v1_configs__config_id__eval_schedule_webhook_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["WebhookInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WebhookIssued"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_webhook_api_v1_configs__config_id__eval_schedule_webhook_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  test_webhook_api_v1_configs__config_id__eval_schedule_webhook_test_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WebhookTestResult"];
+        };
       };
       /** @description Validation Error */
       422: {

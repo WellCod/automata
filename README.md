@@ -378,7 +378,7 @@ api/
     mcp/          cliente MCP, proteção de saída (SSRF)
     routers/      rotas próprias /api/v1
     services/     regras de negócio e validação na escrita
-  alembic/        28 migrations
+  alembic/        29 migrations
   fixtures/       respostas gravadas do modo replay
   tests/          pytest, integração e evals
 web/

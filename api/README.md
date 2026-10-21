@@ -392,6 +392,21 @@ echo "suíte: $VERDICT"
 - Execução já em andamento responde 409: o pipeline pode esperar e tentar de novo.
 - O token fica em um segredo do CI (`AUTOMATA_TOKEN`) e vale até 90 dias. Revogar no painel corta na hora.
 
+### Webhook de aviso
+
+Cada agendamento pode ter um webhook (ADR-0018, migration 0029), em `/api/v1/configs/{id}/eval-schedule/webhook`, com `evals:write`:
+- `PUT {url}` cadastra ou troca e devolve o `secret` **uma vez só**. A URL e o segredo ficam cifrados juntos com `MCP_SECRETS_KEY` (sem a chave, 422), porque URL de Slack e Teams carrega token. O agendamento mostra só `webhook_host`.
+- `DELETE` remove. `POST /test` manda um `suite.test`, numa tentativa só, e devolve o resultado.
+- Agendamento sem webhook dá 404 no teste, e webhook sem agendamento também dá 404.
+
+A saída passa pelo `check_url` dos servidores MCP, no cadastro e a cada envio: só https, nada que resolva para IP interno, salvo hosts em `MCP_ALLOWED_HOSTS`. Redirect não é seguido.
+
+Cada envio (`app/evals/webhook.py`) leva:
+- os headers `X-Automata-Event` e `X-Automata-Signature: sha256=<HMAC-SHA256 do corpo com o segredo>`;
+- corpo JSON com `event`, `at`, dados do evento e o resumo em `text` (Slack, Teams) e `content` (Discord), que funciona colado num canal sem adaptador.
+
+Na entrega, são até 3 tentativas, com timeout de 10 s e espera de 1 s e 5 s. Uma resposta 4xx não é repetida. O resultado fica em `webhook_last_status` e `webhook_last_at`.
+
 ### Estado da suíte
 
 `GET /api/v1/eval-status` (`evals:read`) devolve, para cada config que já rodou a suíte, o estado pela execução mais recente (`app/evals/compare.py`):
