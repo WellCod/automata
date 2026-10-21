@@ -1030,7 +1030,7 @@ Decisão em [ADR-0023](adr/0023-revisao-humana-no-workflow.md). Uma etapa pode p
 - [ ] `docs(adr)`: ADR-0023 e esta seção
 - [x] `feat(api)`: revisão por etapa no payload, pendências do run pausado e acompanhamento do continue
 - [x] `feat(web)`: revisão no editor de workflow, etapas pendentes na página Aprovações e no modo teste
-- [ ] `test(api)`: evals da revisão humana no workflow
+- [x] `test(api)`: evals da revisão humana no workflow
 
 **Critério de aceite da fase:**
 
