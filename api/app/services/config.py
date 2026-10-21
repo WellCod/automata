@@ -148,6 +148,9 @@ class ConfigService:
         errors += self._guardrail_errors(payload)
         errors += self._team_errors(config, payload)
         errors += self._workflow_errors(config, payload)
+        if payload.conversation.compaction and config.kind != ConfigKind.agent:
+            # o Team do Agno 3.1.8 não aceita compaction (ADR-0019)
+            errors.append("só agente compacta a conversa")
         if errors:
             raise ValueError("; ".join(errors))
 

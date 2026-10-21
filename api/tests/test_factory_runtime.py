@@ -600,3 +600,64 @@ def test_conversa_leva_os_turnos_anteriores_da_sessao(
                 path, data={"message": "oi", "stream": "false", "session_id": f"outra-{path}"}
             ).json()["content"]
             assert fresh == "mensagens: 1"
+
+
+def test_compactacao_resume_conversa_longa_e_time_recusa(
+    db_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi.testclient import TestClient
+
+    from tests.fake_models import SummarizingModel
+
+    model = SummarizingModel(id="claude-haiku-4-5")
+    conversation = {
+        "compaction": True,
+        "compact_at_tokens": 4_000,
+        "keep_recent_runs": 1,
+        "summary_instructions": "mantenha números de pedido",
+    }
+    with TestClient(_app_with_model(monkeypatch, model)) as client:  # type: ignore[arg-type]
+        agent = _publish(
+            client,
+            "agent",
+            "conversa longa",
+            {"model_id": "claude-haiku-4-5", "conversation": conversation},
+        )
+        replies = [
+            client.post(
+                f"/agents/{agent}/runs",
+                data={"message": msg, "stream": "false", "session_id": "longa"},
+            ).json()["content"]
+            for msg in ("meu pedido é o 123", "e o prazo?", "e a troca?", "e o frete?", "e aí?")
+        ]
+        # antes de passar do limite não há resumo; depois, o resumo chega ao modelo
+        assert replies[0].startswith("sem-resumo")
+        assert replies[-1].startswith("viu-resumo"), [r[:12] for r in replies]
+
+        # sem a opção, a janela de turnos de sempre: nenhum resumo
+        plain = _publish(client, "agent", "conversa curta", {"model_id": "claude-haiku-4-5"})
+        last = ""
+        for msg in ("meu pedido é o 123", "e o prazo?", "e a troca?", "e o frete?", "e aí?"):
+            last = client.post(
+                f"/agents/{plain}/runs",
+                data={"message": msg, "stream": "false", "session_id": "curta"},
+            ).json()["content"]
+        assert last.startswith("sem-resumo")
+
+        team = client.post(
+            "/api/v1/configs", json={"name": "time longo", "description": "x", "kind": "team"}
+        ).json()["id"]
+        refused = client.put(
+            f"/api/v1/configs/{team}/draft",
+            json={
+                "name": "time longo",
+                "description": "x",
+                "payload": {
+                    "model_id": "claude-haiku-4-5",
+                    "team": {"mode": "coordinate", "members": [{"agent_id": plain}]},
+                    "conversation": conversation,
+                },
+            },
+        )
+        assert refused.status_code in (400, 422), refused.text
+        assert "só agente compacta a conversa" in refused.text

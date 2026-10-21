@@ -956,7 +956,7 @@ Fica para depois: e-mail, destinos de aviso por instância e outros eventos (run
 Decisão em [ADR-0019](adr/0019-compactacao-de-conversa.md). O agente pode compactar conversas longas: os turnos antigos viram um resumo, e o custo por turno fica limitado. A opção fica no payload versionado, desligada por padrão, com limite de 16 mil tokens e resumo pelo modelo do próprio agente.
 
 - [ ] #154 — `docs(adr)`: ADR-0019 e esta seção
-- [ ] `feat(api)`: seção `conversation` no payload, validada na escrita (só agente) e ligada à `Compaction` do Agno na factory
+- [x] `feat(api)`: seção `conversation` no payload, validada na escrita (só agente) e ligada à `Compaction` do Agno na factory
 - [ ] `feat(web)`: compactação na configuração do agente, com limite e instruções do resumo
 - [ ] `test(api)`: evals da compactação, com resumo gerado acima do limite e janela de turnos sem a opção
 

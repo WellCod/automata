@@ -6,6 +6,7 @@ from uuid import UUID
 
 from agno.agent import Agent
 from agno.agent.factory import AgentFactory
+from agno.compaction.compaction import Compaction
 from agno.db.base import AsyncBaseDb, BaseDb
 from agno.factory.utils import FactoryValidationError, RequestContext
 from agno.team import Team, TeamMode
@@ -27,7 +28,7 @@ from app.models.knowledge_base import KnowledgeBase
 from app.repositories.config import ConfigRepository
 from app.repositories.knowledge_base import KnowledgeBaseRepository
 from app.repositories.mcp_server import McpServerRepository
-from app.schemas.config import ConfigPayload
+from app.schemas.config import ConfigPayload, ConversationSettings
 from app.secrets import SecretsKeyMissing
 
 
@@ -138,6 +139,18 @@ def _post_hooks(hook: Callable[..., None] | None) -> list[Any] | None:
 HISTORY_RUNS = 5
 
 
+def compaction_for(settings: ConversationSettings) -> Compaction | None:
+    """Resumo pelo modelo do próprio agente; o consumo entra nos totais do run (ADR-0019)."""
+    if not settings.compaction:
+        return None
+    return Compaction(
+        compact_at_tokens=settings.compact_at_tokens,
+        uncompacted_runs=settings.keep_recent_runs,
+        instructions=settings.summary_instructions,
+        search_compacted_messages=settings.search_history,
+    )
+
+
 def required_model(payload: ConfigPayload) -> str:
     # o serviço exige modelo em agente e time; versão gravada sem ele é dado inválido
     if payload.model_id is None:
@@ -163,6 +176,8 @@ def agent_from(config_id: UUID, resolved: ResolvedVersion, *, tracked: bool) -> 
         # o histórico sai do banco da sessão, que o AgentFactory injeta no agente
         add_history_to_context=True,
         num_history_runs=HISTORY_RUNS,
+        # com compactação, a janela vai até o limite e o num_history_runs deixa de valer
+        compaction=compaction_for(payload.conversation),
     )
     if isinstance(agent, TrackedAgent):
         agent.automata_config_id = config_id

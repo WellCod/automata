@@ -116,6 +116,20 @@ class TeamMember(BaseModel):
     version_id: UUID | None = None
 
 
+class ConversationSettings(BaseModel):
+    """Conversa longa (ADR-0019): turnos antigos viram resumo acima de um limite de tokens."""
+
+    compaction: bool = False
+    # bem abaixo dos 150 mil do Agno: com a compactação ligada, a janela vai até o limite
+    compact_at_tokens: int = Field(default=16_000, ge=4_000, le=128_000)
+    # turnos recentes mantidos inteiros
+    keep_recent_runs: int = Field(default=3, ge=1, le=20)
+    # o que o resumo não pode perder, ex.: "mantenha números de pedido e CPF mascarado"
+    summary_instructions: str | None = Field(default=None, max_length=500)
+    # tool de busca no histórico compactado, para o detalhe que o resumo deixou de fora
+    search_history: bool = True
+
+
 class TeamSettings(BaseModel):
     """Seção de time do payload. Só existe em config de kind=team."""
 
@@ -151,6 +165,7 @@ class ConfigPayload(BaseModel):
     knowledge: list[KnowledgeBinding] = Field(default_factory=list, max_length=10)
     guardrails: GuardrailSettings = Field(default_factory=GuardrailSettings)
     capabilities: CapabilityFlags = Field(default_factory=CapabilityFlags)
+    conversation: ConversationSettings = Field(default_factory=ConversationSettings)
     metadata: dict[str, Any] = Field(default_factory=dict)
     # Em time: modelo, instruções e MCP acima são do líder
     team: TeamSettings | None = None
