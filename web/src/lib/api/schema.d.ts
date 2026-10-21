@@ -1590,6 +1590,7 @@ export interface components {
       guardrails?: components["schemas"]["GuardrailSettings"];
       capabilities?: components["schemas"]["CapabilityFlags"];
       conversation?: components["schemas"]["ConversationSettings"];
+      memory?: components["schemas"]["MemorySettings"];
       /** Metadata */
       metadata?: {
         [key: string]: unknown;
@@ -2661,6 +2662,24 @@ export interface components {
       /** Email */
       email: string | null;
       role: components["schemas"]["UserRole"] | null;
+    };
+    /**
+     * MemorySettings
+     * @description Memória do usuário entre sessões (ADR-0025): só deste agente, mascarada e com prazo.
+     */
+    MemorySettings: {
+      /**
+       * Enabled
+       * @default false
+       */
+      enabled: boolean;
+      /** Instructions */
+      instructions?: string | null;
+      /**
+       * Retention Days
+       * @default 90
+       */
+      retention_days: number;
     };
     /**
      * OutputRule
