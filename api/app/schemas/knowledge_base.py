@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, model_validator
 
 from app.knowledge.embedders import EmbedderName
 
@@ -21,6 +21,16 @@ class RetrievalSettings(BaseModel):
     recency_half_life_days: float = Field(default=30.0, gt=0.0, le=3650.0)
     # 0 só relevância, 1 só idade
     recency_weight: float = Field(default=0.3, ge=0.0, le=1.0)
+    # busca com uma resposta hipotética no lugar da pergunta: uma chamada de modelo por busca
+    hyde: bool = False
+    # sempre explícito: sem modelo, o HyDE do Agno cairia num modelo da OpenAI
+    hyde_model: str | None = Field(default=None, max_length=64)
+
+    @model_validator(mode="after")
+    def hyde_com_modelo(self) -> "RetrievalSettings":
+        if self.hyde and not self.hyde_model:
+            raise ValueError("Escolha o modelo do HyDE")
+        return self
 
 
 class KnowledgeBaseUpdate(BaseModel):

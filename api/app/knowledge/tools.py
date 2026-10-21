@@ -9,9 +9,10 @@ import json
 import logging
 from uuid import UUID
 
+from agno.run import RunContext
 from agno.tools.function import Function
 
-from app.knowledge.search import search_base
+from app.knowledge.search import Caller, search
 from app.models.knowledge_base import KnowledgeBase
 
 logger = logging.getLogger(__name__)
@@ -26,16 +27,24 @@ def tool_name(base: KnowledgeBase) -> str:
 def knowledge_tool(
     base: KnowledgeBase, max_results: int, agent_config_id: UUID | None = None
 ) -> Function:
-    async def buscar(pergunta: str) -> str:
+    async def buscar(pergunta: str, run_context: RunContext) -> str:
         """Busca trechos na base de conhecimento.
 
         Args:
             pergunta: o que procurar, em linguagem natural.
         """
         try:
-            hits = await asyncio.to_thread(
-                search_base, base, pergunta, max_results, agent_config_id=agent_config_id
+            caller = (
+                Caller(
+                    agent_config_id,
+                    run_context.user_id or "anonymous",
+                    run_context.run_id,
+                )
+                if agent_config_id
+                else None
             )
+            outcome = await asyncio.to_thread(search, base, pergunta, max_results, caller=caller)
+            hits = outcome.hits
         except Exception as exc:
             logger.warning(
                 "busca do agente falhou", extra={"base_id": str(base.id), "error": str(exc)}
