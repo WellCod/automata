@@ -215,3 +215,22 @@ def test_sem_destino_nada_e_reservado(client: TestClient) -> None:
         )
     # sem reserva, um destino cadastrado depois ainda recebe o aviso do mês
     assert count == 0
+
+
+def test_evento_da_suite_chega_ao_destino_sem_webhook_no_agendamento(
+    client: TestClient, receiver: Receiver
+) -> None:
+    from tests.test_eval_webhook import _scheduled_agent, _set_check, _tick
+
+    dest = client.post(
+        "/api/v1/alert-destinations",
+        json={"name": "suítes", "url": receiver.url, "events": ["suite.failing"]},
+    ).json()
+    agent = _scheduled_agent(client, "suíte da instância")
+    _set_check(client, agent, {"type": "text", "kind": "contains", "value": "palavra-ausente"})
+    start = len(receiver.requests)
+
+    assert _tick(agent) == "suite.failing"
+    assert _events(receiver, start) == ["suite.failing"]
+    assert json.loads(receiver.requests[-1]["body"])["config_name"] == "suíte da instância"
+    client.delete(f"/api/v1/alert-destinations/{dest['id']}").raise_for_status()

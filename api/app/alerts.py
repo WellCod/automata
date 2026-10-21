@@ -126,6 +126,10 @@ def check_budgets(session: Session, now: datetime) -> list[tuple[UUID, str]]:
     return sent
 
 
+def is_spike(runs: int, errors: int) -> bool:
+    return runs >= SPIKE_MIN_RUNS and errors / runs >= SPIKE_ERROR_RATE
+
+
 @dataclass(frozen=True)
 class ErrorRate:
     config_id: UUID
@@ -155,7 +159,7 @@ def check_errors(session: Session, now: datetime) -> list[UUID]:
     # janela de uma hora: no máximo um aviso de pico por config por hora
     window = now.strftime("%Y%m%d%H")
     for rate in error_rates(session, now):
-        if rate.runs < SPIKE_MIN_RUNS or rate.errors / rate.runs < SPIKE_ERROR_RATE:
+        if not is_spike(rate.runs, rate.errors):
             continue
         if not claim(session, rate.config_id, ERRORS_SPIKE, window):
             continue
