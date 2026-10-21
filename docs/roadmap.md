@@ -1047,7 +1047,7 @@ Fica para depois: editar a saída na aprovação, revisão por volta de laço e 
 Decisão em [ADR-0024](adr/0024-conectores-de-conhecimento.md). A base passa a acompanhar a origem: conectores de GitHub, S3 e SharePoint sincronizam pela versão remota, e conteúdo de URL pode ser baixado de novo num intervalo, reindexando só o que mudou.
 
 - [ ] `docs(adr)`: ADR-0024 e esta seção
-- [ ] `feat(api)`: conectores de GitHub, S3 e SharePoint com credencial cifrada, teste e sincronização pela versão remota
+- [x] `feat(api)`: conectores de GitHub, S3 e SharePoint com credencial cifrada, teste e sincronização pela versão remota
 - [ ] `feat(api)`: sincronização agendada de conector e reindexação agendada de URL no poller
 - [ ] `feat(web)`: conectores e reindexação na página da base
 - [ ] `test(api)`: evals da sincronização e da reindexação

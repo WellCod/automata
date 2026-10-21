@@ -23,6 +23,8 @@ class Scope:
     # Bases de conhecimento (ADR-0012): editor cria e alimenta, viewer consulta
     KNOWLEDGE_READ = "knowledge_bases:read"
     KNOWLEDGE_WRITE = "knowledge_bases:write"
+    # credencial de conector define com que conta a API sai (ADR-0024): só owner
+    KNOWLEDGE_CONNECTORS_WRITE = "knowledge_connectors:write"
     # Suíte de testes por agente e time (ADR-0015): editor escreve e roda, viewer vê
     EVALS_READ = "evals:read"
     EVALS_WRITE = "evals:write"

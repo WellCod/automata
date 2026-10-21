@@ -4,6 +4,7 @@ from app.models.embedding_usage import EmbeddingUsage
 from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSchedule
 from app.models.integration import IntegrationToken
 from app.models.knowledge_base import KnowledgeBase
+from app.models.knowledge_connector import KnowledgeConnector
 from app.models.knowledge_content import KnowledgeContent
 from app.models.mcp_server import McpServer
 from app.models.revoked_token import RevokedToken
@@ -25,6 +26,7 @@ __all__ = [
     "EvalSchedule",
     "IntegrationToken",
     "KnowledgeBase",
+    "KnowledgeConnector",
     "KnowledgeContent",
     "McpServer",
     "RevokedToken",
