@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     tracing_enabled: bool = True
     # Laço que roda as suítes agendadas (ADR-0016); no modo demo fica desligado de qualquer jeito
     eval_scheduler_enabled: bool = True
+    # runs com background=true na fila durável do Agno, no Postgres (ADR-0020);
+    # false volta às tasks em memória
+    background_queue_durable: bool = True
     # Bases de conhecimento (ADR-0012): embedder escolhido na criação de cada base
     knowledge_default_embedder: Literal["voyage", "openai"] = "voyage"
     # Lida pelo SDK da Voyage; a do OpenAI vem de OPENAI_API_KEY, como nos modelos

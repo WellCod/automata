@@ -24,6 +24,7 @@ from app.agents.factory import make_agent_factory, make_team_factory
 from app.agents.models_map import demo_replay
 from app.agents.registry import PublishedAgents
 from app.agents.workflow_factory import make_workflow_factory
+from app.background import background_queue
 from app.evals.runner import fail_stale as fail_stale_evals
 from app.evals.scheduler import run_forever as run_scheduled_evals
 from app.integrations import RevocationMiddleware, RevokedTokens
@@ -204,6 +205,7 @@ def create_app(
         tracing=settings.tracing_enabled,
         # o lifespan agora roda: sem isto, o boot mandaria telemetria de lançamento ao Agno
         telemetry=False,
+        queue=background_queue(settings),
     ).get_app()
 
     # auth_router fica fora do middleware do Agno: /login precisa ser público
