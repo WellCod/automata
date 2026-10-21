@@ -882,7 +882,7 @@ Decisão em [ADR-0016](adr/0016-evals-continuos.md). A suíte da Fase 16 deixa d
 Pré-requisito: Agno 3.1.x (#128 e #129).
 
 - [x] #127 — `docs(adr)`: ADR-0016 e esta seção
-- [ ] `feat(api)`: origem e alvo por apelido na execução da suíte. `trigger` e `target` no `eval_run`, `verdict` no resumo
+- [x] `feat(api)`: origem e alvo por apelido na execução da suíte. `trigger` e `target` no `eval_run` (migration 0023), `verdict` no resumo, criação em `app/evals/service.py`
 - [ ] `feat(api)`: tokens de integração disparam e consultam a suíte. Escopos `evals:<id>:run` e `evals:<id>:read` por config na emissão, checagem por recurso nas rotas de execução
 - [ ] `feat(api)`: agendamento da suíte com poller próprio. Tabela `eval_schedule`, cron e fuso com `agno.scheduler.cron`, reivindicação com `SKIP LOCKED`, intervalo mínimo de 1 hora, desligado no modo demo
 - [ ] `feat(api)`: casos com turnos anteriores. `context` no `eval_case` (até cinco mensagens), rodado no `setup` do `Case` no mesmo `session_id`, e `user_id` do caso no lugar da troca pela `ContextVar`

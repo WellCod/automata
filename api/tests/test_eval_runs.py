@@ -332,3 +332,50 @@ def test_comparacao_aponta_regressao(client: TestClient) -> None:
         f"/api/v1/configs/{other}/eval-runs/compare", params={"base": base, "target": target}
     )
     assert resp.status_code == 404
+
+
+def test_alvo_por_apelido_origem_e_verdict(client: TestClient) -> None:
+    agent = _agent(client, "alvo por apelido")
+    _case(client, agent, "prazo", [{"type": "text", "kind": "contains", "value": "30 dias"}])
+    # rascunho com o modelo "piorado": a vigente passa, o rascunho não
+    client.put(
+        f"/api/v1/configs/{agent}/draft",
+        json={
+            "name": "alvo por apelido",
+            "description": "Use para alvo por apelido",
+            "payload": {"model_id": "claude-sonnet-4-6"},
+        },
+    ).raise_for_status()
+    config = client.get(f"/api/v1/configs/{agent}").json()
+
+    started = _start(client, agent, target="current")
+    assert started.status_code == 202, started.text
+    # a resposta sai antes da execução: ainda pendente
+    assert (started.json()["trigger"], started.json()["target"]) == ("manual", "current")
+    assert started.json()["verdict"] == "pending"
+    current = client.get(f"/api/v1/configs/{agent}/eval-runs/{started.json()['id']}").json()
+    assert current["version_id"] == config["current_version"]["id"]
+    assert current["verdict"] == "passed"
+
+    draft = _start(client, agent, target="draft").json()
+    draft = client.get(f"/api/v1/configs/{agent}/eval-runs/{draft['id']}").json()
+    assert draft["version_id"] == config["draft_version"]["id"]
+    assert (draft["status"], draft["verdict"]) == ("completed", "failed")
+
+
+def test_alvo_invalido_e_recusado(client: TestClient) -> None:
+    agent = _agent(client, "sem rascunho")
+    _case(client, agent, "prazo", [{"type": "text", "kind": "contains", "value": "30 dias"}])
+    config = client.get(f"/api/v1/configs/{agent}").json()
+
+    both = _start(client, agent, target="current", version_id=config["current_version"]["id"])
+    assert both.status_code == 422
+    # publicado sem rascunho aberto
+    no_draft = _start(client, agent, target="draft")
+    assert no_draft.status_code == 422
+    assert no_draft.json()["detail"] == "Config sem rascunho para testar"
+
+    unpublished = _agent(client, "nunca publicado", publish=False)
+    _case(client, unpublished, "prazo", [{"type": "text", "kind": "contains", "value": "30"}])
+    resp = _start(client, unpublished, target="current")
+    assert resp.json()["detail"] == "Config sem versão publicada para testar"

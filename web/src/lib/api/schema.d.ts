@@ -1275,6 +1275,8 @@ export interface components {
     EvalRunCreate: {
       /** Version Id */
       version_id?: string | null;
+      /** Target */
+      target?: ("draft" | "current") | null;
       /** Judge Model */
       judge_model?: string | null;
     };
@@ -1322,6 +1324,18 @@ export interface components {
       cost: number | null;
       /** Started By */
       started_by: string;
+      /**
+       * Trigger
+       * @enum {string}
+       */
+      trigger: "manual" | "integration" | "schedule";
+      /** Target */
+      target: ("draft" | "current") | null;
+      /**
+       * Verdict
+       * @enum {string}
+       */
+      verdict: "pending" | "passed" | "failed";
       /**
        * Created At
        * Format: date-time
@@ -1378,6 +1392,18 @@ export interface components {
       cost: number | null;
       /** Started By */
       started_by: string;
+      /**
+       * Trigger
+       * @enum {string}
+       */
+      trigger: "manual" | "integration" | "schedule";
+      /** Target */
+      target: ("draft" | "current") | null;
+      /**
+       * Verdict
+       * @enum {string}
+       */
+      verdict: "pending" | "passed" | "failed";
       /**
        * Created At
        * Format: date-time
