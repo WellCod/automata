@@ -15,6 +15,7 @@ export type EvalComparison = Schemas["EvalComparison"];
 
 // mesmos limites de app/schemas/eval.py: a API valida de novo na escrita
 export const MAX_CHECKS = 5;
+export const MAX_CONTEXT = 5;
 
 export const TEXT_KINDS: { value: TextCheck["kind"]; label: string; needsValue: boolean }[] = [
   { value: "contains", label: "contém", needsValue: true },
@@ -52,6 +53,8 @@ export function caseErrors(input: EvalCaseInput): string[] {
   const errors: string[] = [];
   if (!input.name.trim()) errors.push("Dê um nome ao caso.");
   if (!input.input.trim()) errors.push("Escreva a mensagem de entrada.");
+  if ((input.context ?? []).some((m) => !m.trim()))
+    errors.push("Preencha ou remova a mensagem anterior vazia.");
   if (input.checks.length === 0) errors.push("Adicione ao menos uma checagem.");
   for (const c of input.checks) {
     if (c.type === "text" && textNeedsValue(c.kind) && !c.value?.trim())
@@ -110,3 +113,5 @@ export const SCHEDULE_PRESETS: { label: string; cron: string }[] = [
   { label: "Dias úteis às 8h", cron: "0 8 * * 1-5" },
   { label: "Toda segunda às 8h", cron: "0 8 * * 1" },
 ];
+
+export type EvalCaseSuggestion = Schemas["EvalCaseSuggestion"];

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EvalCaseForm } from "@/components/eval-case-form";
 import { EvalSuitePanel } from "@/components/eval-suite-panel";
+import { RunsPanel } from "@/components/runs-panel";
 import { SuiteBadge } from "@/components/suite-badge";
 import { availableTypes, caseErrors, type EvalCheck, newCheck } from "@/lib/eval-checks";
 
@@ -317,5 +318,89 @@ describe("SuiteBadge", () => {
       />,
     );
     expect(screen.getByText("Suíte regrediu (2 desde o último agendado)")).toBeInTheDocument();
+  });
+});
+
+describe("virar caso de teste", () => {
+  it("o histórico oferece o caso para run de conversa e não para bloqueado", async () => {
+    const item = (id: string, status: string) => ({
+      id,
+      agent_config_id: "a1",
+      user_id: "u",
+      run_id: `run-${id}`,
+      session_id: "s1",
+      status,
+      duration_ms: 900,
+      error: null,
+      blocked_by: null,
+      created_at: "2026-10-21T10:00:00Z",
+    });
+    vi.mocked(client.GET).mockImplementation(async (path: string) => {
+      if (path === "/api/v1/configs/{config_id}/runs")
+        return {
+          data: { items: [item("1", "success"), item("2", "blocked")], total: 2 },
+          error: undefined,
+        } as never;
+      return { data: undefined, error: undefined } as never;
+    });
+    const onMakeCase = vi.fn();
+    const user = userEvent.setup();
+    render(<RunsPanel agentId="a1" onMakeCase={onMakeCase} />, { wrapper });
+
+    const [ok, blocked] = await screen.findAllByRole("button", { expanded: false });
+    await user.click(blocked!);
+    expect(screen.queryByRole("button", { name: "Virar caso de teste" })).toBeNull();
+    await user.click(ok!);
+    await user.click(await screen.findByRole("button", { name: "Virar caso de teste" }));
+    expect(onMakeCase).toHaveBeenCalledWith("run-1");
+  });
+
+  it("abre o caso preenchido com contexto, avisos e critério sugerido", async () => {
+    vi.mocked(client.GET).mockImplementation(async (path: string) => {
+      const data: Record<string, unknown> = {
+        "/api/v1/configs/{config_id}/eval-cases": [],
+        "/api/v1/configs/{config_id}/eval-runs": [],
+        "/api/v1/configs/{config_id}/eval-cases/suggestion": {
+          name: "meu CPF é [CPF removido]",
+          input: "meu CPF é [CPF removido]",
+          context: ["oi, preciso trocar um produto"],
+          checks: [{ type: "text", kind: "not_empty", value: "" }],
+          judge_criteria: "Responde com o mesmo conteúdo essencial desta resposta de referência",
+          source_run_id: "run-1",
+          notes: ["Dados pessoais foram mascarados."],
+        },
+      };
+      return { data: data[path], error: undefined } as never;
+    });
+    vi.mocked(client.POST).mockResolvedValue({ data: {}, error: undefined } as never);
+    const onDone = vi.fn();
+    const user = userEvent.setup();
+    render(<EvalSuitePanel configId="a1" fromRun="run-1" onFromRunDone={onDone} />, {
+      wrapper,
+    });
+
+    const form = await screen.findByRole("form", { name: "Caso da conversa" });
+    expect(within(form).getByText("Dados pessoais foram mascarados.")).toBeInTheDocument();
+    expect(within(form).getByLabelText("Mensagem anterior 1")).toHaveValue(
+      "oi, preciso trocar um produto",
+    );
+    await user.click(
+      within(form).getByRole("button", { name: "Critério sugerido pela resposta original" }),
+    );
+    await user.click(within(form).getByRole("button", { name: "Salvar caso" }));
+
+    await waitFor(() => expect(client.POST).toHaveBeenCalled());
+    expect(vi.mocked(client.POST).mock.calls.at(-1)![1]).toMatchObject({
+      body: {
+        input: "meu CPF é [CPF removido]",
+        context: ["oi, preciso trocar um produto"],
+        source_run_id: "run-1",
+        checks: [
+          { type: "text", kind: "not_empty" },
+          { type: "judge", mode: "binary", threshold: 7 },
+        ],
+      },
+    });
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
   });
 });

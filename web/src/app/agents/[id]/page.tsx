@@ -155,6 +155,8 @@ function TeamsUsingAgent({ agentId }: { agentId: string }) {
 export default function AgentEditPage() {
   const { id } = useParams<{ id: string }>();
   const [tab, setTab] = useState<PageTab>("config");
+  // run escolhido em "Virar caso de teste": a aba Testes abre o caso preenchido
+  const [caseFromRun, setCaseFromRun] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const {
@@ -443,7 +445,13 @@ export default function AgentEditPage() {
 
           <TabsContent value="runs" className="pt-5">
             <div className="mx-auto max-w-3xl">
-              <RunsPanel agentId={id} />
+              <RunsPanel
+                agentId={id}
+                onMakeCase={(runId) => {
+                  setCaseFromRun(runId);
+                  setTab("testes");
+                }}
+              />
             </div>
           </TabsContent>
 
@@ -460,6 +468,8 @@ export default function AgentEditPage() {
                 configId={id}
                 draftVersion={data?.draft_version}
                 currentVersion={data?.current_version}
+                fromRun={caseFromRun}
+                onFromRunDone={() => setCaseFromRun(null)}
               />
             </div>
           </TabsContent>

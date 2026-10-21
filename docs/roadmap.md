@@ -890,7 +890,7 @@ Pré-requisito: Agno 3.1.x (#128 e #129).
 - [x] `feat(api)`: estado da suíte e regressão agendada. `GET /api/v1/eval-status` com o estado de cada config (rodando, verde, falhando, regrediu) e a comparação com a execução agendada anterior
 - [x] `feat(api)`: sugestão de caso a partir de um run real. Leitura em `agno_runs`, entrada e contexto mascarados, tools chamadas e critério de rascunho, `source_run_id` no `eval_case`
 - [x] `feat(web)`: agendamento e origem das execuções na aba Testes, estado da suíte na lista, suíte na emissão de tokens de integração
-- [ ] `feat(web)`: "Virar caso de teste" no histórico de execuções e na árvore de execução
+- [x] `feat(web)`: "Virar caso de teste" no histórico de execuções e na árvore de execução. Formulário de caso com mensagens anteriores, avisos e critério sugerido do juiz
 - [ ] `test(api)`: evals do agendamento, do escopo por recurso e da sugestão de caso, e exemplo de job de CI na documentação
 
 **Critério de aceite da fase:**
