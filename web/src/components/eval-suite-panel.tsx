@@ -13,11 +13,13 @@ import {
   useEvalRun,
   useEvalRuns,
   useEvalSettings,
+  useEvalSuggestion,
 } from "@/lib/api/evals";
 import {
   CHANGE_LABEL,
   CHECK_LABEL,
   type EvalCase,
+  type EvalCaseInput,
   type EvalResult,
   type EvalRunSummary,
   hasJudge,
@@ -37,6 +39,9 @@ interface Props {
   configId: string;
   draftVersion?: VersionRef | null;
   currentVersion?: VersionRef | null;
+  // run de conversa escolhido em "Virar caso de teste"; o painel abre o caso preenchido
+  fromRun?: string | null;
+  onFromRunDone?: () => void;
 }
 
 const selectCls =
@@ -209,7 +214,62 @@ function useJudgeModels() {
   });
 }
 
-export function EvalSuitePanel({ configId, draftVersion, currentVersion }: Props) {
+function SuggestedCase({
+  configId,
+  runId,
+  saving,
+  error,
+  onSave,
+  onDone,
+}: {
+  configId: string;
+  runId: string;
+  saving: boolean;
+  error?: string | null;
+  onSave: (body: EvalCaseInput) => void;
+  onDone: () => void;
+}) {
+  const { data, isPending, error: loadError } = useEvalSuggestion(configId, runId);
+  if (isPending)
+    return (
+      <p className="text-muted-foreground text-[13px]">Montando o caso a partir da conversa…</p>
+    );
+  if (loadError)
+    return (
+      <div className="flex items-center gap-2 text-[12px]" role="alert">
+        <span className="text-destructive">{loadError.message}</span>
+        <Button size="xs" variant="muted" onClick={onDone}>
+          Fechar
+        </Button>
+      </div>
+    );
+  return (
+    <EvalCaseForm
+      key={runId}
+      initial={{
+        name: data.name,
+        input: data.input,
+        context: data.context,
+        checks: data.checks,
+        source_run_id: data.source_run_id,
+      }}
+      notes={data.notes}
+      judgeSuggestion={data.judge_criteria}
+      saving={saving}
+      error={error}
+      onCancel={onDone}
+      onSave={onSave}
+    />
+  );
+}
+
+export function EvalSuitePanel({
+  configId,
+  draftVersion,
+  currentVersion,
+  fromRun,
+  onFromRunDone,
+}: Props) {
   const { data: cases = [], isPending: loadingCases } = useEvalCases(configId);
   const { data: runs = [] } = useEvalRuns(configId);
   const { data: settings } = useEvalSettings(configId);
@@ -289,6 +349,16 @@ export function EvalSuitePanel({ configId, draftVersion, currentVersion }: Props
           Cada caso é uma mensagem e o que precisa ser verdade na resposta. Os casos não fazem parte
           da versão: editar o rascunho não muda o teste.
         </p>
+        {fromRun && (
+          <SuggestedCase
+            configId={configId}
+            runId={fromRun}
+            saving={saveCase.isPending}
+            error={saveCase.error?.message}
+            onDone={() => onFromRunDone?.()}
+            onSave={(body) => saveCase.mutate({ body }, { onSuccess: () => onFromRunDone?.() })}
+          />
+        )}
         {editing === "new" && (
           <EvalCaseForm
             saving={saveCase.isPending}
@@ -308,7 +378,13 @@ export function EvalSuitePanel({ configId, draftVersion, currentVersion }: Props
             editingCase?.id === item.id ? (
               <li key={item.id}>
                 <EvalCaseForm
-                  initial={{ name: item.name, input: item.input, checks: item.checks }}
+                  initial={{
+                    name: item.name,
+                    input: item.input,
+                    context: item.context,
+                    checks: item.checks,
+                    source_run_id: item.source_run_id,
+                  }}
                   saving={saveCase.isPending}
                   error={saveCase.error?.message}
                   onCancel={() => setEditing(null)}

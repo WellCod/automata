@@ -117,6 +117,7 @@ export default function TeamEditPage() {
   const fieldId = useId();
   const queryClient = useQueryClient();
   const [activePanel, setActivePanel] = useState<PanelId>("teste");
+  const [caseFromRun, setCaseFromRun] = useState<string | null>(null);
   const { data: agents } = usePublishedAgents();
   const memberNames = useMemo(
     () => Object.fromEntries((agents ?? []).map((a) => [a.id, a.name])),
@@ -452,13 +453,23 @@ export default function TeamEditPage() {
               />
             </div>
             {activePanel === "versoes" && <VersionsPanel agentId={id} suite />}
-            {activePanel === "runs" && <RunsPanel agentId={id} />}
+            {activePanel === "runs" && (
+              <RunsPanel
+                agentId={id}
+                onMakeCase={(runId) => {
+                  setCaseFromRun(runId);
+                  setActivePanel("suite");
+                }}
+              />
+            )}
             {activePanel === "metricas" && <MetricsPanel agentId={id} />}
             {activePanel === "suite" && (
               <EvalSuitePanel
                 configId={id}
                 draftVersion={data?.draft_version}
                 currentVersion={data?.current_version}
+                fromRun={caseFromRun}
+                onFromRunDone={() => setCaseFromRun(null)}
               />
             )}
           </div>

@@ -60,6 +60,22 @@ export function useEvalSettings(configId: string, enabled = true) {
   });
 }
 
+// caso montado de uma conversa real; nada é gravado até salvar pelo formulário
+export function useEvalSuggestion(configId: string, runId: string | null) {
+  return useQuery({
+    queryKey: ["eval-suggestion", configId, runId],
+    enabled: runId !== null,
+    retry: false,
+    queryFn: async () => {
+      const res = await client.GET("/api/v1/configs/{config_id}/eval-cases/suggestion", {
+        params: { path: { config_id: configId }, query: { run_id: runId! } },
+      });
+      if (res.error) throw new Error(apiErrorMessage(res.error, "Não foi possível montar o caso"));
+      return res.data!;
+    },
+  });
+}
+
 export function useEvalSchedule(configId: string) {
   return useQuery({
     queryKey: ["eval-schedule", configId],

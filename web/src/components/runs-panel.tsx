@@ -6,12 +6,14 @@ import {
   Ban,
   CheckCircle2,
   ChevronRight,
+  ListChecks,
   PauseCircle,
   ShieldAlert,
   XCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { RunTrace } from "@/components/run-trace";
+import { Button } from "@/components/ui/button";
 import client from "@/lib/api/client";
 import { blockLabel } from "@/lib/guardrail-labels";
 import type { components } from "@/lib/api/schema.d.ts";
@@ -20,6 +22,8 @@ type AgentRunResponse = components["schemas"]["AgentRunResponse"];
 
 interface Props {
   agentId: string;
+  // agente e time: abre a aba de testes com o caso montado a partir do run
+  onMakeCase?: (runId: string) => void;
 }
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
@@ -70,7 +74,13 @@ export function workflowUsage(run: AgentRunResponse): string {
   return parts.join(" · ");
 }
 
-function RunItem({ run }: { run: AgentRunResponse }) {
+function RunItem({
+  run,
+  onMakeCase,
+}: {
+  run: AgentRunResponse;
+  onMakeCase?: (runId: string) => void;
+}) {
   const icon = STATUS_ICON[run.status] ?? (
     <Activity className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
   );
@@ -121,7 +131,16 @@ function RunItem({ run }: { run: AgentRunResponse }) {
         </p>
       )}
       {open && run.run_id && (
-        <div className="border-border mt-1 border-t pt-2">
+        <div className="border-border mt-1 flex flex-col gap-2 border-t pt-2">
+          {/* bloqueio por guardrail e etapa de workflow não viram caso (a API recusa) */}
+          {onMakeCase && run.status !== "blocked" && run.steps == null && (
+            <div>
+              <Button size="xs" variant="muted" onClick={() => onMakeCase(run.run_id!)}>
+                <ListChecks aria-hidden />
+                Virar caso de teste
+              </Button>
+            </div>
+          )}
           <RunTrace runId={run.run_id} />
         </div>
       )}
@@ -129,7 +148,7 @@ function RunItem({ run }: { run: AgentRunResponse }) {
   );
 }
 
-export function RunsPanel({ agentId }: Props) {
+export function RunsPanel({ agentId, onMakeCase }: Props) {
   const { data, isPending, isError } = useQuery({
     queryKey: ["runs", agentId],
     queryFn: async () => {
@@ -155,7 +174,7 @@ export function RunsPanel({ agentId }: Props) {
       </p>
       <ul className="flex flex-col gap-1">
         {data.items.map((run) => (
-          <RunItem key={run.id} run={run} />
+          <RunItem key={run.id} run={run} onMakeCase={onMakeCase} />
         ))}
       </ul>
     </div>

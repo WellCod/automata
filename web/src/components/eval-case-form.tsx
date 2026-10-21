@@ -6,6 +6,7 @@ import {
   availableTypes,
   CHECK_LABEL,
   caseErrors,
+  MAX_CONTEXT,
   type EvalCaseInput,
   type EvalCheck,
   newCheck,
@@ -136,13 +137,24 @@ function CheckFields({
 
 interface Props {
   initial?: EvalCaseInput;
+  // vindo de uma conversa real: avisos (dados mascarados, contexto cortado) e critério sugerido
+  notes?: string[];
+  judgeSuggestion?: string | null;
   saving: boolean;
   error?: string | null;
   onSave: (value: EvalCaseInput) => void;
   onCancel: () => void;
 }
 
-export function EvalCaseForm({ initial, saving, error, onSave, onCancel }: Props) {
+export function EvalCaseForm({
+  initial,
+  notes,
+  judgeSuggestion,
+  saving,
+  error,
+  onSave,
+  onCancel,
+}: Props) {
   const id = useId();
   const [value, setValue] = useState<EvalCaseInput>(
     initial ?? { name: "", input: "", checks: [newCheck("text")] },
@@ -150,10 +162,19 @@ export function EvalCaseForm({ initial, saving, error, onSave, onCancel }: Props
   const errors = caseErrors(value);
   const setCheck = (i: number, c: EvalCheck) =>
     setValue((v) => ({ ...v, checks: v.checks.map((old, j) => (j === i ? c : old)) }));
+  const context = value.context ?? [];
+  const setContext = (next: string[]) => setValue((v) => ({ ...v, context: next }));
+  const canSuggestJudge = !!judgeSuggestion && availableTypes(value.checks).includes("judge");
 
   return (
     <form
-      aria-label={initial ? `Editar ${initial.name}` : "Novo caso"}
+      aria-label={
+        initial?.source_run_id
+          ? "Caso da conversa"
+          : initial
+            ? `Editar ${initial.name}`
+            : "Novo caso"
+      }
       onSubmit={(e) => {
         e.preventDefault();
         if (errors.length === 0) onSave({ ...value, name: value.name.trim() });
@@ -173,6 +194,55 @@ export function EvalCaseForm({ initial, saving, error, onSave, onCancel }: Props
           className={inputCls}
         />
       </div>
+      {notes && notes.length > 0 && (
+        <ul className="text-muted-foreground flex flex-col gap-0.5 text-[12px]" role="note">
+          {notes.map((n) => (
+            <li key={n}>{n}</li>
+          ))}
+        </ul>
+      )}
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className="text-foreground mb-1 text-[12px] font-medium">
+          Conversa antes da mensagem (opcional)
+        </legend>
+        <p className="text-muted-foreground text-[11px]">
+          Rodam na mesma sessão antes da mensagem de entrada; só a resposta a ela é checada.
+        </p>
+        {context.map((message, i) => (
+          <div key={i} className="flex items-start gap-1.5">
+            <textarea
+              aria-label={`Mensagem anterior ${i + 1}`}
+              value={message}
+              rows={1}
+              maxLength={4000}
+              onChange={(e) => setContext(context.map((m, j) => (j === i ? e.target.value : m)))}
+              className={`${inputCls} resize-y`}
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              aria-label={`Remover mensagem anterior ${i + 1}`}
+              onClick={() => setContext(context.filter((_, j) => j !== i))}
+            >
+              <Trash2 aria-hidden />
+            </Button>
+          </div>
+        ))}
+        {context.length < MAX_CONTEXT && (
+          <div>
+            <Button
+              type="button"
+              size="xs"
+              variant="muted"
+              onClick={() => setContext([...context, ""])}
+            >
+              <Plus aria-hidden />
+              Mensagem anterior
+            </Button>
+          </div>
+        )}
+      </fieldset>
       <div className="flex flex-col gap-1">
         <label htmlFor={`${id}-input`} className="text-foreground text-[12px] font-medium">
           Mensagem de entrada
@@ -220,6 +290,25 @@ export function EvalCaseForm({ initial, saving, error, onSave, onCancel }: Props
           ))}
         </ol>
         <div className="flex flex-wrap gap-1.5">
+          {canSuggestJudge && (
+            <Button
+              type="button"
+              size="xs"
+              variant="accent"
+              onClick={() =>
+                setValue({
+                  ...value,
+                  checks: [
+                    ...value.checks,
+                    { type: "judge", criteria: judgeSuggestion!, mode: "binary", threshold: 7 },
+                  ],
+                })
+              }
+            >
+              <Plus aria-hidden />
+              Critério sugerido pela resposta original
+            </Button>
+          )}
           {availableTypes(value.checks).map((type) => (
             <Button
               key={type}
