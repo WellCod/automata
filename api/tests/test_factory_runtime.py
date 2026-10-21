@@ -661,3 +661,27 @@ def test_compactacao_resume_conversa_longa_e_time_recusa(
         )
         assert refused.status_code in (400, 422), refused.text
         assert "só agente compacta a conversa" in refused.text
+
+
+def test_run_sem_custo_do_provedor_grava_custo_estimado(
+    db_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi.testclient import TestClient
+
+    from tests.fake_models import FixedReplyModel
+
+    # como Anthropic e OpenAI: tokens na resposta, custo nenhum
+    model = FixedReplyModel(id="claude-haiku-4-5", reply="ok", tokens=1_000)
+    with TestClient(_app_with_model(monkeypatch, model)) as client:  # type: ignore[arg-type]
+        agent = _publish(client, "agent", "custo estimado", {"model_id": "claude-haiku-4-5"})
+        client.post(
+            f"/agents/{agent}/runs", data={"message": "oi", "stream": "false"}
+        ).raise_for_status()
+    from sqlalchemy import create_engine, text
+
+    with create_engine(db_url).connect() as conn:
+        cost = conn.execute(
+            text("SELECT cost FROM usage_event WHERE agent_config_id = :a"), {"a": agent}
+        ).scalar_one()
+    # 1.000 tokens de saída do haiku a US$ 5 por milhão
+    assert float(cost) == pytest.approx(0.005)

@@ -34,6 +34,7 @@ from sqlalchemy.orm import Session
 from app.db import get_engine
 from app.guardrails.input import BlockLog
 from app.mcp.client import McpUnavailable, connect_strict
+from app.pricing import cost_or_estimate
 from app.repositories.run import RunRepository
 from app.repositories.usage import UsageRepository
 
@@ -335,7 +336,13 @@ class RunTracking:
             input_tokens=int(getattr(metrics, "input_tokens", 0) or 0),
             output_tokens=int(getattr(metrics, "output_tokens", 0) or 0),
             total_tokens=int(getattr(metrics, "total_tokens", 0) or 0),
-            cost=getattr(metrics, "cost", None),
+            # Anthropic e OpenAI não informam custo: estimado pela tabela (ADR-0021)
+            cost=cost_or_estimate(
+                getattr(metrics, "cost", None),
+                self.automata_model_id,
+                int(getattr(metrics, "input_tokens", 0) or 0),
+                int(getattr(metrics, "output_tokens", 0) or 0),
+            ),
             session_id=kwargs.get("session_id") or (output.session_id if output else None),
             pending_tools=_pending_tools(output),
             parent_run_id=current_workflow_run.get(),

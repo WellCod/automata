@@ -26,6 +26,7 @@ from app.db import get_db, get_engine
 from app.evals.judge import JudgeUsage, metered
 from app.models.eval import EvalResult, EvalRun
 from app.models.usage import UsageEvent
+from app.pricing import cost_or_estimate
 from app.repositories.usage import UsageRepository
 from app.schemas.eval import EvalCaseInput, JudgeCheck, TextCheck, ToolsCheck
 
@@ -234,7 +235,7 @@ def _record_judge(
             input_tokens=usage.input_tokens,
             output_tokens=usage.output_tokens,
             total_tokens=usage.total_tokens,
-            cost=usage.cost,
+            cost=cost_or_estimate(usage.cost, model_id, usage.input_tokens, usage.output_tokens),
             eval_run_id=run_id,
         )
         session.commit()
