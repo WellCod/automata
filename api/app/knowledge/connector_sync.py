@@ -61,6 +61,38 @@ def selectable(files: list[RemoteFile], max_bytes: int) -> tuple[list[RemoteFile
     return chosen, skipped
 
 
+# conteúdo já na base: (id, versão remota gravada, status)
+Known = dict[str, tuple[UUID, str | None, str]]
+
+
+@dataclass
+class SyncPlan:
+    # (arquivo, id do conteúdo existente ou None quando é novo)
+    fetch: list[tuple[RemoteFile, UUID | None]]
+    unchanged: int
+    # na base e não mais na origem
+    gone: list[UUID]
+
+
+def plan(known: Known, files: list[RemoteFile]) -> SyncPlan:
+    """O que baixar, o que fica e o que sai, só pela versão remota.
+
+    Conteúdo cuja última ingestão falhou é baixado de novo mesmo com a versão igual.
+    """
+    fetch: list[tuple[RemoteFile, UUID | None]] = []
+    unchanged = 0
+    seen: set[str] = set()
+    for file in files:
+        seen.add(file.path)
+        current = known.get(file.path)
+        if current is not None and current[1] == file.version and current[2] == "completed":
+            unchanged += 1
+            continue
+        fetch.append((file, current[0] if current else None))
+    gone = [cid for path, (cid, _, _) in known.items() if path not in seen]
+    return SyncPlan(fetch=fetch, unchanged=unchanged, gone=gone)
+
+
 def _finish(connector_id: UUID, status: str, message: str | None, summary: SyncSummary) -> None:
     with Session(get_engine()) as session:
         session.execute(
@@ -128,7 +160,7 @@ def sync(connector_id: UUID) -> SyncSummary:
             base = session.get(KnowledgeBase, connector.base_id) if connector else None
             if connector is None or base is None:
                 return summary
-            known = {
+            known: Known = {
                 c.external_path: (c.id, c.external_version, c.status)
                 for c in session.scalars(
                     select(KnowledgeContent).where(KnowledgeContent.connector_id == connector_id)
@@ -141,29 +173,25 @@ def sync(connector_id: UUID) -> SyncSummary:
         summary.truncated = source.truncated
         max_bytes = get_settings().knowledge_max_upload_mb * 1024 * 1024
         files, summary.skipped = selectable(listed, max_bytes)
-        seen: set[str] = set()
-        for file in files:
-            seen.add(file.path)
-            current = known.get(file.path)
-            if current is not None and current[1] == file.version and current[2] == "completed":
-                summary.unchanged += 1
-                continue
+        todo = plan(known, files)
+        summary.unchanged = todo.unchanged
+        for file, existing in todo.fetch:
             try:
                 data = source.download(file)
             except (SourceError, EgressDenied) as exc:
                 summary.failed += 1
                 summary.errors.append(f"{file.path}: {exc}"[:200])
                 continue
-            content_id = _upsert(connector, base, file, current[0] if current else None)
+            content_id = _upsert(connector, base, file, existing)
             ingest(content_id, data)
             if _status_of(content_id) != "completed":
                 summary.failed += 1
-            elif current is None:
+            elif existing is None:
                 summary.added += 1
             else:
                 summary.updated += 1
         # sumiu da origem: sai da base, com os trechos
-        gone = [cid for path, (cid, _, _) in known.items() if path not in seen]
+        gone = todo.gone
         if gone:
             for cid in gone:
                 remove_chunks(base, cid)
