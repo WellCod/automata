@@ -23,6 +23,10 @@ class Scope:
     # Bases de conhecimento (ADR-0012): editor cria e alimenta, viewer consulta
     KNOWLEDGE_READ = "knowledge_bases:read"
     KNOWLEDGE_WRITE = "knowledge_bases:write"
+    # Suíte de testes por agente e time (ADR-0015): editor escreve e roda, viewer vê
+    EVALS_READ = "evals:read"
+    EVALS_WRITE = "evals:write"
+    EVALS_RUN = "evals:run"
     # Gestão de usuários: só owner
     USERS_ADMIN = "users:admin"
     # Emitir token para terceiros: também só owner

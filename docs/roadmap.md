@@ -858,8 +858,8 @@ Fica para depois: pausa humana no meio do fluxo, CEL como modo avançado, rotead
 
 Decisão em [ADR-0015](adr/0015-evals-por-agente.md). Cada agente e time ganha uma suíte de casos (entrada e checagens de texto, de tools chamadas e por juiz LLM), fora do payload versionado. A suíte roda em background com o runner de suíte do Agno (`agno.eval.suite`) contra qualquer versão: rascunho, vigente ou publicada. A comparação mostra regressões entre versões, e um gate opcional exige suíte verde no rascunho para publicar. Os runs de eval ficam fora das métricas de conversa, e o custo deles aparece separado.
 
-- [ ] `docs(adr)`: ADR-0015 e esta seção
-- [ ] `feat(api)`: casos de teste por config, checagens validadas na escrita e CRUD em `/api/v1/configs/{id}/eval-cases`
+- [x] #118 — `docs(adr)`: ADR-0015 e esta seção
+- [x] `feat(api)`: casos de teste por config, checagens validadas na escrita e CRUD em `/api/v1/configs/{id}/eval-cases`. Tabela `eval_case` (migration 0019), scopes `evals:read`, `evals:write` e `evals:run`
 - [ ] `feat(api)`: execução da suíte em background com o runner do Agno, resultado por caso e runs de eval marcados fora do analytics
 - [ ] `feat(api)`: juiz com modelo escolhido e medido, custo da execução e checagem de juiz "não avaliada" no modo demo
 - [ ] `feat(api)`: comparação entre versões e gate de publicação por suíte verde

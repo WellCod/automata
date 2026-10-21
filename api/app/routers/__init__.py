@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.routers.approvals import router as approvals_router
 from app.routers.configs import router as configs_router
+from app.routers.evals import router as evals_router
 from app.routers.integrations import router as integrations_router
 from app.routers.knowledge_bases import router as knowledge_bases_router
 from app.routers.knowledge_contents import router as knowledge_contents_router
@@ -20,6 +21,7 @@ from app.routers.users import router as users_router
 PROTECTED_ROUTERS: list[APIRouter] = [
     approvals_router,
     configs_router,
+    evals_router,
     integrations_router,
     knowledge_bases_router,
     knowledge_contents_router,

@@ -109,6 +109,8 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | `mcp_servers:write` | `POST`, `PUT` e `DELETE` em `/api/v1/mcp-servers` — só owner (`agent_os:admin`) |
 | `knowledge_bases:read` | `GET /api/v1/knowledge-bases`, `GET /api/v1/knowledge-bases/{id}`, `GET /api/v1/knowledge-bases/embedders`, `GET /api/v1/knowledge-bases/{id}/contents[/{content_id}]`, `POST /api/v1/knowledge-bases/{id}/search` |
 | `knowledge_bases:write` | `POST`, `PUT` e `DELETE` em `/api/v1/knowledge-bases`; `POST /contents/file`, `/url` e `/text` e `DELETE /contents/{content_id}` |
+| `evals:read` | `GET /api/v1/configs/{id}/eval-cases` |
+| `evals:write` | `POST`, `PUT` e `DELETE` em `/api/v1/configs/{id}/eval-cases` |
 | `users:admin` | `/api/v1/users` (listar, criar, alterar papel e situação, redefinir senha, remover) — só owner (`agent_os:admin`) |
 | `agent_os:admin` | `POST /api/v1/auth/users`; `integrations:write` (rotas `/api/v1/integrations`) só vem pelo admin |
 
@@ -121,8 +123,8 @@ Definidos em `ROLE_SCOPES` (`app/schemas/user.py`) e gravados no token no login.
 | Papel | Scopes |
 |---|---|
 | `owner` | `agent_os:admin` |
-| `editor` | tudo do viewer + `agents:run`, `teams:run`, `sessions:write`, `configs:write`, `configs:publish`, `knowledge_bases:write` |
-| `viewer` | `agents:read`, `teams:read`, `sessions:read`, `traces:read`, `configs:read`, `metrics:read`, `mcp_servers:read`, `knowledge_bases:read` |
+| `editor` | tudo do viewer + `agents:run`, `teams:run`, `workflows:run`, `sessions:write`, `configs:write`, `configs:publish`, `knowledge_bases:write`, `evals:write`, `evals:run` |
+| `viewer` | `agents:read`, `teams:read`, `workflows:read`, `sessions:read`, `traces:read`, `configs:read`, `metrics:read`, `mcp_servers:read`, `knowledge_bases:read`, `evals:read` |
 
 ### Gestão de usuários
 
@@ -279,3 +281,15 @@ Execução (`app/agents/workflow_factory.py`):
 - O run do workflow vai para `agent_run` com status, duração e erro (`TrackedWorkflow`). Cada etapa continua gravada no agente ou time que a executou.
 - O `TrackedWorkflow` fixa o `run_id` antes de rodar e o publica numa `ContextVar`. Cada etapa grava esse id em `agent_run.parent_run_id` (migration 0018), inclusive ramos paralelos, cujas tasks herdam o contexto.
 - Em `GET /api/v1/configs/{id}/runs` de um workflow, cada run traz `steps`, `total_tokens` e `cost`, somados do `usage_event` das etapas filhas. O workflow não grava `usage_event` próprio, então o analytics não conta o consumo duas vezes. Em agente e time esses campos vêm `null`.
+
+## Evals por agente (ADR-0015)
+
+Cada agente e time tem uma suíte de casos de teste em `/api/v1/configs/{id}/eval-cases`. A tabela é `eval_case` (migration 0019). Os casos ficam fora do payload versionado: um rascunho não consegue afrouxar o próprio teste.
+
+Um caso tem `name` (único na config, até 80 caracteres), `input` (até 4000) e `checks`, de 1 a 5:
+- `text`: `kind` = `contains`, `not_contains`, `starts_with`, `empty` ou `not_empty`, e `value`. É a mesma regra dos workflows, comparada sem diferenciar maiúsculas, sobre a resposta. Quantas quiser.
+- `tools`: `tools` (1 a 10 nomes, como o agente expõe: `buscar_<slug>` das bases e as tools MCP com prefixo) e `allow_additional` (padrão `true`). No máximo uma por caso.
+- `judge`: `criteria` (10 a 1000 caracteres), `mode` (`binary` ou `numeric`) e `threshold` (1 a 10, só no numérico). No máximo uma por caso.
+
+O limite de uma checagem de tools e uma de juiz por caso vem do `Case` do runner de suíte do Agno, que tem um campo para cada. Workflow ainda não tem suíte (422), e são até 50 casos por config. Viewer lê (`evals:read`); editor cria, edita e apaga (`evals:write`).
+
