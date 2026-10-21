@@ -99,13 +99,25 @@ class EvalCaseResponse(BaseModel):
 
 EvalRunStatus = Literal["queued", "running", "completed", "failed"]
 EvalResultStatus = Literal["passed", "failed", "error", "not_evaluated"]
+EvalTrigger = Literal["manual", "integration", "schedule"]
+EvalTarget = Literal["draft", "current"]
+# pending enquanto roda; passed só com a suíte completa e todos os casos aprovados
+EvalVerdict = Literal["pending", "passed", "failed"]
 
 
 class EvalRunCreate(BaseModel):
-    # sem versão: o rascunho, se houver; senão, a vigente
+    # sem versão nem alvo: o rascunho, se houver; senão, a vigente
     version_id: UUID | None = None
+    # apelido para quem não conhece ids de versão (CI de consumidor, agendamento)
+    target: EvalTarget | None = None
     # obrigatório quando algum caso tem checagem de juiz, salvo no modo demo
     judge_model: str | None = None
+
+    @model_validator(mode="after")
+    def versao_ou_alvo(self) -> "EvalRunCreate":
+        if self.version_id is not None and self.target is not None:
+            raise ValueError("Informe version_id ou target, não os dois")
+        return self
 
 
 class EvalRunSummary(BaseModel):
@@ -125,6 +137,9 @@ class EvalRunSummary(BaseModel):
     total_tokens: int
     cost: float | None
     started_by: str
+    trigger: EvalTrigger
+    target: EvalTarget | None
+    verdict: EvalVerdict
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None

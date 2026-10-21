@@ -4,12 +4,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 
-from app.agents.capabilities import get_capabilities
-from app.agents.models_map import demo_replay
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.evals.gate import draft_verdict, latest_run
 from app.evals.runner import execute
+from app.evals.service import EvalRunRefused, create_run
 from app.models.config import AgentConfig
 from app.models.eval import EvalCase, EvalResult, EvalRun
 from app.repositories.config import ConfigRepository
@@ -26,6 +25,7 @@ from app.schemas.eval import (
     EvalRunSummary,
     EvalSettings,
     EvalSettingsInput,
+    EvalVerdict,
 )
 
 router = APIRouter(
@@ -142,6 +142,14 @@ runs_router = APIRouter(
 )
 
 
+def verdict(run: EvalRun) -> EvalVerdict:
+    if run.status in ("queued", "running"):
+        return "pending"
+    # mesma regra do gate: não avaliado não conta como aprovado
+    ok = run.status == "completed" and run.total > 0 and run.passed == run.total
+    return "passed" if ok else "failed"
+
+
 def _summary(session: SessionDep, run: EvalRun) -> EvalRunSummary:
     version = ConfigRepository(session).get_version(run.version_id)
     assert version is not None
@@ -161,6 +169,9 @@ def _summary(session: SessionDep, run: EvalRun) -> EvalRunSummary:
         total_tokens=run.total_tokens,
         cost=float(run.cost) if run.cost is not None else None,
         started_by=run.started_by,
+        trigger=run.trigger,
+        target=run.target,
+        verdict=verdict(run),
         created_at=run.created_at,
         started_at=run.started_at,
         finished_at=run.finished_at,
@@ -183,23 +194,6 @@ def _result(r: EvalResult) -> EvalResultResponse:
     )
 
 
-def _check_judge(cases: list[EvalCase], judge_model: str | None) -> None:
-    if judge_model is not None:
-        try:
-            caps = get_capabilities(judge_model)
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-        # o juiz responde num schema (aprovado e motivo): sem saída estruturada ele não decide
-        if not caps.structured_output:
-            raise HTTPException(
-                status_code=422, detail=f"'{judge_model}' não tem saída estruturada para julgar"
-            )
-        return
-    has_judge = any(c.get("type") == "judge" for case in cases for c in case.checks)
-    if has_judge and not demo_replay():
-        raise HTTPException(status_code=422, detail="Escolha o modelo do juiz: há casos com juiz")
-
-
 @runs_router.post(
     "",
     response_model=EvalRunSummary,
@@ -214,36 +208,10 @@ def start_run(
     session: SessionDep,
 ) -> EvalRunSummary:
     config = _config_or_404(session, config_id)
-    _testable(config)
-    version_id = body.version_id or config.draft_version_id or config.current_version_id
-    if version_id is None:
-        raise HTTPException(status_code=422, detail="Config sem versão para testar")
-    version = ConfigRepository(session).get_version(version_id)
-    if version is None or version.config_id != config_id:
-        raise HTTPException(status_code=422, detail="Versão não é desta config")
-    cases = EvalCaseRepository(session).list_by_config(config_id)
-    if not cases:
-        raise HTTPException(status_code=422, detail="Suíte sem casos")
-    _check_judge(cases, body.judge_model)
-    runs = EvalRunRepository(session)
-    if runs.active(config_id) is not None:
-        raise HTTPException(status_code=409, detail="Já há uma execução em andamento")
-    run = runs.add(
-        EvalRun(
-            agent_config_id=config_id,
-            version_id=version_id,
-            status="queued",
-            total=len(cases),
-            cases=[
-                {"id": str(c.id), "name": c.name, "input": c.input, "checks": c.checks}
-                for c in cases
-            ],
-            judge_model=body.judge_model,
-            started_by=_actor(request),
-        )
-    )
-    session.commit()
-    session.refresh(run)
+    try:
+        run = create_run(session, config, body, actor=_actor(request), trigger="manual")
+    except EvalRunRefused as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     background.add_task(execute, run.id)
     return _summary(session, run)
 

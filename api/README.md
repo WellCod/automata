@@ -301,6 +301,13 @@ O limite de uma checagem de tools e uma de juiz por caso vem do `Case` do runner
 
 `POST /api/v1/configs/{id}/eval-runs` com `version_id` opcional cria um `eval_run` (migration 0020) e responde 202. Sem `version_id`, testa o rascunho, se houver; senão, a vigente. A versão precisa ser da própria config. Uma execução por config por vez (409), e a suíte precisa ter ao menos um caso.
 
+No lugar de `version_id`, o pedido aceita `target`: `draft` ou `current` (ADR-0016). Serve a quem não conhece ids de versão, como o CI de um consumidor ou o agendamento. Os dois juntos são recusados (422), assim como `draft` sem rascunho aberto e `current` sem versão publicada. A criação fica em `app/evals/service.py`, comum ao painel, aos tokens de integração e ao agendamento.
+
+O resumo da execução traz:
+- `trigger`: `manual`, `integration` ou `schedule` (migration 0023);
+- `target`: o apelido usado, quando houver;
+- `verdict`: `pending` enquanto roda; `passed` só com a execução concluída e todos os casos aprovados, a mesma regra do gate; `failed` no resto, inclusive com caso não avaliado. É o campo que um pipeline lê para passar ou falhar.
+
 A execução roda em background (`app/evals/runner.py`):
 - Cada caso gravado vira um `Case` do `agno.eval.suite` e roda com `arun_cases`, um por vez, com timeout de 120 s.
 - Cada caso ganha um agente ou time novo, montado por `agent_from` ou `team_from` a partir da versão pedida.
