@@ -18,6 +18,8 @@ class IntegrationToken(Base):
     jti: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     agent_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     team_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    # suíte de testes que o token pode rodar e consultar, para o CI do consumidor (ADR-0016)
+    eval_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     scopes: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

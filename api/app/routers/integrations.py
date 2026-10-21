@@ -29,6 +29,8 @@ class IntegrationInput(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     agent_ids: list[UUID] = Field(default_factory=list)
     team_ids: list[UUID] = Field(default_factory=list)
+    # agentes e times cuja suíte de testes o token pode rodar e consultar
+    eval_ids: list[UUID] = Field(default_factory=list)
     expires_in_days: int = Field(default=30, ge=1, le=MAX_DAYS)
 
 
@@ -37,6 +39,7 @@ class IntegrationResponse(BaseModel):
     name: str
     agent_ids: list[UUID]
     team_ids: list[UUID]
+    eval_ids: list[UUID]
     created_by: str
     created_at: datetime
     expires_at: datetime
@@ -55,6 +58,7 @@ def _to_response(t: IntegrationToken) -> IntegrationResponse:
         name=t.name,
         agent_ids=[UUID(i) for i in t.agent_ids],
         team_ids=[UUID(i) for i in t.team_ids],
+        eval_ids=[UUID(i) for i in t.eval_ids],
         created_by=t.created_by,
         created_at=t.created_at,
         expires_at=t.expires_at,
@@ -72,6 +76,15 @@ def _check_resources(session: SessionDep, ids: list[UUID], kind: ConfigKind) -> 
             raise HTTPException(status_code=400, detail=f"'{config.name}' não está publicado")
 
 
+def _check_suites(session: SessionDep, ids: list[UUID]) -> None:
+    # a suíte pode rodar no rascunho: não exige versão publicada, só agente ou time
+    repo = ConfigRepository(session)
+    for config_id in ids:
+        config = repo.get_config(config_id)
+        if config is None or config.kind == ConfigKind.workflow.value:
+            raise HTTPException(status_code=400, detail=f"suíte de {config_id} não existe")
+
+
 @router.get("", response_model=list[IntegrationResponse])
 def list_integrations(session: SessionDep) -> list[IntegrationResponse]:
     rows = session.query(IntegrationToken).order_by(IntegrationToken.created_at.desc()).all()
@@ -80,21 +93,23 @@ def list_integrations(session: SessionDep) -> list[IntegrationResponse]:
 
 @router.post("", response_model=IssuedIntegration, status_code=201)
 def issue(body: IntegrationInput, session: SessionDep, request: Request) -> IssuedIntegration:
-    if not body.agent_ids and not body.team_ids:
+    if not body.agent_ids and not body.team_ids and not body.eval_ids:
         raise HTTPException(status_code=400, detail="Escolha ao menos um agente ou time")
     _check_resources(session, body.agent_ids, ConfigKind.agent)
     _check_resources(session, body.team_ids, ConfigKind.team)
+    _check_suites(session, body.eval_ids)
 
     token_id = uuid4()
     jti = uuid4().hex
     expires_in = timedelta(days=body.expires_in_days)
-    scopes = integration_scopes(body.agent_ids, body.team_ids)
+    scopes = integration_scopes(body.agent_ids, body.team_ids, body.eval_ids)
     row = IntegrationToken(
         id=token_id,
         name=body.name,
         jti=jti,
         agent_ids=[str(i) for i in body.agent_ids],
         team_ids=[str(i) for i in body.team_ids],
+        eval_ids=[str(i) for i in body.eval_ids],
         scopes=scopes,
         created_by=str(getattr(request.state, "user_id", None) or "panel"),
         expires_at=datetime.now(UTC) + expires_in,

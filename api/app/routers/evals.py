@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 
-from app.authz import Scope, require_scopes
+from app.authz import Scope, require_resource_scope, require_scopes
 from app.db import SessionDep
 from app.evals.gate import draft_verdict, latest_run
 from app.evals.runner import execute
@@ -25,6 +25,7 @@ from app.schemas.eval import (
     EvalRunSummary,
     EvalSettings,
     EvalSettingsInput,
+    EvalTrigger,
     EvalVerdict,
 )
 
@@ -39,6 +40,11 @@ _WRITE = [Depends(require_scopes(Scope.EVALS_WRITE))]
 
 def _actor(request: Request) -> str:
     return str(getattr(request.state, "user_id", None) or "panel")
+
+
+def _trigger(actor: str) -> EvalTrigger:
+    # o sub dos tokens de integração é "integration:<id>" (routers/integrations.py)
+    return "integration" if actor.startswith("integration:") else "manual"
 
 
 def _config_or_404(session: SessionDep, config_id: UUID) -> AgentConfig:
@@ -138,7 +144,8 @@ def delete_case(config_id: UUID, case_id: UUID, session: SessionDep) -> Response
 runs_router = APIRouter(
     prefix="/api/v1/configs/{config_id}/eval-runs",
     tags=["evals"],
-    dependencies=[Depends(require_scopes(Scope.EVALS_READ))],
+    # aceita também o escopo por config dos tokens de integração (ADR-0016)
+    dependencies=[Depends(require_resource_scope("evals", "read"))],
 )
 
 
@@ -198,7 +205,7 @@ def _result(r: EvalResult) -> EvalResultResponse:
     "",
     response_model=EvalRunSummary,
     status_code=202,
-    dependencies=[Depends(require_scopes(Scope.EVALS_RUN))],
+    dependencies=[Depends(require_resource_scope("evals", "run"))],
 )
 def start_run(
     config_id: UUID,
@@ -209,7 +216,8 @@ def start_run(
 ) -> EvalRunSummary:
     config = _config_or_404(session, config_id)
     try:
-        run = create_run(session, config, body, actor=_actor(request), trigger="manual")
+        actor = _actor(request)
+        run = create_run(session, config, body, actor=actor, trigger=_trigger(actor))
     except EvalRunRefused as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     background.add_task(execute, run.id)
