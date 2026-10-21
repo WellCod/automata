@@ -1,6 +1,6 @@
 # ADR-0015 — Evals por agente no painel, com casos fora da versão e o runner de suíte do Agno
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-10-20
 
 ## Contexto
