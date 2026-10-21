@@ -1544,6 +1544,8 @@ export interface components {
       agent_ids?: string[];
       /** Team Ids */
       team_ids?: string[];
+      /** Eval Ids */
+      eval_ids?: string[];
       /**
        * Expires In Days
        * @default 30
@@ -1563,6 +1565,8 @@ export interface components {
       agent_ids: string[];
       /** Team Ids */
       team_ids: string[];
+      /** Eval Ids */
+      eval_ids: string[];
       /** Created By */
       created_by: string;
       /**
@@ -1591,6 +1595,8 @@ export interface components {
       agent_ids: string[];
       /** Team Ids */
       team_ids: string[];
+      /** Eval Ids */
+      eval_ids: string[];
       /** Created By */
       created_by: string;
       /**

@@ -33,6 +33,32 @@ class Scope:
     INTEGRATIONS_WRITE = "integrations:write"
 
 
+def require_resource_scope(resource: str, action: str) -> Callable[[Request], None]:
+    """Escopo global (`evals:run`) ou do recurso do path (`evals:<config_id>:run`).
+
+    O recurso vem do `config_id` da rota. Tokens de integração recebem só o
+    escopo por recurso; os papéis do painel, o global.
+    """
+
+    def dependency(request: Request) -> None:
+        if not getattr(request.app.state, "enforce_scopes", False):
+            return
+        user_scopes: list[str] = getattr(request.state, "scopes", None) or []
+        admin_scope: str | None = getattr(request.state, "admin_scope", None)
+        resource_id = str(request.path_params.get("config_id", "")) or None
+        allowed = has_required_scopes(
+            user_scopes,
+            [f"{resource}:{action}"],
+            resource_type=resource,
+            resource_id=resource_id,
+            admin_scope=admin_scope,
+        )
+        if not allowed:
+            raise HTTPException(status_code=403, detail="Permissão insuficiente")
+
+    return dependency
+
+
 def require_scopes(*required: str) -> Callable[[Request], None]:
     def dependency(request: Request) -> None:
         # Sem auth (testes e create_app(enable_auth=False)) o app não marca a flag

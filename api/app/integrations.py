@@ -30,13 +30,20 @@ logger = logging.getLogger(__name__)
 MAX_DAYS = 90
 
 
-def integration_scopes(agent_ids: list[UUID], team_ids: list[UUID]) -> list[str]:
-    """Ler e executar só os recursos liberados; nada de sessões de outros nem config."""
+def integration_scopes(
+    agent_ids: list[UUID], team_ids: list[UUID], eval_ids: list[UUID] | None = None
+) -> list[str]:
+    """Ler e executar só os recursos liberados; nada de sessões de outros nem config.
+
+    Na suíte, rodar e ler o resultado; criar ou editar caso e mexer no gate, não.
+    """
     scopes: list[str] = []
     for agent_id in agent_ids:
         scopes += [f"agents:{agent_id}:read", f"agents:{agent_id}:run"]
     for team_id in team_ids:
         scopes += [f"teams:{team_id}:read", f"teams:{team_id}:run"]
+    for config_id in eval_ids or []:
+        scopes += [f"evals:{config_id}:read", f"evals:{config_id}:run"]
     return scopes
 
 

@@ -115,6 +115,7 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | `evals:read` | `GET /api/v1/configs/{id}/eval-cases`, `GET /api/v1/configs/{id}/eval-runs[/{run_id}]`, `GET .../eval-runs/compare`, `GET /api/v1/configs/{id}/eval-settings` |
 | `evals:write` | `POST`, `PUT` e `DELETE` em `/api/v1/configs/{id}/eval-cases`; `PUT /api/v1/configs/{id}/eval-settings` |
 | `evals:run` | `POST /api/v1/configs/{id}/eval-runs` |
+| `evals:<id>:read`, `evals:<id>:run` | As mesmas rotas de `eval-runs`, só para aquele config. Vêm nos tokens de integração com `eval_ids`; a checagem é o `require_resource_scope` de `app/authz.py`, que aceita o escopo global ou o do `config_id` da rota |
 | `users:admin` | `/api/v1/users` (listar, criar, alterar papel e situação, redefinir senha, remover) — só owner (`agent_os:admin`) |
 | `agent_os:admin` | `POST /api/v1/auth/users`; `integrations:write` (rotas `/api/v1/integrations`) só vem pelo admin |
 
@@ -197,8 +198,9 @@ Time é um config com `kind: "team"` (ADR-0011), criado com `POST /api/v1/config
 
 Tokens para sistemas externos e assistentes de IA chamarem agentes e times via REST ou `/mcp` (ADR-0009). Só owner emite, lista e revoga.
 
-- `POST /api/v1/integrations` recebe `{name, agent_ids, team_ids, expires_in_days}` (até 90 dias) e devolve o token **uma vez só**, junto com o `mcp_url` (`PUBLIC_BASE_URL` + `/mcp`).
+- `POST /api/v1/integrations` recebe `{name, agent_ids, team_ids, eval_ids, expires_in_days}` (até 90 dias) e devolve o token **uma vez só**, junto com o `mcp_url` (`PUBLIC_BASE_URL` + `/mcp`).
 - O token carrega só `agents:<id>:read|run` e `teams:<id>:read|run` dos recursos liberados, com `sub = integration:<id>` e um `jti`. Ele lista e executa apenas esses recursos, e não acessa config, métricas nem sessões de outros. Os recursos precisam estar publicados.
+- `eval_ids` (ADR-0016, migration 0024): agentes e times cuja suíte de testes o token pode rodar e consultar, para o CI de quem consome o agente. O token ganha `evals:<id>:read` e `evals:<id>:run` só para esses, e não lê nem edita casos, não mexe no gate e não publica. Não exige versão publicada, porque a suíte pode rodar no rascunho; workflow não entra. Um token pode ter só `eval_ids`. A execução disparada por ele fica com `trigger: integration` e `started_by: integration:<id>`.
 - `GET /api/v1/integrations` lista sem o token. `DELETE /api/v1/integrations/{id}` revoga.
 - Revogação: o Agno só valida assinatura e expiração, então o `RevocationMiddleware` (`app/integrations.py`) recusa com 401 o `jti` revogado (de integração ou de sessão encerrada no logout) antes de a request chegar a ele. No processo que revogou, vale na hora; nos outros workers, em até 30 s (cache).
 - No `/mcp`, as tools `run_agent`/`run_team` exigem os mesmos scopes por recurso da REST, e `get_agentos_config` lista só o liberado.

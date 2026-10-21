@@ -172,3 +172,57 @@ def test_revogados_com_banco_fora_nao_consulta_a_cada_request(
     assert not revoked.is_revoked("a")
     assert not revoked.is_revoked("b")
     assert chamadas == 1
+
+
+def test_token_com_suite_roda_e_le_so_a_liberada(client: TestClient) -> None:
+    liberado = _publish(client, "suite liberada")
+    outro = _publish(client, "suite de outro")
+    for agent_id in (liberado, outro):
+        client.post(
+            f"/api/v1/configs/{agent_id}/eval-cases",
+            json={
+                "name": "responde",
+                "input": "oi",
+                "checks": [{"type": "text", "kind": "not_empty"}],
+            },
+            headers=_owner(),
+        ).raise_for_status()
+
+    resp = client.post(
+        "/api/v1/integrations",
+        json={"name": "ci do crm", "eval_ids": [liberado]},
+        headers=_owner(),
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["eval_ids"] == [liberado]
+    h = _bearer(resp.json()["token"])
+
+    started = client.post(
+        f"/api/v1/configs/{liberado}/eval-runs", json={"target": "current"}, headers=h
+    )
+    assert started.status_code == 202, started.text
+    run = started.json()
+    assert run["trigger"] == "integration"
+    assert run["started_by"] == f"integration:{resp.json()['id']}"
+    detail = client.get(f"/api/v1/configs/{liberado}/eval-runs/{run['id']}", headers=h).json()
+    assert detail["verdict"] == "passed", detail
+
+    # outro agente, edição de casos, gate e config: fora do token
+    base = f"/api/v1/configs/{outro}"
+    assert client.post(f"{base}/eval-runs", json={}, headers=h).status_code == 403
+    assert client.get(f"{base}/eval-runs", headers=h).status_code == 403
+    mine = f"/api/v1/configs/{liberado}"
+    assert client.get(f"{mine}/eval-cases", headers=h).status_code == 403
+    assert client.get(f"{mine}/eval-settings", headers=h).status_code == 403
+    assert client.get(f"/agents/{liberado}", headers=h).status_code == 403
+
+
+def test_suite_de_workflow_ou_inexistente_nao_entra_no_token(client: TestClient) -> None:
+    import uuid
+
+    resp = client.post(
+        "/api/v1/integrations",
+        json={"name": "x", "eval_ids": [str(uuid.uuid4())]},
+        headers=_owner(),
+    )
+    assert resp.status_code == 400
