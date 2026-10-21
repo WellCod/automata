@@ -46,7 +46,7 @@ async def connect_strict(tools: MCPTools, label: str) -> None:
     """Conecta e falha alto.
 
     `MCPTools.connect()` engole a exceção e só loga, e o Agent roda sem as
-    tools. Aqui chamamos o `_connect` interno (agno==2.8.7, fixado) para
+    tools. Aqui chamamos o `_connect` interno (agno==2.9.0, fixado) para
     propagar o motivo — 401, timeout, tool inexistente no include.
     """
     if tools.initialized:
