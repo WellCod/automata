@@ -230,6 +230,25 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/configs/{config_id}/eval-schedule": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read Schedule */
+    get: operations["read_schedule_api_v1_configs__config_id__eval_schedule_get"];
+    /** Save Schedule */
+    put: operations["save_schedule_api_v1_configs__config_id__eval_schedule_put"];
+    post?: never;
+    /** Delete Schedule */
+    delete: operations["delete_schedule_api_v1_configs__config_id__eval_schedule_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/configs/{config_id}/eval-settings": {
     parameters: {
       query?: never;
@@ -1413,6 +1432,65 @@ export interface components {
       started_at: string | null;
       /** Finished At */
       finished_at: string | null;
+    };
+    /** EvalScheduleInput */
+    EvalScheduleInput: {
+      /** Cron Expr */
+      cron_expr: string;
+      /**
+       * Timezone
+       * @default America/Sao_Paulo
+       */
+      timezone: string;
+      /**
+       * Target
+       * @default current
+       * @enum {string}
+       */
+      target: "draft" | "current";
+      /** Judge Model */
+      judge_model?: string | null;
+      /**
+       * Enabled
+       * @default true
+       */
+      enabled: boolean;
+    };
+    /** EvalScheduleResponse */
+    EvalScheduleResponse: {
+      /**
+       * Agent Config Id
+       * Format: uuid
+       */
+      agent_config_id: string;
+      /** Cron Expr */
+      cron_expr: string;
+      /** Timezone */
+      timezone: string;
+      /**
+       * Target
+       * @enum {string}
+       */
+      target: "draft" | "current";
+      /** Judge Model */
+      judge_model: string | null;
+      /** Enabled */
+      enabled: boolean;
+      /** Next Run At */
+      next_run_at: string | null;
+      /** Last Attempt At */
+      last_attempt_at: string | null;
+      /** Last Run Id */
+      last_run_id: string | null;
+      /** Last Error */
+      last_error: string | null;
+      /** Updated By */
+      updated_by: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
     };
     /** EvalSettings */
     EvalSettings: {
@@ -2862,6 +2940,101 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["EvalRunDetail"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  read_schedule_api_v1_configs__config_id__eval_schedule_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvalScheduleResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  save_schedule_api_v1_configs__config_id__eval_schedule_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["EvalScheduleInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvalScheduleResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_schedule_api_v1_configs__config_id__eval_schedule_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {

@@ -1,6 +1,6 @@
 from app.models.config import AgentConfig, AgentConfigVersion, Base
 from app.models.embedding_usage import EmbeddingUsage
-from app.models.eval import EvalCase, EvalResult, EvalRun
+from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSchedule
 from app.models.integration import IntegrationToken
 from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_content import KnowledgeContent
@@ -19,6 +19,7 @@ __all__ = [
     "EvalCase",
     "EvalResult",
     "EvalRun",
+    "EvalSchedule",
     "IntegrationToken",
     "KnowledgeBase",
     "KnowledgeContent",

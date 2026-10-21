@@ -15,6 +15,7 @@ _TABLES = [
     "embedding_usage",
     "knowledge_content",
     "knowledge_base",
+    "eval_schedule",
     "eval_result",
     "eval_run",
     "eval_case",
