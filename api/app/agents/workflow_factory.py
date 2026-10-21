@@ -15,7 +15,7 @@ from agno.db.base import AsyncBaseDb, BaseDb
 from agno.factory.utils import FactoryValidationError, RequestContext
 from agno.workflow import Condition, Loop, OnError, Parallel, Step, StepInput, StepOutput
 from agno.workflow.factory import WorkflowFactory
-from agno.workflow.types import HumanReview
+from agno.workflow.types import HumanReview, OnReject, OnTimeout
 
 from app.agents.factory import (
     FactoryInput,
@@ -32,6 +32,7 @@ from app.schemas.workflow import (
     LoopNode,
     ParallelNode,
     StepNode,
+    StepReview,
     WorkflowNode,
     WorkflowRule,
 )
@@ -132,10 +133,31 @@ def _step(resolved: ResolvedStep) -> Step:
     return Step(
         name=node.name,
         max_retries=node.max_retries,
-        human_review=HumanReview(
-            on_error=OnError.fail if node.on_error == "stop" else OnError.skip
-        ),
+        human_review=human_review_for(node),
         **kind,  # type: ignore[arg-type]
+    )
+
+
+# refazer na recusa: até 3 vezes, como o max_retries da etapa
+REVIEW_RETRIES = 3
+
+
+def human_review_for(node: StepNode) -> HumanReview:
+    on_error = OnError.fail if node.on_error == "stop" else OnError.skip
+    review: StepReview | None = node.review
+    if review is None:
+        return HumanReview(on_error=on_error)
+    message = review.message.strip() or None
+    return HumanReview(
+        requires_confirmation=review.when == "before",
+        confirmation_message=message if review.when == "before" else None,
+        requires_output_review=review.when == "after",
+        output_review_message=message if review.when == "after" else None,
+        on_reject=OnReject(review.on_reject),
+        on_error=on_error,
+        max_retries=REVIEW_RETRIES,
+        timeout=review.timeout_hours * 3600 if review.timeout_hours else None,
+        on_timeout=OnTimeout.cancel,
     )
 
 

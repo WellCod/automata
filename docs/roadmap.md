@@ -1028,7 +1028,7 @@ Fica para depois: checagem de texto numa etapa do meio do workflow e caso de wor
 Decisão em [ADR-0023](adr/0023-revisao-humana-no-workflow.md). Uma etapa pode pausar o workflow para alguém confirmar antes de ela rodar ou aprovar a saída dela antes da próxima. A pendência aparece na página Aprovações e no modo teste, e a decisão segue a rota de `continue` do AgentOS.
 
 - [ ] `docs(adr)`: ADR-0023 e esta seção
-- [ ] `feat(api)`: revisão por etapa no payload, pendências do run pausado e acompanhamento do continue
+- [x] `feat(api)`: revisão por etapa no payload, pendências do run pausado e acompanhamento do continue
 - [ ] `feat(web)`: revisão no editor de workflow, etapas pendentes na página Aprovações e no modo teste
 - [ ] `test(api)`: evals da revisão humana no workflow
 

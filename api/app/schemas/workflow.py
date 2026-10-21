@@ -30,6 +30,23 @@ class WorkflowRule(BaseModel):
 _Name = Annotated[str, Field(min_length=1, max_length=60)]
 
 
+class StepReview(BaseModel):
+    """Pausa humana na etapa (ADR-0023): confirma antes de rodar ou aprova a saída."""
+
+    when: Literal["before", "after"]
+    message: str = Field(default="", max_length=300)
+    # retry roda a etapa de novo com o motivo da recusa; só faz sentido com a saída pronta
+    on_reject: Literal["skip", "cancel", "retry"] = "cancel"
+    # vazio = sem prazo; vencido, o workflow é cancelado
+    timeout_hours: int | None = Field(default=None, ge=1, le=168)
+
+    @model_validator(mode="after")
+    def retry_so_depois(self) -> "StepReview":
+        if self.on_reject == "retry" and self.when != "after":
+            raise ValueError("refazer na recusa só vale na revisão da saída")
+        return self
+
+
 class StepNode(BaseModel):
     type: Literal["step"] = "step"
     name: _Name
@@ -40,6 +57,7 @@ class StepNode(BaseModel):
     # "stop" para o workflow quando a etapa falha; "continue" passa o erro adiante
     on_error: Literal["stop", "continue"] = "stop"
     max_retries: int = Field(default=0, ge=0, le=3)
+    review: StepReview | None = None
 
     @model_validator(mode="after")
     def um_executor(self) -> "StepNode":
@@ -98,6 +116,19 @@ def step_nodes(nodes: list["WorkflowNode"]) -> list[StepNode]:
     return [n for n, _ in walk(nodes) if isinstance(n, StepNode)]
 
 
+def _reviews_inside_containers(nodes: list["WorkflowNode"], inside: bool = False) -> list[str]:
+    found: list[str] = []
+    for node in nodes:
+        if isinstance(node, StepNode):
+            if inside and node.review is not None:
+                found.append(node.name)
+        elif isinstance(node, ConditionNode):
+            found += _reviews_inside_containers([*node.steps, *node.else_steps], inside)
+        else:
+            found += _reviews_inside_containers(_children(node), True)
+    return found
+
+
 class WorkflowSettings(BaseModel):
     """Seção de workflow do payload. Só existe em config de kind=workflow."""
 
@@ -115,6 +146,11 @@ class WorkflowSettings(BaseModel):
             raise ValueError(f"aninhamento de no máximo {MAX_DEPTH} níveis")
         if len(step_nodes(self.steps)) > MAX_STEPS:
             raise ValueError(f"no máximo {MAX_STEPS} etapas")
+        revisadas = sorted(_reviews_inside_containers(self.steps))
+        if revisadas:
+            # a pausa num ramo ou numa volta deixaria o resto do contêiner num estado
+            # que o painel não mostra com clareza (ADR-0023)
+            raise ValueError(f"revisão humana fora de paralelo e de laço: {revisadas}")
         if isinstance(self.steps[-1], ParallelNode):
             # a saída final seria só a do último ramo
             raise ValueError("o workflow não pode terminar num paralelo: adicione uma etapa depois")

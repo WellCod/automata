@@ -35,6 +35,8 @@ class AgentRun(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     # ToolExecution.to_dict() das tools aguardando confirmação; só em run pausado
     pending_tools: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    # etapas do workflow esperando revisão humana (ADR-0023); resumo, não o requisito do Agno
+    pending_steps: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
     # status=blocked: regra de guardrail que barrou (ADR-0013) e o detalhe dela
     # (tipos de dado, termo configurado); nunca o valor que o usuário mandou
     blocked_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
