@@ -45,3 +45,4 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0017](0017-estrategia-de-recuperacao.md) | Estratégia de recuperação por base com o reranker do Agno e HyDE medido | Proposto |
 | [0018](0018-avisos-de-regressao.md) | Avisos de regressão da suíte agendada por webhook assinado, só nas mudanças de estado | Proposto |
 | [0019](0019-compactacao-de-conversa.md) | Compactação de conversa por agente, versionada no payload, com limite baixo | Proposto |
+| [0020](0020-fila-duravel.md) | Fila durável do Agno para runs em background, no Postgres, com Redis opcional | Proposto |
