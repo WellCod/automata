@@ -9,6 +9,9 @@ export type KnowledgeBase = components["schemas"]["KnowledgeBaseResponse"];
 export type KnowledgeContent = components["schemas"]["KnowledgeContentResponse"];
 export type EmbedderInfo = components["schemas"]["EmbedderInfo"];
 export type SearchHit = components["schemas"]["SearchHit"];
+export type RetrievalSettings = components["schemas"]["RetrievalSettings"];
+export type SearchComparison = components["schemas"]["SearchComparison"];
+export type SearchResult = components["schemas"]["SearchResult"];
 
 export function useKnowledgeBases() {
   return useQuery({
