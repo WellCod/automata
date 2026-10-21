@@ -879,7 +879,7 @@ Fica para depois: suíte em workflow, caso que espera bloqueio de guardrail, exe
 
 Decisão em [ADR-0016](adr/0016-evals-continuos.md). A suíte da Fase 16 deixa de depender do botão Rodar: tokens de integração disparam e consultam a suíte dos agentes e times liberados, um agendamento por config roda a suíte contra a vigente, e conversas reais viram casos de teste revisados, com dados pessoais mascarados. Regressão agendada aparece na lista de agentes e na aba Testes.
 
-- [ ] #127 — `docs(adr)`: ADR-0016 e esta seção
+- [x] #127 — `docs(adr)`: ADR-0016 e esta seção
 - [ ] `feat(api)`: origem e alvo por apelido na execução da suíte. `trigger` e `target` no `eval_run`, `verdict` no resumo
 - [ ] `feat(api)`: tokens de integração disparam e consultam a suíte. Escopos `evals:<id>:run` e `evals:<id>:read` por config na emissão, checagem por recurso nas rotas de execução
 - [ ] `feat(api)`: agendamento da suíte com poller próprio. Tabela `eval_schedule`, cron e fuso com `agno.scheduler.cron`, reivindicação com `SKIP LOCKED`, intervalo mínimo de 1 hora, desligado no modo demo
