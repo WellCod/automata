@@ -34,6 +34,7 @@ _AGNO_SCHEMA = "ai"
 _AGNO_TABLES = [
     "agno_sessions",
     "agno_runs",
+    "agno_jobs",
     "agno_memories",
     "agno_metrics",
     "agno_eval_runs",

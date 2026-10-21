@@ -583,7 +583,7 @@ if __name__ == "__main__":
 | 18 — Recuperação por base | #143–#148 | Reranker do Agno (MMR e recência) e HyDE medido por base de conhecimento | Fases 13 e 17 |
 | 19 — Avisos de regressão | #149–#153 | Webhook assinado do agendamento nas mudanças de estado da suíte | Fase 17 |
 | 20 — Compactação de conversa | #154–#157 | Resumo dos turnos antigos por agente, versionado no payload | Fase 17 (#134) |
-| 21 — Fila durável | #158 em diante | Runs em background na fila durável do Agno, com Redis opcional | Fase 7 (Redis) |
+| 21 — Fila durável | #158–#160 | Runs em background na fila durável do Agno, com Redis opcional | Fase 7 (Redis) |
 
 Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
 
@@ -972,9 +972,9 @@ Fica para depois: modelo próprio para o resumo, compactação no líder de time
 Decisão em [ADR-0020](adr/0020-fila-duravel.md). Run aceito com `background=true` vira uma linha na fila durável do Agno, no Postgres da instância. Ele sobrevive a deploy e a crash, e com Redis o cancelamento funciona de qualquer réplica. São uma tentativa só e 15 minutos por execução.
 
 - [x] #158 — `fix(api)`: app externo roda o lifespan do AgentOS montado (pré-requisito: o `/mcp` respondia 500 e o worker da fila não subia)
-- [ ] #159 — `docs(adr)`: ADR-0020 e esta seção
-- [ ] `feat(api)`: fila durável do Agno ligada, com Redis quando há `REDIS_URL` e interruptor `BACKGROUND_QUEUE_DURABLE`
-- [ ] `test(api)`: run em background pela fila, com o agente do factory, e falha visível quando o worker morre no meio
+- [x] #159 — `docs(adr)`: ADR-0020 e esta seção
+- [x] `feat(api)`: fila durável do Agno ligada, com Redis quando há `REDIS_URL` e interruptor `BACKGROUND_QUEUE_DURABLE`
+- [x] `test(api)`: run em background pela fila, com o agente do factory (junto do PR da fila: `test_background_queue.py`). A falha visível com uma tentativa é do Agno (`max_attempts=1`) e fica coberta pela configuração testada
 
 **Critério de aceite da fase:** um run em background aceito passa pela fila, termina e fica em `agent_run`. Um run cujo worker morre no meio vira falha com motivo, sem rodar de novo. Com `BACKGROUND_QUEUE_DURABLE=false`, volta às tasks em memória.
 
