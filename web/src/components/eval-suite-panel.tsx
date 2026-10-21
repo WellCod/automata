@@ -97,6 +97,15 @@ function checkSummary(check: EvalResult["checks"][number]): string {
     return rules.map((r) => `${r.passed === false ? "✗" : "✓"} ${r.kind} "${r.value}"`).join(" · ");
   }
   if (type === "tools") return `esperadas: ${((check.expected as string[]) ?? []).join(", ")}`;
+  if (type === "steps") {
+    const missing = (check.missing as string[] | undefined) ?? [];
+    const extra = (check.extra as string[] | undefined) ?? [];
+    const ran = (check.ran as string[] | undefined) ?? [];
+    const parts = [`rodou: ${ran.length ? ran.join(" → ") : "nenhuma"}`];
+    if (missing.length) parts.push(`faltou: ${missing.join(", ")}`);
+    if (extra.length) parts.push(`fora da lista: ${extra.join(", ")}`);
+    return parts.join(" · ");
+  }
   if (type === "blocked") {
     const expected = check.rule ? blockLabel(String(check.rule)) : "qualquer regra";
     return check.blocked_by

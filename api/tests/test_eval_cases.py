@@ -138,10 +138,19 @@ def test_casos_sao_de_cada_config(client: TestClient) -> None:
     )
 
 
+def agent_of(client: TestClient) -> str:
+    return _config(client, "agent", "sem etapas")
+
+
 def test_workflow_e_limite(client: TestClient) -> None:
     wf = _config(client, "workflow", "fluxo")
-    resp = client.post(f"/api/v1/configs/{wf}/eval-cases", json=_case())
-    assert resp.status_code == 422 and "Workflow" in resp.json()["detail"]
+    # workflow aceita texto, juiz e etapas; tools são de cada etapa (ADR-0022)
+    assert client.post(f"/api/v1/configs/{wf}/eval-cases", json=_case()).status_code == 201
+    resp = client.post(f"/api/v1/configs/{wf}/eval-cases", json=_case("t", checks=[TOOLS]))
+    assert resp.status_code == 422 and "não vale para workflow" in resp.json()["detail"]
+    steps = {"type": "steps", "steps": ["triagem"]}
+    resp = client.post(f"/api/v1/configs/{agent_of(client)}/eval-cases", json=_case(checks=[steps]))
+    assert resp.status_code == 422 and "não vale para agent" in resp.json()["detail"]
 
     agent = _config(client, "agent", "muitos")
     for i in range(50):

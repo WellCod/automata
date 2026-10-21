@@ -1594,6 +1594,7 @@ export interface components {
         | components["schemas"]["ToolsCheck"]
         | components["schemas"]["JudgeCheck"]
         | components["schemas"]["BlockedCheck"]
+        | components["schemas"]["StepsCheck"]
       )[];
       /** Source Run Id */
       source_run_id?: string | null;
@@ -1622,6 +1623,7 @@ export interface components {
         | components["schemas"]["ToolsCheck"]
         | components["schemas"]["JudgeCheck"]
         | components["schemas"]["BlockedCheck"]
+        | components["schemas"]["StepsCheck"]
       )[];
       /** Source Run Id */
       source_run_id: string | null;
@@ -1657,6 +1659,7 @@ export interface components {
         | components["schemas"]["ToolsCheck"]
         | components["schemas"]["JudgeCheck"]
         | components["schemas"]["BlockedCheck"]
+        | components["schemas"]["StepsCheck"]
       )[];
       /** Judge Criteria */
       judge_criteria: string | null;
@@ -2668,6 +2671,24 @@ export interface components {
        * @default 0
        */
       max_retries: number;
+    };
+    /**
+     * StepsCheck
+     * @description Etapas do workflow que precisam ter rodado (ADR-0022).
+     */
+    StepsCheck: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "steps";
+      /** Steps */
+      steps: string[];
+      /**
+       * Exclusive
+       * @default false
+       */
+      exclusive: boolean;
     };
     /** TeamMember */
     TeamMember: {

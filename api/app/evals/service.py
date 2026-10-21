@@ -68,9 +68,6 @@ def create_run(
     `commit=False` deixa o commit para quem chama: o agendamento grava a execução e
     o próximo horário juntos, com a linha do agendamento ainda travada.
     """
-    if config.kind == "workflow":
-        # o runner de suíte do Agno roda agente ou time; workflow fica para depois
-        raise EvalRunRefused(422, "Workflow ainda não tem suíte de testes")
     version_id = resolve_version(config, body)
     version = ConfigRepository(session).get_version(version_id)
     if version is None or version.config_id != config.id:

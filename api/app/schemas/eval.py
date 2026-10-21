@@ -80,9 +80,40 @@ class BlockedCheck(BaseModel):
     rule: BlockRule | None = None
 
 
+class StepsCheck(BaseModel):
+    """Etapas do workflow que precisam ter rodado (ADR-0022)."""
+
+    type: Literal["steps"] = "steps"
+    steps: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(
+        min_length=1, max_length=20
+    )
+    # com True, rodar qualquer etapa fora da lista reprova o caso
+    exclusive: bool = False
+
+
 EvalCheck = Annotated[
-    TextCheck | ToolsCheck | JudgeCheck | BlockedCheck, Field(discriminator="type")
+    TextCheck | ToolsCheck | JudgeCheck | BlockedCheck | StepsCheck,
+    Field(discriminator="type"),
 ]
+
+# o que cada tipo de config aceita: tools e bloqueio são de cada etapa do workflow,
+# e etapas só existem no workflow
+CHECKS_BY_KIND: dict[str, frozenset[str]] = {
+    "agent": frozenset({"text", "tools", "judge", "blocked"}),
+    "team": frozenset({"text", "tools", "judge", "blocked"}),
+    "workflow": frozenset({"text", "judge", "steps"}),
+}
+
+
+def kind_problem(kind: str, spec: "EvalCaseInput") -> str | None:
+    """Motivo de o caso não servir a este tipo de config, ou None."""
+    allowed = CHECKS_BY_KIND.get(kind, frozenset())
+    refused = sorted({c.type for c in spec.checks} - allowed)
+    if refused:
+        return f"checagem {', '.join(refused)} não vale para {kind}"
+    if kind == "workflow" and spec.context:
+        return "workflow roda uma entrada por vez: caso sem turnos anteriores"
+    return None
 
 
 class EvalCaseInput(BaseModel):
@@ -107,7 +138,7 @@ class EvalCaseInput(BaseModel):
     @model_validator(mode="after")
     def um_por_tipo_no_runner(self) -> "EvalCaseInput":
         # o Case do Agno tem um campo de critério e um de tools; texto vira um scorer só
-        for kind in ("tools", "judge"):
+        for kind in ("tools", "judge", "steps"):
             if sum(1 for c in self.checks if c.type == kind) > 1:
                 raise ValueError(f"no máximo uma checagem do tipo {kind} por caso")
         # run barrado não tem resposta para comparar, julgar ou conferir tools
