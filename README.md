@@ -14,7 +14,7 @@ O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é
 | **Backend** | Python 3.12 · FastAPI · Agno 2.8.7 · PostgreSQL 17 + pgvector · Redis · Alembic |
 | **Frontend** | Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · TanStack Query |
 | **Qualidade** | mypy strict · ruff · ~290 testes pytest (testcontainers) · 126 testes Vitest · Playwright · evals |
-| **Decisões** | 15 ADRs com contexto, alternativas descartadas e gatilho de reversão |
+| **Decisões** | 16 ADRs com contexto, alternativas descartadas e gatilho de reversão |
 
 ---
 
@@ -300,6 +300,7 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0013](docs/adr/0013-guardrails-por-agente.md) | Guardrails versionados com o agente, bloqueio sem custo de modelo |
 | [0014](docs/adr/0014-workflows-por-etapas.md) | Workflows por etapas com regras sem CEL e etapa com erro que para o fluxo |
 | [0015](docs/adr/0015-evals-por-agente.md) | Evals por agente no painel: casos fora da versão, runner de suíte do Agno e gate de publicação |
+| [0016](docs/adr/0016-evals-continuos.md) | Evals contínuos: suíte por token de integração, agendamento próprio e casos de conversas reais (proposto, Fase 17) |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 
