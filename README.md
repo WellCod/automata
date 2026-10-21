@@ -3,7 +3,7 @@
 [![CI](https://github.com/WellCod/automata/actions/workflows/ci.yml/badge.svg)](https://github.com/WellCod/automata/actions/workflows/ci.yml)
 [![Publish](https://github.com/WellCod/automata/actions/workflows/publish.yml/badge.svg)](https://github.com/WellCod/automata/actions/workflows/publish.yml)
 
-Plataforma para operar agentes de IA em produção. Com ela, quem não programa cria, versiona, testa e publica agentes, times multi-agente e workflows. Também liga bases de conhecimento (RAG), ferramentas via MCP e guardrails, roda suítes de teste por agente antes de publicar e acompanha execução, latência e custo de cada um.
+Plataforma para operar agentes de IA em produção. Com ela, quem não programa cria, versiona, testa e publica agentes, times multi-agente e workflows. Também liga bases de conhecimento (RAG), ferramentas via MCP e guardrails, roda suítes de teste por agente antes de publicar e de forma agendada, com aviso de regressão no canal do time, e acompanha execução, latência e custo de cada um.
 
 O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é a camada de produto em volta: configuração versionada em banco próprio, validação antes de publicar, rastreamento de cada execução, segurança e painel.
 
@@ -13,7 +13,7 @@ O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é
 |---|---|
 | **Backend** | Python 3.12 · FastAPI · Agno 3.1.8 · PostgreSQL 17 + pgvector · Redis · Alembic |
 | **Frontend** | Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · TanStack Query |
-| **Qualidade** | mypy strict · ruff · ~460 testes pytest (testcontainers) · 131 testes Vitest · Playwright · evals |
+| **Qualidade** | mypy strict · ruff · ~510 testes pytest (testcontainers) · 136 testes Vitest · Playwright · evals |
 | **Decisões** | 20 ADRs com contexto, alternativas descartadas e gatilho de reversão |
 
 ---
@@ -133,7 +133,7 @@ Caso novo não precisa nascer do zero. No histórico de execuções, **Virar cas
 
 Catálogo de servidores MCP externos, com credenciais cifradas e teste de conexão que descobre as tools. Em cada agente, escolhe-se quais tools ele usa e quais **pedem confirmação**. Uma tool sensível pausa a execução até alguém aprovar ou rejeitar, no modo teste ou na página Aprovações, vendo nome e argumentos da ação.
 
-O caminho inverso também existe: os próprios agentes e times ficam expostos via **MCP server mode** para Claude Desktop, Cursor e outros sistemas, com tokens de integração limitados aos agentes escolhidos e revogáveis na hora.
+O caminho inverso também existe: os próprios agentes e times ficam expostos via **MCP server mode** para Claude Desktop, Cursor e outros sistemas, com tokens de integração limitados aos agentes escolhidos e revogáveis na hora. Por REST, um sistema pode pedir o run em **background**: o pedido entra numa fila durável no Postgres e sobrevive a deploy e a crash.
 
 ### Analytics e rastreamento
 
@@ -162,21 +162,27 @@ flowchart LR
         OS["AgentOS (Agno)<br/>/agents /teams /workflows<br/>/mcp (server mode)"]
         F["Factories por request<br/>agente · time · workflow"]
         T["RunTracking<br/>agent_run · usage_event"]
+        W["Workers<br/>fila de background ·<br/>suítes agendadas"]
     end
     PG[("PostgreSQL 17<br/>config versionada, runs,<br/>metering, pgvector")]
-    RD[("Redis<br/>rate limit")]
+    RD[("Redis<br/>rate limit · cancelamento<br/>entre réplicas")]
     LLM["Provedores<br/>Anthropic · OpenAI"]
     MCP["Servidores MCP<br/>externos"]
     EMB["Embeddings<br/>Voyage · OpenAI"]
+    HOOK["Webhooks<br/>Slack · Teams · Discord"]
 
     UI --> BFF --> R & OS
     OS --> F --> T --> PG
     R --> PG
     R --> RD
     F --> LLM & MCP & EMB
+    W --> F
+    W --> PG
+    W --> RD
+    W --> HOOK
 ```
 
-O painel nunca fala direto com a API: todo acesso passa por Route Handlers server-side, e o token fica num cookie httpOnly. A API tem dois lados. As rotas próprias, em `/api/v1`, gerenciam configuração, execuções, métricas, bases, servidores MCP e usuários. As rotas do AgentOS executam agentes, times e workflows; o Automata não as modifica, só registra nelas o que foi publicado.
+O painel nunca fala direto com a API: todo acesso passa por Route Handlers server-side, e o token fica num cookie httpOnly. A API tem dois lados. As rotas próprias, em `/api/v1`, gerenciam configuração, execuções, métricas, bases, servidores MCP e usuários. As rotas do AgentOS executam agentes, times e workflows; o Automata não as modifica, só registra nelas o que foi publicado. Dois laços rodam dentro da API, sem serviço à parte: o worker da fila de background, do próprio Agno, e o poller das suítes agendadas, que avisa por webhook quando o estado muda.
 
 ---
 
@@ -196,6 +202,17 @@ rascunho ──publicar──▶ v3 (publicada, imutável) ◀── current_ver
 - **O payload tem `schema_version`.** Formatos antigos são convertidos na leitura, por um validator do pydantic, sem migração de dados.
 - **O agente não é um objeto em código.** `AgentFactory`, `TeamFactory` e `WorkflowFactory` do Agno reconstroem tudo a cada request a partir da versão vigente: modelo, instruções, tools MCP, buscas nas bases e guardrails como `pre_hooks` e `post_hooks`. Com `version_id` no `factory_input`, a mesma factory roda um rascunho, que é como o modo teste funciona. A versão precisa pertencer ao config, senão um rascunho de B rodaria com o custo contado em A.
 - **Publicar não exige restart.** O AgentOS lê listas mutáveis de agentes, times e workflows a cada request. Publicar registra a factory na hora, e outros workers sincronizam por um middleware com TTL de 5 s.
+- **Memória da conversa.** O agente leva ao modelo os últimos 5 turnos da sessão, lidos do banco que o `AgentFactory` injeta. Com a compactação ligada na versão, a janela passa a ir até um limite de tokens (16 mil por padrão, contra 150 mil do Agno), e o que sobra vira um resumo feito pelo modelo do próprio agente. O consumo do resumo entra no run ([ADR-0019](docs/adr/0019-compactacao-de-conversa.md)).
+- **Lifespan do AgentOS.** O AgentOS fica montado dentro do app que tem `/login` e `/health`, e o Starlette não roda lifespan de app montado. O app externo entra no lifespan do AgentOS de propósito: sem isso, o servidor MCP respondia 500 e o worker da fila não subia.
+
+### Execução em background
+
+Um run pedido com `background=true` vira uma linha na fila durável do Agno, no Postgres da instância ([ADR-0020](docs/adr/0020-fila-duravel.md)). Um worker por réplica reivindica a linha e roda o agente pelo mesmo factory dos runs síncronos.
+
+- **Sobrevive a deploy.** Run aceito termina ou falha com motivo. Nunca fica `PENDING` para sempre.
+- **Uma tentativa só.** O agente pode ter chamado uma tool com efeito antes de cair. Rodar de novo sozinho repetiria o efeito, então quem integra decide se reenvia.
+- **15 minutos por execução** e 429 acima de mil pendentes.
+- **Redis opcional.** Com `REDIS_URL`, cancelar e acompanhar o stream funcionam de qualquer réplica.
 
 ### Rastreamento e consumo
 
@@ -230,6 +247,7 @@ flowchart LR
 - **Pgvector no Postgres que já existe.** Cada base tem sua tabela vetorial, com dimensão fixada pelo embedder escolhido na criação, e busca híbrida (vetor + texto) configurada para português. Nada de serviço vetorial à parte ([ADR-0012](docs/adr/0012-bases-de-conhecimento.md)).
 - **Ingestão em background.** O estado de cada documento fica em `knowledge_content`. O primeiro trecho é embedado antes do insert, para que chave inválida ou cota estourada vire mensagem de falha legível; depois do insert, os trechos são contados. Documento preso em "processando" por mais de 30 min vira falha no boot.
 - **Uma tool por base.** O agente recebe `buscar_<slug>`, e a descrição da base diz quando usar. A tool devolve trechos com documento e fonte, e as instruções mandam citar o documento e tratar o trecho como **dado, não instrução**, uma defesa contra injeção vinda de documento.
+- **Estratégia por base.** O reranker do Agno entra na nossa busca: MMR, para trechos relevantes e diferentes entre si, ou recência, pela data da linha. Com reranker, a busca pede um lote maior de candidatos e reordena contra a pergunta. O HyDE, opcional, busca com uma resposta hipotética escrita por um modelo escolhido na base, com os tokens gravados no consumo do agente que buscou ([ADR-0017](docs/adr/0017-estrategia-de-recuperacao.md)).
 - **Custo de embedding no metering.** `MeteredEmbedder` conta tokens de ingestão e de busca, com um cache curto para não pagar duas vezes pela mesma consulta.
 - **Demo sem chave.** No modo replay, um embedder local determinístico indexa e busca por palavra em comum.
 
@@ -241,6 +259,9 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 - **Runs de teste não são conversas.** Uma `ContextVar` marca `agent_run.eval_run_id` e `usage_event.eval_run_id`. Esses runs ficam fora do histórico, das aprovações e das métricas; o custo continua no metering, separado como custo de testes.
 - **Juiz com modelo nosso e medido.** Sem modelo explícito, o Agno cairia num modelo da OpenAI. O modelo do juiz é escolhido entre os que têm saída estruturada e embrulhado num medidor que soma os tokens dele no consumo da execução. No modo demo, o juiz aparece como "não avaliado" em vez de fingir aprovação.
 - **Gate sem hash.** Cada rascunho salvo já é uma versão nova, então o resultado vale para aquele `version_id` e nenhum outro. Caso não avaliado não conta como aprovado, e rollback segue livre.
+- **Agendamento com poller próprio.** Um laço na API reivindica os agendamentos vencidos com `SELECT … FOR UPDATE SKIP LOCKED`, e duas réplicas não duplicam a execução. O scheduler do AgentOS ficou de fora: o token interno dele não cobre as rotas próprias ([ADR-0016](docs/adr/0016-evals-continuos.md)).
+- **Caso com contexto.** Os turnos anteriores do caso rodam no `setup` do `Case`, na mesma sessão, e só a última resposta é checada. É o que permite transformar uma conversa real em caso, com dados pessoais mascarados.
+- **Aviso só na mudança.** Depois de cada execução agendada, a API compara com a anterior e chama o webhook só quando a suíte regride, passa a falhar ou volta a passar. O corpo é assinado com HMAC ([ADR-0018](docs/adr/0018-avisos-de-regressao.md)).
 
 ### MCP
 
@@ -262,6 +283,8 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 | **Rate limit** | Login limitado por e-mail e por IP no Redis. `X-Forwarded-For` só vale vindo de proxy listado em `TRUSTED_PROXIES`. |
 | **Superfície** | Login com e-mail inexistente também roda argon2, para a latência não revelar contas. `/docs` e `/openapi.json` só em desenvolvimento. |
 | **Headers** | HSTS, CSP com `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`. |
+| **Saída** | Servidores MCP e webhooks passam pelo mesmo filtro: só https, sem host que resolva para IP interno, conferido no cadastro e a cada chamada, sem seguir redirect. URLs e segredos ficam cifrados com Fernet. A telemetria do Agno fica desligada. |
+| **Integrações** | Token de consumidor com escopo por recurso: roda só os agentes liberados e, se marcado, a suíte de testes deles, sem acesso a configuração. |
 
 ---
 
@@ -269,9 +292,9 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 
 | Camada | Ferramenta | Cobertura |
 |---|---|---|
-| API | pytest + testcontainers | ~460 testes contra Postgres com pgvector real, sem mock de banco. Gate de cobertura de 70%. |
+| API | pytest + testcontainers | ~510 testes contra Postgres com pgvector real, sem mock de banco. Gate de cobertura de 70%. |
 | Tipos | mypy strict + plugin pydantic · ruff | Rodam em todo PR. |
-| Web | Vitest + Testing Library | 131 testes de componente e de lógica, inclusive o redutor de eventos do workflow e a suíte de testes. |
+| Web | Vitest + Testing Library | 136 testes de componente e de lógica, inclusive o redutor de eventos do workflow e a suíte de testes. |
 | E2E | Playwright | Login → editar agente → publicar → rollback. |
 | Contrato | openapi-typescript | Os tipos do painel são gerados do OpenAPI da API, nunca escritos à mão. |
 
@@ -380,9 +403,9 @@ pnpm --filter web test:e2e                 # Playwright
 api/
   app/
     agents/       factories, rastreamento, workflows, modelos, replay
-    evals/        runner da suíte, juiz medido e gate de publicação
+    evals/        runner da suíte, juiz, gate, agendamento, avisos e sugestão de caso
     guardrails/   regras de entrada e saída
-    knowledge/    embedders, ingestão, tools de busca
+    knowledge/    embedders, ingestão, busca com reranker e HyDE, tools
     mcp/          cliente MCP, proteção de saída (SSRF)
     routers/      rotas próprias /api/v1
     services/     regras de negócio e validação na escrita
@@ -395,7 +418,7 @@ web/
   src/lib/        client gerado do OpenAPI, SSE, progresso do workflow
   e2e/            Playwright
 docs/
-  adr/            15 Architecture Decision Records
+  adr/            20 Architecture Decision Records
   roadmap.md      fases, auditorias e critérios de aceite
 DESIGN.md         sistema visual do painel
 DEMO.md           demo local sem chave de LLM
