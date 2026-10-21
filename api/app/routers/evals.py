@@ -4,6 +4,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 
+from app.agents.capabilities import get_capabilities
+from app.agents.models_map import demo_replay
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.evals.runner import execute
@@ -150,6 +152,9 @@ def _summary(session: SessionDep, run: EvalRun) -> EvalRunSummary:
         failed=run.failed,
         not_evaluated=run.not_evaluated,
         error=run.error,
+        judge_model=run.judge_model,
+        total_tokens=run.total_tokens,
+        cost=float(run.cost) if run.cost is not None else None,
         started_by=run.started_by,
         created_at=run.created_at,
         started_at=run.started_at,
@@ -171,6 +176,23 @@ def _result(r: EvalResult) -> EvalResultResponse:
         error=r.error,
         session_id=r.session_id,
     )
+
+
+def _check_judge(cases: list[EvalCase], judge_model: str | None) -> None:
+    if judge_model is not None:
+        try:
+            caps = get_capabilities(judge_model)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        # o juiz responde num schema (aprovado e motivo): sem saída estruturada ele não decide
+        if not caps.structured_output:
+            raise HTTPException(
+                status_code=422, detail=f"'{judge_model}' não tem saída estruturada para julgar"
+            )
+        return
+    has_judge = any(c.get("type") == "judge" for case in cases for c in case.checks)
+    if has_judge and not demo_replay():
+        raise HTTPException(status_code=422, detail="Escolha o modelo do juiz: há casos com juiz")
 
 
 @runs_router.post(
@@ -197,6 +219,7 @@ def start_run(
     cases = EvalCaseRepository(session).list_by_config(config_id)
     if not cases:
         raise HTTPException(status_code=422, detail="Suíte sem casos")
+    _check_judge(cases, body.judge_model)
     runs = EvalRunRepository(session)
     if runs.active(config_id) is not None:
         raise HTTPException(status_code=409, detail="Já há uma execução em andamento")
@@ -210,6 +233,7 @@ def start_run(
                 {"id": str(c.id), "name": c.name, "input": c.input, "checks": c.checks}
                 for c in cases
             ],
+            judge_model=body.judge_model,
             started_by=_actor(request),
         )
     )

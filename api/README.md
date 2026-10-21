@@ -302,11 +302,15 @@ A execução roda em background (`app/evals/runner.py`):
 - Cada caso gravado vira um `Case` do `agno.eval.suite` e roda com `arun_cases`, um por vez, com timeout de 120 s.
 - Cada caso ganha um agente ou time novo, montado por `agent_from` ou `team_from` a partir da versão pedida.
 - Checagens de texto viram um `Scorer` próprio (`TextScorer`, as mesmas regras dos workflows); as de tools vão para o `expected_tool_calls`.
-- Juiz ainda não roda: a checagem aparece com `passed: null` e o motivo. Caso só com juiz fica `not_evaluated` sem rodar o agente.
+- Checagem de juiz vai para o `criteria` do Agno, com o modelo escolhido em `judge_model` no pedido. O modelo precisa estar na matriz e ter saída estruturada, e é obrigatório quando algum caso tem juiz. Ele é sempre passado ao runner: sem isso o `AgentAsJudgeEval` cairia num modelo da OpenAI. O medidor (`app/evals/judge.py`) embrulha o `ainvoke` da instância e soma os tokens do juiz, gravados num `usage_event` da execução.
+- No modo demo (`DEMO_REPLAY`), o juiz não roda: a checagem aparece com `passed: null` e o motivo. Caso só com juiz fica `not_evaluated`, sem rodar o agente.
+- No fim, `eval_run.total_tokens` e `eval_run.cost` (migration 0021) somam os `usage_event` da execução: casos e juiz.
 - O `on_case_end` grava cada `eval_result` (status `passed`, `failed`, `error` ou `not_evaluated`, checagens com detalhe, resposta, tools chamadas, duração) assim que o caso termina. A execução guarda uma cópia dos casos como estavam.
 - Execução presa em `queued`/`running` quando a API reinicia vira `failed` no boot.
 
 Os runs dos casos passam pelo `RunTracking` com a `ContextVar` `current_eval_run`, que grava `agent_run.eval_run_id`, `usage_event.eval_run_id` e, como `user_id`, quem disparou a suíte (o runner do Agno não passa `user_id`). Esses runs ficam fora do histórico de execuções, das aprovações pendentes, das métricas por agente e globais, da série diária, dos bloqueios e do uso no analytics. O rollup de metering (`/api/v1/usage/rollup`) continua contando o custo deles, porque é gasto real.
 
 `GET /api/v1/configs/{id}/eval-runs` lista as 20 últimas; `GET .../eval-runs/{run_id}` traz os resultados por caso.
+
+No `GET /api/v1/metrics/summary`, `eval_tokens` e `eval_cost` trazem o consumo das suítes no período, fora do `total_cost` das conversas.
 

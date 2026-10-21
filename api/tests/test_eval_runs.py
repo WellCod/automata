@@ -22,7 +22,14 @@ from tests.fake_models import FixedReplyModel
 REPLY = "Prazo de troca: 30 dias corridos a partir do recebimento."
 
 
+JUDGE = "gpt-4o-mini"
+VERDICT = '{"passed": true, "reason": "Cita o prazo de 30 dias."}'
+
+
 def _model(model_id: str, *_: Any, **__: Any) -> ReplayModel:
+    # o juiz responde no schema binário do AgentAsJudgeEval
+    if model_id == JUDGE:
+        return FixedReplyModel(id=model_id, reply=VERDICT, tokens=7)
     return FixedReplyModel(id=model_id, reply=REPLY, tokens=10)
 
 
@@ -49,16 +56,18 @@ def client() -> Generator[TestClient, None, None]:
         get_settings.cache_clear()
         command.upgrade(Config("alembic.ini"), "head")
         import app.agents.factory as factory
+        import app.agents.models_map as models_map
 
-        original = factory.resolve_model
+        original = factory.resolve_model, models_map.resolve_model
         factory.resolve_model = _model  # type: ignore[assignment]
+        models_map.resolve_model = _model  # type: ignore[assignment]
         from app.main import create_app
 
         with TestClient(
             create_app(auto_provision_dbs=True, enable_auth=False, enable_mcp_server=False)
         ) as c:
             yield c
-        factory.resolve_model = original
+        factory.resolve_model, models_map.resolve_model = original  # type: ignore[assignment]
         os.environ.pop("DATABASE_URL", None)
         get_settings.cache_clear()
 
@@ -86,7 +95,11 @@ def _start(client: TestClient, config_id: str, **body: Any) -> Any:
     return client.post(f"/api/v1/configs/{config_id}/eval-runs", json=body)
 
 
-def test_suite_roda_cada_caso_e_marca_os_runs(client: TestClient) -> None:
+def test_suite_roda_cada_caso_e_marca_os_runs(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # no modo demo o juiz não roda: o caso só com juiz fica não avaliado
+    monkeypatch.setenv("DEMO_REPLAY", "true")
     agent = _agent(client, "atendimento")
     _case(client, agent, "prazo", [{"type": "text", "kind": "contains", "value": "30 dias"}])
     _case(client, agent, "sem prazo", [{"type": "text", "kind": "not_contains", "value": "prazo"}])
@@ -120,7 +133,7 @@ def test_suite_roda_cada_caso_e_marca_os_runs(client: TestClient) -> None:
     judge = by_name["só juiz"]
     assert judge["status"] == "not_evaluated"
     assert judge["checks"][0]["passed"] is None
-    assert "juiz" in judge["checks"][0]["reason"]
+    assert judge["checks"][0]["reason"].startswith("modo demo")
     assert [r["case_name"] for r in run["results"]] == [
         "prazo",
         "sem prazo",
@@ -196,3 +209,49 @@ def test_workflow_nao_roda_suite(client: TestClient) -> None:
     body = {"name": "fluxo", "description": "Use para fluxo", "kind": "workflow"}
     wf = client.post("/api/v1/configs", json=body).json()["id"]
     assert _start(client, wf).status_code == 422
+
+
+def test_juiz_obrigatorio_e_com_saida_estruturada(client: TestClient) -> None:
+    agent = _agent(client, "precisa de juiz")
+    _case(client, agent, "tom", [{"type": "judge", "criteria": "Responde com cordialidade"}])
+    resp = _start(client, agent)
+    assert resp.status_code == 422 and "juiz" in resp.json()["detail"]
+    resp = _start(client, agent, judge_model="modelo-inexistente")
+    assert resp.status_code == 422 and "não suportado" in resp.json()["detail"]
+
+
+def test_juiz_avalia_e_consumo_da_execucao(client: TestClient) -> None:
+    agent = _agent(client, "com juiz")
+    criteria = "Cita o prazo de 30 dias"
+    _case(client, agent, "só juiz", [{"type": "judge", "criteria": criteria}])
+    _case(
+        client,
+        agent,
+        "texto e juiz",
+        [
+            {"type": "text", "kind": "contains", "value": "30 dias"},
+            {"type": "judge", "criteria": criteria, "mode": "binary"},
+        ],
+    )
+    before = client.get("/api/v1/metrics/summary").json()
+
+    run_id = _start(client, agent, judge_model=JUDGE).json()["id"]
+    run = client.get(f"/api/v1/configs/{agent}/eval-runs/{run_id}").json()
+    assert run["status"] == "completed", run
+    assert (run["passed"], run["failed"], run["not_evaluated"]) == (2, 0, 0)
+    assert run["judge_model"] == JUDGE
+    judge = run["results"][0]["checks"][0]
+    assert judge == {
+        "type": "judge",
+        "passed": True,
+        "criteria": criteria,
+        "mode": "binary",
+        "score": None,
+        "reason": "Cita o prazo de 30 dias.",
+    }
+    # dois casos de 10 tokens mais o juiz medido nos dois julgamentos
+    assert run["total_tokens"] == 2 * 10 + 2 * 7
+
+    after = client.get("/api/v1/metrics/summary").json()
+    assert after["eval_tokens"] - before["eval_tokens"] == run["total_tokens"]
+    assert after["total_tokens"] == before["total_tokens"]

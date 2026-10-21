@@ -104,6 +104,8 @@ EvalResultStatus = Literal["passed", "failed", "error", "not_evaluated"]
 class EvalRunCreate(BaseModel):
     # sem versão: o rascunho, se houver; senão, a vigente
     version_id: UUID | None = None
+    # obrigatório quando algum caso tem checagem de juiz, salvo no modo demo
+    judge_model: str | None = None
 
 
 class EvalRunSummary(BaseModel):
@@ -118,6 +120,10 @@ class EvalRunSummary(BaseModel):
     failed: int
     not_evaluated: int
     error: str | None
+    judge_model: str | None
+    # casos e juiz, somados do usage_event da execução
+    total_tokens: int
+    cost: float | None
     started_by: str
     created_at: datetime
     started_at: datetime | None

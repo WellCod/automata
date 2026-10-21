@@ -100,6 +100,20 @@ class UsageRepository:
             total_cost=cost,
         )
 
+    def eval_summary(self, *, since: datetime, until: datetime | None = None) -> UsageSummary:
+        """Consumo das suítes de teste (ADR-0015), fora do total das conversas."""
+        where_clauses = [UsageEvent.created_at >= since, UsageEvent.eval_run_id.is_not(None)]
+        if until is not None:
+            where_clauses.append(UsageEvent.created_at <= until)
+        row = self._session.execute(
+            select(
+                func.sum(UsageEvent.total_tokens).label("tokens"),
+                func.sum(UsageEvent.cost).label("cost"),
+            ).where(*where_clauses)
+        ).one()
+        cost = float(row.cost) if isinstance(row.cost, Decimal) else row.cost
+        return UsageSummary(total_tokens=int(row.tokens or 0), total_cost=cost)
+
     def usage_by_agent(
         self,
         *,
