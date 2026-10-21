@@ -5,16 +5,19 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
+from sqlalchemy import select
 
 from app.authz import Scope, require_resource_scope, require_scopes
-from app.db import SessionDep
+from app.db import SessionDep, get_db
 from app.evals.compare import compare, suite_states
 from app.evals.gate import draft_verdict, latest_run
 from app.evals.runner import execute
 from app.evals.scheduler import next_run, validate
 from app.evals.service import EvalRunRefused, check_judge, create_run
+from app.evals.suggest import suggest
 from app.models.config import AgentConfig
 from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSchedule
+from app.models.run import AgentRun
 from app.repositories.config import ConfigRepository
 from app.repositories.eval import EvalCaseRepository, EvalRunRepository, EvalScheduleRepository
 from app.schemas.eval import (
@@ -22,6 +25,7 @@ from app.schemas.eval import (
     CaseComparison,
     EvalCaseInput,
     EvalCaseResponse,
+    EvalCaseSuggestion,
     EvalComparison,
     EvalResultResponse,
     EvalRunCreate,
@@ -83,6 +87,7 @@ def to_response(case: EvalCase) -> EvalCaseResponse:
             "input": case.input,
             "context": case.context,
             "checks": case.checks,
+            "source_run_id": case.source_run_id,
             "position": case.position,
             "updated_by": case.updated_by,
             "created_at": case.created_at,
@@ -95,6 +100,46 @@ def to_response(case: EvalCase) -> EvalCaseResponse:
 def list_cases(config_id: UUID, session: SessionDep) -> list[EvalCaseResponse]:
     _config_or_404(session, config_id)
     return [to_response(c) for c in EvalCaseRepository(session).list_by_config(config_id)]
+
+
+@router.get("/suggestion", response_model=EvalCaseSuggestion, dependencies=_WRITE)
+def suggest_case(
+    config_id: UUID, run_id: str, request: Request, session: SessionDep
+) -> EvalCaseSuggestion:
+    """Caso a partir de uma conversa real: o formulário abre preenchido e nada é gravado."""
+    _testable(_config_or_404(session, config_id))
+    row = session.scalars(
+        select(AgentRun).where(AgentRun.run_id == run_id, AgentRun.agent_config_id == config_id)
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Run não encontrado neste agente")
+    if row.eval_run_id is not None:
+        raise HTTPException(status_code=422, detail="Run de teste não vira caso")
+    if row.parent_run_id is not None:
+        raise HTTPException(status_code=422, detail="Etapa de workflow não vira caso")
+    if row.status == "blocked":
+        raise HTTPException(status_code=422, detail="Run bloqueado por guardrail não vira caso")
+    # a sugestão traz a conversa: mesma regra do trace, só o dono ou admin
+    enforce = getattr(request.app.state, "enforce_scopes", False)
+    is_admin = "agent_os:admin" in (getattr(request.state, "scopes", None) or [])
+    if enforce and not is_admin and row.user_id != getattr(request.state, "user_id", None):
+        raise HTTPException(status_code=403, detail="Só quem teve a conversa ou um admin")
+    db = get_db()
+    run = db.get_run(run_id)
+    if run is None or isinstance(run, dict):
+        raise HTTPException(status_code=404, detail="A conversa deste run não está mais guardada")
+    previous = []
+    if row.session_id:
+        runs = db.get_runs(session_id=row.session_id, sort_by="created_at", sort_order="asc")
+        previous = [
+            r
+            for r in (runs if isinstance(runs, list) else [])
+            if r.run_id != run_id
+            and not getattr(r, "parent_run_id", None)
+            and (r.created_at or 0) <= (run.created_at or 0)
+        ]
+    found = suggest(run, previous)
+    return EvalCaseSuggestion.model_validate(asdict(found))
 
 
 @router.post("", response_model=EvalCaseResponse, status_code=201, dependencies=_WRITE)
@@ -114,6 +159,7 @@ def create_case(
             input=body.input,
             context=body.context,
             checks=[c.model_dump() for c in body.checks],
+            source_run_id=body.source_run_id,
             position=repo.next_position(config_id),
             updated_by=_actor(request),
         )

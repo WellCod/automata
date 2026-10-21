@@ -427,3 +427,55 @@ def test_caso_com_contexto_roda_os_turnos_anteriores_na_mesma_sessao(client: Tes
     assert by_name["lembra do pedido"]["output"] == "mensagens: 3"
     # os turnos de contexto também são runs de teste: ficam fora das conversas
     assert client.get(f"/api/v1/configs/{agent}/runs").json()["total"] == 0
+
+
+def test_caso_a_partir_de_conversa_real(client: TestClient) -> None:
+    agent = _agent(client, "conversa real")
+
+    def say(message: str) -> str:
+        resp = client.post(
+            f"/agents/{agent}/runs",
+            data={"message": message, "stream": "false", "session_id": "conversa-1"},
+        )
+        assert resp.status_code == 200, resp.text
+        return str(resp.json()["run_id"])
+
+    say("oi, preciso trocar um produto")
+    run_id = say("meu CPF é 529.982.247-25")
+
+    resp = client.get(f"/api/v1/configs/{agent}/eval-cases/suggestion", params={"run_id": run_id})
+    assert resp.status_code == 200, resp.text
+    found = resp.json()
+    assert found["input"] == "meu CPF é [CPF removido]"
+    assert found["context"] == ["oi, preciso trocar um produto"]
+    assert found["source_run_id"] == run_id
+    assert REPLY in found["judge_criteria"]
+
+    saved = client.post(
+        f"/api/v1/configs/{agent}/eval-cases",
+        json={k: found[k] for k in ("name", "input", "context", "checks", "source_run_id")},
+    )
+    assert saved.status_code == 201, saved.text
+    assert saved.json()["source_run_id"] == run_id
+
+    missing = client.get(
+        f"/api/v1/configs/{agent}/eval-cases/suggestion", params={"run_id": "nao-existe"}
+    )
+    assert missing.status_code == 404
+    # run da própria suíte não vira caso
+    started = _start(client, agent).json()
+    result = client.get(f"/api/v1/configs/{agent}/eval-runs/{started['id']}").json()["results"][0]
+    from sqlalchemy import create_engine, text
+
+    with create_engine(os.environ["DATABASE_URL"]).connect() as conn:
+        eval_run_id = conn.execute(
+            text(
+                "SELECT run_id FROM agent_run "
+                "WHERE eval_run_id IS NOT NULL AND session_id = :s LIMIT 1"
+            ),
+            {"s": result["session_id"]},
+        ).scalar_one()
+    from_eval = client.get(
+        f"/api/v1/configs/{agent}/eval-cases/suggestion", params={"run_id": eval_run_id}
+    )
+    assert from_eval.status_code == 422
