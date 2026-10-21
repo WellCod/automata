@@ -581,7 +581,7 @@ if __name__ == "__main__":
 | 16 — Evals no painel | #118–#125 | Casos de teste por agente e time, juiz por LLM, regressão entre versões e gate de publicação | Fases 13 e 14 |
 | 17 — Evals contínuos | #127, #130–#140 | Suíte disparada por token de integração, agendamento e casos a partir de conversas reais | Fase 16 |
 | 18 — Recuperação por base | #143–#148 | Reranker do Agno (MMR e recência) e HyDE medido por base de conhecimento | Fases 13 e 17 |
-| 19 — Avisos de regressão | #149 em diante | Webhook assinado do agendamento nas mudanças de estado da suíte | Fase 17 |
+| 19 — Avisos de regressão | #149–#153 | Webhook assinado do agendamento nas mudanças de estado da suíte | Fase 17 |
 
 Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
 
@@ -933,11 +933,11 @@ Fica para depois: reranker por cross-encoder (Cohere, Bedrock), estratégia por 
 
 Decisão em [ADR-0018](adr/0018-avisos-de-regressao.md). Cada agendamento da suíte pode ter um webhook assinado, chamado só quando o estado muda: regrediu, passou a falhar ou se recuperou. O corpo traz um `text` em português, que Slack, Teams e Discord leem sem adaptador.
 
-- [ ] #149 — `docs(adr)`: ADR-0018 e esta seção
+- [x] #149 — `docs(adr)`: ADR-0018 e esta seção
 - [x] `feat(api)`: webhook do agendamento com URL e segredo cifrados, saída pelo `check_url` e evento de teste (migration 0029)
 - [x] `feat(api)`: aviso nas mudanças de estado da suíte agendada, com assinatura HMAC e até 3 tentativas
 - [x] `feat(web)`: webhook na seção de agendamento da aba Testes, com segredo mostrado uma vez, teste e último resultado
-- [ ] `test(api)`: evals das transições de estado e da assinatura
+- [x] `test(api)`: evals das transições de estado e da assinatura. `test_evals_avisos.py` sem banco nem rede
 
 **Critério de aceite da fase:**
 
