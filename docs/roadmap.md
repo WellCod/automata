@@ -1012,7 +1012,7 @@ Decisão em [ADR-0022](adr/0022-suite-de-workflow-e-bloqueio.md). Workflow ganha
 - [x] `feat(api)`: checagem `blocked` com regra opcional, lida do registro de bloqueios do run, já no formulário de caso do painel
 - [x] `feat(api)`: suíte para workflow com checagem de etapas, gate e agendamento
 - [x] `feat(web)`: aba de testes no workflow com checagem de etapas
-- [ ] `test(api)`: evals da checagem de bloqueio e da suíte de workflow
+- [x] `test(api)`: evals da checagem de bloqueio e da suíte de workflow, com suíte de exemplo no workflow do seed
 
 **Critério de aceite da fase:**
 
