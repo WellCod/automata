@@ -26,6 +26,14 @@ const base = {
   embedder_model: "voyage-3.5",
   dimensions: 1024,
   chunk_size: 2000,
+  retrieval: {
+    reranker: "none",
+    mmr_lambda: 0.5,
+    recency_half_life_days: 30,
+    recency_weight: 0.3,
+    hyde: false,
+    hyde_model: null,
+  },
   embedding_tokens: 1200,
   embedding_cost: 0.000072,
   updated_by: "editor",
@@ -185,5 +193,68 @@ describe("KnowledgeBasePage", () => {
 
     expect(await screen.findByText(/assistente-rh/)).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it("salva a estratégia de busca junto da base", async () => {
+    mockGet();
+    vi.mocked(client.PUT).mockResolvedValue({ data: base, error: undefined } as never);
+    render(<KnowledgeBasePage />, { wrapper });
+    await userEvent.click(await screen.findByRole("tab", { name: /configuração/i }));
+    await userEvent.selectOptions(screen.getByLabelText("Reordenação dos trechos"), "mmr");
+    expect(screen.getByText(/Evita trechos repetidos/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^salvar$/i }));
+
+    await waitFor(() => expect(client.PUT).toHaveBeenCalled());
+    const [, opts] = vi.mocked(client.PUT).mock.calls[0] as unknown as [
+      string,
+      { body: { retrieval: { reranker: string; mmr_lambda: number } } },
+    ];
+    expect(opts.body.retrieval).toMatchObject({ reranker: "mmr", mmr_lambda: 0.5 });
+  });
+
+  it("compara a estratégia com a busca simples lado a lado", async () => {
+    const withMmr = { ...base, retrieval: { ...base.retrieval, reranker: "mmr", hyde: true } };
+    vi.mocked(client.GET).mockImplementation(async (path: string) => {
+      if (path.endsWith("/contents")) return { data: [content({})], error: undefined } as never;
+      return { data: withMmr, error: undefined } as never;
+    });
+    const hit = (name: string) => ({
+      content_id: name,
+      content_name: name,
+      source: null,
+      text: `trecho de ${name}`,
+      score: 0.5,
+    });
+    vi.mocked(client.POST).mockResolvedValue({
+      data: {
+        with_strategy: {
+          hits: [hit("politica"), hit("garantia")],
+          searched: "Produtos usados não podem ser devolvidos.",
+          hyde_tokens: 42,
+        },
+        without_strategy: {
+          hits: [hit("politica"), hit("politica (copia)")],
+          searched: "posso devolver?",
+          hyde_tokens: 0,
+        },
+        retrieval: withMmr.retrieval,
+      },
+      error: undefined,
+    } as never);
+    render(<KnowledgeBasePage />, { wrapper });
+    await userEvent.click(await screen.findByRole("tab", { name: /busca de teste/i }));
+    // com estratégia gravada, a comparação já vem marcada
+    expect(screen.getByRole("checkbox", { name: /comparar/i })).toBeChecked();
+    await userEvent.type(screen.getByLabelText("Pergunta"), "posso devolver?");
+    await userEvent.click(screen.getByRole("button", { name: /^buscar$/i }));
+
+    const comStrategia = await screen.findByRole("region", { name: "Com a estratégia da base" });
+    expect(within(comStrategia).getByText("trecho de garantia")).toBeInTheDocument();
+    expect(within(comStrategia).getByText(/HyDE: 42 tokens/)).toBeInTheDocument();
+    const simples = screen.getByRole("region", { name: "Busca simples" });
+    expect(within(simples).getByText("trecho de politica (copia)")).toBeInTheDocument();
+    expect(vi.mocked(client.POST).mock.calls.at(-1)![0]).toBe(
+      "/api/v1/knowledge-bases/{base_id}/search/compare",
+    );
   });
 });

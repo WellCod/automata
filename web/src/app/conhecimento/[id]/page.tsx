@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { DEFAULT_RETRIEVAL, RetrievalFields } from "@/components/retrieval-settings";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,7 +15,10 @@ import { apiErrorMessage } from "@/lib/api/errors";
 import {
   type KnowledgeBase,
   type KnowledgeContent,
+  type RetrievalSettings,
+  type SearchComparison,
   type SearchHit,
+  type SearchResult,
   uploadFile,
   useKnowledgeBase,
   useKnowledgeContents,
@@ -308,18 +312,74 @@ function Documents({ baseId }: { baseId: string }) {
   );
 }
 
-function TestSearch({ baseId }: { baseId: string }) {
+function HitList({ hits }: { hits: SearchHit[] }) {
+  if (hits.length === 0)
+    return <p className="text-muted-foreground text-[13px]">Nada encontrado.</p>;
+  return (
+    <ol className="flex flex-col gap-2">
+      {hits.map((hit, i) => (
+        <li key={i} className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-foreground text-[13px] font-medium">
+              {hit.content_name ?? hit.source ?? "documento"}
+            </span>
+            {hit.score !== null && (
+              <span className="text-muted-foreground text-[11px]">
+                relevância {Math.round(hit.score * 100)}%
+              </span>
+            )}
+          </div>
+          <p className="text-muted-foreground text-[13px] whitespace-pre-line">{hit.text}</p>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function ResultColumn({ title, result }: { title: string; result: SearchResult }) {
+  return (
+    <section aria-label={title} className="flex min-w-0 flex-col gap-2">
+      <h3 className="text-foreground text-[13px] font-medium">{title}</h3>
+      {result.hyde_tokens > 0 && (
+        <p className="text-muted-foreground text-[11px]">
+          HyDE: {result.hyde_tokens.toLocaleString("pt-BR")} tokens · buscou com &ldquo;
+          {result.searched.length > 160 ? `${result.searched.slice(0, 160)}…` : result.searched}
+          &rdquo;
+        </p>
+      )}
+      <HitList hits={result.hits} />
+    </section>
+  );
+}
+
+function hasStrategy(base: KnowledgeBase): boolean {
+  return base.retrieval.reranker !== "none" || base.retrieval.hyde;
+}
+
+function TestSearch({ base }: { base: KnowledgeBase }) {
   const [query, setQuery] = useState("");
+  const [compare, setCompare] = useState(hasStrategy(base));
   const search = useMutation({
     mutationFn: async (): Promise<SearchHit[]> => {
       const res = await client.POST("/api/v1/knowledge-bases/{base_id}/search", {
-        params: { path: { base_id: baseId } },
+        params: { path: { base_id: base.id } },
         body: { query, max_results: 5 },
       });
       if (res.error) throw new Error(apiErrorMessage(res.error, "Falha na busca"));
       return res.data!;
     },
   });
+  const comparison = useMutation({
+    mutationFn: async (): Promise<SearchComparison> => {
+      const res = await client.POST("/api/v1/knowledge-bases/{base_id}/search/compare", {
+        params: { path: { base_id: base.id } },
+        body: { query, max_results: 5 },
+      });
+      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha na busca"));
+      return res.data!;
+    },
+  });
+  const active = compare ? comparison : search;
 
   return (
     <div className="flex flex-col gap-4">
@@ -330,7 +390,7 @@ function TestSearch({ baseId }: { baseId: string }) {
         className="flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (query.trim()) search.mutate();
+          if (query.trim()) active.mutate();
         }}
       >
         <input
@@ -340,39 +400,25 @@ function TestSearch({ baseId }: { baseId: string }) {
           aria-label="Pergunta"
           className={inputCls}
         />
-        <Button type="submit" variant="strong" disabled={search.isPending || !query.trim()}>
-          {search.isPending ? "Buscando…" : "Buscar"}
+        <Button type="submit" variant="strong" disabled={active.isPending || !query.trim()}>
+          {active.isPending ? "Buscando…" : "Buscar"}
         </Button>
       </form>
-      {search.isError && (
+      <label className="text-muted-foreground flex items-center gap-2 text-[12px]">
+        <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} />
+        Comparar a estratégia da base com a busca simples
+      </label>
+      {active.isError && (
         <p className="text-destructive text-[13px]" role="alert">
-          {search.error.message}
+          {active.error.message}
         </p>
       )}
-      {search.data && search.data.length === 0 && (
-        <p className="text-muted-foreground text-[13px]">Nada encontrado.</p>
-      )}
-      {search.data && search.data.length > 0 && (
-        <ol className="flex flex-col gap-2">
-          {search.data.map((hit, i) => (
-            <li
-              key={i}
-              className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-foreground text-[13px] font-medium">
-                  {hit.content_name ?? hit.source ?? "documento"}
-                </span>
-                {hit.score !== null && (
-                  <span className="text-muted-foreground text-[11px]">
-                    relevância {Math.round(hit.score * 100)}%
-                  </span>
-                )}
-              </div>
-              <p className="text-muted-foreground text-[13px] whitespace-pre-line">{hit.text}</p>
-            </li>
-          ))}
-        </ol>
+      {!compare && search.data && <HitList hits={search.data} />}
+      {compare && comparison.data && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <ResultColumn title="Com a estratégia da base" result={comparison.data.with_strategy} />
+          <ResultColumn title="Busca simples" result={comparison.data.without_strategy} />
+        </div>
       )}
     </div>
   );
@@ -384,13 +430,17 @@ function Settings({ base }: { base: KnowledgeBase }) {
   const [name, setName] = useState(base.name);
   const [description, setDescription] = useState(base.description);
   const [chunkSize, setChunkSize] = useState(base.chunk_size);
+  const [retrieval, setRetrieval] = useState<RetrievalSettings>({
+    ...DEFAULT_RETRIEVAL,
+    ...base.retrieval,
+  });
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const save = useMutation({
     mutationFn: async () => {
       const res = await client.PUT("/api/v1/knowledge-bases/{base_id}", {
         params: { path: { base_id: base.id } },
-        body: { name, description, chunk_size: chunkSize },
+        body: { name, description, chunk_size: chunkSize, retrieval },
       });
       if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar"));
     },
@@ -460,6 +510,13 @@ function Settings({ base }: { base: KnowledgeBase }) {
             className={inputCls}
           />
           <FieldDescription>Vale para documentos enviados depois da mudança.</FieldDescription>
+        </Field>
+        <Field>
+          <RetrievalFields value={retrieval} onChange={setRetrieval} />
+          <FieldDescription>
+            Vale para todos os agentes que usam esta base, já na próxima busca. Compare na aba Busca
+            de teste antes de salvar.
+          </FieldDescription>
         </Field>
       </FieldGroup>
       <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-[13px]">
@@ -569,7 +626,7 @@ export default function KnowledgeBasePage() {
               <Documents baseId={base.id} />
             </TabsContent>
             <TabsContent value="busca" className="pt-5">
-              <TestSearch baseId={base.id} />
+              <TestSearch key={JSON.stringify(base.retrieval)} base={base} />
             </TabsContent>
             <TabsContent value="config" className="pt-5">
               <Settings base={base} />
