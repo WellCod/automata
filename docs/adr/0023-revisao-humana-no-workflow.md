@@ -42,7 +42,7 @@ No código atual:
 - `on_reject`: `skip`, `cancel` ou `retry`. `retry` só vale com `after`, e a etapa roda de novo com o motivo da recusa, até 3 vezes;
 - `timeout_hours`: de 1 a 168, vazio = sem prazo. Vencido, o workflow é cancelado.
 
-**Só em etapa fora de paralelo e de laço.** Uma pausa num ramo paralelo ou numa volta de laço deixaria o resto do contêiner num estado que o painel não consegue mostrar com clareza. A validação na escrita recusa (422). Etapa dentro de condição pode ter revisão.
+**Só em etapa do nível principal do workflow.** Verificado no 3.1.8: a revisão de uma etapa dentro de condição não pausa, e o fluxo segue como se ela não existisse. Uma pausa num ramo paralelo ou numa volta de laço deixaria o resto do contêiner num estado que o painel não consegue mostrar com clareza. A validação na escrita recusa revisão dentro de qualquer contêiner (422), para não prometer uma aprovação que não acontece.
 
 **O que está pendente fica no `agent_run`.** O run pausado do workflow ganha `pending_steps` com um resumo por requisito ativo:
 
@@ -63,7 +63,7 @@ No código atual:
 
 - **Rota própria de aprovação que chama o workflow.** Repetiria o controle de acesso e o gate de aprovação do AgentOS, e duas rotas para continuar o mesmo run dariam corrida entre elas.
 - **Guardar os requisitos completos no `agent_run`.** O `StepRequirement` carrega o `step_input` com a sessão do workflow, que pode ser grande e repetiria dado que já está no banco do Agno.
-- **Revisão em ramo paralelo e em laço.** O Agno aceita revisão por volta de laço (`requires_iteration_review`). Ela fica para quando houver um uso claro. Pausar um ramo e seguir os outros é um modelo de execução diferente.
+- **Revisão dentro de condição, ramo paralelo e laço.** Na condição, o Agno 3.1.8 ignora a revisão da etapa interna. O Agno aceita revisão por volta de laço (`requires_iteration_review`). Ela fica para quando houver um uso claro. Pausar um ramo e seguir os outros é um modelo de execução diferente.
 - **Editar a saída na aprovação (`edited_output`).** É útil, mas pede editor e diff na página Aprovações. Fica para depois. Por enquanto a recusa com motivo e `retry` cobre a correção.
 
 ## Consequências
@@ -77,4 +77,5 @@ No código atual:
 ## O que me faria reverter
 
 - O AgentOS mudar o contrato do `continue` de workflow, por exemplo passando a mesclar requisitos por `step_id` em vez de substituir a lista. Nesse caso, o painel manda só o requisito decidido.
+- O Agno passar a pausar etapa dentro de condição. Nesse caso, a revisão passa a valer também ali.
 - Pedido recorrente de revisão em ramo paralelo. Nesse caso, a pausa passa a valer por ramo, com o contêiner esperando todos.

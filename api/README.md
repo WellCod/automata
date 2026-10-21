@@ -288,7 +288,7 @@ Validação na escrita:
 - o workflow não termina num `parallel`;
 - agentes e times existem, estão publicados e a versão fixada é publicada e deles;
 - agente (ou membro de time) com tool de confirmação humana não entra em workflow;
-- `review` só em etapa fora de `parallel` e de `loop`. Dentro de `condition`, vale.
+- `review` só em etapa do nível principal: dentro de `condition` o Agno 3.1.8 não pausa, e em `parallel` e `loop` a pausa deixaria o contêiner num estado que o painel não mostra.
 
 Execução (`app/agents/workflow_factory.py`):
 - `WorkflowFactory` por request, registrada em `os.workflows` sem restart, como agentes e times. Roda em `POST /workflows/{id}/runs` e exige `workflows:run` (editor e owner); o viewer tem `workflows:read`.
