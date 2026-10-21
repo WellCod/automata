@@ -66,6 +66,8 @@ A base **Políticas de atendimento** (troca e devolução, prazos de entrega, ga
 
 O **Atendimento ao Cliente** vem com quatro casos na aba **Testes**: responde a saudação, não promete prazo sem confirmar, consulta a política de troca (tool `buscar_politicas_atendimento` e texto) e tom cordial com cliente irritado (juiz). Na demo, os dois primeiros passam, o da política falha porque as respostas gravadas não chamam a busca e o do juiz aparece como não avaliado, já que o juiz não roda sem modelo real. Rode a suíte no rascunho e na vigente para ver a comparação, e ligue o gate para ver a publicação bloqueada.
 
+Na demo, o agendamento pode ser salvo e mostra o próximo horário, mas não dispara: o laço do agendador fica desligado no modo replay. Para ver um caso nascer de uma conversa, mande duas mensagens no modo teste, abra o run em **Execuções** e clique em **Virar caso de teste**.
+
 ### Histórico de execuções
 
 500 runs distribuídos nos últimos 90 dias com:

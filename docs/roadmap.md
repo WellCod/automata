@@ -579,7 +579,7 @@ if __name__ == "__main__":
 | Usuários e redesign | #97, #100 | Gestão de usuários, tema claro e escuro | — |
 | 15 — Workflows | #108–#114 | Etapas em sequência, paralelo, condição e loop sobre agentes e times | Fases 12 e 14 |
 | 16 — Evals no painel | #118–#125 | Casos de teste por agente e time, juiz por LLM, regressão entre versões e gate de publicação | Fases 13 e 14 |
-| 17 — Evals contínuos | #127 em diante | Suíte disparada por token de integração, agendamento e casos a partir de conversas reais | Fase 16 |
+| 17 — Evals contínuos | #127, #130–#140 | Suíte disparada por token de integração, agendamento e casos a partir de conversas reais | Fase 16 |
 
 Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
 
@@ -891,7 +891,7 @@ Pré-requisito: Agno 3.1.x (#128 e #129).
 - [x] `feat(api)`: sugestão de caso a partir de um run real. Leitura em `agno_runs`, entrada e contexto mascarados, tools chamadas e critério de rascunho, `source_run_id` no `eval_case`
 - [x] `feat(web)`: agendamento e origem das execuções na aba Testes, estado da suíte na lista, suíte na emissão de tokens de integração
 - [x] `feat(web)`: "Virar caso de teste" no histórico de execuções e na árvore de execução. Formulário de caso com mensagens anteriores, avisos e critério sugerido do juiz
-- [ ] `test(api)`: evals do agendamento, do escopo por recurso e da sugestão de caso, e exemplo de job de CI na documentação
+- [x] `test(api)`: evals do agendamento, do escopo por recurso e da sugestão de caso, e exemplo de job de CI na documentação. `test_evals_continuos.py` sem banco nem LLM; o passo de CI com `curl` e `verdict` está no README da API
 
 **Critério de aceite da fase:**
 
