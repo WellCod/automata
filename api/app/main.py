@@ -9,7 +9,6 @@ from agno.agent.factory import AgentFactory
 from agno.agent.protocol import AgentProtocol
 from agno.agent.remote import RemoteAgent
 from agno.db.postgres import PostgresDb
-from agno.job_queue.config import QueueConfig
 from agno.os import AgentOS
 from agno.os.authz import Authorization
 from agno.os.config import MCPConfig
@@ -26,6 +25,7 @@ from app.agents.factory import make_agent_factory, make_team_factory
 from app.agents.models_map import demo_replay
 from app.agents.registry import PublishedAgents
 from app.agents.workflow_factory import make_workflow_factory
+from app.background import background_queue
 from app.evals.runner import fail_stale as fail_stale_evals
 from app.evals.scheduler import run_forever as run_scheduled_evals
 from app.integrations import RevocationMiddleware, RevokedTokens
@@ -37,7 +37,7 @@ from app.rate_limit import make_rate_limiter
 from app.routers import PROTECTED_ROUTERS
 from app.routers.auth import router as auth_router
 from app.routers.health import router as health_router
-from app.settings import Settings, get_settings
+from app.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -117,27 +117,6 @@ def _lifespan_for(protected: FastAPI) -> Callable[[FastAPI], AbstractAsyncContex
                         await task
 
     return lifespan
-
-
-# fixos no código, não por variável: o Agno exige o mesmo valor em todas as réplicas
-QUEUE_TIMEOUT_S = 900
-QUEUE_MAX_ATTEMPTS = 1
-
-
-def background_queue(settings: Settings) -> QueueConfig | None:
-    """Fila durável dos runs em background (ADR-0020); None deixa as tasks em memória.
-
-    Uma tentativa: o agente pode ter chamado tool com efeito antes de cair, e rodar de
-    novo sozinho repetiria o efeito. Com Redis, cancelar e acompanhar valem entre réplicas.
-    """
-    if not settings.background_queue_durable:
-        return None
-    return QueueConfig(
-        durable=True,
-        max_attempts=QUEUE_MAX_ATTEMPTS,
-        timeout_seconds=QUEUE_TIMEOUT_S,
-        redis=settings.redis_url or None,
-    )
 
 
 def _fail_stale_evals() -> None:
