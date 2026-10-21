@@ -20,6 +20,9 @@ REPLY = "Prazo de troca: 30 dias corridos a partir do recebimento."
 
 
 def _model(model_id: str, *_: Any, **__: Any) -> FixedReplyModel:
+    # versão "piorada" para a regressão agendada: perde o prazo
+    if model_id == "claude-sonnet-4-6":
+        return FixedReplyModel(id=model_id, reply="Não sei informar.", tokens=10)
     return FixedReplyModel(id=model_id, reply=REPLY, tokens=10)
 
 
@@ -182,3 +185,65 @@ def test_desligar_e_apagar(client: TestClient) -> None:
 
     assert client.delete(f"/api/v1/configs/{agent}/eval-schedule").status_code == 204
     assert client.get(f"/api/v1/configs/{agent}/eval-schedule").status_code == 404
+
+
+def _tick(agent: str) -> str:
+    """Um horário vencido: o poller cria a execução e ela roda até o fim."""
+    import asyncio
+
+    from app.evals import scheduler
+    from app.evals.runner import execute
+
+    _due(agent)
+    started = scheduler.poll_once()
+    assert len(started) == 1
+    asyncio.run(execute(started[0]))
+    return str(started[0])
+
+
+def _status(client: TestClient, agent: str) -> dict[str, Any]:
+    states = {s["config_id"]: s for s in client.get("/api/v1/eval-status").json()}
+    return states[agent]
+
+
+def test_regressao_agendada_aparece_no_estado_da_suite(client: TestClient) -> None:
+    agent = _agent(client, "regride")
+    client.put(f"/api/v1/configs/{agent}/eval-schedule", json={"cron_expr": "0 8 * * *"})
+
+    first = _tick(agent)
+    status = _status(client, agent)
+    assert (status["state"], status["regressions"]) == ("passing", 0)
+    assert status["last_run"]["id"] == first
+
+    # a vigente muda por fora do teste (aqui, o modelo) e perde o prazo
+    body = {"name": "regride", "description": "Use para regride"}
+    client.put(
+        f"/api/v1/configs/{agent}/draft",
+        json={**body, "payload": {"model_id": "claude-sonnet-4-6"}},
+    ).raise_for_status()
+    client.post(f"/api/v1/configs/{agent}/publish").raise_for_status()
+
+    second = _tick(agent)
+    status = _status(client, agent)
+    assert (status["state"], status["regressions"]) == ("regressed", 1)
+    assert (status["last_run"]["id"], status["previous_run_id"]) == (second, first)
+    compared = client.get(
+        f"/api/v1/configs/{agent}/eval-runs/compare", params={"base": first, "target": second}
+    ).json()
+    assert [c["change"] for c in compared["cases"]] == ["regression"]
+
+
+def test_falha_sem_passado_verde_e_so_falhando(client: TestClient) -> None:
+    agent = _agent(client, "sempre falhou")
+    body = {"name": "sempre falhou", "description": "Use para sempre falhou"}
+    client.put(
+        f"/api/v1/configs/{agent}/draft",
+        json={**body, "payload": {"model_id": "claude-sonnet-4-6"}},
+    ).raise_for_status()
+    client.post(f"/api/v1/configs/{agent}/publish").raise_for_status()
+    client.put(f"/api/v1/configs/{agent}/eval-schedule", json={"cron_expr": "0 8 * * *"})
+
+    _tick(agent)
+    _tick(agent)
+    status = _status(client, agent)
+    assert (status["state"], status["regressions"]) == ("failing", 0)

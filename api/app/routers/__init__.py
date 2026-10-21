@@ -6,6 +6,7 @@ from app.routers.evals import router as evals_router
 from app.routers.evals import runs_router as eval_runs_router
 from app.routers.evals import schedule_router as eval_schedule_router
 from app.routers.evals import settings_router as eval_settings_router
+from app.routers.evals import status_router as eval_status_router
 from app.routers.integrations import router as integrations_router
 from app.routers.knowledge_bases import router as knowledge_bases_router
 from app.routers.knowledge_contents import router as knowledge_contents_router
@@ -28,6 +29,7 @@ PROTECTED_ROUTERS: list[APIRouter] = [
     eval_runs_router,
     eval_schedule_router,
     eval_settings_router,
+    eval_status_router,
     integrations_router,
     knowledge_bases_router,
     knowledge_contents_router,

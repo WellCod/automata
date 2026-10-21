@@ -267,6 +267,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/eval-status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Suite Status
+     * @description Estado da suíte de cada config que já rodou: para a lista de agentes e times.
+     */
+    get: operations["list_suite_status_api_v1_eval_status_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/integrations": {
     parameters: {
       query?: never;
@@ -1512,6 +1532,24 @@ export interface components {
     EvalSettingsInput: {
       /** Require Passing Evals */
       require_passing_evals: boolean;
+    };
+    /** EvalSuiteStatus */
+    EvalSuiteStatus: {
+      /**
+       * Config Id
+       * Format: uuid
+       */
+      config_id: string;
+      /**
+       * State
+       * @enum {string}
+       */
+      state: "running" | "passing" | "failing" | "regressed";
+      last_run: components["schemas"]["EvalRunSummary"];
+      /** Previous Run Id */
+      previous_run_id: string | null;
+      /** Regressions */
+      regressions: number;
     };
     /** GlobalMetricsSummary */
     GlobalMetricsSummary: {
@@ -3113,6 +3151,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_suite_status_api_v1_eval_status_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvalSuiteStatus"][];
         };
       };
     };
