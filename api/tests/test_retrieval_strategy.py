@@ -228,3 +228,20 @@ def test_hyde_exige_modelo_da_matriz(client: TestClient) -> None:
         json={**body, "retrieval": {"hyde": True, "hyde_model": "modelo-inventado"}},
     )
     assert fora.status_code == 422
+
+
+def test_busca_de_teste_compara_com_e_sem_estrategia(client: TestClient) -> None:
+
+    base = _base(DOCS, {"reranker": "mmr", "mmr_lambda": 0.3})
+    resp = client.post(
+        f"/api/v1/knowledge-bases/{base.id}/search/compare",
+        json={"query": "prazo de troca com nota fiscal", "max_results": 2},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["retrieval"]["reranker"] == "mmr"
+    without = {h["content_name"] for h in body["without_strategy"]["hits"]}
+    with_ = {h["content_name"] for h in body["with_strategy"]["hits"]}
+    assert without == {"politica de troca", "politica de troca (copia)"}
+    assert "politica de garantia" in with_
+    assert body["with_strategy"]["hyde_tokens"] == 0

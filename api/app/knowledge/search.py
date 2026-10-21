@@ -90,13 +90,19 @@ def _record_hyde(caller: Caller, model_id: str, usage: JudgeUsage) -> None:
 
 
 def search(
-    base: KnowledgeBase, query: str, limit: int, *, caller: Caller | None = None
+    base: KnowledgeBase,
+    query: str,
+    limit: int,
+    *,
+    caller: Caller | None = None,
+    plain: bool = False,
 ) -> SearchOutcome:
-    searched, usage, hyde_model = _hyde(base, query)
+    """`plain` ignora a estratégia da base: é o lado "sem" da comparação da busca de teste."""
+    searched, usage, hyde_model = (query, None, None) if plain else _hyde(base, query)
     if usage is not None and hyde_model is not None and caller is not None:
         _record_hyde(caller, hyde_model, usage)
     hyde_tokens = usage.total_tokens if usage is not None else 0
-    reranker = reranker_for(base)
+    reranker = None if plain else reranker_for(base)
     vector_db = vector_db_for(base, "query", with_dates=reranker is not None)
     if not vector_db.table_exists():
         return SearchOutcome([], searched, hyde_tokens)

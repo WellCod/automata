@@ -107,9 +107,26 @@ class SearchInput(BaseModel):
     max_results: int = Field(default=5, ge=1, le=20)
 
 
+class SearchResult(BaseModel):
+    hits: list["SearchHit"]
+    # texto que foi de fato buscado: com HyDE, a resposta hipotética
+    searched: str
+    # tokens do HyDE nesta busca; na busca de teste não são atribuídos a agente nenhum
+    hyde_tokens: int
+
+
+class SearchComparison(BaseModel):
+    with_strategy: SearchResult
+    without_strategy: SearchResult
+    retrieval: RetrievalSettings
+
+
 class SearchHit(BaseModel):
     content_id: UUID | None
     content_name: str | None
     source: str | None
     text: str
     score: float | None = Field(description="Combina similaridade e full-text, de 0 a 1")
+
+
+SearchResult.model_rebuild()
