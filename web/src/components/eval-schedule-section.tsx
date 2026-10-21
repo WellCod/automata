@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useEvalMutations, useEvalSchedule } from "@/lib/api/evals";
 import { type EvalRunSummary, SCHEDULE_PRESETS } from "@/lib/eval-checks";
+import { EvalWebhook } from "@/components/eval-webhook";
 import { Button } from "@/components/ui/button";
 
 const selectCls =
@@ -131,6 +132,7 @@ export function EvalScheduleSection({ configId, needsJudge, judgeModels, lastRun
           {schedule.last_attempt_at && ` · último horário: ${when(schedule.last_attempt_at)}`}
         </p>
       )}
+      {schedule && <EvalWebhook configId={configId} schedule={schedule} />}
       {schedule?.last_error && (
         <p className="text-destructive text-[12px]">
           O último horário não rodou: {schedule.last_error}.
