@@ -170,3 +170,68 @@ def test_webhook_sem_agendamento(client: TestClient, receiver: Receiver) -> None
     resp = client.put(f"/api/v1/configs/{agent}/eval-schedule/webhook", json={"url": receiver.url})
     assert resp.status_code == 404
     assert resp.json()["detail"] == "Crie o agendamento antes do webhook"
+
+
+def _tick(agent: str) -> str | None:
+    """Um horário vencido: roda a execução agendada e o aviso, como o poller faz."""
+    import asyncio
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import update
+    from sqlalchemy.orm import Session
+
+    from app.db import get_engine
+    from app.evals import scheduler
+    from app.evals.notify import notify_after
+    from app.evals.runner import execute
+    from app.models.eval import EvalSchedule
+
+    with Session(get_engine()) as session:
+        session.execute(
+            update(EvalSchedule)
+            .where(EvalSchedule.agent_config_id == agent)
+            .values(next_run_at=datetime.now(UTC) - timedelta(minutes=1))
+        )
+        session.commit()
+    (run_id,) = scheduler.poll_once()
+    asyncio.run(execute(run_id))
+    return notify_after(run_id)
+
+
+def _set_check(client: TestClient, agent: str, check: dict[str, Any]) -> None:
+    case = client.get(f"/api/v1/configs/{agent}/eval-cases").json()[0]
+    client.put(
+        f"/api/v1/configs/{agent}/eval-cases/{case['id']}",
+        json={"name": case["name"], "input": case["input"], "checks": [check]},
+    ).raise_for_status()
+
+
+def test_avisa_so_nas_mudancas_de_estado(client: TestClient, receiver: Receiver) -> None:
+    agent = _scheduled_agent(client, "transicoes")
+    client.put(
+        f"/api/v1/configs/{agent}/eval-schedule/webhook", json={"url": receiver.url}
+    ).raise_for_status()
+    sent = len(receiver.requests)
+
+    # primeira agendada verde: nada a avisar
+    assert _tick(agent) is None
+    # o caso que passava passa a falhar
+    _set_check(client, agent, {"type": "text", "kind": "contains", "value": "palavra-ausente"})
+    assert _tick(agent) == "suite.regressed"
+    regressed = json.loads(receiver.requests[-1]["body"])
+    assert regressed["regressions"] == ["responde"]
+    assert "regrediu" in regressed["text"] and "transicoes" in regressed["text"]
+    # mesmo estado na execução seguinte: silêncio
+    assert _tick(agent) is None
+    _set_check(client, agent, {"type": "text", "kind": "not_empty"})
+    assert _tick(agent) == "suite.recovered"
+    assert json.loads(receiver.requests[-1]["body"])["event"] == "suite.recovered"
+    assert len(receiver.requests) == sent + 2
+    schedule = client.get(f"/api/v1/configs/{agent}/eval-schedule").json()
+    assert schedule["webhook_last_status"] == "HTTP 200"
+
+
+def test_sem_webhook_nao_avisa(client: TestClient) -> None:
+    agent = _scheduled_agent(client, "sem webhook")
+    _set_check(client, agent, {"type": "text", "kind": "contains", "value": "palavra-ausente"})
+    assert _tick(agent) is None
