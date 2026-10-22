@@ -87,7 +87,8 @@ def test_refazer_so_na_revisao_da_saida() -> None:
                     "steps": [_step("dentro", review={"when": "before"})],
                 },
             ],
-            True,
+            # o Agno 3.1.8 não pausa etapa dentro de condição
+            False,
         ),
         (
             [
@@ -119,11 +120,11 @@ def test_refazer_so_na_revisao_da_saida() -> None:
         ),
     ],
 )
-def test_revisao_fora_de_paralelo_e_de_laco(steps: list[dict[str, Any]], ok: bool) -> None:
+def test_revisao_so_no_nivel_principal(steps: list[dict[str, Any]], ok: bool) -> None:
     if ok:
         WorkflowSettings.model_validate({"steps": steps})
     else:
-        with pytest.raises(ValidationError, match="fora de paralelo e de laço"):
+        with pytest.raises(ValidationError, match="nível principal"):
             WorkflowSettings.model_validate({"steps": steps})
 
 
