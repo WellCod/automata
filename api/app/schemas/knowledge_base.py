@@ -79,6 +79,12 @@ class EmbedderInfo(BaseModel):
 class UrlContentInput(BaseModel):
     url: HttpUrl
     name: str | None = Field(default=None, max_length=255)
+    # baixa de novo nesse intervalo e reindexa se mudou (ADR-0024); vazio = nunca
+    refresh_every_hours: int | None = Field(default=None, ge=1, le=168)
+
+
+class ContentScheduleInput(BaseModel):
+    refresh_every_hours: int | None = Field(default=None, ge=1, le=168)
 
 
 class TextContentInput(BaseModel):
@@ -103,6 +109,8 @@ class KnowledgeContentResponse(BaseModel):
     # conteúdo de conector (ADR-0024): o conector e o caminho na origem
     connector_id: UUID | None = None
     external_path: str | None = None
+    refresh_every_hours: int | None = None
+    next_refresh_at: datetime | None = None
 
 
 class SearchInput(BaseModel):

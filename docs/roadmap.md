@@ -1048,7 +1048,7 @@ Decisão em [ADR-0024](adr/0024-conectores-de-conhecimento.md). A base passa a a
 
 - [ ] `docs(adr)`: ADR-0024 e esta seção
 - [x] `feat(api)`: conectores de GitHub, S3 e SharePoint com credencial cifrada, teste e sincronização pela versão remota
-- [ ] `feat(api)`: sincronização agendada de conector e reindexação agendada de URL no poller
+- [x] `feat(api)`: sincronização agendada de conector e reindexação agendada de URL no poller
 - [ ] `feat(web)`: conectores e reindexação na página da base
 - [ ] `test(api)`: evals da sincronização e da reindexação
 

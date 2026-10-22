@@ -716,6 +716,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/knowledge-bases/{base_id}/contents/{content_id}/schedule": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Update Schedule
+     * @description Intervalo de reindexação de uma URL; vazio desliga.
+     */
+    put: operations["update_schedule_api_v1_knowledge_bases__base_id__contents__content_id__schedule_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge-bases/{base_id}/contents/{content_id}/refresh": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Refresh Content
+     * @description Baixa a URL agora; só reindexa se o conteúdo mudou.
+     */
+    post: operations["refresh_content_api_v1_knowledge_bases__base_id__contents__content_id__refresh_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/models/prices": {
     parameters: {
       query?: never;
@@ -1579,6 +1619,8 @@ export interface components {
       secret?: {
         [key: string]: string;
       } | null;
+      /** Sync Every Hours */
+      sync_every_hours?: number | null;
     };
     /** ConnectorResponse */
     ConnectorResponse: {
@@ -1615,6 +1657,10 @@ export interface components {
       } | null;
       /** Last Sync At */
       last_sync_at: string | null;
+      /** Sync Every Hours */
+      sync_every_hours: number | null;
+      /** Next Sync At */
+      next_sync_at: string | null;
       /** Content Count */
       content_count: number;
       /** Created By */
@@ -1635,6 +1681,11 @@ export interface components {
       sample: string[];
       /** Error */
       error: string | null;
+    };
+    /** ContentScheduleInput */
+    ContentScheduleInput: {
+      /** Refresh Every Hours */
+      refresh_every_hours?: number | null;
     };
     /**
      * ConversationSettings
@@ -2472,6 +2523,10 @@ export interface components {
       connector_id?: string | null;
       /** External Path */
       external_path?: string | null;
+      /** Refresh Every Hours */
+      refresh_every_hours?: number | null;
+      /** Next Refresh At */
+      next_refresh_at?: string | null;
     };
     /** LintWarning */
     LintWarning: {
@@ -3032,6 +3087,8 @@ export interface components {
       url: string;
       /** Name */
       name?: string | null;
+      /** Refresh Every Hours */
+      refresh_every_hours?: number | null;
     };
     /** UserResponse */
     UserResponse: {
@@ -4911,6 +4968,74 @@ export interface operations {
         "application/json": components["schemas"]["TextContentInput"];
       };
     };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["KnowledgeContentResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_schedule_api_v1_knowledge_bases__base_id__contents__content_id__schedule_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+        content_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ContentScheduleInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["KnowledgeContentResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  refresh_content_api_v1_knowledge_bases__base_id__contents__content_id__refresh_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+        content_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       /** @description Successful Response */
       202: {
