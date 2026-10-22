@@ -368,7 +368,7 @@ def test_recusa_cancela_ou_refaz_a_etapa(client: TestClient) -> None:
     assert _workflow_run(wf).pending_steps[0]["retry_count"] == 1
 
 
-def test_revisao_em_paralelo_ou_laco_e_recusada(client: TestClient) -> None:
+def test_revisao_dentro_de_conteiner_e_recusada(client: TestClient) -> None:
     agent = _agent(client, "qualquer", "claude-haiku-4-5")
     body = {"name": "revisão no ramo", "description": "x"}
     wf = client.post("/api/v1/configs", json={**body, "kind": "workflow"}).json()["id"]
@@ -383,12 +383,21 @@ def test_revisao_em_paralelo_ou_laco_e_recusada(client: TestClient) -> None:
             _step("fim", agent),
         ],
         [{"type": "loop", "name": "voltas", "steps": [_step("a", agent, review=review)]}],
+        # o Agno 3.1.8 não pausa etapa dentro de condição
+        [
+            {
+                "type": "condition",
+                "name": "se",
+                "rule": {"kind": "always"},
+                "steps": [_step("a", agent, review=review)],
+            }
+        ],
     ):
         resp = client.put(
             f"/api/v1/configs/{wf}/draft",
             json={**body, "payload": {"workflow": {"steps": steps}}},
         )
-        assert resp.status_code == 422 and "fora de paralelo e de laço" in resp.text
+        assert resp.status_code == 422 and "nível principal" in resp.text
     resp = client.put(
         f"/api/v1/configs/{wf}/draft",
         json={
