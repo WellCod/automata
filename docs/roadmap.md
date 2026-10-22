@@ -1069,7 +1069,7 @@ Decisão em [ADR-0025](adr/0025-memoria-do-usuario.md). O agente pode lembrar fa
 - [x] `feat(api)`: memória por agente no payload, lida por usuário e agente, mascarada e fora de anônimo e da suíte
 - [x] `feat(api)`: retenção no poller e rotas para ver e apagar memórias por agente e do próprio usuário
 - [x] `feat(web)`: memória na configuração do agente, aba de memórias e minhas memórias
-- [ ] `test(api)`: evals da memória do usuário
+- [x] `test(api)`: evals da memória do usuário
 
 **Critério de aceite da fase:**
 
