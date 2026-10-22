@@ -306,6 +306,7 @@ Um caso tem `name` (único na config, até 80 caracteres), `input` (até 4000) e
 - `text`: `kind` = `contains`, `not_contains`, `starts_with`, `empty` ou `not_empty`, e `value`. É a mesma regra dos workflows, comparada sem diferenciar maiúsculas, sobre a resposta. Quantas quiser.
 - `tools`: `tools` (1 a 10 nomes, como o agente expõe: `buscar_<slug>` das bases e as tools MCP com prefixo) e `allow_additional` (padrão `true`). No máximo uma por caso.
 - `judge`: `criteria` (10 a 1000 caracteres), `mode` (`binary` ou `numeric`) e `threshold` (1 a 10, só no numérico). No máximo uma por caso.
+- `blocked` (ADR-0022): o caso passa quando o guardrail barra o run. `rule` opcional exige a regra: `pii_detected`, `prompt_injection`, `off_topic`, `input_too_long`, `moderation` ou `output_not_allowed`. Sempre sozinha no caso, porque um run barrado não tem resposta para checar (422 com outra checagem).
 
 Um caso pode trazer `context`, com até 5 mensagens anteriores (ADR-0016, migration 0026). Na execução, o caso ganha sessão própria (`eval-<uuid>`) e o banco do Agno, que o agente da suíte não recebe do `AgentFactory`. O `setup` do `Case` roda essas mensagens nessa sessão, uma por vez, com 60 s cada, e só a resposta a `input` passa pelas checagens. Os turnos de contexto são runs de teste como os outros: ficam fora das conversas e entram no custo da execução. Todo caso roda com `user_id` de quem disparou a suíte.
 
@@ -337,6 +338,7 @@ A execução roda em background (`app/evals/runner.py`):
 - Cada caso gravado vira um `Case` do `agno.eval.suite` e roda com `arun_cases`, um por vez, com timeout de 120 s.
 - Cada caso ganha um agente ou time novo, montado por `agent_from` ou `team_from` a partir da versão pedida.
 - Checagens de texto viram um `Scorer` próprio (`TextScorer`, as mesmas regras dos workflows); as de tools vão para o `expected_tool_calls`.
+- O Agno trata o run barrado como erro e só chama o scorer em run completo. Por isso o caso `blocked` leva um scorer que reprova (`respondeu sem bloquear`), e o veredito do bloqueio vem do `BlockLog` do agente ou time do caso, a mesma fonte do `blocked_by`. Bloqueio por orçamento não conta, e o de um turno de contexto é descartado antes do turno avaliado. O resultado traz `rule` e `blocked_by`.
 - Checagem de juiz vai para o `criteria` do Agno, com o modelo escolhido em `judge_model` no pedido. O modelo precisa estar na matriz e ter saída estruturada, e é obrigatório quando algum caso tem juiz. Ele é sempre passado ao runner: sem isso o `AgentAsJudgeEval` cairia num modelo da OpenAI. O medidor (`app/evals/judge.py`) embrulha o `ainvoke` da instância e soma os tokens do juiz, gravados num `usage_event` da execução.
 - No modo demo (`DEMO_REPLAY`), o juiz não roda: a checagem aparece com `passed: null` e o motivo. Caso só com juiz fica `not_evaluated`, sem rodar o agente.
 - No fim, `eval_run.total_tokens` e `eval_run.cost` (migration 0021) somam os `usage_event` da execução: casos e juiz.

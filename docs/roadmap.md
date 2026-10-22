@@ -1009,9 +1009,9 @@ Fica para depois: conciliação com a API de uso do provedor, orçamento por usu
 Decisão em [ADR-0022](adr/0022-suite-de-workflow-e-bloqueio.md). Workflow ganha suíte de testes pelo mesmo runner de agentes e times, com checagem das etapas que rodaram. Agente e time ganham caso que passa quando o guardrail barra, para a configuração de cada um ter teste.
 
 - [ ] `docs(adr)`: ADR-0022 e esta seção
-- [ ] `feat(api)`: checagem `blocked` com regra opcional, lida do registro de bloqueios do run
+- [x] `feat(api)`: checagem `blocked` com regra opcional, lida do registro de bloqueios do run, já no formulário de caso do painel
 - [ ] `feat(api)`: suíte para workflow com checagem de etapas, gate e agendamento
-- [ ] `feat(web)`: caso que espera bloqueio e aba de testes no workflow
+- [ ] `feat(web)`: aba de testes no workflow com checagem de etapas
 - [ ] `test(api)`: evals da checagem de bloqueio e da suíte de workflow
 
 **Critério de aceite da fase:**

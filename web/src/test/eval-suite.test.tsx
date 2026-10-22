@@ -28,6 +28,17 @@ describe("checagens", () => {
     expect(availableTypes(Array.from({ length: 5 }, () => newCheck("text")))).toEqual([]);
   });
 
+  it("bloqueio só entra em caso sem outra checagem", () => {
+    expect(availableTypes([])).toEqual(["text", "tools", "judge", "blocked"]);
+    expect(availableTypes([newCheck("text")])).not.toContain("blocked");
+    expect(availableTypes([newCheck("blocked")])).toEqual([]);
+    const base = { name: "frete", input: "E o frete?" };
+    expect(caseErrors({ ...base, checks: [newCheck("blocked"), newCheck("judge")] })).toContain(
+      "Caso que espera bloqueio não leva outras checagens.",
+    );
+    expect(caseErrors({ ...base, checks: [{ type: "blocked", rule: "off_topic" }] })).toEqual([]);
+  });
+
   it("acusa o que a API recusaria", () => {
     const base = { name: "prazo", input: "Qual o prazo?" };
     expect(caseErrors({ ...base, checks: [] })).toContain("Adicione ao menos uma checagem.");
@@ -44,6 +55,27 @@ describe("checagens", () => {
 });
 
 describe("EvalCaseForm", () => {
+  it("monta o caso que espera bloqueio com a regra", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    render(<EvalCaseForm saving={false} onSave={onSave} onCancel={() => {}} />);
+
+    await user.type(screen.getByLabelText("Nome do caso"), "barra frete");
+    await user.type(screen.getByLabelText("Mensagem de entrada"), "Quanto custa o frete?");
+    await user.click(screen.getByRole("button", { name: "Remover checagem 1" }));
+    await user.click(screen.getByRole("button", { name: "Bloqueio do guardrail" }));
+    await user.selectOptions(screen.getByLabelText("Regra do bloqueio da checagem 1"), "off_topic");
+    // com bloqueio, nenhuma outra checagem cabe
+    expect(screen.queryByRole("button", { name: "Texto da resposta" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Salvar caso" }));
+
+    expect(onSave).toHaveBeenCalledWith({
+      name: "barra frete",
+      input: "Quanto custa o frete?",
+      checks: [{ type: "blocked", rule: "off_topic" }],
+    });
+  });
+
   it("monta o caso com texto, tools e juiz", async () => {
     const onSave = vi.fn();
     const user = userEvent.setup();

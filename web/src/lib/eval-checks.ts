@@ -4,7 +4,9 @@ type Schemas = components["schemas"];
 export type TextCheck = Schemas["TextCheck"];
 export type ToolsCheck = Schemas["ToolsCheck"];
 export type JudgeCheck = Schemas["JudgeCheck"];
-export type EvalCheck = TextCheck | ToolsCheck | JudgeCheck;
+export type BlockedCheck = Schemas["BlockedCheck"];
+export type EvalCheck = TextCheck | ToolsCheck | JudgeCheck | BlockedCheck;
+export type BlockRule = NonNullable<BlockedCheck["rule"]>;
 export type EvalCase = Schemas["EvalCaseResponse"];
 export type EvalCaseInput = Schemas["EvalCaseInput"];
 export type EvalRunSummary = Schemas["EvalRunSummary"];
@@ -29,11 +31,23 @@ export const CHECK_LABEL: Record<EvalCheck["type"], string> = {
   text: "Texto da resposta",
   tools: "Tools chamadas",
   judge: "Critério do juiz",
+  blocked: "Bloqueio do guardrail",
 };
+
+// regras que um caso pode esperar (ADR-0022); orçamento não entra, não é comportamento
+export const BLOCK_RULES: BlockRule[] = [
+  "pii_detected",
+  "prompt_injection",
+  "off_topic",
+  "input_too_long",
+  "moderation",
+  "output_not_allowed",
+];
 
 export function newCheck(type: EvalCheck["type"]): EvalCheck {
   if (type === "text") return { type, kind: "contains", value: "" };
   if (type === "tools") return { type, tools: [], allow_additional: true };
+  if (type === "blocked") return { type, rule: null };
   return { type, criteria: "", mode: "binary", threshold: 7 };
 }
 
@@ -41,12 +55,14 @@ export function textNeedsValue(kind: TextCheck["kind"]): boolean {
   return TEXT_KINDS.find((k) => k.value === kind)?.needsValue ?? false;
 }
 
-// tipos que ainda cabem: o Case do Agno tem um campo de tools e um de critério
+// tipos que ainda cabem: o Case do Agno tem um campo de tools e um de critério, e o
+// caso que espera bloqueio não leva outra checagem (run barrado não tem resposta)
 export function availableTypes(checks: EvalCheck[]): EvalCheck["type"][] {
-  if (checks.length >= MAX_CHECKS) return [];
-  return (["text", "tools", "judge"] as const).filter(
+  if (checks.length >= MAX_CHECKS || checks.some((c) => c.type === "blocked")) return [];
+  const types = (["text", "tools", "judge"] as const).filter(
     (t) => t === "text" || !checks.some((c) => c.type === t),
   );
+  return checks.length === 0 ? [...types, "blocked"] : types;
 }
 
 export function caseErrors(input: EvalCaseInput): string[] {
@@ -56,6 +72,8 @@ export function caseErrors(input: EvalCaseInput): string[] {
   if ((input.context ?? []).some((m) => !m.trim()))
     errors.push("Preencha ou remova a mensagem anterior vazia.");
   if (input.checks.length === 0) errors.push("Adicione ao menos uma checagem.");
+  if (input.checks.length > 1 && input.checks.some((c) => c.type === "blocked"))
+    errors.push("Caso que espera bloqueio não leva outras checagens.");
   for (const c of input.checks) {
     if (c.type === "text" && textNeedsValue(c.kind) && !c.value?.trim())
       errors.push("Preencha o texto da regra.");

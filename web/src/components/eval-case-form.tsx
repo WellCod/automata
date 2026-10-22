@@ -2,8 +2,11 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
+import { blockLabel } from "@/lib/guardrail-labels";
 import {
   availableTypes,
+  BLOCK_RULES,
+  type BlockRule,
   CHECK_LABEL,
   caseErrors,
   MAX_CONTEXT,
@@ -53,6 +56,26 @@ function CheckFields({
             className={`${inputCls} min-w-40 flex-1`}
           />
         )}
+      </div>
+    );
+  }
+  if (check.type === "blocked") {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-muted-foreground text-[12px]">O guardrail barra por</span>
+        <select
+          aria-label={`Regra do bloqueio da checagem ${index + 1}`}
+          value={check.rule ?? ""}
+          onChange={(e) => onChange({ ...check, rule: (e.target.value || null) as BlockRule })}
+          className={`${inputCls} w-auto`}
+        >
+          <option value="">qualquer regra</option>
+          {BLOCK_RULES.map((rule) => (
+            <option key={rule} value={rule}>
+              {blockLabel(rule)}
+            </option>
+          ))}
+        </select>
       </div>
     );
   }
