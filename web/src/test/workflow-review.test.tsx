@@ -28,7 +28,7 @@ const step = (name: string, review?: object): WorkflowNode =>
   }) as WorkflowNode;
 
 describe("revisão na estrutura", () => {
-  it("só fora de paralelo e de laço", () => {
+  it("só no nível principal", () => {
     const review = { when: "after", on_reject: "cancel" };
     expect(structureErrors([step("analise", review), step("fim")])).toEqual([]);
     const inCondition: WorkflowNode = {
@@ -38,7 +38,9 @@ describe("revisão na estrutura", () => {
       steps: [step("dentro", review)],
       else_steps: [],
     };
-    expect(structureErrors([inCondition, step("fim")])).toEqual([]);
+    expect(structureErrors([inCondition, step("fim")])).toContain(
+      '"dentro" está dentro de um contêiner: revisão humana só no nível principal.',
+    );
     const inLoop: WorkflowNode = {
       type: "loop",
       name: "voltas",
@@ -47,7 +49,7 @@ describe("revisão na estrutura", () => {
       until: null,
     };
     expect(structureErrors([inLoop])).toContain(
-      '"volta" está num paralelo ou laço: revisão humana só fora deles.',
+      '"volta" está dentro de um contêiner: revisão humana só no nível principal.',
     );
   });
 });
