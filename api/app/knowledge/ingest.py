@@ -73,12 +73,20 @@ def read_documents(name: str, extension: str, data: bytes, chunk_size: int) -> l
     return docs
 
 
-def _finish(content_id: UUID, *, status: str, message: str | None, chunks: int = 0) -> None:
+def _finish(
+    content_id: UUID,
+    *,
+    status: str,
+    message: str | None,
+    chunks: int = 0,
+    digest: str | None = None,
+) -> None:
+    values: dict[str, object] = {"status": status, "status_message": message, "chunk_count": chunks}
+    if digest is not None:
+        values["content_hash"] = digest
     with Session(get_engine()) as session:
         session.execute(
-            update(KnowledgeContent)
-            .where(KnowledgeContent.id == content_id)
-            .values(status=status, status_message=message, chunk_count=chunks)
+            update(KnowledgeContent).where(KnowledgeContent.id == content_id).values(**values)
         )
         session.commit()
 
@@ -127,12 +135,13 @@ def ingest(content_id: UUID, data: bytes) -> None:
                 "content_id": str(content_id),
                 "source": content.source,
             }
-        vector_db.insert(content_hash=hashlib.sha256(data).hexdigest(), documents=docs)
+        digest = hashlib.sha256(data).hexdigest()
+        vector_db.insert(content_hash=digest, documents=docs)
         stored = count_chunks(base, content_id)
         if stored < len(docs):
             vector_db.delete_by_content_id(str(content_id))
             raise IngestError(f"{len(docs) - stored} de {len(docs)} trechos não foram indexados")
-        _finish(content_id, status="completed", message=None, chunks=stored)
+        _finish(content_id, status="completed", message=None, chunks=stored, digest=digest)
         logger.info(
             "conteúdo indexado",
             extra={"content_id": str(content_id), "base_id": str(base.id), "chunks": stored},

@@ -90,7 +90,7 @@ class KnowledgeContentResponse(BaseModel):
     id: UUID
     base_id: UUID
     name: str
-    source_type: Literal["file", "url", "text"]
+    source_type: Literal["file", "url", "text", "connector"]
     source: str
     extension: str
     size_bytes: int
@@ -100,6 +100,9 @@ class KnowledgeContentResponse(BaseModel):
     created_by: str
     created_at: datetime
     updated_at: datetime
+    # conteúdo de conector (ADR-0024): o conector e o caminho na origem
+    connector_id: UUID | None = None
+    external_path: str | None = None
 
 
 class SearchInput(BaseModel):

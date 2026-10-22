@@ -15,6 +15,8 @@ class KnowledgeContent(Base):
     __table_args__ = (
         Index("ix_knowledge_content_base_created", "base_id", "created_at"),
         Index("ix_knowledge_content_status", "status"),
+        # um arquivo da origem é um conteúdo só por conector (ADR-0024)
+        Index("ix_knowledge_content_connector_path", "connector_id", "external_path", unique=True),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -22,7 +24,7 @@ class KnowledgeContent(Base):
         UUID(as_uuid=True), ForeignKey("knowledge_base.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    # file | url | text
+    # file | url | text | connector
     source_type: Mapped[str] = mapped_column(String(16), nullable=False)
     # nome do arquivo ou URL de origem
     source: Mapped[str] = mapped_column(String(2048), nullable=False)
@@ -33,6 +35,16 @@ class KnowledgeContent(Base):
     status_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    # origem remota (ADR-0024): o conector, o caminho lá e a versão lá
+    connector_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("knowledge_connector.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    external_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    external_version: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # sha256 dos bytes ingeridos: a reindexação de URL só indexa de novo se mudar
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

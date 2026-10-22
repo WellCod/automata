@@ -52,6 +52,8 @@ def to_response(c: KnowledgeContent) -> KnowledgeContentResponse:
         created_by=c.created_by,
         created_at=c.created_at,
         updated_at=c.updated_at,
+        connector_id=c.connector_id,
+        external_path=c.external_path,
     )
 
 

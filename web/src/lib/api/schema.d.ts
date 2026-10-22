@@ -554,6 +554,82 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/knowledge-bases/{base_id}/connectors": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Connectors */
+    get: operations["list_connectors_api_v1_knowledge_bases__base_id__connectors_get"];
+    put?: never;
+    /** Create Connector */
+    post: operations["create_connector_api_v1_knowledge_bases__base_id__connectors_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Update Connector */
+    put: operations["update_connector_api_v1_knowledge_bases__base_id__connectors__connector_id__put"];
+    post?: never;
+    /**
+     * Delete Connector
+     * @description Os conteúdos do conector saem com ele, e os trechos antes.
+     */
+    delete: operations["delete_connector_api_v1_knowledge_bases__base_id__connectors__connector_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Test Connector
+     * @description Lista a origem sem baixar nada: confere credencial, caminho e o que entraria.
+     */
+    post: operations["test_connector_api_v1_knowledge_bases__base_id__connectors__connector_id__test_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/sync": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Sync Connector */
+    post: operations["sync_connector_api_v1_knowledge_bases__base_id__connectors__connector_id__sync_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/knowledge-bases/{base_id}/contents": {
     parameters: {
       query?: never;
@@ -1486,6 +1562,80 @@ export interface components {
      * @enum {string}
      */
     ConfigPayloadStatus: "draft" | "published";
+    /** ConnectorInput */
+    ConnectorInput: {
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "github" | "s3" | "sharepoint";
+      /** Name */
+      name: string;
+      /** Settings */
+      settings: {
+        [key: string]: unknown;
+      };
+      /** Secret */
+      secret?: {
+        [key: string]: string;
+      } | null;
+    };
+    /** ConnectorResponse */
+    ConnectorResponse: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Base Id
+       * Format: uuid
+       */
+      base_id: string;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "github" | "s3" | "sharepoint";
+      /** Name */
+      name: string;
+      /** Settings */
+      settings: {
+        [key: string]: unknown;
+      };
+      /** Has Secret */
+      has_secret: boolean;
+      /** Last Status */
+      last_status: string;
+      /** Last Message */
+      last_message: string | null;
+      /** Last Summary */
+      last_summary: {
+        [key: string]: unknown;
+      } | null;
+      /** Last Sync At */
+      last_sync_at: string | null;
+      /** Content Count */
+      content_count: number;
+      /** Created By */
+      created_by: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** ConnectorTestResult */
+    ConnectorTestResult: {
+      /** Ok */
+      ok: boolean;
+      /** Files */
+      files: number;
+      /** Sample */
+      sample: string[];
+      /** Error */
+      error: string | null;
+    };
     /**
      * ConversationSettings
      * @description Conversa longa (ADR-0019): turnos antigos viram resumo acima de um limite de tokens.
@@ -2290,7 +2440,7 @@ export interface components {
        * Source Type
        * @enum {string}
        */
-      source_type: "file" | "url" | "text";
+      source_type: "file" | "url" | "text" | "connector";
       /** Source */
       source: string;
       /** Extension */
@@ -2318,6 +2468,10 @@ export interface components {
        * Format: date-time
        */
       updated_at: string;
+      /** Connector Id */
+      connector_id?: string | null;
+      /** External Path */
+      external_path?: string | null;
     };
     /** LintWarning */
     LintWarning: {
@@ -4371,6 +4525,202 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["SearchComparison"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_connectors_api_v1_knowledge_bases__base_id__connectors_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ConnectorResponse"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_connector_api_v1_knowledge_bases__base_id__connectors_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ConnectorInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ConnectorResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_connector_api_v1_knowledge_bases__base_id__connectors__connector_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+        connector_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ConnectorInput"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ConnectorResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_connector_api_v1_knowledge_bases__base_id__connectors__connector_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+        connector_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  test_connector_api_v1_knowledge_bases__base_id__connectors__connector_id__test_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+        connector_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ConnectorTestResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  sync_connector_api_v1_knowledge_bases__base_id__connectors__connector_id__sync_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        base_id: string;
+        connector_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ConnectorResponse"];
         };
       };
       /** @description Validation Error */
