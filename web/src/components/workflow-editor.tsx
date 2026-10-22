@@ -224,7 +224,7 @@ function ReviewFields({
       </label>
       {review && !reviewable && (
         <p className="text-destructive text-[11px]">
-          Revisão humana não vale em paralelo nem em laço. Desmarque ou mova a etapa.
+          Revisão humana só vale no nível principal do workflow. Desmarque ou mova a etapa.
         </p>
       )}
       {review && (
@@ -445,7 +445,7 @@ function NodeCard({
               nodes={node.steps}
               onChange={(steps) => onChange({ ...node, steps })}
               depth={depth + 1}
-              ctx={ctx}
+              ctx={{ ...ctx, reviewable: false }}
               min={1}
             />
           </div>
@@ -455,7 +455,7 @@ function NodeCard({
               nodes={node.else_steps ?? []}
               onChange={(else_steps) => onChange({ ...node, else_steps })}
               depth={depth + 1}
-              ctx={ctx}
+              ctx={{ ...ctx, reviewable: false }}
             />
           </div>
         </>
