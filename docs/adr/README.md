@@ -50,3 +50,4 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0022](0022-suite-de-workflow-e-bloqueio.md) | Suíte de testes para workflows e caso que espera bloqueio de guardrail | Proposto |
 | [0023](0023-revisao-humana-no-workflow.md) | Revisão humana numa etapa do workflow, antes de rodar ou depois da saída | Proposto |
 | [0024](0024-conectores-de-conhecimento.md) | Conectores de conhecimento (GitHub, S3, SharePoint) e reindexação agendada | Proposto |
+| [0025](0025-memoria-do-usuario.md) | Memória do usuário entre sessões, por agente, com retenção, PII mascarado e exclusão | Proposto |
