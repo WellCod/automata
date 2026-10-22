@@ -586,6 +586,7 @@ if __name__ == "__main__":
 | 21 — Fila durável | #158–#160 | Runs em background na fila durável do Agno, com Redis opcional | Fase 7 (Redis) |
 | 22 — Orçamento e alertas | #164 em diante | Custo estimado pela tabela de preços, orçamento mensal com bloqueio e destinos de aviso | Fases 19 e 21 |
 | 23 — Suíte de workflow e bloqueio | depois da 22 | Suíte de testes para workflows e caso que espera bloqueio de guardrail | Fases 14, 15 e 16 |
+| 24 — Revisão humana no workflow | depois da 23 | Etapa que pausa para aprovação antes de rodar ou depois da saída | Fases 12 e 15 |
 
 Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
 
@@ -1021,3 +1022,21 @@ Decisão em [ADR-0022](adr/0022-suite-de-workflow-e-bloqueio.md). Workflow ganha
 - O gate de publicação barra o workflow com suíte vermelha.
 
 Fica para depois: checagem de texto numa etapa do meio do workflow e caso de workflow com turnos anteriores.
+
+## Fase 24 — Revisão humana numa etapa do workflow
+
+Decisão em [ADR-0023](adr/0023-revisao-humana-no-workflow.md). Uma etapa pode pausar o workflow para alguém confirmar antes de ela rodar ou aprovar a saída dela antes da próxima. A pendência aparece na página Aprovações e no modo teste, e a decisão segue a rota de `continue` do AgentOS.
+
+- [ ] `docs(adr)`: ADR-0023 e esta seção
+- [ ] `feat(api)`: revisão por etapa no payload, pendências do run pausado e acompanhamento do continue
+- [ ] `feat(web)`: revisão no editor de workflow, etapas pendentes na página Aprovações e no modo teste
+- [ ] `test(api)`: evals da revisão humana no workflow
+
+**Critério de aceite da fase:**
+
+- Um workflow com revisão `after` na etapa de análise pausa com a saída da análise na página Aprovações.
+- Aprovar segue para a próxima etapa, e o `agent_run` do workflow termina `success`.
+- Recusar com `retry` roda a etapa de novo com o motivo, e recusar com `cancel` encerra o workflow.
+- Revisão dentro de condição, ramo paralelo ou laço é recusada na escrita.
+
+Fica para depois: editar a saída na aprovação, revisão por volta de laço, revisão dentro de condição e revisão em ramo paralelo.
