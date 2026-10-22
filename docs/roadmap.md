@@ -1038,9 +1038,9 @@ Decisão em [ADR-0023](adr/0023-revisao-humana-no-workflow.md). Uma etapa pode p
 - Um workflow com revisão `after` na etapa de análise pausa com a saída da análise na página Aprovações.
 - Aprovar segue para a próxima etapa, e o `agent_run` do workflow termina `success`.
 - Recusar com `retry` roda a etapa de novo com o motivo, e recusar com `cancel` encerra o workflow.
-- Revisão em ramo paralelo ou em laço é recusada na escrita.
+- Revisão dentro de condição, ramo paralelo ou laço é recusada na escrita.
 
-Fica para depois: editar a saída na aprovação, revisão por volta de laço e revisão em ramo paralelo.
+Fica para depois: editar a saída na aprovação, revisão por volta de laço, revisão dentro de condição e revisão em ramo paralelo.
 
 ## Fase 25 — Conectores de conhecimento e reindexação agendada
 
