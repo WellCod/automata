@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { BudgetSection } from "@/components/budget-section";
 import { MetricsCharts } from "@/components/metrics-charts";
 import { Button } from "@/components/ui/button";
 import { InfoHint } from "@/components/ui/info-hint";
@@ -73,6 +74,7 @@ export function MetricsPanel({ agentId }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
+      <BudgetSection configId={agentId} />
       <div className="flex gap-1">
         {PERIODS.map((p) => (
           <Button

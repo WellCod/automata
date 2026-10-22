@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import {
   BarChart3,
+  Bell,
   BookOpen,
   KeyRound,
   LayoutGrid,
@@ -28,6 +29,7 @@ const navItems = [
   { href: "/mcp", label: "Servidores MCP", icon: Plug, exact: true },
   { href: "/aprovacoes", label: "Aprovações", icon: ShieldCheck, exact: true },
   { href: "/integracoes", label: "Integrações", icon: KeyRound, exact: true },
+  { href: "/alertas", label: "Alertas", icon: Bell, exact: true, ownerOnly: true },
   { href: "/usuarios", label: "Usuários", icon: UserCog, exact: true, ownerOnly: true },
 ];
 
