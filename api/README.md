@@ -182,7 +182,7 @@ Gerar a chave: `python -c "from cryptography.fernet import Fernet; print(Fernet.
 
 Tools marcadas em `require_confirmation` no agente pausam o run antes de executar (`status=PAUSED`, evento `RunPaused`). O `TrackedAgent` grava o run como `paused`, com o `session_id` e as tools pendentes (`ToolExecution` serializado) em `agent_run.pending_tools`.
 
-- `GET /api/v1/approvals[?agent_id=]` lista os runs pausados com agente, quem pediu, nome e argumentos de cada tool.
+- `GET /api/v1/approvals[?agent_id=]` lista os runs pausados com agente, quem pediu, nome e argumentos de cada tool. Cada item traz `kind`, e os de workflow vêm com `steps` (etapas esperando revisão, ADR-0023) no lugar de `tools`.
 - A decisão é o continue do próprio AgentOS: `POST /agents/{id}/runs/{run_id}/continue`, com `session_id` e `tools` = os `tool_execution` recebidos, cada um com `confirmed: true` ou `false`. Exige `agents:run`. Com `user_isolation`, só o dono da sessão ou um owner retoma.
 - Aprovado, a tool executa e o run segue. Rejeitado, o modelo recebe a recusa e responde sem a ação. Nos dois casos o mesmo `agent_run` passa a `success`, e a pendência some.
 
@@ -273,7 +273,7 @@ Com `TRACING_ENABLED=true` (padrão), o AgentOS grava em banco, via OpenTelemetr
 
 Workflow é um config com `kind: "workflow"`, criado com `POST /api/v1/configs` e `"kind": "workflow"`. Tem rascunho, publicação, rollback e versões como agente e time. O payload não tem modelo (`model_id` fica `null`; o serviço recusa modelo em workflow e exige em agente e time). A estrutura vai na seção `workflow.steps`, uma árvore de nós com `type`:
 
-- `step`: `name`, `agent_id` **ou** `team_id`, `version_id` opcional (fixa a versão), `on_error` (`stop` para o fluxo, padrão; `continue` passa o erro adiante) e `max_retries` (0 a 3).
+- `step`: `name`, `agent_id` **ou** `team_id`, `version_id` opcional (fixa a versão), `on_error` (`stop` para o fluxo, padrão; `continue` passa o erro adiante), `max_retries` (0 a 3) e `review` opcional (ADR-0023): `when` (`before` confirma antes de rodar, `after` aprova a saída), `message` (até 300), `on_reject` (`skip`, `cancel`, padrão, ou `retry`, só com `after`) e `timeout_hours` (1 a 168; vencido, cancela).
 - `parallel`: `name` e `branches`, de 2 a 5 etapas `step` que recebem a mesma entrada.
 - `condition`: `name`, `rule`, `steps` e `else_steps` opcional.
 - `loop`: `name`, `steps`, `max_iterations` (1 a 10) e `until` opcional (regra avaliada na saída da última etapa de cada volta).
@@ -287,7 +287,8 @@ Validação na escrita:
 - nomes de etapa únicos, até 3 níveis de aninhamento e 30 etapas;
 - o workflow não termina num `parallel`;
 - agentes e times existem, estão publicados e a versão fixada é publicada e deles;
-- agente (ou membro de time) com tool de confirmação humana não entra em workflow.
+- agente (ou membro de time) com tool de confirmação humana não entra em workflow;
+- `review` só em etapa do nível principal: dentro de `condition` o Agno 3.1.8 não pausa, e em `parallel` e `loop` a pausa deixaria o contêiner num estado que o painel não mostra.
 
 Execução (`app/agents/workflow_factory.py`):
 - `WorkflowFactory` por request, registrada em `os.workflows` sem restart, como agentes e times. Roda em `POST /workflows/{id}/runs` e exige `workflows:run` (editor e owner); o viewer tem `workflows:read`.
@@ -296,6 +297,7 @@ Execução (`app/agents/workflow_factory.py`):
 - Etapa com erro ou bloqueio de guardrail levanta `StepFailed`, e assim `on_error`/`max_retries` passam a valer. Com `stop`, o workflow termina com `status=ERROR` e o motivo no `content` (`WorkflowError` no stream), em vez do 500 que o Agno devolveria. Com `continue`, a etapa seguinte roda.
 - O run do workflow vai para `agent_run` com status, duração e erro (`TrackedWorkflow`). Cada etapa continua gravada no agente ou time que a executou.
 - O `TrackedWorkflow` fixa o `run_id` antes de rodar e o publica numa `ContextVar`. Cada etapa grava esse id em `agent_run.parent_run_id` (migration 0018), inclusive ramos paralelos, cujas tasks herdam o contexto.
+- Revisão humana (ADR-0023): `review` vira o `HumanReview` do Agno (`requires_confirmation` ou `requires_output_review`, `on_reject`, `timeout` com `on_timeout=cancel`; `retry` refaz até 3 vezes com o motivo no contexto). O run pausa com `status=PAUSED`, e o `TrackedWorkflow` grava `paused` com um resumo do requisito ativo em `agent_run.pending_steps` (migration 0032): etapa, `when`, mensagem, prazo, tentativas e até 4.000 caracteres da saída na revisão `after`. A decisão é o continue do AgentOS: `GET /workflows/{id}/runs/{run_id}` devolve os `step_requirements`, o painel marca o último com `confirmed` (e `rejection_feedback` na recusa) e manda a lista inteira em `POST /workflows/{id}/runs/{run_id}/continue`, que a substitui. O `TrackedWorkflow` acompanha o continue e atualiza o mesmo `agent_run`: `paused` de novo, ou o desfecho. As etapas depois do continue ficam com o mesmo `parent_run_id`. Na suíte de testes, um caso que chega numa revisão termina em erro.
 - Em `GET /api/v1/configs/{id}/runs` de um workflow, cada run traz `steps`, `total_tokens` e `cost`, somados do `usage_event` das etapas filhas. O workflow não grava `usage_event` próprio, então o analytics não conta o consumo duas vezes. Em agente e time esses campos vêm `null`.
 
 ## Evals por agente (ADR-0015)

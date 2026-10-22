@@ -265,3 +265,148 @@ def test_etapa_marcada_para_seguir(client: TestClient) -> None:
     out = _run(client, wf, "oi")
     assert out["status"] == "COMPLETED"
     assert _runs(client, depois) == 1
+
+
+def _review_workflow(client: TestClient, name: str, review: dict[str, Any]) -> tuple[str, str]:
+    analise = _agent(client, f"{name} análise", "claude-sonnet-4-6")
+    resposta = _agent(client, f"{name} resposta", "claude-opus-4-7")
+    wf = _publish(
+        client,
+        "workflow",
+        name,
+        {
+            "workflow": {
+                "steps": [
+                    _step("analise", analise, review=review),
+                    _step("resposta", resposta),
+                ]
+            }
+        },
+    )
+    return wf, analise
+
+
+def _decide(client: TestClient, wf: str, out: dict[str, Any], **decision: Any) -> dict[str, Any]:
+    """Como o painel: lê os requisitos do run, marca o ativo e devolve a lista no continue."""
+    import json
+
+    run = client.get(
+        f"/workflows/{wf}/runs/{out['run_id']}", params={"session_id": out["session_id"]}
+    ).json()
+    requirements = run["step_requirements"]
+    requirements[-1].update(decision)
+    resp = client.post(
+        f"/workflows/{wf}/runs/{out['run_id']}/continue",
+        data={
+            "step_requirements": json.dumps(requirements),
+            "session_id": out["session_id"],
+            "stream": "false",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    result: dict[str, Any] = resp.json()
+    return result
+
+
+def _workflow_run(config_id: str) -> Any:
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from app.db import get_engine
+    from app.models.run import AgentRun
+
+    with Session(get_engine()) as session:
+        return session.scalars(select(AgentRun).where(AgentRun.agent_config_id == config_id)).one()
+
+
+def test_revisao_da_saida_pausa_lista_e_segue_ao_aprovar(client: TestClient) -> None:
+    review = {"when": "after", "message": "Confira o valor antes de responder"}
+    wf, analise = _review_workflow(client, "reembolso revisado", review)
+
+    out = _run(client, wf, "quero reembolso")
+    assert out["status"] == "PAUSED", out
+    paused = _workflow_run(wf)
+    assert paused.status == "paused"
+    [pending] = paused.pending_steps
+    assert pending["step_name"] == "analise" and pending["when"] == "after"
+    assert pending["output"] == "análise técnica ok"
+    assert pending["message"] == "Confira o valor antes de responder"
+
+    [item] = [i for i in client.get("/api/v1/approvals").json() if i["agent_id"] == wf]
+    assert item["kind"] == "workflow" and item["tools"] == []
+    assert item["steps"][0]["output"] == "análise técnica ok"
+
+    done = _decide(client, wf, out, confirmed=True)
+    assert done["status"] == "COMPLETED", done
+    assert done["content"] == "consolidado: pronto"
+    finished = _workflow_run(wf)
+    assert finished.status == "success" and finished.pending_steps is None
+    # a etapa depois do continue fica com o mesmo pai
+    assert _parent_ids(analise) == [out["run_id"]]
+    assert not [i for i in client.get("/api/v1/approvals").json() if i["agent_id"] == wf]
+
+
+def test_recusa_cancela_ou_refaz_a_etapa(client: TestClient) -> None:
+    wf, _ = _review_workflow(
+        client, "reembolso recusado", {"when": "before", "on_reject": "cancel"}
+    )
+    out = _run(client, wf, "quero reembolso")
+    assert out["status"] == "PAUSED"
+    assert _workflow_run(wf).pending_steps[0]["when"] == "before"
+    cancelled = _decide(client, wf, out, confirmed=False)
+    assert cancelled["status"] == "CANCELLED", cancelled
+    assert _workflow_run(wf).status == "cancelled"
+
+    wf, analise = _review_workflow(
+        client, "reembolso refeito", {"when": "after", "on_reject": "retry"}
+    )
+    out = _run(client, wf, "quero reembolso")
+    again = _decide(client, wf, out, confirmed=False, rejection_feedback="faltou o valor")
+    # recusa com retry: a etapa roda de novo e pausa outra vez para revisão
+    assert again["status"] == "PAUSED", again
+    assert _runs(client, analise) == 2
+    assert _workflow_run(wf).pending_steps[0]["retry_count"] == 1
+
+
+def test_revisao_dentro_de_conteiner_e_recusada(client: TestClient) -> None:
+    agent = _agent(client, "qualquer", "claude-haiku-4-5")
+    body = {"name": "revisão no ramo", "description": "x"}
+    wf = client.post("/api/v1/configs", json={**body, "kind": "workflow"}).json()["id"]
+    review = {"when": "after"}
+    for steps in (
+        [
+            {
+                "type": "parallel",
+                "name": "ramos",
+                "branches": [_step("a", agent, review=review), _step("b", agent)],
+            },
+            _step("fim", agent),
+        ],
+        [{"type": "loop", "name": "voltas", "steps": [_step("a", agent, review=review)]}],
+        # o Agno 3.1.8 não pausa etapa dentro de condição
+        [
+            {
+                "type": "condition",
+                "name": "se",
+                "rule": {"kind": "always"},
+                "steps": [_step("a", agent, review=review)],
+            }
+        ],
+    ):
+        resp = client.put(
+            f"/api/v1/configs/{wf}/draft",
+            json={**body, "payload": {"workflow": {"steps": steps}}},
+        )
+        assert resp.status_code == 422 and "nível principal" in resp.text
+    resp = client.put(
+        f"/api/v1/configs/{wf}/draft",
+        json={
+            **body,
+            "payload": {
+                "workflow": {
+                    "steps": [_step("a", agent, review={"when": "before", "on_reject": "retry"})]
+                }
+            },
+        },
+    )
+    assert resp.status_code == 422 and "revisão da saída" in resp.text

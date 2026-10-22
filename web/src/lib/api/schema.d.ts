@@ -1305,6 +1305,8 @@ export interface components {
       agent_id: string;
       /** Agent Name */
       agent_name: string;
+      /** Kind */
+      kind: string;
       /** Session Id */
       session_id: string | null;
       /** User Id */
@@ -1316,6 +1318,8 @@ export interface components {
       created_at: string;
       /** Tools */
       tools: components["schemas"]["PendingTool"][];
+      /** Steps */
+      steps: components["schemas"]["PendingStep"][];
     };
     /**
      * BlockedCheck
@@ -2476,6 +2480,29 @@ export interface components {
       /** Branches */
       branches: components["schemas"]["StepNode"][];
     };
+    /** PendingStep */
+    PendingStep: {
+      /** Step Id */
+      step_id: string | null;
+      /** Step Name */
+      step_name: string | null;
+      /**
+       * When
+       * @enum {string}
+       */
+      when: "before" | "after";
+      /** Message */
+      message: string | null;
+      /** Output */
+      output: string | null;
+      /** Timeout At */
+      timeout_at: string | null;
+      /**
+       * Retry Count
+       * @default 0
+       */
+      retry_count: number;
+    };
     /** PendingTool */
     PendingTool: {
       /** Tool Call Id */
@@ -2671,6 +2698,31 @@ export interface components {
        * @default 0
        */
       max_retries: number;
+      review?: components["schemas"]["StepReview"] | null;
+    };
+    /**
+     * StepReview
+     * @description Pausa humana na etapa (ADR-0023): confirma antes de rodar ou aprova a saída.
+     */
+    StepReview: {
+      /**
+       * When
+       * @enum {string}
+       */
+      when: "before" | "after";
+      /**
+       * Message
+       * @default
+       */
+      message: string;
+      /**
+       * On Reject
+       * @default cancel
+       * @enum {string}
+       */
+      on_reject: "skip" | "cancel" | "retry";
+      /** Timeout Hours */
+      timeout_hours?: number | null;
     };
     /**
      * StepsCheck

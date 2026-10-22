@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Date, cast, func, select
+from sqlalchemy import Date, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.run import AgentRun
@@ -58,6 +58,7 @@ class RunRepository:
         block_detail: dict[str, Any] | None = None,
         parent_run_id: str | None = None,
         eval_run_id: UUID | None = None,
+        pending_steps: list[dict[str, Any]] | None = None,
     ) -> AgentRun:
         run = AgentRun(
             agent_config_id=agent_config_id,
@@ -72,6 +73,7 @@ class RunRepository:
             block_detail=block_detail,
             parent_run_id=parent_run_id,
             eval_run_id=eval_run_id,
+            pending_steps=pending_steps,
         )
         self._session.add(run)
         self._session.flush()
@@ -92,6 +94,7 @@ class RunRepository:
         block_detail: dict[str, Any] | None = None,
         parent_run_id: str | None = None,
         eval_run_id: UUID | None = None,
+        pending_steps: list[dict[str, Any]] | None = None,
     ) -> AgentRun:
         """Atualiza o run de mesmo run_id (pausado e retomado) ou cria um novo."""
         existing = None
@@ -115,10 +118,12 @@ class RunRepository:
                 block_detail=block_detail,
                 parent_run_id=parent_run_id,
                 eval_run_id=eval_run_id,
+                pending_steps=pending_steps,
             )
         existing.status = status
         existing.error = error
         existing.pending_tools = pending_tools
+        existing.pending_steps = pending_steps
         existing.blocked_by = blocked_by
         existing.block_detail = block_detail
         existing.session_id = session_id or existing.session_id
@@ -163,7 +168,7 @@ class RunRepository:
             select(AgentRun)
             .where(
                 AgentRun.status == "paused",
-                AgentRun.pending_tools.is_not(None),
+                or_(AgentRun.pending_tools.is_not(None), AgentRun.pending_steps.is_not(None)),
                 AgentRun.eval_run_id.is_(None),
             )
             .order_by(AgentRun.created_at.desc())

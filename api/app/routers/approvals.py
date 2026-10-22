@@ -1,20 +1,23 @@
-"""Runs pausados aguardando confirmação humana de tools.
+"""Runs pausados aguardando decisão humana: tool de agente ou etapa de workflow.
 
-A decisão em si é feita na rota do AgentOS
-(`POST /agents/{id}/runs/{run_id}/continue`), reenviando cada item de
-`tool_execution` com `confirmed` true ou false; aqui só se lista o pendente.
+A decisão em si é feita na rota do AgentOS. No agente,
+`POST /agents/{id}/runs/{run_id}/continue`, reenviando cada item de
+`tool_execution` com `confirmed` true ou false. No workflow (ADR-0023),
+`POST /workflows/{id}/runs/{run_id}/continue` com os `step_requirements` lidos do
+run e o ativo marcado. Aqui só se lista o pendente.
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
+from sqlalchemy import select
 
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
-from app.repositories.config import ConfigRepository
+from app.models.config import AgentConfig
 from app.repositories.run import RunRepository
 
 router = APIRouter(
@@ -32,14 +35,27 @@ class PendingTool(BaseModel):
     tool_execution: dict[str, Any]
 
 
+class PendingStep(BaseModel):
+    step_id: str | None
+    step_name: str | None
+    # before: confirma antes de rodar; after: aprova a saída antes da próxima etapa
+    when: Literal["before", "after"]
+    message: str | None
+    output: str | None
+    timeout_at: datetime | None
+    retry_count: int = 0
+
+
 class ApprovalItem(BaseModel):
     run_id: str
     agent_id: UUID
     agent_name: str
+    kind: str
     session_id: str | None
     user_id: str
     created_at: datetime
     tools: list[PendingTool]
+    steps: list[PendingStep]
 
 
 @router.get("", response_model=list[ApprovalItem])
@@ -48,12 +64,14 @@ def list_pending(
     agent_id: UUID | None = Query(default=None),  # noqa: B008
 ) -> list[ApprovalItem]:
     runs = RunRepository(session).list_paused([agent_id] if agent_id else None)
-    names = ConfigRepository(session).names_by_ids(list({r.agent_config_id for r in runs}))
+    ids = list({r.agent_config_id for r in runs})
+    configs = {c.id: c for c in session.scalars(select(AgentConfig).where(AgentConfig.id.in_(ids)))}
     return [
         ApprovalItem(
             run_id=r.run_id or "",
             agent_id=r.agent_config_id,
-            agent_name=names.get(r.agent_config_id, ""),
+            agent_name=configs[r.agent_config_id].name if r.agent_config_id in configs else "",
+            kind=configs[r.agent_config_id].kind if r.agent_config_id in configs else "agent",
             session_id=r.session_id,
             user_id=r.user_id,
             created_at=r.created_at,
@@ -66,6 +84,7 @@ def list_pending(
                 )
                 for t in r.pending_tools or []
             ],
+            steps=[PendingStep.model_validate(step) for step in r.pending_steps or []],
         )
         for r in runs
         if r.run_id

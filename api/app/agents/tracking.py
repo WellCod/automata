@@ -81,6 +81,7 @@ class RunRecord:
     block_detail: dict[str, Any] | None = None
     parent_run_id: str | None = None
     eval_run_id: UUID | None = None
+    pending_steps: list[dict[str, Any]] | None = None
 
 
 # run do workflow em andamento; etapas (inclusive ramos paralelos, que copiam o contexto)
@@ -114,6 +115,7 @@ def persist(record: RunRecord) -> None:
             block_detail=record.block_detail,
             parent_run_id=record.parent_run_id,
             eval_run_id=record.eval_run_id,
+            pending_steps=record.pending_steps,
         )
         if record.total_tokens:
             UsageRepository(session).record_event(
@@ -433,6 +435,36 @@ class TrackedTeam(RunTracking, Team):
         )
 
 
+# saída da etapa mostrada na página Aprovações; o resto fica no run do Agno
+PENDING_OUTPUT_CHARS = 4000
+
+
+def pending_steps(requirements: list[Any] | None) -> list[dict[str, Any]] | None:
+    """Resumo dos requisitos ativos do workflow pausado (ADR-0023)."""
+    active = [r for r in requirements or [] if not getattr(r, "is_resolved", False)]
+    if not active:
+        return None
+    out: list[dict[str, Any]] = []
+    for req in active:
+        after = bool(getattr(req, "requires_output_review", False))
+        step_output = getattr(req, "step_output", None)
+        content = getattr(step_output, "content", None) if step_output is not None else None
+        timeout_at = getattr(req, "timeout_at", None)
+        out.append(
+            {
+                "step_id": req.step_id,
+                "step_name": req.step_name,
+                "when": "after" if after else "before",
+                "message": (req.output_review_message if after else req.confirmation_message)
+                or None,
+                "output": str(content)[:PENDING_OUTPUT_CHARS] if after and content else None,
+                "timeout_at": timeout_at.isoformat() if timeout_at else None,
+                "retry_count": getattr(req, "retry_count", 0),
+            }
+        )
+    return out
+
+
 class TrackedWorkflow(Workflow):
     """Workflow que registra o próprio run e transforma etapa que parou em run com erro.
 
@@ -453,6 +485,17 @@ class TrackedWorkflow(Workflow):
             return self._track_output(result, kwargs)
         return self._track_stream(result, kwargs)
 
+    async def acontinue_run(self, *args: Any, **kwargs: Any) -> Any:
+        """Continue depois da revisão humana: atualiza o mesmo agent_run (ADR-0023)."""
+        if self.automata_config_id is None or kwargs.get("background"):
+            return await super().acontinue_run(*args, **kwargs)
+        paused = kwargs.get("run_response")
+        run_id = kwargs.get("run_id") or getattr(paused, "run_id", None)
+        track = {**kwargs, "run_id": run_id}
+        if kwargs.get("stream"):
+            return self._track_stream(await super().acontinue_run(*args, **kwargs), track)
+        return await self._track_output(super().acontinue_run(*args, **kwargs), track)
+
     def _record(
         self,
         kwargs: dict[str, Any],
@@ -461,6 +504,7 @@ class TrackedWorkflow(Workflow):
         run_id: str | None,
         status: str,
         error: str | None,
+        pending: list[dict[str, Any]] | None = None,
     ) -> RunRecord:
         assert self.automata_config_id is not None
         # caso da suíte (ADR-0022): o run do workflow fica fora das conversas, como as etapas
@@ -475,6 +519,7 @@ class TrackedWorkflow(Workflow):
             error=error,
             session_id=kwargs.get("session_id") or (output.session_id if output else None),
             eval_run_id=evaluation.eval_run_id if evaluation else None,
+            pending_steps=pending if status == "paused" else None,
         )
 
     def _failed(
@@ -508,7 +553,10 @@ class TrackedWorkflow(Workflow):
             current_workflow_run.reset(token)
         status = _STATUS.get(output.status, "success") if output.status else "success"
         error = str(output.content) if status == "error" and output.content else None
-        await RunTracking._save(self._record(kwargs, start, output, output.run_id, status, error))
+        pending = pending_steps(output.step_requirements) if status == "paused" else None
+        await RunTracking._save(
+            self._record(kwargs, start, output, output.run_id, status, error, pending)
+        )
         return output
 
     async def _track_stream(self, stream: AsyncIterator[Any], kwargs: dict[str, Any]) -> Any:
@@ -516,6 +564,7 @@ class TrackedWorkflow(Workflow):
         run_id: str | None = kwargs.get("run_id")
         last_event: str | None = None
         error: str | None = None
+        pending: list[dict[str, Any]] | None = None
         # gerador: o contexto vale enquanto ele é iterado, na task de quem consome o stream
         current_workflow_run.set(run_id)
         try:
@@ -525,6 +574,8 @@ class TrackedWorkflow(Workflow):
                 if name in _WORKFLOW_END_EVENTS:
                     last_event = name
                     error = getattr(event, "error", None) or error
+                if name == "WorkflowPaused":
+                    pending = pending_steps(getattr(event, "step_requirements", None))
                 yield event
         except (asyncio.CancelledError, GeneratorExit):
             RunTracking._schedule(self._record(kwargs, start, None, run_id, "cancelled", None))
@@ -540,4 +591,4 @@ class TrackedWorkflow(Workflow):
             await RunTracking._save(self._record(kwargs, start, None, run_id, "error", str(exc)))
             return
         status = _WORKFLOW_END_EVENTS.get(last_event or "", "success")
-        await RunTracking._save(self._record(kwargs, start, None, run_id, status, error))
+        await RunTracking._save(self._record(kwargs, start, None, run_id, status, error, pending))
