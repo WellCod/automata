@@ -14,7 +14,7 @@ O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é
 | **Backend** | Python 3.12 · FastAPI · Agno 3.1.8 · PostgreSQL 17 + pgvector · Redis · Alembic |
 | **Frontend** | Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · TanStack Query |
 | **Qualidade** | mypy strict · ruff · ~510 testes pytest (testcontainers) · 136 testes Vitest · Playwright · evals |
-| **Decisões** | 20 ADRs com contexto, alternativas descartadas e gatilho de reversão |
+| **Decisões** | 21 ADRs com contexto, alternativas descartadas e gatilho de reversão |
 
 ---
 
@@ -341,6 +341,7 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0018](docs/adr/0018-avisos-de-regressao.md) | Avisos de regressão por webhook assinado nas mudanças de estado da suíte agendada |
 | [0019](docs/adr/0019-compactacao-de-conversa.md) | Compactação de conversa por agente no payload versionado, limite de 16 mil tokens |
 | [0020](docs/adr/0020-fila-duravel.md) | Fila durável para runs em background, uma tentativa e 15 min por execução |
+| [0021](docs/adr/0021-orcamento-e-alertas.md) | Custo estimado pela tabela de preços, orçamento mensal com bloqueio e destinos de aviso (proposto, Fase 22) |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 
@@ -418,7 +419,7 @@ web/
   src/lib/        client gerado do OpenAPI, SSE, progresso do workflow
   e2e/            Playwright
 docs/
-  adr/            20 Architecture Decision Records
+  adr/            21 Architecture Decision Records
   roadmap.md      fases, auditorias e critérios de aceite
 DESIGN.md         sistema visual do painel
 DEMO.md           demo local sem chave de LLM
