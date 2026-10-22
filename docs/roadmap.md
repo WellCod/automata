@@ -992,7 +992,7 @@ Decisão em [ADR-0021](adr/0021-orcamento-e-alertas.md). O custo passa a ser cal
 - [x] `feat(api)`: orçamento mensal por config com aviso e bloqueio antes do run (`budget_exceeded`)
 - [x] `feat(api)`: destinos de aviso da instância com orçamento, pico de erro e eventos da suíte
 - [x] `feat(web)`: orçamento no desempenho do agente e página de alertas
-- [ ] `test(api)`: evals do custo estimado, do orçamento e do pico de erro
+- [x] `test(api)`: evals do custo estimado, do orçamento e do pico de erro
 
 **Critério de aceite da fase:**
 
