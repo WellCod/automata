@@ -1,4 +1,63 @@
 export interface paths {
+  "/api/v1/alert-destinations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Destinations */
+    get: operations["list_destinations_api_v1_alert_destinations_get"];
+    put?: never;
+    /**
+     * Create Destination
+     * @description Cadastra o destino; o segredo é devolvido uma vez só.
+     */
+    post: operations["create_destination_api_v1_alert_destinations_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/alert-destinations/{destination_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Update Destination */
+    put: operations["update_destination_api_v1_alert_destinations__destination_id__put"];
+    post?: never;
+    /** Delete Destination */
+    delete: operations["delete_destination_api_v1_alert_destinations__destination_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/alert-destinations/{destination_id}/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Test Destination
+     * @description Manda um alert.test, uma tentativa só, para conferir a integração.
+     */
+    post: operations["test_destination_api_v1_alert_destinations__destination_id__test_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/approvals": {
     parameters: {
       query?: never;
@@ -1131,6 +1190,109 @@ export interface components {
        * Format: date-time
        */
       created_at: string;
+    };
+    /** AlertDestinationCreate */
+    AlertDestinationCreate: {
+      /** Name */
+      name: string;
+      /** Url */
+      url: string;
+      /** Events */
+      events: (
+        | "budget.warning"
+        | "budget.exceeded"
+        | "errors.spike"
+        | "suite.regressed"
+        | "suite.failing"
+        | "suite.recovered"
+      )[];
+    };
+    /** AlertDestinationIssued */
+    AlertDestinationIssued: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Name */
+      name: string;
+      /** Host */
+      host: string;
+      /** Events */
+      events: (
+        | "budget.warning"
+        | "budget.exceeded"
+        | "errors.spike"
+        | "suite.regressed"
+        | "suite.failing"
+        | "suite.recovered"
+      )[];
+      /** Created By */
+      created_by: string;
+      /** Last Status */
+      last_status: string | null;
+      /** Last At */
+      last_at: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Secret */
+      secret: string;
+    };
+    /** AlertDestinationResponse */
+    AlertDestinationResponse: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Name */
+      name: string;
+      /** Host */
+      host: string;
+      /** Events */
+      events: (
+        | "budget.warning"
+        | "budget.exceeded"
+        | "errors.spike"
+        | "suite.regressed"
+        | "suite.failing"
+        | "suite.recovered"
+      )[];
+      /** Created By */
+      created_by: string;
+      /** Last Status */
+      last_status: string | null;
+      /** Last At */
+      last_at: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** AlertDestinationUpdate */
+    AlertDestinationUpdate: {
+      /** Name */
+      name: string;
+      /** Events */
+      events: (
+        | "budget.warning"
+        | "budget.exceeded"
+        | "errors.spike"
+        | "suite.regressed"
+        | "suite.failing"
+        | "suite.recovered"
+      )[];
+    };
+    /** AlertTestResult */
+    AlertTestResult: {
+      /** Status */
+      status: string;
+      /** Delivered */
+      delivered: boolean;
     };
     /** ApprovalItem */
     ApprovalItem: {
@@ -2721,6 +2883,154 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  list_destinations_api_v1_alert_destinations_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AlertDestinationResponse"][];
+        };
+      };
+    };
+  };
+  create_destination_api_v1_alert_destinations_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AlertDestinationCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AlertDestinationIssued"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_destination_api_v1_alert_destinations__destination_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        destination_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AlertDestinationUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AlertDestinationResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_destination_api_v1_alert_destinations__destination_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        destination_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  test_destination_api_v1_alert_destinations__destination_id__test_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        destination_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AlertTestResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   list_pending_api_v1_approvals_get: {
     parameters: {
       query?: {

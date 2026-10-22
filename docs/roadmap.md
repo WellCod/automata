@@ -990,7 +990,7 @@ Decisão em [ADR-0021](adr/0021-orcamento-e-alertas.md). O custo passa a ser cal
 - [ ] #164 — `docs(adr)`: ADR-0021 e esta seção
 - [x] `feat(api)`: preço por modelo na matriz e custo calculado pelos tokens quando o provedor não informa, com `MODEL_PRICES` para sobrescrever
 - [x] `feat(api)`: orçamento mensal por config com aviso e bloqueio antes do run (`budget_exceeded`)
-- [ ] `feat(api)`: destinos de aviso da instância com orçamento, pico de erro e eventos da suíte
+- [x] `feat(api)`: destinos de aviso da instância com orçamento, pico de erro e eventos da suíte
 - [ ] `feat(web)`: orçamento no desempenho do agente e página de alertas
 - [ ] `test(api)`: evals do custo estimado, do orçamento e do pico de erro
 

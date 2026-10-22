@@ -2,6 +2,8 @@
 
 Depois de cada execução agendada, compara com a agendada anterior e só avisa
 quando o estado muda: suíte quebrada há dias não manda uma mensagem por horário.
+O mesmo evento vai ao webhook do agendamento e aos destinos de aviso da
+instância que o assinam (ADR-0021).
 """
 
 import logging
@@ -11,6 +13,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import alerts
 from app.db import get_engine
 from app.evals import webhook
 from app.evals.compare import compare
@@ -84,7 +87,7 @@ def _notify(run_id: UUID) -> str | None:
         if run is None or run.trigger != "schedule":
             return None
         schedule = EvalScheduleRepository(session).get(run.agent_config_id)
-        if schedule is None or schedule.webhook_encrypted is None:
+        if schedule is None:
             return None
         previous = _previous(session, run)
         regressions: list[str] = []
@@ -96,27 +99,25 @@ def _notify(run_id: UUID) -> str | None:
             return None
         config = session.get(AgentConfig, run.agent_config_id)
         name = config.name if config is not None else str(run.agent_config_id)
-        try:
-            target = webhook.unseal(schedule.webhook_encrypted)
-        except SecretsKeyMissing as exc:
-            schedule.webhook_last_status = f"recusado: {exc}"
+        data = {
+            "config_id": str(run.agent_config_id),
+            "config_name": name,
+            "run_id": str(run.id),
+            "previous_run_id": str(previous.id) if previous is not None else None,
+            "passed": run.passed,
+            "total": run.total,
+            "regressions": regressions,
+        }
+        text = _text(event, name, run, regressions)
+        sent = alerts.broadcast(session, event, data, text) > 0
+        if schedule.webhook_encrypted is not None:
+            try:
+                target = webhook.unseal(schedule.webhook_encrypted)
+                status = webhook.deliver(target, event, webhook.body_for(event, data, text))
+                sent = True
+            except SecretsKeyMissing as exc:
+                status = f"recusado: {exc}"
+            schedule.webhook_last_status = status
             schedule.webhook_last_at = datetime.now(UTC)
             session.commit()
-            return None
-        body = webhook.body_for(
-            event,
-            {
-                "config_id": str(run.agent_config_id),
-                "config_name": name,
-                "run_id": str(run.id),
-                "previous_run_id": str(previous.id) if previous is not None else None,
-                "passed": run.passed,
-                "total": run.total,
-                "regressions": regressions,
-            },
-            _text(event, name, run, regressions),
-        )
-        schedule.webhook_last_status = webhook.deliver(target, event, body)
-        schedule.webhook_last_at = datetime.now(UTC)
-        session.commit()
-        return event
+        return event if sent else None
