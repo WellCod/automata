@@ -106,14 +106,13 @@ export function removeAt<T>(list: T[], index: number): T[] {
   return list.filter((_, i) => i !== index);
 }
 
-// revisão humana só fora de paralelo e de laço (ADR-0023); condição não conta
-export function reviewsInsideContainers(nodes: WorkflowNode[], inside = false): string[] {
-  return nodes.flatMap((n) => {
-    if (n.type === "step") return inside && n.review ? [n.name] : [];
-    if (n.type === "condition")
-      return reviewsInsideContainers([...n.steps, ...(n.else_steps ?? [])], inside);
-    return reviewsInsideContainers(children(n), true);
-  });
+// revisão humana só no nível principal (ADR-0023): o Agno 3.1.8 não pausa etapa
+// dentro de condição, e em paralelo e laço o contêiner ficaria pela metade
+export function reviewsInsideContainers(nodes: WorkflowNode[]): string[] {
+  return nodes
+    .flatMap((n) => allNodes(children(n)))
+    .filter((n) => n.type === "step" && n.review)
+    .map((n) => n.name);
 }
 
 // mesmas regras estruturais da API, para avisar antes de salvar
@@ -136,7 +135,7 @@ export function structureErrors(nodes: WorkflowNode[]): string[] {
   }
   if (countSteps(nodes) > MAX_STEPS) errors.push(`No máximo ${MAX_STEPS} etapas.`);
   for (const name of reviewsInsideContainers(nodes))
-    errors.push(`"${name}" está num paralelo ou laço: revisão humana só fora deles.`);
+    errors.push(`"${name}" está dentro de um contêiner: revisão humana só no nível principal.`);
   if (nodes.at(-1)?.type === "parallel")
     errors.push("O workflow não pode terminar num paralelo: junte os ramos numa etapa.");
   return [...new Set(errors)];
