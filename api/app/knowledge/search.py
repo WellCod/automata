@@ -15,6 +15,7 @@ from app.knowledge.runtime import metered as metered_embedder
 from app.knowledge.runtime import vector_db_for
 from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_content import KnowledgeContent
+from app.pricing import cost_or_estimate
 from app.repositories.embedding_usage import record_embedding_usage
 from app.repositories.usage import UsageRepository
 from app.schemas.knowledge_base import RetrievalSettings
@@ -82,7 +83,7 @@ def _record_hyde(caller: Caller, model_id: str, usage: JudgeUsage) -> None:
             input_tokens=usage.input_tokens,
             output_tokens=usage.output_tokens,
             total_tokens=usage.total_tokens,
-            cost=usage.cost,
+            cost=cost_or_estimate(usage.cost, model_id, usage.input_tokens, usage.output_tokens),
             run_id=caller.run_id,
             eval_run_id=evaluation.eval_run_id if evaluation else None,
         )

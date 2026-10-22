@@ -563,6 +563,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/models/prices": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Prices
+     * @description Dólar por milhão de tokens, com os ajustes de MODEL_PRICES (ADR-0021).
+     */
+    get: operations["list_prices_api_v1_models_prices_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/models/capabilities": {
     parameters: {
       query?: never;
@@ -4034,6 +4054,30 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_prices_api_v1_models_prices_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: {
+              [key: string]: number;
+            };
+          };
         };
       };
     };

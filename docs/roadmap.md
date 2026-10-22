@@ -988,7 +988,7 @@ Fica para depois: retry por agente marcado como idempotente, fila em banco próp
 Decisão em [ADR-0021](adr/0021-orcamento-e-alertas.md). O custo passa a ser calculado pela tabela de preços quando o provedor não informa: Anthropic e OpenAI só devolvem tokens, e o custo vinha vazio com chave real. Cada agente, time e workflow pode ter um orçamento mensal, com aviso e bloqueio opcional. Destinos de aviso da instância recebem orçamento, pico de erro e eventos da suíte.
 
 - [ ] #164 — `docs(adr)`: ADR-0021 e esta seção
-- [ ] `feat(api)`: preço por modelo na matriz e custo calculado pelos tokens quando o provedor não informa, com `MODEL_PRICES` para sobrescrever
+- [x] `feat(api)`: preço por modelo na matriz e custo calculado pelos tokens quando o provedor não informa, com `MODEL_PRICES` para sobrescrever
 - [ ] `feat(api)`: orçamento mensal por config com aviso e bloqueio antes do run (`budget_exceeded`)
 - [ ] `feat(api)`: destinos de aviso da instância com orçamento, pico de erro e eventos da suíte
 - [ ] `feat(web)`: orçamento no desempenho do agente e página de alertas

@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     # runs com background=true na fila durável do Agno, no Postgres (ADR-0020);
     # false volta às tasks em memória
     background_queue_durable: bool = True
+    # sobrescreve o preço de referência por modelo, em JSON (ADR-0021)
+    model_prices: str = ""
     # Bases de conhecimento (ADR-0012): embedder escolhido na criação de cada base
     knowledge_default_embedder: Literal["voyage", "openai"] = "voyage"
     # Lida pelo SDK da Voyage; a do OpenAI vem de OPENAI_API_KEY, como nos modelos
