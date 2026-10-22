@@ -116,17 +116,17 @@ def step_nodes(nodes: list["WorkflowNode"]) -> list[StepNode]:
     return [n for n, _ in walk(nodes) if isinstance(n, StepNode)]
 
 
-def _reviews_inside_containers(nodes: list["WorkflowNode"], inside: bool = False) -> list[str]:
-    found: list[str] = []
-    for node in nodes:
-        if isinstance(node, StepNode):
-            if inside and node.review is not None:
-                found.append(node.name)
-        elif isinstance(node, ConditionNode):
-            found += _reviews_inside_containers([*node.steps, *node.else_steps], inside)
-        else:
-            found += _reviews_inside_containers(_children(node), True)
-    return found
+def _reviews_inside_containers(nodes: list["WorkflowNode"]) -> list[str]:
+    """Etapas com revisão fora do nível principal.
+
+    No Agno 3.1.8 a revisão de etapa dentro de condição não pausa; em paralelo e laço
+    a pausa deixaria o contêiner num estado que o painel não mostra (ADR-0023).
+    """
+    return [
+        n.name
+        for n, depth in walk(nodes)
+        if depth > 1 and isinstance(n, StepNode) and n.review is not None
+    ]
 
 
 class WorkflowSettings(BaseModel):
@@ -148,9 +148,9 @@ class WorkflowSettings(BaseModel):
             raise ValueError(f"no máximo {MAX_STEPS} etapas")
         revisadas = sorted(_reviews_inside_containers(self.steps))
         if revisadas:
-            # a pausa num ramo ou numa volta deixaria o resto do contêiner num estado
-            # que o painel não mostra com clareza (ADR-0023)
-            raise ValueError(f"revisão humana fora de paralelo e de laço: {revisadas}")
+            raise ValueError(
+                f"revisão humana só em etapa do nível principal do workflow: {revisadas}"
+            )
         if isinstance(self.steps[-1], ParallelNode):
             # a saída final seria só a do último ramo
             raise ValueError("o workflow não pode terminar num paralelo: adicione uma etapa depois")
