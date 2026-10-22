@@ -17,6 +17,7 @@ from agno.tools.mcp import MCPTools
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.agents.memory import memory_kwargs
 from app.agents.models_map import resolve_model
 from app.agents.tracking import TrackedAgent, TrackedTeam
 from app.budget import BudgetGuardrail, hard_limit
@@ -174,7 +175,14 @@ def required_model(payload: ConfigPayload) -> str:
     return payload.model_id
 
 
-def agent_from(config_id: UUID, resolved: ResolvedVersion, *, tracked: bool) -> Agent:
+def agent_from(
+    config_id: UUID,
+    resolved: ResolvedVersion,
+    *,
+    tracked: bool,
+    memory_user: str | None = None,
+) -> Agent:
+    """`memory_user` liga a memória do usuário (ADR-0025); sem ele, o agente não lembra."""
     payload = resolved.payload
     cls = TrackedAgent if tracked else Agent
     blocks = BlockLog()
@@ -195,6 +203,7 @@ def agent_from(config_id: UUID, resolved: ResolvedVersion, *, tracked: bool) -> 
         num_history_runs=HISTORY_RUNS,
         # com compactação, a janela vai até o limite e o num_history_runs deixa de valer
         compaction=compaction_for(payload.conversation),
+        **memory_kwargs(str(config_id), payload.memory, memory_user if tracked else None),
     )
     if isinstance(agent, TrackedAgent):
         agent.automata_config_id = config_id
@@ -215,7 +224,7 @@ def make_agent_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> AgentFactor
         version_id = ctx.input.version_id if isinstance(ctx.input, FactoryInput) else None
         # leitura síncrona do banco fora do event loop
         resolved = await asyncio.to_thread(load_version, config_id, version_id)
-        return agent_from(config_id, resolved, tracked=True)
+        return agent_from(config_id, resolved, tracked=True, memory_user=ctx.user_id)
 
     return AgentFactory(
         id=str(config_id),

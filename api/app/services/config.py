@@ -151,6 +151,9 @@ class ConfigService:
         if payload.conversation.compaction and config.kind != ConfigKind.agent:
             # o Team do Agno 3.1.8 não aceita compaction (ADR-0019)
             errors.append("só agente compacta a conversa")
+        if payload.memory.enabled and config.kind != ConfigKind.agent:
+            # memória do líder e dos membros se misturariam (ADR-0025)
+            errors.append("só agente guarda memória do usuário")
         if errors:
             raise ValueError("; ".join(errors))
 

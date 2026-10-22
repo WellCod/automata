@@ -130,6 +130,15 @@ class ConversationSettings(BaseModel):
     search_history: bool = True
 
 
+class MemorySettings(BaseModel):
+    """Memória do usuário entre sessões (ADR-0025): só deste agente, mascarada e com prazo."""
+
+    enabled: bool = False
+    # o que vale lembrar, ex.: "preferências de entrega e tamanho que veste"
+    instructions: str | None = Field(default=None, max_length=500)
+    retention_days: int = Field(default=90, ge=1, le=365)
+
+
 class TeamSettings(BaseModel):
     """Seção de time do payload. Só existe em config de kind=team."""
 
@@ -166,6 +175,7 @@ class ConfigPayload(BaseModel):
     guardrails: GuardrailSettings = Field(default_factory=GuardrailSettings)
     capabilities: CapabilityFlags = Field(default_factory=CapabilityFlags)
     conversation: ConversationSettings = Field(default_factory=ConversationSettings)
+    memory: MemorySettings = Field(default_factory=MemorySettings)
     metadata: dict[str, Any] = Field(default_factory=dict)
     # Em time: modelo, instruções e MCP acima são do líder
     team: TeamSettings | None = None
