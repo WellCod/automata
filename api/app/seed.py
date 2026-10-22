@@ -375,22 +375,49 @@ _EVAL_CASES: list[dict[str, Any]] = [
 ]
 
 
+# suíte do workflow (ADR-0022): o caminho muda pela palavra "reembolso" na entrada
+_WORKFLOW_EVAL_CASES: list[dict[str, Any]] = [
+    {
+        "name": "reembolso passa pela revisão",
+        "input": "Quero reembolso do pedido 4521, o produto chegou com defeito.",
+        "checks": [{"type": "steps", "steps": ["triagem", "consolidação", "revisão"]}],
+    },
+    {
+        "name": "dúvida sem reembolso não revisa",
+        "input": "O produto do pedido 4521 aquece muito, isso é normal?",
+        "checks": [
+            {
+                "type": "steps",
+                "steps": ["triagem", "técnica", "financeira", "consolidação"],
+                "exclusive": True,
+            },
+            {"type": "text", "kind": "not_empty"},
+        ],
+    },
+]
+
+
 def seed_evals(session: Session) -> None:
-    """Casos de teste de exemplo no agente de atendimento."""
+    """Casos de teste de exemplo no agente de atendimento e no workflow."""
+    _seed_suite(session, _EVAL_AGENT, _EVAL_CASES)
+    _seed_suite(session, _WORKFLOW_NAME, _WORKFLOW_EVAL_CASES)
+
+
+def _seed_suite(session: Session, config_name: str, cases: list[dict[str, Any]]) -> None:
     from app.models.eval import EvalCase
     from app.repositories.eval import EvalCaseRepository
     from app.schemas.eval import EvalCaseInput
 
-    agents, _ = ConfigService(ConfigRepository(session)).list_configs(q=_EVAL_AGENT)
-    agent = next((a for a in agents if a.name == _EVAL_AGENT), None)
+    configs, _ = ConfigService(ConfigRepository(session)).list_configs(q=config_name)
+    agent = next((a for a in configs if a.name == config_name), None)
     if agent is None:
         return
     repo = EvalCaseRepository(session)
     if repo.count(agent.id) > 0:
-        logger.info("suíte de exemplo já existe")
+        logger.info("suíte de exemplo já existe em %s", config_name)
         return
     email = os.environ["SEED_OWNER_EMAIL"]
-    for position, raw in enumerate(_EVAL_CASES):
+    for position, raw in enumerate(cases):
         case = EvalCaseInput.model_validate(raw)
         repo.add(
             EvalCase(
@@ -403,7 +430,7 @@ def seed_evals(session: Session) -> None:
             )
         )
     session.commit()
-    logger.info("suíte de exemplo criada em %s", _EVAL_AGENT)
+    logger.info("suíte de exemplo criada em %s", config_name)
 
 
 def seed_knowledge(session: Session) -> None:

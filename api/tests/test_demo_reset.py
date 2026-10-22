@@ -191,3 +191,9 @@ def test_seed_cria_workflow_de_exemplo_sem_runs_falsos(
         ]
         assert len(cases) == 4
         assert {check["type"] for c in cases for check in c.checks} == {"text", "tools", "judge"}
+        # e no workflow, conferindo o caminho pela condição de reembolso (ADR-0022)
+        wf_cases = session.scalars(
+            select(EvalCase).where(EvalCase.agent_config_id == workflow.id)
+        ).all()
+        assert len(wf_cases) == 2
+        assert all(any(ch["type"] == "steps" for ch in c.checks) for c in wf_cases)
