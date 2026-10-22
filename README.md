@@ -155,6 +155,8 @@ O custo sai da tabela de preços de cada modelo quando o provedor só informa to
 
 <p align="center"><img src="docs/img/orcamento.png" alt="Orçamento do mês no desempenho de um agente" width="600"></p>
 
+![Destinos de aviso da instância](docs/img/alertas.png)
+
 ![Analytics](docs/img/analytics.png)
 
 Tema claro e escuro, escolhido pelo usuário:
