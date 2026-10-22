@@ -21,8 +21,18 @@ export interface StepProgress {
   output?: string;
 }
 
+// etapa esperando revisão humana (ADR-0023), lida do requisito ativo do run
+export interface PendingReview {
+  stepName: string;
+  when: "before" | "after";
+  message?: string;
+  output?: string;
+}
+
 export interface WorkflowProgress {
-  status: "idle" | "running" | "done" | "error";
+  status: "idle" | "running" | "done" | "error" | "paused";
+  runId: string | null;
+  pending: PendingReview | null;
   steps: StepProgress[];
   open: number[];
   final: string;
@@ -33,6 +43,8 @@ export interface WorkflowProgress {
 
 export const EMPTY_PROGRESS: WorkflowProgress = {
   status: "idle",
+  runId: null,
+  pending: null,
   steps: [],
   open: [],
   final: "",
@@ -89,12 +101,56 @@ function failRunning(p: WorkflowProgress, detail: string): WorkflowProgress {
   };
 }
 
+// o continue substitui a lista de requisitos e o ativo é o último
+export function pendingFrom(requirements: unknown): PendingReview | null {
+  if (!Array.isArray(requirements) || requirements.length === 0) return null;
+  const active = requirements[requirements.length - 1] as Record<string, unknown>;
+  if (active.confirmed === true || active.confirmed === false) return null;
+  const after = active.requires_output_review === true;
+  const output = (active.step_output ?? {}) as { content?: unknown };
+  return {
+    stepName: str(active.step_name) ?? "etapa",
+    when: after ? "after" : "before",
+    message: str(after ? active.output_review_message : active.confirmation_message),
+    output: after ? str(output.content) : undefined,
+  };
+}
+
+// resposta do continue sem stream: as etapas depois da revisão não têm progresso próprio
+export function applyContinue(
+  p: WorkflowProgress,
+  output: Record<string, unknown>,
+): WorkflowProgress {
+  const status = str(output.status)?.toUpperCase();
+  if (status === "PAUSED") {
+    return { ...p, status: "paused", pending: pendingFrom(output.step_requirements) };
+  }
+  if (status === "COMPLETED") {
+    return { ...p, status: "done", pending: null, final: str(output.content) ?? "" };
+  }
+  const error =
+    status === "CANCELLED"
+      ? "Revisão recusada: workflow encerrado."
+      : (str(output.content) ?? "O workflow falhou.");
+  return { ...p, status: "error", pending: null, error };
+}
+
 export function applyEvent(p: WorkflowProgress, { event, data }: SseEvent): WorkflowProgress {
   const name = str(data.step_name);
   const next =
     p.sessionId === null && str(data.session_id) ? { ...p, sessionId: str(data.session_id)! } : p;
 
-  if (event === "WorkflowStarted") return { ...next, status: "running" };
+  if (event === "WorkflowStarted") {
+    return { ...next, status: "running", runId: str(data.run_id) ?? next.runId };
+  }
+  if (event === "WorkflowPaused") {
+    return {
+      ...next,
+      status: "paused",
+      runId: str(data.run_id) ?? next.runId,
+      pending: pendingFrom(data.step_requirements),
+    };
+  }
   if (event === "WorkflowCompleted") {
     return { ...next, status: "done", final: str(data.content) ?? next.final, open: [] };
   }

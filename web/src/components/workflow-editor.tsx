@@ -9,6 +9,7 @@ import {
   type NodeType,
   RULE_KINDS,
   type StepNode,
+  type StepReview,
   type WorkflowNode,
   type WorkflowRule,
   move,
@@ -54,6 +55,8 @@ interface Ctx {
   executors: Executor[];
   // nomes na árvore inteira: nó novo nunca repete nome
   taken: Set<string>;
+  // fora de paralelo e de laço a etapa pode pausar para revisão humana (ADR-0023)
+  reviewable: boolean;
 }
 
 function executorKey(step: StepNode): string {
@@ -183,6 +186,107 @@ function StepFields({
           className={`${inputCls} w-14`}
         />
       </label>
+      {(ctx.reviewable || node.review) && (
+        <ReviewFields node={node} onChange={onChange} reviewable={ctx.reviewable} />
+      )}
+    </div>
+  );
+}
+
+const NEW_REVIEW: StepReview = {
+  when: "after",
+  message: "",
+  on_reject: "cancel",
+  timeout_hours: null,
+};
+
+function ReviewFields({
+  node,
+  onChange,
+  reviewable,
+}: {
+  node: StepNode;
+  onChange: (n: StepNode) => void;
+  reviewable: boolean;
+}) {
+  const review = node.review ?? null;
+  const set = (next: Partial<StepReview>) =>
+    onChange({ ...node, review: { ...(review ?? NEW_REVIEW), ...next } });
+  return (
+    <div className="flex w-full flex-col gap-1.5">
+      <label className="text-foreground flex items-center gap-1.5 text-[12px]">
+        <input
+          type="checkbox"
+          checked={review != null}
+          onChange={(e) => onChange({ ...node, review: e.target.checked ? NEW_REVIEW : null })}
+        />
+        Pausar para revisão humana
+      </label>
+      {review && !reviewable && (
+        <p className="text-destructive text-[11px]">
+          Revisão humana só vale no nível principal do workflow. Desmarque ou mova a etapa.
+        </p>
+      )}
+      {review && (
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label={`Quando revisar ${node.name}`}
+            value={review.when}
+            onChange={(e) => {
+              const when = e.target.value as StepReview["when"];
+              // refazer só existe depois da saída: antes de rodar não há o que refazer
+              set({
+                when,
+                on_reject:
+                  when === "before" && review.on_reject === "retry" ? "cancel" : review.on_reject,
+              });
+            }}
+            className={inputCls}
+          >
+            <option value="before">Confirmar antes de rodar</option>
+            <option value="after">Aprovar a saída antes da próxima etapa</option>
+          </select>
+          <select
+            aria-label={`Se recusarem ${node.name}`}
+            value={review.on_reject}
+            onChange={(e) => set({ on_reject: e.target.value as StepReview["on_reject"] })}
+            className={inputCls}
+          >
+            <option value="cancel">Se recusarem, encerra o fluxo</option>
+            <option value="skip">Se recusarem, pula a etapa</option>
+            {review.when === "after" && (
+              <option value="retry">Se recusarem, refaz com o motivo</option>
+            )}
+          </select>
+          <label className="text-muted-foreground flex items-center gap-1 text-[12px]">
+            Prazo
+            <input
+              type="number"
+              min={1}
+              max={168}
+              placeholder="sem"
+              value={review.timeout_hours ?? ""}
+              onChange={(e) =>
+                set({
+                  timeout_hours: e.target.value
+                    ? Math.min(168, Math.max(1, Number(e.target.value)))
+                    : null,
+                })
+              }
+              className={`${inputCls} w-16`}
+            />
+            horas
+          </label>
+          <input
+            aria-label={`O que conferir em ${node.name}`}
+            value={review.message ?? ""}
+            maxLength={300}
+            placeholder="O que o revisor precisa conferir"
+            onChange={(e) => set({ message: e.target.value })}
+            className={`${inputCls} min-w-56 flex-1`}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -316,7 +420,7 @@ function NodeCard({
           nodes={node.branches}
           onChange={(branches) => onChange({ ...node, branches: branches as StepNode[] })}
           depth={depth + 1}
-          ctx={ctx}
+          ctx={{ ...ctx, reviewable: false }}
           types={["step"]}
           min={2}
           max={MAX_BRANCHES}
@@ -341,7 +445,7 @@ function NodeCard({
               nodes={node.steps}
               onChange={(steps) => onChange({ ...node, steps })}
               depth={depth + 1}
-              ctx={ctx}
+              ctx={{ ...ctx, reviewable: false }}
               min={1}
             />
           </div>
@@ -351,7 +455,7 @@ function NodeCard({
               nodes={node.else_steps ?? []}
               onChange={(else_steps) => onChange({ ...node, else_steps })}
               depth={depth + 1}
-              ctx={ctx}
+              ctx={{ ...ctx, reviewable: false }}
             />
           </div>
         </>
@@ -405,7 +509,7 @@ function NodeCard({
             nodes={node.steps}
             onChange={(steps) => onChange({ ...node, steps })}
             depth={depth + 1}
-            ctx={ctx}
+            ctx={{ ...ctx, reviewable: false }}
             min={1}
           />
         </>
@@ -486,7 +590,7 @@ interface Props {
 
 export function WorkflowEditor({ value, onChange }: Props) {
   const { data: executors = [], isError } = usePublishedExecutors();
-  const ctx: Ctx = { executors, taken: namesOf(value) };
+  const ctx: Ctx = { executors, taken: namesOf(value), reviewable: true };
   const errors = structureErrors(value);
   return (
     <fieldset className="border-border flex flex-col gap-3 rounded border px-4 pt-3 pb-4">

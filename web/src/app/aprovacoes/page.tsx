@@ -3,11 +3,101 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { usePendingApprovals } from "@/lib/api/approvals";
+import { useState } from "react";
+import { decideWorkflowStep, type StepDecision, usePendingApprovals } from "@/lib/api/approvals";
 import type { components } from "@/lib/api/schema.d.ts";
 import { Button } from "@/components/ui/button";
 
 type ApprovalItem = components["schemas"]["ApprovalItem"];
+
+function when(iso: string): string {
+  return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function WorkflowApprovalCard({ item }: { item: ApprovalItem }) {
+  const queryClient = useQueryClient();
+  const [feedback, setFeedback] = useState("");
+  const decide = useMutation({
+    mutationFn: (decision: StepDecision) =>
+      decideWorkflowStep(item.agent_id, item.run_id, item.session_id, decision),
+    onSuccess: () => {
+      setFeedback("");
+      void queryClient.invalidateQueries({ queryKey: ["approvals"] });
+      void queryClient.invalidateQueries({ queryKey: ["runs", item.agent_id] });
+    },
+  });
+
+  return (
+    <li
+      className="border-border bg-card flex flex-col gap-3 rounded border p-4"
+      aria-label={`Workflow ${item.agent_name}`}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <Link
+          href={`/workflows/${item.agent_id}`}
+          className="text-foreground hover:text-accent text-sm font-medium"
+        >
+          {item.agent_name || item.agent_id}
+        </Link>
+        <span className="text-muted-foreground text-[13px]">
+          pedido por {item.user_id} · {when(item.created_at)}
+        </span>
+      </div>
+      {item.steps.map((step) => (
+        <div key={step.step_id ?? step.step_name} className="flex flex-col gap-1.5">
+          <p className="text-foreground text-[13px]">
+            Etapa <strong>{step.step_name}</strong>
+            {step.when === "after"
+              ? " terminou e espera aprovação da saída"
+              : " espera confirmação para rodar"}
+            {step.retry_count > 0 && ` · tentativa ${step.retry_count + 1}`}
+          </p>
+          {step.message && <p className="text-muted-foreground text-[13px]">{step.message}</p>}
+          {step.output && (
+            <pre className="border-border bg-muted text-foreground max-h-64 overflow-auto rounded border p-2 text-[12px] whitespace-pre-wrap">
+              {step.output}
+            </pre>
+          )}
+          {step.timeout_at && (
+            <p className="text-muted-foreground text-[12px]">
+              Sem decisão até {when(step.timeout_at)}, o workflow é cancelado.
+            </p>
+          )}
+        </div>
+      ))}
+      <textarea
+        aria-label="Motivo da recusa"
+        value={feedback}
+        rows={2}
+        maxLength={1000}
+        placeholder="Motivo da recusa (opcional; vai para a etapa quando ela é refeita)"
+        onChange={(e) => setFeedback(e.target.value)}
+        className="border-border text-foreground placeholder:text-muted-foreground focus:border-accent rounded border bg-[var(--input)] px-3 py-1.5 text-[13px] focus:outline-none"
+      />
+      {decide.isError && (
+        <p className="text-destructive text-[13px]" role="alert">
+          {decide.error.message}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <Button
+          disabled={decide.isPending}
+          onClick={() => decide.mutate({ approve: true })}
+          variant="strong"
+        >
+          Aprovar
+        </Button>
+        <Button
+          disabled={decide.isPending}
+          onClick={() => decide.mutate({ approve: false, feedback })}
+          variant="destructive"
+        >
+          Recusar
+        </Button>
+      </div>
+    </li>
+  );
+}
 
 function ApprovalCard({ item }: { item: ApprovalItem }) {
   const queryClient = useQueryClient();
@@ -94,8 +184,9 @@ export default function ApprovalsPage() {
       </header>
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-6 py-6">
         <p className="text-muted-foreground text-[13px]">
-          Execuções pausadas porque o agente pediu uma ferramenta marcada para confirmação. Aprovar
-          executa a ação; rejeitar segue o run sem ela.
+          Execuções pausadas esperando alguém. Agente com ferramenta marcada para confirmação:
+          aprovar executa a ação, rejeitar segue sem ela. Etapa de workflow com revisão humana:
+          aprovar segue o fluxo, recusar faz o que a etapa define (encerra, pula ou refaz).
         </p>
         {isPending && <p className="text-muted-foreground text-[13px]">Carregando…</p>}
         {isError && (
@@ -106,14 +197,18 @@ export default function ApprovalsPage() {
         {data && data.length === 0 && (
           <div className="border-border flex flex-col items-center gap-2 rounded border border-dashed px-6 py-10 text-center">
             <ShieldCheck className="text-accent h-5 w-5" aria-hidden />
-            <p className="text-foreground text-sm">Nada aguardando confirmação</p>
+            <p className="text-foreground text-sm">Nada aguardando decisão</p>
           </div>
         )}
         {data && data.length > 0 && (
           <ul className="flex flex-col gap-3" aria-live="polite">
-            {data.map((item) => (
-              <ApprovalCard key={item.run_id} item={item} />
-            ))}
+            {data.map((item) =>
+              item.kind === "workflow" ? (
+                <WorkflowApprovalCard key={item.run_id} item={item} />
+              ) : (
+                <ApprovalCard key={item.run_id} item={item} />
+              ),
+            )}
           </ul>
         )}
       </main>

@@ -7,6 +7,7 @@ export type ConditionNode = Schemas["ConditionNode"];
 export type LoopNode = Schemas["LoopNode"];
 export type WorkflowNode = StepNode | ParallelNode | ConditionNode | LoopNode;
 export type WorkflowRule = Schemas["WorkflowRule"];
+export type StepReview = Schemas["StepReview"];
 export type NodeType = WorkflowNode["type"];
 
 // mesmos limites de app/schemas/workflow.py: a API valida de novo na escrita
@@ -105,6 +106,15 @@ export function removeAt<T>(list: T[], index: number): T[] {
   return list.filter((_, i) => i !== index);
 }
 
+// revisão humana só no nível principal (ADR-0023): o Agno 3.1.8 não pausa etapa
+// dentro de condição, e em paralelo e laço o contêiner ficaria pela metade
+export function reviewsInsideContainers(nodes: WorkflowNode[]): string[] {
+  return nodes
+    .flatMap((n) => allNodes(children(n)))
+    .filter((n) => n.type === "step" && n.review)
+    .map((n) => n.name);
+}
+
 // mesmas regras estruturais da API, para avisar antes de salvar
 export function structureErrors(nodes: WorkflowNode[]): string[] {
   const errors: string[] = [];
@@ -124,6 +134,8 @@ export function structureErrors(nodes: WorkflowNode[]): string[] {
       errors.push(`Preencha o texto da regra de "${n.name}".`);
   }
   if (countSteps(nodes) > MAX_STEPS) errors.push(`No máximo ${MAX_STEPS} etapas.`);
+  for (const name of reviewsInsideContainers(nodes))
+    errors.push(`"${name}" está dentro de um contêiner: revisão humana só no nível principal.`);
   if (nodes.at(-1)?.type === "parallel")
     errors.push("O workflow não pode terminar num paralelo: junte os ramos numa etapa.");
   return [...new Set(errors)];

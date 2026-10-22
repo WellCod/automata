@@ -12,9 +12,11 @@ import {
   XCircle,
 } from "lucide-react";
 import { useState } from "react";
+import { decideWorkflowStep, type StepDecision } from "@/lib/api/approvals";
 import { blockLabel } from "@/lib/guardrail-labels";
 import { readSse } from "@/lib/sse";
 import {
+  applyContinue,
   applyEvent,
   EMPTY_PROGRESS,
   type ProgressKind,
@@ -59,10 +61,34 @@ export function WorkflowTestPanel({ workflowId, draftVersionId }: Props) {
   const [useDraft, setUseDraft] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const running = progress.status === "running";
+  const [feedback, setFeedback] = useState("");
+  const [deciding, setDeciding] = useState(false);
+
+  async function decide(decision: StepDecision) {
+    if (!progress.runId) return;
+    setDeciding(true);
+    setFailure(null);
+    try {
+      const output = await decideWorkflowStep(
+        workflowId,
+        progress.runId,
+        progress.sessionId,
+        decision,
+      );
+      setFeedback("");
+      setProgress((p) => applyContinue(p, output));
+    } catch (e) {
+      setFailure(e instanceof Error ? e.message : "Falha ao registrar a decisão.");
+    } finally {
+      setDeciding(false);
+      void queryClient.invalidateQueries({ queryKey: ["runs", workflowId] });
+      void queryClient.invalidateQueries({ queryKey: ["approvals"] });
+    }
+  }
 
   async function send() {
     const text = input.trim();
-    if (!text || running) return;
+    if (!text || running || progress.status === "paused") return;
     setInput("");
     setMessage(text);
     setFailure(null);
@@ -174,6 +200,55 @@ export function WorkflowTestPanel({ workflowId, draftVersionId }: Props) {
             );
           })}
         </ol>
+      )}
+
+      {progress.status === "paused" && progress.pending && (
+        <div
+          role="group"
+          aria-label="Revisão humana"
+          className="flex flex-col gap-1.5 rounded border border-amber-500/50 p-2.5 text-[12px]"
+        >
+          <p className="text-foreground">
+            <strong>{progress.pending.stepName}</strong>
+            {progress.pending.when === "after"
+              ? " terminou e espera aprovação da saída."
+              : " espera confirmação para rodar."}
+          </p>
+          {progress.pending.message && (
+            <p className="text-muted-foreground">{progress.pending.message}</p>
+          )}
+          {progress.pending.output && (
+            <pre className="border-border bg-muted text-foreground max-h-48 overflow-auto rounded border p-2 whitespace-pre-wrap">
+              {progress.pending.output}
+            </pre>
+          )}
+          <textarea
+            aria-label="Motivo da recusa no teste"
+            value={feedback}
+            rows={2}
+            placeholder="Motivo da recusa (opcional)"
+            onChange={(e) => setFeedback(e.target.value)}
+            className="border-border text-foreground placeholder:text-muted-foreground focus:border-accent rounded border bg-[var(--input)] px-2 py-1 focus:outline-none"
+          />
+          <div className="flex gap-2">
+            <Button
+              size="xs"
+              variant="strong"
+              disabled={deciding}
+              onClick={() => void decide({ approve: true })}
+            >
+              Aprovar
+            </Button>
+            <Button
+              size="xs"
+              variant="destructive"
+              disabled={deciding}
+              onClick={() => void decide({ approve: false, feedback })}
+            >
+              Recusar
+            </Button>
+          </div>
+        </div>
       )}
 
       {progress.status === "done" && progress.final && (
