@@ -47,3 +47,4 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0019](0019-compactacao-de-conversa.md) | Compactação de conversa por agente, versionada no payload, com limite baixo | Aceito |
 | [0020](0020-fila-duravel.md) | Fila durável do Agno para runs em background, no Postgres, com Redis opcional | Aceito |
 | [0021](0021-orcamento-e-alertas.md) | Custo pela tabela de preços, orçamento mensal por config e destinos de aviso | Proposto |
+| [0022](0022-suite-de-workflow-e-bloqueio.md) | Suíte de testes para workflows e caso que espera bloqueio de guardrail | Proposto |
