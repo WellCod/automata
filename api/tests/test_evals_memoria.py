@@ -36,6 +36,14 @@ def test_texto_sem_dado_pessoal_fica_igual() -> None:
     assert _masked(None) is None
 
 
+@pytest.fixture(autouse=True)
+def _sem_banco(monkeypatch: pytest.MonkeyPatch) -> None:
+    # os evals rodam sem banco: o manager recebe um banco de mentira
+    import app.agents.memory as memory
+
+    monkeypatch.setattr(memory, "memory_db", lambda: FakeDb())
+
+
 @pytest.mark.parametrize(
     ("enabled", "user", "on"),
     [(True, "cliente", True), (True, None, False), (True, "", False), (False, "cliente", False)],
