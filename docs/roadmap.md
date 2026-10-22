@@ -1050,7 +1050,7 @@ Decisão em [ADR-0024](adr/0024-conectores-de-conhecimento.md). A base passa a a
 - [x] `feat(api)`: conectores de GitHub, S3 e SharePoint com credencial cifrada, teste e sincronização pela versão remota
 - [x] `feat(api)`: sincronização agendada de conector e reindexação agendada de URL no poller
 - [x] `feat(web)`: conectores e reindexação na página da base
-- [ ] `test(api)`: evals da sincronização e da reindexação
+- [x] `test(api)`: evals da sincronização e da reindexação
 
 **Critério de aceite da fase:**
 
