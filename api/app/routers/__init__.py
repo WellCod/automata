@@ -15,6 +15,8 @@ from app.routers.knowledge_connectors import router as knowledge_connectors_rout
 from app.routers.knowledge_contents import router as knowledge_contents_router
 from app.routers.linter import router as linter_router
 from app.routers.mcp_servers import router as mcp_servers_router
+from app.routers.memories import me_router as my_memories_router
+from app.routers.memories import router as memories_router
 from app.routers.metrics import router as metrics_router
 from app.routers.models import router as models_router
 from app.routers.runs import router as runs_router
@@ -42,6 +44,8 @@ PROTECTED_ROUTERS: list[APIRouter] = [
     models_router,
     linter_router,
     mcp_servers_router,
+    memories_router,
+    my_memories_router,
     metrics_router,
     runs_router,
     traces_router,

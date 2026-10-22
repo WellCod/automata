@@ -870,6 +870,79 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/configs/{config_id}/memories": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Agent Memories */
+    get: operations["list_agent_memories_api_v1_configs__config_id__memories_get"];
+    put?: never;
+    post?: never;
+    /**
+     * Forget User
+     * @description Pedido de exclusão: tudo o que este agente guardou sobre o usuário.
+     */
+    delete: operations["forget_user_api_v1_configs__config_id__memories_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/configs/{config_id}/memories/{memory_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete Agent Memory */
+    delete: operations["delete_agent_memory_api_v1_configs__config_id__memories__memory_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/me/memories": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List My Memories */
+    get: operations["list_my_memories_api_v1_me_memories_get"];
+    put?: never;
+    post?: never;
+    /** Forget Me */
+    delete: operations["forget_me_api_v1_me_memories_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/me/memories/{memory_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete My Memory */
+    delete: operations["delete_my_memory_api_v1_me_memories__memory_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/metrics/summary": {
     parameters: {
       query?: never;
@@ -2662,6 +2735,23 @@ export interface components {
       /** Email */
       email: string | null;
       role: components["schemas"]["UserRole"] | null;
+    };
+    /** MemoryItem */
+    MemoryItem: {
+      /** Memory Id */
+      memory_id: string;
+      /** User Id */
+      user_id: string | null;
+      /** Agent Id */
+      agent_id: string | null;
+      /** Agent Name */
+      agent_name?: string | null;
+      /** Memory */
+      memory: string;
+      /** Topics */
+      topics: string[];
+      /** Updated At */
+      updated_at: string | null;
     };
     /**
      * MemorySettings
@@ -5324,6 +5414,167 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["McpServerResponse"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_agent_memories_api_v1_configs__config_id__memories_get: {
+    parameters: {
+      query?: {
+        user_id?: string | null;
+      };
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemoryItem"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  forget_user_api_v1_configs__config_id__memories_delete: {
+    parameters: {
+      query: {
+        user_id: string;
+      };
+      header?: never;
+      path: {
+        config_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_agent_memory_api_v1_configs__config_id__memories__memory_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        config_id: string;
+        memory_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_my_memories_api_v1_me_memories_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MemoryItem"][];
+        };
+      };
+    };
+  };
+  forget_me_api_v1_me_memories_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  delete_my_memory_api_v1_me_memories__memory_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        memory_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {
