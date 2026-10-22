@@ -1,11 +1,12 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, FileText, Search, Settings2, Upload } from "lucide-react";
+import { ArrowLeft, FileText, FolderSync, Search, Settings2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { KnowledgeConnectors } from "@/components/knowledge-connectors";
 import { DEFAULT_RETRIEVAL, RetrievalFields } from "@/components/retrieval-settings";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -66,6 +67,21 @@ function ContentRow({ baseId, content }: { baseId: string; content: KnowledgeCon
     },
     onError: (e) => toast.error(e.message),
   });
+  const refetch = useMutation({
+    mutationFn: async () => {
+      const res = await client.POST(
+        "/api/v1/knowledge-bases/{base_id}/contents/{content_id}/refresh",
+        { params: { path: { base_id: baseId, content_id: content.id } } },
+      );
+      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao baixar de novo"));
+    },
+    onSuccess: () => {
+      // só reindexa se mudou; a lista mostra o estado
+      toast.success(`${content.name}: baixando de novo`);
+      void queryClient.invalidateQueries({ queryKey: ["knowledge-bases", baseId, "contents"] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   return (
     <li className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2">
@@ -77,9 +93,23 @@ function ContentRow({ baseId, content }: { baseId: string; content: KnowledgeCon
         </div>
         <div className="flex flex-none items-center gap-2">
           <span className="text-muted-foreground text-[11px]">
-            {content.source_type === "url" ? "URL" : content.extension.toUpperCase()} ·{" "}
-            {formatSize(content.size_bytes)}
+            {content.source_type === "url"
+              ? "URL"
+              : content.source_type === "connector"
+                ? `Conector · ${content.extension.toUpperCase()}`
+                : content.extension.toUpperCase()}{" "}
+            · {formatSize(content.size_bytes)}
           </span>
+          {content.source_type === "url" && content.status !== "processing" && (
+            <Button
+              size="xs"
+              variant="muted"
+              disabled={refetch.isPending}
+              onClick={() => refetch.mutate()}
+            >
+              Baixar de novo
+            </Button>
+          )}
           {confirm ? (
             <>
               <Button size="xs" variant="destructive" onClick={() => remove.mutate()}>
@@ -99,6 +129,14 @@ function ContentRow({ baseId, content }: { baseId: string; content: KnowledgeCon
       {content.source_type === "url" && content.source !== content.name && (
         <span className="text-muted-foreground truncate text-[11px]">{content.source}</span>
       )}
+      {content.source_type === "url" && content.refresh_every_hours && (
+        <span className="text-muted-foreground text-[11px]">
+          Reindexa a cada {content.refresh_every_hours} h, se a página mudar
+        </span>
+      )}
+      {content.source_type === "connector" && content.external_path && (
+        <span className="text-muted-foreground truncate text-[11px]">{content.external_path}</span>
+      )}
       {content.status === "failed" && content.status_message && (
         <p className="text-destructive text-[11px]" role="alert">
           {content.status_message}
@@ -114,6 +152,7 @@ function AddContent({ baseId }: { baseId: string }) {
   const [dragging, setDragging] = useState(false);
   const [mode, setMode] = useState<"url" | "text" | null>(null);
   const [url, setUrl] = useState("");
+  const [refreshHours, setRefreshHours] = useState("");
   const [textName, setTextName] = useState("");
   const [text, setText] = useState("");
   const refresh = () =>
@@ -139,12 +178,13 @@ function AddContent({ baseId }: { baseId: string }) {
     mutationFn: async () => {
       const res = await client.POST("/api/v1/knowledge-bases/{base_id}/contents/url", {
         params: { path: { base_id: baseId } },
-        body: { url },
+        body: { url, refresh_every_hours: refreshHours ? Number(refreshHours) : null },
       });
       if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao adicionar URL"));
     },
     onSuccess: () => {
       setUrl("");
+      setRefreshHours("");
       setMode(null);
       refresh();
     },
@@ -236,6 +276,16 @@ function AddContent({ baseId }: { baseId: string }) {
             aria-label="URL"
             className={inputCls}
           />
+          <select
+            aria-label="Reindexar a URL"
+            value={refreshHours}
+            onChange={(e) => setRefreshHours(e.target.value)}
+            className={`${inputCls} w-auto`}
+          >
+            <option value="">Baixar uma vez</option>
+            <option value="24">Reindexar todo dia</option>
+            <option value="168">Reindexar toda semana</option>
+          </select>
           <Button type="submit" variant="strong" disabled={addUrl.isPending}>
             Adicionar
           </Button>
@@ -613,6 +663,10 @@ export default function KnowledgeBasePage() {
                 <FileText />
                 Documentos
               </TabsTrigger>
+              <TabsTrigger value="conectores">
+                <FolderSync />
+                Conectores
+              </TabsTrigger>
               <TabsTrigger value="busca">
                 <Search />
                 Busca de teste
@@ -624,6 +678,9 @@ export default function KnowledgeBasePage() {
             </TabsList>
             <TabsContent value="documentos" className="pt-5">
               <Documents baseId={base.id} />
+            </TabsContent>
+            <TabsContent value="conectores" className="pt-5">
+              <KnowledgeConnectors baseId={base.id} />
             </TabsContent>
             <TabsContent value="busca" className="pt-5">
               <TestSearch key={JSON.stringify(base.retrieval)} base={base} />
