@@ -12,6 +12,7 @@ import {
   MAX_CONTEXT,
   type EvalCaseInput,
   type EvalCheck,
+  type SuiteKind,
   newCheck,
   TEXT_KINDS,
   textNeedsValue,
@@ -20,6 +21,18 @@ import { Button } from "@/components/ui/button";
 
 const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-2.5 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none";
+
+// separa na saída do campo: vírgula no meio da digitação não vira nome vazio
+function splitNames(raw: string): string[] {
+  return [
+    ...new Set(
+      raw
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
 
 function CheckFields({
   check,
@@ -76,6 +89,27 @@ function CheckFields({
             </option>
           ))}
         </select>
+      </div>
+    );
+  }
+  if (check.type === "steps") {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <input
+          aria-label={`Etapas da checagem ${index + 1}`}
+          defaultValue={check.steps.join(", ")}
+          placeholder="triagem, revisao"
+          onBlur={(e) => onChange({ ...check, steps: splitNames(e.target.value) })}
+          className={inputCls}
+        />
+        <label className="text-muted-foreground flex items-center gap-1.5 text-[12px]">
+          <input
+            type="checkbox"
+            checked={check.exclusive ?? false}
+            onChange={(e) => onChange({ ...check, exclusive: e.target.checked })}
+          />
+          Reprovar se rodar outras etapas além destas
+        </label>
       </div>
     );
   }
@@ -160,6 +194,8 @@ function CheckFields({
 
 interface Props {
   initial?: EvalCaseInput;
+  // workflow troca tools e bloqueio por etapas e não tem turnos anteriores
+  kind?: SuiteKind;
   // vindo de uma conversa real: avisos (dados mascarados, contexto cortado) e critério sugerido
   notes?: string[];
   judgeSuggestion?: string | null;
@@ -170,6 +206,7 @@ interface Props {
 }
 
 export function EvalCaseForm({
+  kind = "agent",
   initial,
   notes,
   judgeSuggestion,
@@ -187,7 +224,7 @@ export function EvalCaseForm({
     setValue((v) => ({ ...v, checks: v.checks.map((old, j) => (j === i ? c : old)) }));
   const context = value.context ?? [];
   const setContext = (next: string[]) => setValue((v) => ({ ...v, context: next }));
-  const canSuggestJudge = !!judgeSuggestion && availableTypes(value.checks).includes("judge");
+  const canSuggestJudge = !!judgeSuggestion && availableTypes(value.checks, kind).includes("judge");
 
   return (
     <form
@@ -224,48 +261,50 @@ export function EvalCaseForm({
           ))}
         </ul>
       )}
-      <fieldset className="flex flex-col gap-1.5">
-        <legend className="text-foreground mb-1 text-[12px] font-medium">
-          Conversa antes da mensagem (opcional)
-        </legend>
-        <p className="text-muted-foreground text-[11px]">
-          Rodam na mesma sessão antes da mensagem de entrada; só a resposta a ela é checada.
-        </p>
-        {context.map((message, i) => (
-          <div key={i} className="flex items-start gap-1.5">
-            <textarea
-              aria-label={`Mensagem anterior ${i + 1}`}
-              value={message}
-              rows={1}
-              maxLength={4000}
-              onChange={(e) => setContext(context.map((m, j) => (j === i ? e.target.value : m)))}
-              className={`${inputCls} resize-y`}
-            />
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              aria-label={`Remover mensagem anterior ${i + 1}`}
-              onClick={() => setContext(context.filter((_, j) => j !== i))}
-            >
-              <Trash2 aria-hidden />
-            </Button>
-          </div>
-        ))}
-        {context.length < MAX_CONTEXT && (
-          <div>
-            <Button
-              type="button"
-              size="xs"
-              variant="muted"
-              onClick={() => setContext([...context, ""])}
-            >
-              <Plus aria-hidden />
-              Mensagem anterior
-            </Button>
-          </div>
-        )}
-      </fieldset>
+      {kind !== "workflow" && (
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="text-foreground mb-1 text-[12px] font-medium">
+            Conversa antes da mensagem (opcional)
+          </legend>
+          <p className="text-muted-foreground text-[11px]">
+            Rodam na mesma sessão antes da mensagem de entrada; só a resposta a ela é checada.
+          </p>
+          {context.map((message, i) => (
+            <div key={i} className="flex items-start gap-1.5">
+              <textarea
+                aria-label={`Mensagem anterior ${i + 1}`}
+                value={message}
+                rows={1}
+                maxLength={4000}
+                onChange={(e) => setContext(context.map((m, j) => (j === i ? e.target.value : m)))}
+                className={`${inputCls} resize-y`}
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label={`Remover mensagem anterior ${i + 1}`}
+                onClick={() => setContext(context.filter((_, j) => j !== i))}
+              >
+                <Trash2 aria-hidden />
+              </Button>
+            </div>
+          ))}
+          {context.length < MAX_CONTEXT && (
+            <div>
+              <Button
+                type="button"
+                size="xs"
+                variant="muted"
+                onClick={() => setContext([...context, ""])}
+              >
+                <Plus aria-hidden />
+                Mensagem anterior
+              </Button>
+            </div>
+          )}
+        </fieldset>
+      )}
       <div className="flex flex-col gap-1">
         <label htmlFor={`${id}-input`} className="text-foreground text-[12px] font-medium">
           Mensagem de entrada
@@ -332,7 +371,7 @@ export function EvalCaseForm({
               Critério sugerido pela resposta original
             </Button>
           )}
-          {availableTypes(value.checks).map((type) => (
+          {availableTypes(value.checks, kind).map((type) => (
             <Button
               key={type}
               type="button"

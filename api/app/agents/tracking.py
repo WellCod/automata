@@ -463,6 +463,8 @@ class TrackedWorkflow(Workflow):
         error: str | None,
     ) -> RunRecord:
         assert self.automata_config_id is not None
+        # caso da suíte (ADR-0022): o run do workflow fica fora das conversas, como as etapas
+        evaluation = current_eval_run.get()
         return RunRecord(
             agent_config_id=self.automata_config_id,
             model_id="",
@@ -472,6 +474,7 @@ class TrackedWorkflow(Workflow):
             duration_ms=int((monotonic() - start) * 1000),
             error=error,
             session_id=kwargs.get("session_id") or (output.session_id if output else None),
+            eval_run_id=evaluation.eval_run_id if evaluation else None,
         )
 
     def _failed(

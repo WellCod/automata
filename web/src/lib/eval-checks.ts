@@ -5,7 +5,9 @@ export type TextCheck = Schemas["TextCheck"];
 export type ToolsCheck = Schemas["ToolsCheck"];
 export type JudgeCheck = Schemas["JudgeCheck"];
 export type BlockedCheck = Schemas["BlockedCheck"];
-export type EvalCheck = TextCheck | ToolsCheck | JudgeCheck | BlockedCheck;
+export type StepsCheck = Schemas["StepsCheck"];
+export type EvalCheck = TextCheck | ToolsCheck | JudgeCheck | BlockedCheck | StepsCheck;
+export type SuiteKind = "agent" | "team" | "workflow";
 export type BlockRule = NonNullable<BlockedCheck["rule"]>;
 export type EvalCase = Schemas["EvalCaseResponse"];
 export type EvalCaseInput = Schemas["EvalCaseInput"];
@@ -32,6 +34,15 @@ export const CHECK_LABEL: Record<EvalCheck["type"], string> = {
   tools: "Tools chamadas",
   judge: "Critério do juiz",
   blocked: "Bloqueio do guardrail",
+  steps: "Etapas que rodaram",
+};
+
+// mesmo recorte de CHECKS_BY_KIND em app/schemas/eval.py: tools e bloqueio são de
+// cada etapa do workflow, e etapas só existem nele (ADR-0022)
+const TYPES_BY_KIND: Record<SuiteKind, EvalCheck["type"][]> = {
+  agent: ["text", "tools", "judge", "blocked"],
+  team: ["text", "tools", "judge", "blocked"],
+  workflow: ["text", "judge", "steps"],
 };
 
 // regras que um caso pode esperar (ADR-0022); orçamento não entra, não é comportamento
@@ -48,6 +59,7 @@ export function newCheck(type: EvalCheck["type"]): EvalCheck {
   if (type === "text") return { type, kind: "contains", value: "" };
   if (type === "tools") return { type, tools: [], allow_additional: true };
   if (type === "blocked") return { type, rule: null };
+  if (type === "steps") return { type, steps: [], exclusive: false };
   return { type, criteria: "", mode: "binary", threshold: 7 };
 }
 
@@ -57,12 +69,15 @@ export function textNeedsValue(kind: TextCheck["kind"]): boolean {
 
 // tipos que ainda cabem: o Case do Agno tem um campo de tools e um de critério, e o
 // caso que espera bloqueio não leva outra checagem (run barrado não tem resposta)
-export function availableTypes(checks: EvalCheck[]): EvalCheck["type"][] {
+export function availableTypes(
+  checks: EvalCheck[],
+  kind: SuiteKind = "agent",
+): EvalCheck["type"][] {
   if (checks.length >= MAX_CHECKS || checks.some((c) => c.type === "blocked")) return [];
-  const types = (["text", "tools", "judge"] as const).filter(
-    (t) => t === "text" || !checks.some((c) => c.type === t),
-  );
-  return checks.length === 0 ? [...types, "blocked"] : types;
+  return TYPES_BY_KIND[kind].filter((t) => {
+    if (t === "blocked") return checks.length === 0;
+    return t === "text" || !checks.some((c) => c.type === t);
+  });
 }
 
 export function caseErrors(input: EvalCaseInput): string[] {
@@ -78,6 +93,7 @@ export function caseErrors(input: EvalCaseInput): string[] {
     if (c.type === "text" && textNeedsValue(c.kind) && !c.value?.trim())
       errors.push("Preencha o texto da regra.");
     if (c.type === "tools" && c.tools.length === 0) errors.push("Liste ao menos uma tool.");
+    if (c.type === "steps" && c.steps.length === 0) errors.push("Liste ao menos uma etapa.");
     if (c.type === "judge" && c.criteria.trim().length < 10)
       errors.push("O critério do juiz precisa de ao menos 10 caracteres.");
   }

@@ -211,10 +211,11 @@ def test_sem_casos_execucao_ativa_e_reinicio(client: TestClient) -> None:
     assert _start(client, agent).status_code == 202
 
 
-def test_workflow_nao_roda_suite(client: TestClient) -> None:
+def test_workflow_sem_versao_nao_roda_suite(client: TestClient) -> None:
     body = {"name": "fluxo", "description": "Use para fluxo", "kind": "workflow"}
     wf = client.post("/api/v1/configs", json=body).json()["id"]
-    assert _start(client, wf).status_code == 422
+    started = _start(client, wf)
+    assert started.status_code == 422
 
 
 def test_juiz_obrigatorio_e_com_saida_estruturada(client: TestClient) -> None:
@@ -532,3 +533,91 @@ def test_caso_que_espera_bloqueio(client: TestClient) -> None:
     }
     assert answered["output"] == REPLY
     assert (run["passed"], run["failed"]) == (2, 2)
+
+
+def _workflow_draft(client: TestClient, wf: str, name: str, agents: list[str], value: str) -> None:
+    triagem, revisao = agents
+    steps = [
+        {"type": "step", "name": "triagem", "agent_id": triagem},
+        {
+            "type": "condition",
+            "name": "se reembolso",
+            "rule": {"kind": "contains", "source": "input", "value": value},
+            "steps": [{"type": "step", "name": "revisao", "agent_id": revisao}],
+        },
+    ]
+    body = {"name": name, "description": f"Use para {name}"}
+    client.put(
+        f"/api/v1/configs/{wf}/draft", json={**body, "payload": {"workflow": {"steps": steps}}}
+    ).raise_for_status()
+
+
+def _workflow(client: TestClient, name: str, value: str) -> tuple[str, list[str]]:
+    agents = [_agent(client, f"{name} triagem"), _agent(client, f"{name} revisão")]
+    body = {"name": name, "description": f"Use para {name}", "kind": "workflow"}
+    wf = str(client.post("/api/v1/configs", json=body).json()["id"])
+    _workflow_draft(client, wf, name, agents, value)
+    return wf, agents
+
+
+def test_suite_de_workflow_confere_o_caminho_e_a_saida(client: TestClient) -> None:
+    wf, _ = _workflow(client, "devolução", "reembolso")
+    client.post(f"/api/v1/configs/{wf}/publish").raise_for_status()
+
+    def case(name: str, text: str, checks: list[dict[str, Any]], **extra: Any) -> Any:
+        return client.post(
+            f"/api/v1/configs/{wf}/eval-cases",
+            json={"name": name, "input": text, "checks": checks, **extra},
+        )
+
+    revisa = [
+        {"type": "steps", "steps": ["triagem", "revisao"], "exclusive": True},
+        {"type": "text", "kind": "contains", "value": "30 dias"},
+    ]
+    assert case("reembolso revisa", "Quero reembolso", revisa).status_code == 201
+    so_triagem = [{"type": "steps", "steps": ["triagem"], "exclusive": True}]
+    assert case("sem reembolso", "Qual o prazo?", so_triagem).status_code == 201
+    errado = [{"type": "steps", "steps": ["revisao"]}]
+    assert case("caminho errado", "Oi", errado).status_code == 201
+    # tools e bloqueio são de cada etapa; workflow não tem conversa
+    assert case("tools", "Oi", [{"type": "tools", "tools": ["x"]}]).status_code == 422
+    assert case("bloqueio", "Oi", [{"type": "blocked"}]).status_code == 422
+    with_context = case("contexto", "Oi", so_triagem, context=["antes"])
+    assert with_context.status_code == 422 and "turnos anteriores" in with_context.json()["detail"]
+
+    run_id = _start(client, wf).json()["id"]
+    run = client.get(f"/api/v1/configs/{wf}/eval-runs/{run_id}").json()
+    assert run["status"] == "completed", run
+    by_name = {r["case_name"]: r for r in run["results"]}
+    assert by_name["reembolso revisa"]["status"] == "passed", by_name["reembolso revisa"]
+    assert by_name["reembolso revisa"]["output"] == REPLY
+    [steps] = [c for c in by_name["reembolso revisa"]["checks"] if c["type"] == "steps"]
+    assert steps["ran"] == ["triagem", "revisao"] and steps["passed"] is True
+    assert by_name["sem reembolso"]["status"] == "passed"
+    wrong = by_name["caminho errado"]
+    assert wrong["status"] == "failed"
+    assert wrong["checks"][0]["missing"] == ["revisao"]
+    # os runs do workflow e das etapas ficam fora das conversas
+    assert client.get(f"/api/v1/configs/{wf}/runs").json()["total"] == 0
+
+
+def test_gate_barra_workflow_com_suite_vermelha(client: TestClient) -> None:
+    wf, agents = _workflow(client, "troca", "reembolso")
+    client.post(f"/api/v1/configs/{wf}/publish").raise_for_status()
+    client.post(
+        f"/api/v1/configs/{wf}/eval-cases",
+        json={
+            "name": "reembolso revisa",
+            "input": "Quero reembolso",
+            "checks": [{"type": "steps", "steps": ["revisao"]}],
+        },
+    ).raise_for_status()
+    settings = f"/api/v1/configs/{wf}/eval-settings"
+    client.put(settings, json={"require_passing_evals": True}).raise_for_status()
+
+    # rascunho que muda a regra da condição: a revisão deixa de rodar
+    _workflow_draft(client, wf, "troca", agents, "estorno")
+    run = _start(client, wf).json()
+    assert client.get(f"/api/v1/configs/{wf}/eval-runs/{run['id']}").json()["failed"] == 1
+    resp = client.post(f"/api/v1/configs/{wf}/publish")
+    assert resp.status_code == 409 and "suíte verde" in resp.json()["detail"]

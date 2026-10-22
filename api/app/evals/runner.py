@@ -1,4 +1,4 @@
-"""Execução da suíte de testes de um agente ou time (ADR-0015).
+"""Execução da suíte de testes de um agente, time ou workflow (ADR-0015, ADR-0022).
 
 Os casos gravados viram `Case`s do runner de suíte do Agno (`agno.eval.suite`), que
 roda um por vez com timeout próprio. Cada caso ganha um agente ou time novo, montado
@@ -20,17 +20,25 @@ from sqlalchemy.orm import Session
 
 from app.agents import models_map
 from app.agents.factory import agent_from, load_team, load_version, team_from
-from app.agents.tracking import EvalContext, current_eval_run
-from app.agents.workflow_factory import rule_matches
+from app.agents.tracking import EvalContext, TrackedWorkflow, current_eval_run
+from app.agents.workflow_factory import build_nodes, load_workflow, rule_matches
 from app.budget import RULE_BUDGET
 from app.db import get_db, get_engine
 from app.evals.judge import JudgeUsage, metered
+from app.evals.workflow_case import WorkflowUnderTest
 from app.guardrails.input import BlockLog
 from app.models.eval import EvalResult, EvalRun
 from app.models.usage import UsageEvent
 from app.pricing import cost_or_estimate
 from app.repositories.usage import UsageRepository
-from app.schemas.eval import BlockedCheck, EvalCaseInput, JudgeCheck, TextCheck, ToolsCheck
+from app.schemas.eval import (
+    BlockedCheck,
+    EvalCaseInput,
+    JudgeCheck,
+    StepsCheck,
+    TextCheck,
+    ToolsCheck,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +53,18 @@ def _text(content: Any) -> str:
     return "" if content is None else str(content)
 
 
-class TextScorer:
-    """Checagens de texto como `Scorer` do Agno: todas precisam passar."""
+def steps_verdict(check: StepsCheck, ran: list[str]) -> dict[str, Any]:
+    missing = [name for name in check.steps if name not in ran]
+    extra = sorted({name for name in ran if name not in check.steps}) if check.exclusive else []
+    return {"ran": ran, "missing": missing, "extra": extra, "passed": not missing and not extra}
 
-    def __init__(self, checks: list[TextCheck]) -> None:
+
+class TextScorer:
+    """Checagens de texto, e de etapas no workflow, como `Scorer` do Agno: todas precisam passar."""
+
+    def __init__(self, checks: list[TextCheck], steps: StepsCheck | None = None) -> None:
         self._checks = checks
+        self._steps = steps
 
     def verdicts(self, content: str) -> list[dict[str, Any]]:
         return [
@@ -60,12 +75,24 @@ class TextScorer:
     async def ascore(self, run: Any, expected: Any = None) -> Score:
         verdicts = self.verdicts(_text(getattr(run, "content", None)))
         ok = sum(1 for v in verdicts if v["passed"])
+        total = len(verdicts)
         failed = [f"{v['kind']} {v['value']!r}".strip() for v in verdicts if not v["passed"]]
+        detail: dict[str, Any] = {"checks": verdicts}
+        if self._steps is not None:
+            ran = list((getattr(run, "metadata", None) or {}).get("steps", []))
+            steps = steps_verdict(self._steps, ran)
+            detail["steps"] = steps
+            total += 1
+            ok += steps["passed"]
+            if steps["missing"]:
+                failed.append("não rodou " + ", ".join(steps["missing"]))
+            if steps["extra"]:
+                failed.append("rodou fora da lista " + ", ".join(steps["extra"]))
         return Score(
-            value=ok / len(verdicts),
-            passed=ok == len(verdicts),
+            value=ok / total,
+            passed=ok == total,
             reason=("falhou: " + "; ".join(failed)) if failed else None,
-            detail={"checks": verdicts},
+            detail=detail,
         )
 
 
@@ -102,6 +129,28 @@ def _blocked(spec: EvalCaseInput) -> BlockedCheck | None:
     return next((c for c in spec.checks if isinstance(c, BlockedCheck)), None)
 
 
+def _steps(spec: EvalCaseInput) -> StepsCheck | None:
+    return next((c for c in spec.checks if isinstance(c, StepsCheck)), None)
+
+
+def _runner_for(config_id: UUID, kind: str, version_id: UUID, actor: str) -> tuple[str, Any]:
+    """Instância nova por caso: casos não compartilham sessão, estado nem conexão MCP."""
+    if kind == "workflow":
+        resolved = load_workflow(config_id, version_id)
+        workflow = TrackedWorkflow(
+            id=str(config_id),
+            name=resolved.name,
+            description=resolved.description,
+            steps=build_nodes(resolved.steps, resolved),
+            user_id=actor,
+        )
+        workflow.automata_config_id = config_id
+        return "agent", WorkflowUnderTest(workflow, set(resolved.executors))
+    if kind == "team":
+        return "team", team_from(config_id, load_team(config_id, version_id))
+    return "agent", agent_from(config_id, load_version(config_id, version_id), tracked=True)
+
+
 def plan_case(
     position: int,
     snapshot: dict[str, Any],
@@ -115,21 +164,17 @@ def plan_case(
     spec = EvalCaseInput.model_validate(snapshot)
     text, tools, judge = _split(spec)
     blocked = _blocked(spec)
+    steps = _steps(spec)
     skipped: dict[str, str] = {}
     use_judge = judge is not None and judge_unavailable is None
     if judge is not None and judge_unavailable is not None:
         skipped["judge"] = judge_unavailable
     case_id = UUID(snapshot["id"]) if snapshot.get("id") else None
-    if not text and tools is None and not use_judge and blocked is None:
+    if not text and tools is None and not use_judge and blocked is None and steps is None:
         # o Case do Agno recusa caso sem checagem; nada roda e o caso fica não avaliado
         return PlannedCase(position, case_id, spec.name, spec, None, skipped)
-    # instância nova por caso: casos não compartilham sessão, estado nem conexão MCP
-    runner: Any = (
-        team_from(config_id, load_team(config_id, version_id))
-        if kind == "team"
-        else agent_from(config_id, load_version(config_id, version_id), tracked=True)
-    )
-    target = {"team" if kind == "team" else "agent": runner}
+    field, runner = _runner_for(config_id, kind, version_id, actor)
+    target = {field: runner}
     session_args = _context_args(runner, spec.context, actor)
     agno_case = Case(
         name=spec.name,
@@ -137,7 +182,11 @@ def plan_case(
         timeout_seconds=CASE_TIMEOUT_S,
         expected_tool_calls=tuple(tools.tools) if tools else None,
         allow_additional_tool_calls=tools.allow_additional if tools else True,
-        scorer=AnsweredScorer() if blocked is not None else TextScorer(text) if text else None,
+        scorer=AnsweredScorer()
+        if blocked is not None
+        else TextScorer(text, steps)
+        if text or steps is not None
+        else None,
         criteria=judge.criteria if judge is not None and use_judge else None,
         judge_mode=JudgeMode(judge.mode) if judge is not None else JudgeMode.BINARY,
         judge_threshold=judge.threshold if judge is not None else 7,
@@ -180,11 +229,13 @@ def result_from(planned: PlannedCase, result: CaseResult | None) -> EvalResult:
     checks: list[dict[str, Any]] = []
     if text:
         detail = (result.score.detail or {}) if result and result.score else {}
+        rules = detail.get("checks")
         checks.append(
             {
                 "type": "text",
-                "passed": result.score.passed if result and result.score else None,
-                "rules": detail.get("checks", [{"kind": c.kind, "value": c.value} for c in text]),
+                # o scorer também confere as etapas no workflow: o texto passa pelas regras
+                "passed": all(r["passed"] for r in rules) if rules else None,
+                "rules": rules or [{"kind": c.kind, "value": c.value} for c in text],
             }
         )
     if tools is not None:
@@ -194,6 +245,21 @@ def result_from(planned: PlannedCase, result: CaseResult | None) -> EvalResult:
                 "passed": result.reliability_passed if result else None,
                 "expected": tools.tools,
                 "allow_additional": tools.allow_additional,
+            }
+        )
+    steps = _steps(planned.spec)
+    if steps is not None:
+        detail = (result.score.detail or {}) if result and result.score else {}
+        verdict = detail.get("steps") or {}
+        checks.append(
+            {
+                "type": "steps",
+                "passed": verdict.get("passed") if verdict else None,
+                "expected": steps.steps,
+                "exclusive": steps.exclusive,
+                "ran": verdict.get("ran", []),
+                "missing": verdict.get("missing", []),
+                "extra": verdict.get("extra", []),
             }
         )
     if judge is not None:

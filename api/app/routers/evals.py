@@ -43,6 +43,7 @@ from app.schemas.eval import (
     WebhookInput,
     WebhookIssued,
     WebhookTestResult,
+    kind_problem,
 )
 from app.secrets import SecretsKeyMissing
 
@@ -71,10 +72,11 @@ def _config_or_404(session: SessionDep, config_id: UUID) -> AgentConfig:
     return config
 
 
-def _testable(config: AgentConfig) -> None:
-    # o runner de suíte do Agno roda agente ou time; workflow fica para depois
-    if config.kind == "workflow":
-        raise HTTPException(status_code=422, detail="Workflow ainda não tem suíte de testes")
+def _fits(config: AgentConfig, body: EvalCaseInput) -> None:
+    # tools e bloqueio são de cada etapa do workflow; etapas só existem nele (ADR-0022)
+    problem = kind_problem(config.kind, body)
+    if problem is not None:
+        raise HTTPException(status_code=422, detail=problem)
 
 
 def _case_or_404(repo: EvalCaseRepository, config_id: UUID, case_id: UUID) -> EvalCase:
@@ -113,7 +115,8 @@ def suggest_case(
     config_id: UUID, run_id: str, request: Request, session: SessionDep
 ) -> EvalCaseSuggestion:
     """Caso a partir de uma conversa real: o formulário abre preenchido e nada é gravado."""
-    _testable(_config_or_404(session, config_id))
+    if _config_or_404(session, config_id).kind == "workflow":
+        raise HTTPException(status_code=422, detail="Run de workflow ainda não vira caso")
     row = session.scalars(
         select(AgentRun).where(AgentRun.run_id == run_id, AgentRun.agent_config_id == config_id)
     ).first()
@@ -152,7 +155,7 @@ def suggest_case(
 def create_case(
     config_id: UUID, body: EvalCaseInput, request: Request, session: SessionDep
 ) -> EvalCaseResponse:
-    _testable(_config_or_404(session, config_id))
+    _fits(_config_or_404(session, config_id), body)
     repo = EvalCaseRepository(session)
     if repo.count(config_id) >= MAX_CASES:
         raise HTTPException(status_code=422, detail=f"No máximo {MAX_CASES} casos por suíte")
@@ -179,7 +182,7 @@ def create_case(
 def update_case(
     config_id: UUID, case_id: UUID, body: EvalCaseInput, request: Request, session: SessionDep
 ) -> EvalCaseResponse:
-    _config_or_404(session, config_id)
+    _fits(_config_or_404(session, config_id), body)
     repo = EvalCaseRepository(session)
     case = _case_or_404(repo, config_id, case_id)
     if repo.name_taken(config_id, body.name, exclude=case_id):
@@ -348,7 +351,6 @@ def read_eval_settings(config_id: UUID, session: SessionDep) -> EvalSettings:
 @settings_router.put("", response_model=EvalSettings, dependencies=_WRITE)
 def update_settings(config_id: UUID, body: EvalSettingsInput, session: SessionDep) -> EvalSettings:
     config = _config_or_404(session, config_id)
-    _testable(config)
     config.require_passing_evals = body.require_passing_evals
     session.commit()
     session.refresh(config)
@@ -395,8 +397,7 @@ def read_schedule(config_id: UUID, session: SessionDep) -> EvalScheduleResponse:
 def save_schedule(
     config_id: UUID, body: EvalScheduleInput, request: Request, session: SessionDep
 ) -> EvalScheduleResponse:
-    config = _config_or_404(session, config_id)
-    _testable(config)
+    _config_or_404(session, config_id)
     reason = validate(body.cron_expr, body.timezone)
     if reason is not None:
         raise HTTPException(status_code=422, detail=reason)

@@ -300,13 +300,16 @@ Execução (`app/agents/workflow_factory.py`):
 
 ## Evals por agente (ADR-0015)
 
-Cada agente e time tem uma suíte de casos de teste em `/api/v1/configs/{id}/eval-cases`. A tabela é `eval_case` (migration 0019). Os casos ficam fora do payload versionado: um rascunho não consegue afrouxar o próprio teste.
+Cada agente, time e workflow tem uma suíte de casos de teste em `/api/v1/configs/{id}/eval-cases`. A tabela é `eval_case` (migration 0019). Os casos ficam fora do payload versionado: um rascunho não consegue afrouxar o próprio teste.
 
 Um caso tem `name` (único na config, até 80 caracteres), `input` (até 4000) e `checks`, de 1 a 5:
 - `text`: `kind` = `contains`, `not_contains`, `starts_with`, `empty` ou `not_empty`, e `value`. É a mesma regra dos workflows, comparada sem diferenciar maiúsculas, sobre a resposta. Quantas quiser.
 - `tools`: `tools` (1 a 10 nomes, como o agente expõe: `buscar_<slug>` das bases e as tools MCP com prefixo) e `allow_additional` (padrão `true`). No máximo uma por caso.
 - `judge`: `criteria` (10 a 1000 caracteres), `mode` (`binary` ou `numeric`) e `threshold` (1 a 10, só no numérico). No máximo uma por caso.
 - `blocked` (ADR-0022): o caso passa quando o guardrail barra o run. `rule` opcional exige a regra: `pii_detected`, `prompt_injection`, `off_topic`, `input_too_long`, `moderation` ou `output_not_allowed`. Sempre sozinha no caso, porque um run barrado não tem resposta para checar (422 com outra checagem).
+- `steps` (ADR-0022, só workflow): `steps` (1 a 20 nomes de etapa) que precisam ter rodado e `exclusive` (padrão `false`), que reprova se rodar qualquer etapa fora da lista. Só etapas contam, não paralelo, condição ou laço. No máximo uma por caso.
+
+O tipo de config limita as checagens: agente e time aceitam `text`, `tools`, `judge` e `blocked`; workflow aceita `text`, `judge` e `steps`, e caso de workflow não leva `context`, porque o workflow roda uma entrada por vez. Fora disso, 422.
 
 Um caso pode trazer `context`, com até 5 mensagens anteriores (ADR-0016, migration 0026). Na execução, o caso ganha sessão própria (`eval-<uuid>`) e o banco do Agno, que o agente da suíte não recebe do `AgentFactory`. O `setup` do `Case` roda essas mensagens nessa sessão, uma por vez, com 60 s cada, e só a resposta a `input` passa pelas checagens. Os turnos de contexto são runs de teste como os outros: ficam fora das conversas e entram no custo da execução. Todo caso roda com `user_id` de quem disparou a suíte.
 
@@ -321,7 +324,7 @@ Um caso pode trazer `context`, com até 5 mensagens anteriores (ADR-0016, migrat
 
 Salvar usa o `POST` de casos com `source_run_id` (migration 0027), que fica no caso para mostrar de onde veio.
 
-O limite de uma checagem de tools e uma de juiz por caso vem do `Case` do runner de suíte do Agno, que tem um campo para cada. Workflow ainda não tem suíte (422), e são até 50 casos por config. Viewer lê (`evals:read`); editor cria, edita e apaga (`evals:write`).
+O limite de uma checagem de tools e uma de juiz por caso vem do `Case` do runner de suíte do Agno, que tem um campo para cada. São até 50 casos por config. Run de workflow ainda não vira caso pela sugestão (422). Viewer lê (`evals:read`); editor cria, edita e apaga (`evals:write`).
 
 ### Execução da suíte
 
@@ -336,7 +339,8 @@ O resumo da execução traz:
 
 A execução roda em background (`app/evals/runner.py`):
 - Cada caso gravado vira um `Case` do `agno.eval.suite` e roda com `arun_cases`, um por vez, com timeout de 120 s.
-- Cada caso ganha um agente ou time novo, montado por `agent_from` ou `team_from` a partir da versão pedida.
+- Cada caso ganha um agente, time ou workflow novo, montado por `agent_from`, `team_from` ou `load_workflow` e `build_nodes` a partir da versão pedida.
+- O `Case` do Agno só aceita agente ou time. O workflow entra em `agent=` pelo adaptador `WorkflowUnderTest` (`app/evals/workflow_case.py`): roda o workflow sem stream e devolve um `RunOutput` com a saída final e as etapas que rodaram em `metadata`. Etapa que parou o workflow vira `WorkflowErrorEvent`, e o caso fica com o motivo. O run do workflow ganha `eval_run_id`, como as etapas, e fica fora das conversas.
 - Checagens de texto viram um `Scorer` próprio (`TextScorer`, as mesmas regras dos workflows); as de tools vão para o `expected_tool_calls`.
 - O Agno trata o run barrado como erro e só chama o scorer em run completo. Por isso o caso `blocked` leva um scorer que reprova (`respondeu sem bloquear`), e o veredito do bloqueio vem do `BlockLog` do agente ou time do caso, a mesma fonte do `blocked_by`. Bloqueio por orçamento não conta, e o de um turno de contexto é descartado antes do turno avaliado. O resultado traz `rule` e `blocked_by`.
 - Checagem de juiz vai para o `criteria` do Agno, com o modelo escolhido em `judge_model` no pedido. O modelo precisa estar na matriz e ter saída estruturada, e é obrigatório quando algum caso tem juiz. Ele é sempre passado ao runner: sem isso o `AgentAsJudgeEval` cairia num modelo da OpenAI. O medidor (`app/evals/judge.py`) embrulha o `ainvoke` da instância e soma os tokens do juiz, gravados num `usage_event` da execução.
