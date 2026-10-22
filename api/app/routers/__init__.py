@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.routers.approvals import router as approvals_router
+from app.routers.budget import router as budget_router
 from app.routers.configs import router as configs_router
 from app.routers.evals import router as evals_router
 from app.routers.evals import runs_router as eval_runs_router
@@ -24,6 +25,7 @@ from app.routers.users import router as users_router
 # do OpenAPI usam a mesma lista para os tipos do painel não divergirem.
 PROTECTED_ROUTERS: list[APIRouter] = [
     approvals_router,
+    budget_router,
     configs_router,
     evals_router,
     eval_runs_router,
