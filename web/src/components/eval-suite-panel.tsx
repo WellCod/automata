@@ -22,6 +22,7 @@ import {
   type EvalCaseInput,
   type EvalResult,
   type EvalRunSummary,
+  type SuiteKind,
   hasJudge,
   RESULT_LABEL,
   runActive,
@@ -38,6 +39,8 @@ interface VersionRef {
 
 interface Props {
   configId: string;
+  // workflow troca tools e bloqueio por etapas (ADR-0022)
+  kind?: SuiteKind;
   draftVersion?: VersionRef | null;
   currentVersion?: VersionRef | null;
   // run de conversa escolhido em "Virar caso de teste"; o painel abre o caso preenchido
@@ -281,6 +284,7 @@ function SuggestedCase({
 
 export function EvalSuitePanel({
   configId,
+  kind = "agent",
   draftVersion,
   currentVersion,
   fromRun,
@@ -377,6 +381,7 @@ export function EvalSuitePanel({
         )}
         {editing === "new" && (
           <EvalCaseForm
+            kind={kind}
             saving={saveCase.isPending}
             error={saveCase.error?.message}
             onCancel={() => setEditing(null)}
@@ -394,6 +399,7 @@ export function EvalSuitePanel({
             editingCase?.id === item.id ? (
               <li key={item.id}>
                 <EvalCaseForm
+                  kind={kind}
                   initial={{
                     name: item.name,
                     input: item.input,

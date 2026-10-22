@@ -2,12 +2,13 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, ArrowLeft, FlaskConical, History } from "lucide-react";
+import { Activity, ArrowLeft, FlaskConical, History, ListChecks } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { EvalSuitePanel } from "@/components/eval-suite-panel";
 import { RunsPanel } from "@/components/runs-panel";
 import { VersionsPanel } from "@/components/versions-panel";
 import { WorkflowEditor } from "@/components/workflow-editor";
@@ -32,6 +33,7 @@ const PANEL_TABS = [
   { id: "teste" as const, label: "Teste", icon: FlaskConical },
   { id: "versoes" as const, label: "Versões", icon: History },
   { id: "runs" as const, label: "Execuções", icon: Activity },
+  { id: "suite" as const, label: "Suíte", icon: ListChecks },
 ];
 type PanelId = (typeof PANEL_TABS)[number]["id"];
 
@@ -219,9 +221,18 @@ export default function WorkflowEditPage() {
                 agentId={id}
                 currentVersionId={data?.current_version?.id}
                 hasUnsavedChanges={isDirty}
+                suite
               />
             )}
             {activePanel === "runs" && <RunsPanel agentId={id} />}
+            {activePanel === "suite" && (
+              <EvalSuitePanel
+                configId={id}
+                kind="workflow"
+                draftVersion={data?.draft_version}
+                currentVersion={data?.current_version}
+              />
+            )}
           </div>
         </aside>
       </div>
