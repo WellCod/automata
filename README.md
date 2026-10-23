@@ -360,11 +360,11 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0018](docs/adr/0018-avisos-de-regressao.md) | Avisos de regressão por webhook assinado nas mudanças de estado da suíte agendada |
 | [0019](docs/adr/0019-compactacao-de-conversa.md) | Compactação de conversa por agente no payload versionado, limite de 16 mil tokens |
 | [0020](docs/adr/0020-fila-duravel.md) | Fila durável para runs em background, uma tentativa e 15 min por execução |
-| [0021](docs/adr/0021-orcamento-e-alertas.md) | Custo estimado pela tabela de preços, orçamento mensal com bloqueio e destinos de aviso (proposto, Fase 22) |
-| [0022](docs/adr/0022-suite-de-workflow-e-bloqueio.md) | Suíte de testes para workflows e caso que espera bloqueio de guardrail (proposto, Fase 23) |
-| [0023](docs/adr/0023-revisao-humana-no-workflow.md) | Revisão humana numa etapa do workflow, antes de rodar ou depois da saída (proposto, Fase 24) |
-| [0024](docs/adr/0024-conectores-de-conhecimento.md) | Conectores de conhecimento (GitHub, S3, SharePoint) e reindexação agendada (proposto, Fase 25) |
-| [0025](docs/adr/0025-memoria-do-usuario.md) | Memória do usuário entre sessões, por agente, com retenção, PII mascarado e exclusão (proposto, Fase 26) |
+| [0021](docs/adr/0021-orcamento-e-alertas.md) | Custo estimado pela tabela de preços, orçamento mensal com bloqueio e destinos de aviso |
+| [0022](docs/adr/0022-suite-de-workflow-e-bloqueio.md) | Suíte de testes para workflows e caso que espera bloqueio de guardrail |
+| [0023](docs/adr/0023-revisao-humana-no-workflow.md) | Revisão humana numa etapa do workflow, antes de rodar ou depois da saída |
+| [0024](docs/adr/0024-conectores-de-conhecimento.md) | Conectores de conhecimento (GitHub, S3, SharePoint) e reindexação agendada |
+| [0025](docs/adr/0025-memoria-do-usuario.md) | Memória do usuário entre sessões, por agente, com retenção, PII mascarado e exclusão |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 

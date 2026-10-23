@@ -1,6 +1,6 @@
 # ADR-0024 — Conectores de conhecimento (GitHub, S3, SharePoint) e reindexação agendada
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-10-21
 
 ## Contexto

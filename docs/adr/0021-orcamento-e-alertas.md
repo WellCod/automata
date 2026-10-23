@@ -1,6 +1,6 @@
 # ADR-0021 — Custo calculado pela tabela de preços, orçamento mensal por config e destinos de aviso da instância
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-10-21
 
 ## Contexto

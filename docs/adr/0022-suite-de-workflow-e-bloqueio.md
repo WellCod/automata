@@ -1,6 +1,6 @@
 # ADR-0022 — Suíte de testes para workflows e caso que espera bloqueio de guardrail
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-10-21
 
 ## Contexto

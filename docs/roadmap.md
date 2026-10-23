@@ -1,7 +1,6 @@
-# Roadmap — Fases 4 a 16
+# Roadmap — Fases 4 a 26
 
-Plano de ação derivado de auditoria técnica e de segurança realizada em 2026-08-12.
-Ordem otimizada: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade.
+As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
 ---
 
@@ -584,13 +583,13 @@ if __name__ == "__main__":
 | 19 — Avisos de regressão | #149–#153 | Webhook assinado do agendamento nas mudanças de estado da suíte | Fase 17 |
 | 20 — Compactação de conversa | #154–#157 | Resumo dos turnos antigos por agente, versionado no payload | Fase 17 (#134) |
 | 21 — Fila durável | #158–#160 | Runs em background na fila durável do Agno, com Redis opcional | Fase 7 (Redis) |
-| 22 — Orçamento e alertas | #164 em diante | Custo estimado pela tabela de preços, orçamento mensal com bloqueio e destinos de aviso | Fases 19 e 21 |
-| 23 — Suíte de workflow e bloqueio | depois da 22 | Suíte de testes para workflows e caso que espera bloqueio de guardrail | Fases 14, 15 e 16 |
-| 24 — Revisão humana no workflow | depois da 23 | Etapa que pausa para aprovação antes de rodar ou depois da saída | Fases 12 e 15 |
-| 25 — Conectores de conhecimento | depois da 24 | GitHub, S3 e SharePoint na base, com sincronização e reindexação agendada de URL | Fases 13 e 18 |
-| 26 — Memória do usuário | depois da 25 | Fatos sobre o usuário entre sessões, por agente, com retenção, PII mascarado e exclusão | Fases 14 e 20 |
+| 22 — Orçamento e alertas | #164–#169 | Custo estimado pela tabela de preços, orçamento mensal com bloqueio e destinos de aviso | Fases 19 e 21 |
+| 23 — Suíte de workflow e bloqueio | #170–#174 | Suíte de testes para workflows e caso que espera bloqueio de guardrail | Fases 14, 15 e 16 |
+| 24 — Revisão humana no workflow | #175–#178 | Etapa que pausa para aprovação antes de rodar ou depois da saída | Fases 12 e 15 |
+| 25 — Conectores de conhecimento | #179–#183 | GitHub, S3 e SharePoint na base, com sincronização e reindexação agendada de URL | Fases 13 e 18 |
+| 26 — Memória do usuário | #184–#188 | Fatos sobre o usuário entre sessões, por agente, com retenção, PII mascarado e exclusão | Fases 14 e 20 |
 
-Fases 4 a 15 estão na `main` (estado em 2026-10-20); a 16 está em andamento.
+Fases 4 a 26 estão na `main` (estado em 2026-10-22). Fica pendente a ação manual da Fase 11 (rotação da chave JWT e das senhas).
 
 ---
 
@@ -918,7 +917,7 @@ Fica para depois: aviso de regressão por webhook ou e-mail, suíte em workflow,
 
 Decisão em [ADR-0017](adr/0017-estrategia-de-recuperacao.md). Cada base de conhecimento ganha uma estratégia de busca, com o reranker do Agno (diversidade por MMR ou recência) e o HyDE com modelo nosso e medido. A busca de teste compara com e sem a estratégia, e os evals de recuperação medem cada uma.
 
-- [ ] #143 — `docs(adr)`: ADR-0017 e esta seção
+- [x] #143 — `docs(adr)`: ADR-0017 e esta seção
 - [x] `feat(api)`: estratégia de recuperação por base com MMR e recência. `retrieval` no `knowledge_base` (migration 0028), busca com lote maior de candidatos e reordenação contra a pergunta original
 - [x] `feat(api)`: HyDE com modelo escolhido e medido. Medidor também no `invoke` síncrono, `usage_event` do agente pelo `RunContext` da tool, desligado no modo demo
 - [x] `feat(api)`: busca de teste compara com e sem a estratégia da base. `POST /knowledge-bases/{id}/search/compare`, com o texto buscado e os tokens do HyDE de cada lado
@@ -991,7 +990,7 @@ Fica para depois: retry por agente marcado como idempotente, fila em banco próp
 
 Decisão em [ADR-0021](adr/0021-orcamento-e-alertas.md). O custo passa a ser calculado pela tabela de preços quando o provedor não informa: Anthropic e OpenAI só devolvem tokens, e o custo vinha vazio com chave real. Cada agente, time e workflow pode ter um orçamento mensal, com aviso e bloqueio opcional. Destinos de aviso da instância recebem orçamento, pico de erro e eventos da suíte.
 
-- [ ] #164 — `docs(adr)`: ADR-0021 e esta seção
+- [x] #164 — `docs(adr)`: ADR-0021 e esta seção
 - [x] `feat(api)`: preço por modelo na matriz e custo calculado pelos tokens quando o provedor não informa, com `MODEL_PRICES` para sobrescrever
 - [x] `feat(api)`: orçamento mensal por config com aviso e bloqueio antes do run (`budget_exceeded`)
 - [x] `feat(api)`: destinos de aviso da instância com orçamento, pico de erro e eventos da suíte
@@ -1011,7 +1010,7 @@ Fica para depois: conciliação com a API de uso do provedor, orçamento por usu
 
 Decisão em [ADR-0022](adr/0022-suite-de-workflow-e-bloqueio.md). Workflow ganha suíte de testes pelo mesmo runner de agentes e times, com checagem das etapas que rodaram. Agente e time ganham caso que passa quando o guardrail barra, para a configuração de cada um ter teste.
 
-- [ ] `docs(adr)`: ADR-0022 e esta seção
+- [x] #170 — `docs(adr)`: ADR-0022 e esta seção
 - [x] `feat(api)`: checagem `blocked` com regra opcional, lida do registro de bloqueios do run, já no formulário de caso do painel
 - [x] `feat(api)`: suíte para workflow com checagem de etapas, gate e agendamento
 - [x] `feat(web)`: aba de testes no workflow com checagem de etapas
@@ -1029,7 +1028,7 @@ Fica para depois: checagem de texto numa etapa do meio do workflow e caso de wor
 
 Decisão em [ADR-0023](adr/0023-revisao-humana-no-workflow.md). Uma etapa pode pausar o workflow para alguém confirmar antes de ela rodar ou aprovar a saída dela antes da próxima. A pendência aparece na página Aprovações e no modo teste, e a decisão segue a rota de `continue` do AgentOS.
 
-- [ ] `docs(adr)`: ADR-0023 e esta seção
+- [x] #175 — `docs(adr)`: ADR-0023 e esta seção
 - [x] `feat(api)`: revisão por etapa no payload, pendências do run pausado e acompanhamento do continue
 - [x] `feat(web)`: revisão no editor de workflow, etapas pendentes na página Aprovações e no modo teste
 - [x] `test(api)`: evals da revisão humana no workflow
@@ -1047,7 +1046,7 @@ Fica para depois: editar a saída na aprovação, revisão por volta de laço, r
 
 Decisão em [ADR-0024](adr/0024-conectores-de-conhecimento.md). A base passa a acompanhar a origem: conectores de GitHub, S3 e SharePoint sincronizam pela versão remota, e conteúdo de URL pode ser baixado de novo num intervalo, reindexando só o que mudou.
 
-- [ ] `docs(adr)`: ADR-0024 e esta seção
+- [x] #179 — `docs(adr)`: ADR-0024 e esta seção
 - [x] `feat(api)`: conectores de GitHub, S3 e SharePoint com credencial cifrada, teste e sincronização pela versão remota
 - [x] `feat(api)`: sincronização agendada de conector e reindexação agendada de URL no poller
 - [x] `feat(web)`: conectores e reindexação na página da base
@@ -1065,7 +1064,7 @@ Fica para depois: webhook da origem, Google Drive e GCS, e filtros por padrão d
 
 Decisão em [ADR-0025](adr/0025-memoria-do-usuario.md). O agente pode lembrar fatos sobre o usuário de uma conversa para outra, só os dele e só daquele usuário. Os dados pessoais são mascarados antes de gravar, as memórias vencem pela retenção e podem ser vistas e apagadas pelo owner e pelo próprio usuário.
 
-- [ ] `docs(adr)`: ADR-0025 e esta seção
+- [x] #184 — `docs(adr)`: ADR-0025 e esta seção
 - [x] `feat(api)`: memória por agente no payload, lida por usuário e agente, mascarada e fora de anônimo e da suíte
 - [x] `feat(api)`: retenção no poller e rotas para ver e apagar memórias por agente e do próprio usuário
 - [x] `feat(web)`: memória na configuração do agente, aba de memórias e minhas memórias
