@@ -1,6 +1,6 @@
 # ADR-0025 — Memória do usuário entre sessões, por agente, com retenção, dados pessoais mascarados e direito de apagar
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-10-21
 
 ## Contexto

@@ -1,6 +1,6 @@
 # ADR-0023 — Revisão humana numa etapa do workflow, antes de rodar ou depois da saída
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-10-21
 
 ## Contexto
