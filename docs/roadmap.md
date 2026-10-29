@@ -753,7 +753,7 @@ Revisão de estrutura, segurança e UI/UX feita sobre a `main` em `cf186bc`. Os 
 
 O repositório é público e o histórico guarda duas senhas de owner antigas (README, DEMO, roadmap e `deploy.sh`, removidas no #64) e um par RSA de teste em `web/playwright.config.ts` (`9e52842`). O `deploy.sh` também enviava a chave privada JWT ao Vercel.
 
-- [ ] Gerar par JWT novo em todo ambiente que rodou `scripts/deploy.sh` (apagar `.deploy-keys` e rodar de novo, ou trocar à mão na API)
+- [ ] Gerar par JWT novo em todo ambiente que rodou `scripts/deploy.sh`, **sem** `JWT_PREVIOUS_PUBLIC_KEY`, porque a privada foi exposta. Passo a passo em [rotacao-de-chaves.md](rotacao-de-chaves.md) (Fase 27)
 - [ ] Remover `JWT_PRIVATE_KEY` do Vercel (o `deploy.sh` novo faz isso)
 - [ ] Trocar a senha do owner em toda instância semeada com um dos valores antigos, incluindo o secret `DEMO_OWNER_PASSWORD`
 
@@ -1090,7 +1090,7 @@ Decisão em [ADR-0026](adr/0026-rotacao-de-chaves.md). A chave JWT e a chave dos
 - [x] `feat(api)`: chave anterior dos segredos e comando que recifra as quatro tabelas
 - [x] `feat(api)`: estado da rotação para o owner, com tokens de integração e segredos na chave anterior
 - [x] `feat(web)`: estado da rotação no painel
-- [ ] `test(api)`: evals da rotação e passo a passo em `docs/rotacao-de-chaves.md`
+- [x] `test(api)`: evals da rotação e passo a passo em `docs/rotacao-de-chaves.md`
 
 **Critério de aceite da fase:**
 
