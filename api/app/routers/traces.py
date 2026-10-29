@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 from starlette.concurrency import run_in_threadpool
 
-from app.authz import Scope, require_scopes
+from app.authz import Scope, require_scopes, sees_everyone
 
 router = APIRouter(
     prefix="/api/v1/runs",
@@ -60,11 +60,6 @@ def _load(db: Any, run_id: str) -> TraceDetail | None:
     return TraceDetail.from_trace_and_spans(trace, db.get_spans(trace_id=trace.trace_id))
 
 
-def _is_admin(request: Request) -> bool:
-    admin = getattr(request.state, "admin_scope", None) or "agent_os:admin"
-    return admin in (getattr(request.state, "scopes", None) or [])
-
-
 @router.get("/{run_id}/trace", response_model=RunTrace)
 async def get_run_trace(run_id: str, request: Request) -> RunTrace:
     db = getattr(request.app.state, "agno_db", None)
@@ -74,9 +69,8 @@ async def get_run_trace(run_id: str, request: Request) -> RunTrace:
     if detail is None:
         raise HTTPException(status_code=404, detail="Trace não encontrado para este run")
     # trace traz entrada e saída da conversa: mesma regra do Agno, só o dono ou admin
-    enforce = getattr(request.app.state, "enforce_scopes", False)
     owner = detail.user_id == getattr(request.state, "user_id", None)
-    if enforce and not _is_admin(request) and not owner:
+    if not sees_everyone(request) and not owner:
         raise HTTPException(status_code=403, detail="Permissão insuficiente")
     data = detail.model_dump()
     return RunTrace(

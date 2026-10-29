@@ -65,6 +65,14 @@ def require_resource_scope(resource: str, action: str) -> Callable[[Request], No
     return dependency
 
 
+def sees_everyone(request: Request) -> bool:
+    """Owner (admin) ou app sem autenticação: enxerga dados de conversa de todos os usuários."""
+    if not getattr(request.app.state, "enforce_scopes", False):
+        return True
+    admin = getattr(request.state, "admin_scope", None) or "agent_os:admin"
+    return admin in (getattr(request.state, "scopes", None) or [])
+
+
 def require_scopes(*required: str) -> Callable[[Request], None]:
     def dependency(request: Request) -> None:
         # Sem auth (testes e create_app(enable_auth=False)) o app não marca a flag

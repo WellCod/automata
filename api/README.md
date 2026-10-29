@@ -116,7 +116,7 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | `configs:read` | `GET /api/v1/configs`, `GET /api/v1/configs/{id}`, `GET /api/v1/configs/{id}/versions`, `GET /api/v1/models/capabilities`, `POST /api/v1/linter` |
 | `configs:write` | `POST /api/v1/configs`, `PUT /api/v1/configs/{id}/draft`, `POST /api/v1/mcp-servers/{id}/discover` |
 | `configs:publish` | `POST /api/v1/configs/{id}/publish`, `POST /api/v1/configs/{id}/rollback` |
-| `metrics:read` | `GET /api/v1/configs/{id}/runs`, `GET /api/v1/configs/{id}/metrics`, `GET /api/v1/metrics/*`, `GET /api/v1/usage/rollup`, `GET /api/v1/approvals`, `GET /api/v1/runs/{run_id}/trace` (este só para o dono do run ou owner) |
+| `metrics:read` | `GET /api/v1/configs/{id}/runs`, `GET /api/v1/configs/{id}/metrics`, `GET /api/v1/metrics/*`, `GET /api/v1/usage/rollup`, `GET /api/v1/approvals` e `GET /api/v1/runs/{run_id}/trace` (os dois só com os runs do próprio usuário, ou de todos para o owner) |
 | `mcp_servers:read` | `GET /api/v1/mcp-servers`, `GET /api/v1/mcp-servers/{id}` |
 | `mcp_servers:write` | `POST`, `PUT` e `DELETE` em `/api/v1/mcp-servers` — só owner (`agent_os:admin`) |
 | `knowledge_bases:read` | `GET /api/v1/knowledge-bases`, `GET /api/v1/knowledge-bases/{id}`, `GET /api/v1/knowledge-bases/embedders`, `GET /api/v1/knowledge-bases/{id}/contents[/{content_id}]`, `POST /api/v1/knowledge-bases/{id}/search` |
@@ -187,7 +187,7 @@ Gerar a chave: `python -c "from cryptography.fernet import Fernet; print(Fernet.
 
 Tools marcadas em `require_confirmation` no agente pausam o run antes de executar (`status=PAUSED`, evento `RunPaused`). O `TrackedAgent` grava o run como `paused`, com o `session_id` e as tools pendentes (`ToolExecution` serializado) em `agent_run.pending_tools`.
 
-- `GET /api/v1/approvals[?agent_id=]` lista os runs pausados com agente, quem pediu, nome e argumentos de cada tool. Cada item traz `kind`, e os de workflow vêm com `steps` (etapas esperando revisão, ADR-0023) no lugar de `tools`.
+- `GET /api/v1/approvals[?agent_id=]` lista os runs pausados com agente, quem pediu, nome e argumentos de cada tool. Cada usuário vê só os dele e o owner vê todos, porque os argumentos e a saída da etapa são dados da conversa. O `continue` do Agno também exige o dono da sessão. Cada item traz `kind`, e os de workflow vêm com `steps` (etapas esperando revisão, ADR-0023) no lugar de `tools`.
 - A decisão é o continue do próprio AgentOS: `POST /agents/{id}/runs/{run_id}/continue`, com `session_id` e `tools` = os `tool_execution` recebidos, cada um com `confirmed: true` ou `false`. Exige `agents:run`. Com `user_isolation`, só o dono da sessão ou um owner retoma.
 - Aprovado, a tool executa e o run segue. Rejeitado, o modelo recebe a recusa e responde sem a ação. Nos dois casos o mesmo `agent_run` passa a `success`, e a pendência some.
 
