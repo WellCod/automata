@@ -333,4 +333,6 @@ def test_busca_com_embedder_quebrado_da_502(
     )
     resp = client.post(f"/api/v1/knowledge-bases/{base_id}/search", json={"query": "texto"})
     assert resp.status_code == 502
-    assert "chave do embedder inválida" in resp.text
+    # o detalhe do provedor fica no log; a resposta só aponta onde olhar
+    assert "chave do embedder inválida" not in resp.text
+    assert "confira a chave do embedder" in resp.text
