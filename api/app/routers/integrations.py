@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from app.auth import issue_token
+from app.auth import current_kid, issue_token
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.integrations import MAX_DAYS, integration_scopes
@@ -44,6 +44,8 @@ class IntegrationResponse(BaseModel):
     created_at: datetime
     expires_at: datetime
     revoked_at: datetime | None
+    # falso enquanto o token depende da chave anterior ou é de antes do kid (ADR-0026)
+    on_current_key: bool
 
 
 class IssuedIntegration(IntegrationResponse):
@@ -52,7 +54,7 @@ class IssuedIntegration(IntegrationResponse):
     mcp_url: str | None
 
 
-def _to_response(t: IntegrationToken) -> IntegrationResponse:
+def _to_response(t: IntegrationToken, kid: str | None = None) -> IntegrationResponse:
     return IntegrationResponse(
         id=t.id,
         name=t.name,
@@ -63,6 +65,7 @@ def _to_response(t: IntegrationToken) -> IntegrationResponse:
         created_at=t.created_at,
         expires_at=t.expires_at,
         revoked_at=t.revoked_at,
+        on_current_key=t.signing_kid is not None and t.signing_kid == kid,
     )
 
 
@@ -88,7 +91,8 @@ def _check_suites(session: SessionDep, ids: list[UUID]) -> None:
 @router.get("", response_model=list[IntegrationResponse])
 def list_integrations(session: SessionDep) -> list[IntegrationResponse]:
     rows = session.query(IntegrationToken).order_by(IntegrationToken.created_at.desc()).all()
-    return [_to_response(t) for t in rows]
+    kid = current_kid()
+    return [_to_response(t, kid) for t in rows]
 
 
 @router.post("", response_model=IssuedIntegration, status_code=201)
@@ -113,6 +117,7 @@ def issue(body: IntegrationInput, session: SessionDep, request: Request) -> Issu
         scopes=scopes,
         created_by=str(getattr(request.state, "user_id", None) or "panel"),
         expires_at=datetime.now(UTC) + expires_in,
+        signing_kid=current_kid(),
     )
     session.add(row)
     session.commit()
@@ -126,7 +131,7 @@ def issue(body: IntegrationInput, session: SessionDep, request: Request) -> Issu
     base = get_settings().public_base_url
     logger.info("token de integração emitido", extra={"integration_id": str(token_id)})
     return IssuedIntegration(
-        **_to_response(row).model_dump(),
+        **_to_response(row, row.signing_kid).model_dump(),
         token=token,
         mcp_url=f"{base.rstrip('/')}/mcp" if base else None,
     )
@@ -146,4 +151,4 @@ def revoke(integration_id: UUID, session: SessionDep, request: Request) -> Integ
         if revoked is not None:
             revoked.revoke_now(row.jti)
         logger.info("token de integração revogado", extra={"integration_id": str(row.id)})
-    return _to_response(row)
+    return _to_response(row, current_kid())
