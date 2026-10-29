@@ -19,7 +19,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from app.mcp.egress import EgressDenied, check_url
+from app.mcp.egress import EgressDenied, check_url, guarded_client
 from app.secrets import decrypt_json, encrypt_json
 
 logger = logging.getLogger(__name__)
@@ -85,14 +85,12 @@ def deliver(webhook: Webhook, event: str, body: bytes, *, attempts: int = 3) -> 
         if attempt:
             time.sleep(RETRY_WAITS_S[min(attempt - 1, len(RETRY_WAITS_S) - 1)])
         try:
-            # sem seguir redirect: o destino do redirect não passou pelo check_url
-            response = httpx.post(
-                webhook.url,
-                content=body,
-                headers=headers,
-                timeout=TIMEOUT_S,
-                follow_redirects=False,
-            )
+            # sem seguir redirect, com o IP conferido de novo na conexão
+            with guarded_client(timeout=TIMEOUT_S) as client:
+                response = client.post(webhook.url, content=body, headers=headers)
+        except EgressDenied as exc:
+            # o DNS mudou desde o check: o IP conferido na conexão caiu em rede interna
+            return f"recusado: {exc}"
         except httpx.HTTPError as exc:
             result = f"erro: {type(exc).__name__}"
             continue

@@ -7,9 +7,7 @@ um 302 levaria a requisição para a rede interna sem passar pela checagem.
 from dataclasses import dataclass
 from urllib.parse import urljoin
 
-import httpx
-
-from app.mcp.egress import check_url
+from app.mcp.egress import check_url, guarded_client
 
 MAX_REDIRECTS = 3
 TIMEOUT_SECONDS = 20.0
@@ -28,7 +26,7 @@ class Fetched:
 
 def fetch_url(url: str, max_bytes: int) -> Fetched:
     current = url
-    with httpx.Client(timeout=TIMEOUT_SECONDS, follow_redirects=False) as client:
+    with guarded_client(timeout=TIMEOUT_SECONDS) as client:
         for _ in range(MAX_REDIRECTS + 1):
             check_url(current)
             with client.stream("GET", current, headers={"User-Agent": "automata-rag/1"}) as resp:
