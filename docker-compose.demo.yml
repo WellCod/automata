@@ -89,6 +89,7 @@ services:
       AUTOMATA_API_URL: ${AUTOMATA_API_URL:-http://api:8000}
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
       JWT_PREVIOUS_PUBLIC_KEY: ${JWT_PREVIOUS_PUBLIC_KEY:-}
+      CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:-}
     ports:
       - "3000:3000"
     healthcheck:

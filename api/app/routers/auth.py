@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from datetime import UTC, datetime
 
@@ -24,6 +25,14 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
 
 _LOGIN_LIMIT_PER_IP = 20
+# por e-mail e IP o limite padrão (5/min); só por e-mail, folgado: segura força bruta
+# distribuída sem deixar qualquer um travar o login de outra pessoa com 5 tentativas
+_LOGIN_LIMIT_PER_EMAIL = 30
+
+
+def _email_ref(email: str) -> str:
+    """Referência estável para o log sem gravar o e-mail digitado (que pode ser de outra pessoa)."""
+    return hashlib.sha256(email.strip().lower().encode()).hexdigest()[:12]
 
 
 def _require_admin(authorization: str = Header(...)) -> None:
@@ -39,12 +48,15 @@ def _require_admin(authorization: str = Header(...)) -> None:
 @router.post("/login", response_model=TokenResponse)
 def login(request: Request, body: LoginInput, session: SessionDep) -> TokenResponse:
     ip = get_client_ip(request)
-    logger.info("login attempt", extra={"ip": ip, "email": body.email})
+    email_ref = _email_ref(body.email)
+    logger.info("login attempt", extra={"ip": ip, "email_ref": email_ref})
     # Por e-mail contra força bruta distribuída; por IP, com folga para vários
     # usuários atrás do mesmo NAT, contra varredura de contas
     limiter = request.app.state.rate_limiter
     limiter.check(f"login:ip:{ip}", limit=_LOGIN_LIMIT_PER_IP)
-    limiter.check(f"login:email:{body.email.lower()}")
+    email = body.email.lower()
+    limiter.check(f"login:email:{email}:{ip}")
+    limiter.check(f"login:email:{email}", limit=_LOGIN_LIMIT_PER_EMAIL)
     svc = UserService(UserRepository(session))
     try:
         user = svc.authenticate(body.email, body.password)
@@ -52,7 +64,7 @@ def login(request: Request, body: LoginInput, session: SessionDep) -> TokenRespo
         user_role = user.role
         session.commit()
     except ValueError as e:
-        logger.warning("login failed", extra={"ip": ip, "email": body.email})
+        logger.warning("login failed", extra={"ip": ip, "email_ref": email_ref})
         raise HTTPException(status_code=401, detail="Credenciais inválidas") from e
     logger.info("login ok", extra={"ip": ip, "user_id": user_id, "role": user_role})
     return TokenResponse(access_token=issue_token(user_id, ROLE_SCOPES[user_role]))
