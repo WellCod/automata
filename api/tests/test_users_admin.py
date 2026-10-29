@@ -187,3 +187,19 @@ def test_ultimo_owner_e_remocao(client: TestClient, owner: str) -> None:
         ).status_code
         == 404
     )
+
+
+def test_token_de_usuario_removido_nao_volta_a_valer(client: TestClient, owner: str) -> None:
+    user_id = _criar(client, owner, "removido@example.com")
+    # recém-criado, ainda fora do cache de usuários: a consulta pelo id deixa entrar
+    sessao = _login(client, "removido@example.com")
+    assert client.get("/api/v1/configs", headers=_bearer(sessao)).status_code == 200
+    client.patch(
+        f"/api/v1/users/{user_id}", json={"is_active": False}, headers=_bearer(owner)
+    ).raise_for_status()
+    assert client.delete(f"/api/v1/users/{user_id}", headers=_bearer(owner)).status_code == 204
+
+    # a remoção apagou o corte gravado na desativação; o cache recarrega e o token segue fora
+    time.sleep(1.1)
+    client.app.state.revoked_tokens.refresh()  # type: ignore[attr-defined]
+    assert client.get("/api/v1/configs", headers=_bearer(sessao)).status_code == 401
