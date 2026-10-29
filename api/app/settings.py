@@ -20,8 +20,10 @@ class Settings(BaseSettings):
     # IPs ou CIDRs de proxies cujo X-Forwarded-For é confiável (separados por vírgula).
     # Vazio: o header é ignorado e vale o IP da conexão.
     trusted_proxies: str = ""
-    # Chave Fernet que cifra headers de servidores MCP (ADR-0010)
+    # Chave Fernet que cifra os segredos em repouso: MCP, webhooks, alertas e conectores (ADR-0010)
     mcp_secrets_key: str | None = None
+    # Chave Fernet anterior, só decifra durante a rotação (ADR-0026)
+    mcp_secrets_previous_key: str | None = None
     # Hosts liberados da checagem de rede interna (separados por vírgula)
     mcp_allowed_hosts: str = ""
     # URL pública da API, usada para montar o endereço do /mcp nas integrações
