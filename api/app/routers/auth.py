@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from sqlalchemy import delete
 from sqlalchemy.dialects.postgresql import insert
 
-from app.auth import issue_token
+from app.auth import decode_token, issue_token
 from app.db import SessionDep
 from app.models.revoked_token import RevokedToken
 from app.proxy import get_client_ip
@@ -19,7 +19,6 @@ from app.schemas.user import (
     UserResponse,
 )
 from app.services.user import UserService
-from app.settings import get_settings
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
@@ -29,11 +28,8 @@ _LOGIN_LIMIT_PER_IP = 20
 
 def _require_admin(authorization: str = Header(...)) -> None:
     token = authorization.removeprefix("Bearer ")
-    settings = get_settings()
     try:
-        payload = jwt.decode(
-            token, settings.jwt_public_key, algorithms=["RS256"], audience="automata"
-        )
+        payload = decode_token(token)
     except jwt.InvalidTokenError as e:
         raise HTTPException(status_code=401, detail="Token inválido") from e
     if "agent_os:admin" not in payload.get("scopes", []):
@@ -66,11 +62,8 @@ def login(request: Request, body: LoginInput, session: SessionDep) -> TokenRespo
 def logout(request: Request, session: SessionDep, authorization: str = Header(...)) -> Response:
     """Revoga o token da sessão: o RevocationMiddleware passa a recusá-lo até expirar."""
     token = authorization.removeprefix("Bearer ")
-    settings = get_settings()
     try:
-        payload = jwt.decode(
-            token, settings.jwt_public_key, algorithms=["RS256"], audience="automata"
-        )
+        payload = decode_token(token)
     except jwt.InvalidTokenError as e:
         raise HTTPException(status_code=401, detail="Token inválido") from e
     jti = payload.get("jti")

@@ -1,4 +1,4 @@
-import { importSPKI, jwtVerify } from "jose";
+import { errors, importSPKI, jwtVerify } from "jose";
 import { NextRequest, NextResponse } from "next/server";
 
 const ALG = "RS256";
@@ -20,10 +20,27 @@ function csrfCheck(req: NextRequest): NextResponse | null {
   return null;
 }
 
-async function getPublicKey() {
-  const raw = process.env.JWT_PUBLIC_KEY;
-  if (!raw) throw new Error("JWT_PUBLIC_KEY não definida");
-  return importSPKI(raw, ALG);
+// Atual primeiro; a anterior só existe durante a rotação da chave (ADR-0026)
+async function getPublicKeys() {
+  const current = process.env.JWT_PUBLIC_KEY;
+  if (!current) throw new Error("JWT_PUBLIC_KEY não definida");
+  const previous = process.env.JWT_PREVIOUS_PUBLIC_KEY;
+  const raws = previous ? [current, previous] : [current];
+  return Promise.all(raws.map((raw) => importSPKI(raw, ALG)));
+}
+
+// Só assinatura inválida passa para a próxima chave; vencido falha na chave certa
+export async function verifyToken(token: string): Promise<void> {
+  const keys = await getPublicKeys();
+  for (const [i, key] of keys.entries()) {
+    try {
+      await jwtVerify(token, key, { audience: AUDIENCE });
+      return;
+    } catch (err) {
+      const last = i === keys.length - 1;
+      if (last || !(err instanceof errors.JWSSignatureVerificationFailed)) throw err;
+    }
+  }
 }
 
 export async function proxy(req: NextRequest) {
@@ -43,7 +60,7 @@ export async function proxy(req: NextRequest) {
   }
 
   try {
-    await jwtVerify(token, await getPublicKey(), { audience: AUDIENCE });
+    await verifyToken(token);
   } catch {
     const res = NextResponse.redirect(new URL("/login", req.url));
     res.cookies.delete("automata_token");
