@@ -56,6 +56,7 @@ O painel mostra isso numa seção para o owner. A rotação acaba quando os dois
 - Rotacionar o JWT não derruba ninguém. Sessões do painel migram sozinhas em 1 hora. Integrações migram quando o token é reemitido, e o painel mostra quantas faltam.
 - Rotacionar os segredos é: configurar a nova como atual e a velha como anterior, reiniciar, rodar o comando e tirar a anterior.
 - Enquanto a chave anterior do JWT estiver configurada, um token roubado assinado com ela continua valendo até vencer. A revogação por `jti` segue funcionando nesse período, e o estado da rotação mostra o que ainda depende da chave velha.
+- **Chave privada vazada não usa a anterior.** Quem tem a privada velha assina tokens novos que a pública anterior aceitaria, inclusive com `jti` que nunca foi revogado. Nesse caso a troca corta todas as sessões e todos os tokens de integração, como hoje. A chave anterior serve para troca de rotina. O passo a passo diz isso antes do primeiro comando.
 - O painel precisa das duas chaves públicas no proxy, como a API.
 - Uma migration: `signing_kid` no `integration_token`.
 
