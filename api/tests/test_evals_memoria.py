@@ -99,3 +99,12 @@ def test_vencimento_conta_da_ultima_atualizacao() -> None:
         UserMemory(memory="no limite", memory_id="l", updated_at=at(89.9)),
     ]
     assert expired(rows, 90, now) == ["v", "c"]
+
+
+def test_input_enorme_e_cortado_no_teto_e_mascarado() -> None:
+    from app.guardrails.pii import PII_SCAN_MAX_CHARS
+
+    text = "CPF 529.982.247-25 " + "x" * (PII_SCAN_MAX_CHARS * 3)
+    masked = _masked(text)
+    assert masked is not None and len(masked) <= PII_SCAN_MAX_CHARS
+    assert "529.982.247-25" not in masked

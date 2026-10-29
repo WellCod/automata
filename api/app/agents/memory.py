@@ -14,7 +14,7 @@ from agno.db.postgres import PostgresDb
 from agno.db.schemas.memory import UserMemory
 from agno.memory import MemoryManager
 
-from app.guardrails.pii import find_pii, mask
+from app.guardrails.pii import PII_SCAN_MAX_CHARS, find_pii, mask
 from app.schemas.config import MemorySettings
 from app.settings import get_settings
 
@@ -28,6 +28,10 @@ CAPTURE_RULES = (
 def _masked(text: str | None) -> str | None:
     if not text:
         return text
+    # o input cru que o Agno grava junto da memória pode ser enorme: acima do teto do
+    # scan, guarda só o começo, que é o que serve para auditar de onde veio o fato
+    if len(text) > PII_SCAN_MAX_CHARS:
+        text = text[:PII_SCAN_MAX_CHARS]
     return mask(text, find_pii(text))
 
 
