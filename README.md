@@ -365,6 +365,7 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0023](docs/adr/0023-revisao-humana-no-workflow.md) | Revisão humana numa etapa do workflow, antes de rodar ou depois da saída |
 | [0024](docs/adr/0024-conectores-de-conhecimento.md) | Conectores de conhecimento (GitHub, S3, SharePoint) e reindexação agendada |
 | [0025](docs/adr/0025-memoria-do-usuario.md) | Memória do usuário entre sessões, por agente, com retenção, PII mascarado e exclusão |
+| [0026](docs/adr/0026-rotacao-de-chaves.md) | Rotação da chave JWT e da chave dos segredos sem derrubar sessões nem integrações (proposto, Fase 27) |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 
