@@ -270,7 +270,7 @@ export default function AnalyticsPage() {
         ) : !breakdown || breakdown.length === 0 ? (
           <p className="text-muted-foreground text-[13px]">Nenhum dado neste período.</p>
         ) : (
-          <div className="border-border overflow-hidden rounded border">
+          <div className="border-border overflow-x-auto rounded border">
             <table className="w-full text-[13px]">
               <thead>
                 <tr className="border-border bg-card border-b">

@@ -1118,7 +1118,7 @@ Segunda rodada de verificação, sobre a `main` em `9909b4c`: UI e UX nas 66 tel
 
 ### UI e UX
 
-- [ ] O painel não funciona no celular. A barra lateral tem 200 px fixos, sem breakpoint, e corta o conteúdo em 375 px.
+- [x] O painel não funciona no celular. A barra lateral tem 200 px fixos, sem breakpoint, e corta o conteúdo em 375 px.
 - [ ] As páginas de agente, time, workflow e base não têm `h1`.
 - [ ] Faltam rótulos acessíveis na busca e no filtro de Agentes, nas datas do Analytics e no seletor das páginas de agente e de time.
 - [ ] O texto branco do botão primário sobre o azul fica em 3,68:1, abaixo dos 4,5:1 do AA.

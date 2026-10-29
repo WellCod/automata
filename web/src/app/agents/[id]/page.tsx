@@ -330,8 +330,8 @@ export default function AgentEditPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-border bg-background sticky top-0 z-10 flex h-11 flex-none items-center justify-between border-b px-6">
-        <div className="flex items-center gap-3">
+      <header className="border-border bg-background sticky top-0 z-10 flex h-11 flex-none items-center justify-between gap-3 border-b px-4 md:px-6">
+        <div className="flex min-w-0 items-center gap-3">
           <Link
             href="/"
             className="text-muted-foreground hover:border-border hover:text-foreground rounded border border-transparent p-1 transition-colors"
@@ -339,12 +339,16 @@ export default function AgentEditPage() {
           >
             <ArrowLeft className="h-3.5 w-3.5" />
           </Link>
-          <span className="text-foreground text-[13px] font-medium">{data?.name ?? "Agente"}</span>
-          <StatusBadge data={data} />
+          <span className="text-foreground truncate text-[13px] font-medium">
+            {data?.name ?? "Agente"}
+          </span>
+          <span className="hidden sm:contents">
+            <StatusBadge data={data} />
+          </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-none items-center gap-3">
           {isDirty && !mutation.isPending && (
-            <span className="text-[11px] text-amber-600 dark:text-amber-400">
+            <span className="hidden text-[11px] text-amber-600 sm:inline dark:text-amber-400">
               Alterações não salvas
             </span>
           )}
@@ -354,13 +358,13 @@ export default function AgentEditPage() {
         </div>
       </header>
 
-      <div className="flex flex-1">
+      <div className="flex flex-1 flex-col lg:flex-row">
         <Tabs
           value={tab}
           onValueChange={(v) => setTab(v as PageTab)}
-          className="min-w-0 flex-1 px-8 pt-2 pb-6"
+          className="min-w-0 flex-1 px-4 pt-2 pb-6 md:px-8"
         >
-          <TabsList>
+          <TabsList className="overflow-x-auto">
             {PAGE_TABS.map(({ id: tid, label, icon: Icon }) => (
               <TabsTrigger key={tid} value={tid}>
                 <Icon />
@@ -536,7 +540,7 @@ export default function AgentEditPage() {
 
         <aside
           aria-label="Testar"
-          className="border-border bg-background w-[400px] flex-none border-l lg:sticky lg:top-11 lg:max-h-[calc(100vh-2.75rem)] lg:overflow-y-auto"
+          className="border-border bg-background w-full flex-none border-t lg:sticky lg:top-11 lg:max-h-[calc(100vh-2.75rem)] lg:w-[400px] lg:overflow-y-auto lg:border-t-0 lg:border-l"
         >
           <div className="border-border flex h-9 items-center gap-1.5 border-b px-4">
             <FlaskConical className="text-muted-foreground h-3.5 w-3.5" />
