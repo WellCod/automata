@@ -1086,7 +1086,7 @@ Fica para depois: memória em time, tipos de máscara configuráveis por agente 
 Decisão em [ADR-0026](adr/0026-rotacao-de-chaves.md). A chave JWT e a chave dos segredos passam a aceitar uma anterior durante a troca. O JWT leva `kid`, um comando recifra os segredos e o owner acompanha no painel o que ainda depende da chave velha. É o que destrava a ação manual pendente da Fase 11.
 
 - [ ] `docs(adr)`: ADR-0026 e esta seção
-- [ ] `feat`: JWT com `kid` e chave pública anterior aceita na API, no `/mcp` e no proxy do painel
+- [x] `feat`: JWT com `kid` e chave pública anterior aceita na API, no `/mcp` e no proxy do painel
 - [ ] `feat(api)`: chave anterior dos segredos e comando que recifra as quatro tabelas
 - [ ] `feat(api)`: estado da rotação para o owner, com tokens de integração e segredos na chave anterior
 - [ ] `feat(web)`: estado da rotação no painel

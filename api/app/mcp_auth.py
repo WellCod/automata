@@ -3,25 +3,19 @@
 import jwt
 from fastmcp.server.auth import AccessToken, TokenVerifier
 
-from app.settings import get_settings
+from app.auth import decode_token
 
 
 class JWTMCPAuth(TokenVerifier):
     """Verifica Bearer tokens RS256 no endpoint /mcp.
 
-    Reutiliza a mesma chave pública e audiência da API HTTP, garantindo que
+    Reutiliza as mesmas chaves públicas e audiência da API HTTP, garantindo que
     /mcp exige o mesmo JWT que as demais rotas protegidas.
     """
 
     async def verify_token(self, token: str) -> AccessToken | None:
-        settings = get_settings()
         try:
-            payload = jwt.decode(
-                token,
-                settings.jwt_public_key,
-                algorithms=["RS256"],
-                audience="automata",
-            )
+            payload = decode_token(token)
         except jwt.InvalidTokenError:
             return None
 

@@ -25,6 +25,7 @@ from app.agents.factory import make_agent_factory, make_team_factory
 from app.agents.models_map import demo_replay
 from app.agents.registry import PublishedAgents
 from app.agents.workflow_factory import make_workflow_factory
+from app.auth import verification_keys
 from app.background import background_queue
 from app.evals.runner import fail_stale as fail_stale_evals
 from app.evals.scheduler import run_forever as run_scheduled_evals
@@ -162,7 +163,7 @@ def create_app(
     # verificação do JWT RS256 emitido pela API; sem papéis gerenciados pelo Agno, os scopes
     # vêm do token (ADR-0005). O AuthorizationConfig solto foi descontinuado na v3
     authorization: Authorization | bool = (
-        Authorization(verification_keys=[settings.jwt_public_key], algorithm="RS256")
+        Authorization(verification_keys=verification_keys(), algorithm="RS256")
         if enable_auth
         else False
     )

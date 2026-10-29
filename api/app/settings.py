@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     database_url: str
     jwt_private_key: str
     jwt_public_key: str
+    # Chave pública da troca anterior: tokens assinados com ela continuam valendo até vencer
+    # (ADR-0026). A emissão usa sempre a atual
+    jwt_previous_public_key: str | None = None
     log_level: str = "INFO"
     # "development" liga /docs, /redoc e /openapi.json; qualquer outro valor os desliga
     app_env: str = "production"

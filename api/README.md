@@ -84,7 +84,7 @@ O rollup agrega tokens e custo por `(agent_config_id, period)`. Campos: `run_cou
 
 ## Scopes JWT
 
-Autenticação por JWT assimétrico RS256. O backend emite o token (via `app.auth.issue_token`), o AgentOS verifica usando a chave pública de `JWT_PUBLIC_KEY`, configurada no `Authorization` de `agno.os.authz` (o `AuthorizationConfig` solto foi descontinuado na v3). Os scopes vêm do token, sem papéis gerenciados pelo Agno. `AgentOS(user_isolation=True)` ativo: cada usuário só enxerga suas próprias sessões e memórias.
+Autenticação por JWT assimétrico RS256. O backend emite o token (via `app.auth.issue_token`), o AgentOS verifica usando a chave pública de `JWT_PUBLIC_KEY`, configurada no `Authorization` de `agno.os.authz` (o `AuthorizationConfig` solto foi descontinuado na v3). O token leva `kid` no cabeçalho (16 hexadecimais do SHA-256 da chave pública). Durante a troca do par, `JWT_PREVIOUS_PUBLIC_KEY` faz a API, o `/mcp`, as rotas de `/api/v1/auth` e o proxy do painel aceitarem também os tokens da chave anterior até vencerem (ADR-0026). Todos passam por `app.auth.decode_token`. Os scopes vêm do token, sem papéis gerenciados pelo Agno. `AgentOS(user_isolation=True)` ativo: cada usuário só enxerga suas próprias sessões e memórias.
 
 | Scope | Descrição |
 |---|---|
