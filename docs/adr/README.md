@@ -51,3 +51,4 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0023](0023-revisao-humana-no-workflow.md) | Revisão humana numa etapa do workflow, antes de rodar ou depois da saída | Aceito |
 | [0024](0024-conectores-de-conhecimento.md) | Conectores de conhecimento (GitHub, S3, SharePoint) e reindexação agendada | Aceito |
 | [0025](0025-memoria-do-usuario.md) | Memória do usuário entre sessões, por agente, com retenção, PII mascarado e exclusão | Aceito |
+| [0026](0026-rotacao-de-chaves.md) | Rotação da chave JWT e da chave dos segredos com uma chave anterior aceita na leitura | Proposto |

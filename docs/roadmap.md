@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 26
+# Roadmap — Fases 4 a 27
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -588,6 +588,7 @@ if __name__ == "__main__":
 | 24 — Revisão humana no workflow | #175–#178 | Etapa que pausa para aprovação antes de rodar ou depois da saída | Fases 12 e 15 |
 | 25 — Conectores de conhecimento | #179–#183 | GitHub, S3 e SharePoint na base, com sincronização e reindexação agendada de URL | Fases 13 e 18 |
 | 26 — Memória do usuário | #184–#188 | Fatos sobre o usuário entre sessões, por agente, com retenção, PII mascarado e exclusão | Fases 14 e 20 |
+| 27 — Rotação de chaves | #191 em diante | Chave JWT e chave dos segredos trocadas sem derrubar sessões nem integrações | Fases 11, 12 e 17 |
 
 Fases 4 a 26 estão na `main` (estado em 2026-10-22). Fica pendente a ação manual da Fase 11 (rotação da chave JWT e das senhas).
 
@@ -1079,3 +1080,22 @@ Decisão em [ADR-0025](adr/0025-memoria-do-usuario.md). O agente pode lembrar fa
 - O usuário apaga as próprias memórias e o agente deixa de usá-las.
 
 Fica para depois: memória em time, tipos de máscara configuráveis por agente e exportação das memórias de um usuário.
+
+## Fase 27 — Rotação de chaves sem queda
+
+Decisão em [ADR-0026](adr/0026-rotacao-de-chaves.md). A chave JWT e a chave dos segredos passam a aceitar uma anterior durante a troca. O JWT leva `kid`, um comando recifra os segredos e o owner acompanha no painel o que ainda depende da chave velha. É o que destrava a ação manual pendente da Fase 11.
+
+- [ ] `docs(adr)`: ADR-0026 e esta seção
+- [ ] `feat`: JWT com `kid` e chave pública anterior aceita na API, no `/mcp` e no proxy do painel
+- [ ] `feat(api)`: chave anterior dos segredos e comando que recifra as quatro tabelas
+- [ ] `feat(api)`: estado da rotação para o owner, com tokens de integração e segredos na chave anterior
+- [ ] `feat(web)`: estado da rotação no painel
+- [ ] `test(api)`: evals da rotação e passo a passo em `docs/rotacao-de-chaves.md`
+
+**Critério de aceite da fase:**
+
+- Com a chave nova como atual e a velha como anterior, um token de integração emitido antes da troca continua chamando `/api/v1` e `/mcp`, e uma sessão do painel aberta antes da troca continua navegando.
+- Token novo sai com o `kid` da chave atual.
+- Sem a chave anterior, o token antigo recebe 401.
+- Depois do comando de recifrar, todos os segredos abrem só com a chave atual, e rodar de novo não muda nada.
+- O estado da rotação chega a zero depois de reemitir os tokens de integração e recifrar os segredos.
