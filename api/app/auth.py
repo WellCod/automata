@@ -24,11 +24,16 @@ def key_id(public_key_pem: str) -> str:
     return hashlib.sha256(der).hexdigest()[:16]
 
 
-def _safe_kid(public_key_pem: str) -> str | None:
+def safe_kid(public_key_pem: str) -> str | None:
     try:
         return key_id(public_key_pem)
     except ValueError:
         return None
+
+
+def current_kid() -> str | None:
+    """kid da chave atual; None quando a chave configurada não é PEM (testes sem JWT)."""
+    return safe_kid(get_settings().jwt_public_key)
 
 
 def verification_keys() -> list[str]:
@@ -49,7 +54,7 @@ def decode_token(token: str, *, audience: str = _AUDIENCE) -> dict[str, Any]:
     keys = verification_keys()
     kid = jwt.get_unverified_header(token).get("kid")
     if kid:
-        keys.sort(key=lambda k: _safe_kid(k) != kid)
+        keys.sort(key=lambda k: safe_kid(k) != kid)
     last: jwt.InvalidTokenError = jwt.InvalidSignatureError("nenhuma chave verificou o token")
     for key in keys:
         try:

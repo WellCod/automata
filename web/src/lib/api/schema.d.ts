@@ -460,6 +460,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/key-rotation": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Rotation Status */
+    get: operations["rotation_status_api_v1_key_rotation_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/knowledge-bases/embedders": {
     parameters: {
       query?: never;
@@ -2384,6 +2401,8 @@ export interface components {
       expires_at: string;
       /** Revoked At */
       revoked_at: string | null;
+      /** On Current Key */
+      on_current_key: boolean;
     };
     /** IssuedIntegration */
     IssuedIntegration: {
@@ -2414,6 +2433,8 @@ export interface components {
       expires_at: string;
       /** Revoked At */
       revoked_at: string | null;
+      /** On Current Key */
+      on_current_key: boolean;
       /** Token */
       token: string;
       /** Mcp Url */
@@ -2442,6 +2463,24 @@ export interface components {
        * @default 7
        */
       threshold: number;
+    };
+    /** JwtRotation */
+    JwtRotation: {
+      /** Current Kid */
+      current_kid: string | null;
+      /** Previous Kid */
+      previous_kid: string | null;
+      /** Tokens On Previous */
+      tokens_on_previous: number;
+      /** Tokens Without Kid */
+      tokens_without_kid: number;
+    };
+    /** KeyRotationStatus */
+    KeyRotationStatus: {
+      jwt: components["schemas"]["JwtRotation"];
+      secrets: components["schemas"]["SecretsRotation"];
+      /** Done */
+      done: boolean;
     };
     /** KnowledgeBaseCreate */
     KnowledgeBaseCreate: {
@@ -2989,6 +3028,17 @@ export interface components {
       searched: string;
       /** Hyde Tokens */
       hyde_tokens: number;
+    };
+    /** SecretsRotation */
+    SecretsRotation: {
+      /** Configured */
+      configured: boolean;
+      /** Previous Configured */
+      previous_configured: boolean;
+      /** Pending */
+      pending: {
+        [key: string]: number;
+      };
     };
     /** StepNode */
     StepNode: {
@@ -4462,6 +4512,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  rotation_status_api_v1_key_rotation_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["KeyRotationStatus"];
         };
       };
     };

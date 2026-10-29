@@ -1088,7 +1088,7 @@ Decisão em [ADR-0026](adr/0026-rotacao-de-chaves.md). A chave JWT e a chave dos
 - [ ] `docs(adr)`: ADR-0026 e esta seção
 - [x] `feat`: JWT com `kid` e chave pública anterior aceita na API, no `/mcp` e no proxy do painel
 - [x] `feat(api)`: chave anterior dos segredos e comando que recifra as quatro tabelas
-- [ ] `feat(api)`: estado da rotação para o owner, com tokens de integração e segredos na chave anterior
+- [x] `feat(api)`: estado da rotação para o owner, com tokens de integração e segredos na chave anterior
 - [ ] `feat(web)`: estado da rotação no painel
 - [ ] `test(api)`: evals da rotação e passo a passo em `docs/rotacao-de-chaves.md`
 
