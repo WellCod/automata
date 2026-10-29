@@ -63,6 +63,7 @@ export function ModelSelector({ value, capabilities, onChange, error }: Props) {
           Modelo<span className="text-destructive ml-0.5">*</span>
         </label>
         <select
+          aria-label="Modelo"
           value={value}
           onChange={(e) => handleModelChange(e.target.value)}
           disabled={isPending}

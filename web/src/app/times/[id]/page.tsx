@@ -248,7 +248,7 @@ export default function TeamEditPage() {
             Times
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="text-foreground font-medium">{data?.name ?? "Time"}</span>
+          <h1 className="text-foreground font-medium">{data?.name ?? "Time"}</h1>
         </nav>
         <div className="flex items-center gap-3">
           {save.isError && (

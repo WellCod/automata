@@ -1086,7 +1086,7 @@ Fica para depois: memória em time, tipos de máscara configuráveis por agente 
 
 Decisão em [ADR-0026](adr/0026-rotacao-de-chaves.md). A chave JWT e a chave dos segredos passam a aceitar uma anterior durante a troca. O JWT leva `kid`, um comando recifra os segredos e o owner acompanha no painel o que ainda depende da chave velha. É o que destrava a ação manual pendente da Fase 11.
 
-- [ ] `docs(adr)`: ADR-0026 e esta seção
+- [x] #191 — `docs(adr)`: ADR-0026 e esta seção
 - [x] `feat`: JWT com `kid` e chave pública anterior aceita na API, no `/mcp` e no proxy do painel
 - [x] `feat(api)`: chave anterior dos segredos e comando que recifra as quatro tabelas
 - [x] `feat(api)`: estado da rotação para o owner, com tokens de integração e segredos na chave anterior
@@ -1119,12 +1119,12 @@ Segunda rodada de verificação, sobre a `main` em `9909b4c`: UI e UX nas 66 tel
 ### UI e UX
 
 - [x] O painel não funciona no celular. A barra lateral tem 200 px fixos, sem breakpoint, e corta o conteúdo em 375 px.
-- [ ] As páginas de agente, time, workflow e base não têm `h1`.
-- [ ] Faltam rótulos acessíveis na busca e no filtro de Agentes, nas datas do Analytics e no seletor das páginas de agente e de time.
-- [ ] O texto branco do botão primário sobre o azul fica em 3,68:1, abaixo dos 4,5:1 do AA.
-- [ ] Há alvos de clique com menos de 24 px nas listas de execuções e nas integrações.
-- [ ] O Analytics mostra o custo com 4 casas ("US$ 46,6832") e o tempo com ponto ("4.5s"); o resto do painel usa pt-BR.
-- [ ] A aba Testes faz o console mostrar 404, porque o agendamento ainda não existe.
+- [x] As páginas de agente, time, workflow e base não têm `h1`.
+- [x] Faltam rótulos acessíveis na busca e no filtro de Agentes, nas datas do Analytics e no seletor das páginas de agente e de time.
+- [x] O texto branco do botão primário sobre o azul fica em 3,68:1, abaixo dos 4,5:1 do AA.
+- [x] Há alvos de clique com menos de 24 px nas listas de execuções e nas integrações.
+- [x] O Analytics mostra o custo com 4 casas ("US$ 46,6832") e o tempo com ponto ("4.5s"); o resto do painel usa pt-BR.
+- [x] A aba Testes faz o console mostrar 404, porque o agendamento ainda não existe.
 
 **Critério de aceite da fase:**
 

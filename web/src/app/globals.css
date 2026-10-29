@@ -27,8 +27,10 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-solid: var(--destructive-solid);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
+  --color-accent-solid: var(--accent-solid);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -68,7 +70,10 @@
   --text-label: #52525b;
   --accent: #2563eb;
   --accent-foreground: #ffffff;
+  /* fundo de botão com texto branco: 5,2:1 (AA) */
+  --accent-solid: #2563eb;
   --destructive: #dc2626;
+  --destructive-solid: #dc2626;
   --border: #e4e4e7;
   --input: #ffffff;
   --ring: #2563eb;
@@ -109,7 +114,11 @@
   --text-label: #a1a1aa;
   --accent: #3b82f6;
   --accent-foreground: #ffffff;
+  /* o #3b82f6 serve de texto no escuro, mas com texto branco por cima fica em 3,7:1 */
+  --accent-solid: #2563eb;
   --destructive: #ef4444;
+  /* como o accent: o #ef4444 com texto branco fica em 3,8:1 */
+  --destructive-solid: #dc2626;
   --border: #27272a;
   --input: #18181b;
   --ring: #3b82f6;

@@ -92,7 +92,7 @@ function RunItem({
         onClick={() => setOpen((o) => !o)}
         disabled={!run.run_id}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 text-left disabled:cursor-default"
+        className="flex min-h-8 w-full items-center justify-between gap-2 text-left disabled:cursor-default"
       >
         <div className="flex items-center gap-1.5">
           {run.run_id && (

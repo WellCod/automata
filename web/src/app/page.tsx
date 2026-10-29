@@ -127,6 +127,7 @@ export default function AgentsPage() {
           />
           <input
             type="text"
+            aria-label="Buscar agente"
             placeholder="Buscar por nome ou ID…"
             value={q}
             onChange={(e) => {
@@ -137,6 +138,7 @@ export default function AgentsPage() {
           />
         </div>
         <select
+          aria-label="Filtrar por versão"
           value={status}
           onChange={(e) => {
             setStatus(e.target.value as StatusFilter);

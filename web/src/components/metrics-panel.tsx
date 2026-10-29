@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDuration } from "@/lib/format";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { BudgetSection } from "@/components/budget-section";
@@ -24,12 +25,6 @@ const PERIODS = [
 ] as const;
 
 type Period = (typeof PERIODS)[number]["value"];
-
-function formatMs(ms: number | null): string {
-  if (ms === null) return "—";
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  return `${(ms / 1000).toFixed(2)}s`;
-}
 
 function formatRate(rate: number): string {
   return `${(rate * 100).toFixed(1)}%`;
@@ -100,8 +95,16 @@ export function MetricsPanel({ agentId }: Props) {
             value={formatRate(data.error_rate)}
             sub={data.total_runs === 0 ? "sem dados" : undefined}
           />
-          <MetricCard label="Latência p50" value={formatMs(data.p50_ms)} hint={LATENCY_HINTS.p50} />
-          <MetricCard label="Latência p95" value={formatMs(data.p95_ms)} hint={LATENCY_HINTS.p95} />
+          <MetricCard
+            label="Latência p50"
+            value={formatDuration(data.p50_ms)}
+            hint={LATENCY_HINTS.p50}
+          />
+          <MetricCard
+            label="Latência p95"
+            value={formatDuration(data.p95_ms)}
+            hint={LATENCY_HINTS.p95}
+          />
           <MetricCard
             label="Bloqueios"
             value={String(data.blocked_runs ?? 0)}

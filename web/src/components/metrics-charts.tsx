@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDuration } from "@/lib/format";
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -44,10 +45,6 @@ const costConfig = {
 function dayLabel(iso: string): string {
   const [, m, d] = iso.split("-");
   return `${d}/${m}`;
-}
-
-function formatMs(ms: number): string {
-  return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
 function formatUsd(v: number): string {
@@ -115,10 +112,10 @@ function SeriesTable({ points }: { points: DailyMetricsPoint[] }) {
                 <td className="text-foreground px-3 py-1 text-right">{p.error_count}</td>
                 <td className="text-foreground px-3 py-1 text-right">{p.blocked_count ?? 0}</td>
                 <td className="text-foreground px-3 py-1 text-right">
-                  {p.p50_ms === null ? "—" : formatMs(p.p50_ms)}
+                  {p.p50_ms === null ? "—" : formatDuration(p.p50_ms)}
                 </td>
                 <td className="text-foreground px-3 py-1 text-right">
-                  {p.p95_ms === null ? "—" : formatMs(p.p95_ms)}
+                  {p.p95_ms === null ? "—" : formatDuration(p.p95_ms)}
                 </td>
                 <td className="text-foreground px-3 py-1 text-right">{p.total_tokens}</td>
                 <td className="text-foreground px-3 py-1 text-right">
@@ -236,7 +233,7 @@ export function MetricsCharts({ range, agentId }: Props) {
             <LineChart data={rows}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="date" tickFormatter={dayLabel} minTickGap={16} {...axisProps} />
-              <YAxis width={52} tickFormatter={(v: number) => formatMs(v)} {...axisProps} />
+              <YAxis width={52} tickFormatter={(v: number) => formatDuration(v)} {...axisProps} />
               <ChartTooltip
                 content={
                   <ChartTooltipContent
@@ -247,7 +244,7 @@ export function MetricsCharts({ range, agentId }: Props) {
                           {latencyConfig[name as keyof typeof latencyConfig]?.label ?? name}
                         </span>
                         <span className="text-foreground font-medium">
-                          {formatMs(Number(value))}
+                          {formatDuration(Number(value))}
                         </span>
                       </span>
                     )}

@@ -339,9 +339,9 @@ export default function AgentEditPage() {
           >
             <ArrowLeft className="h-3.5 w-3.5" />
           </Link>
-          <span className="text-foreground truncate text-[13px] font-medium">
+          <h1 className="text-foreground truncate text-[13px] font-medium">
             {data?.name ?? "Agente"}
-          </span>
+          </h1>
           <span className="hidden sm:contents">
             <StatusBadge data={data} />
           </span>

@@ -645,7 +645,7 @@ export default function KnowledgeBasePage() {
         >
           <ArrowLeft className="h-3.5 w-3.5" />
         </Link>
-        <span className="text-foreground text-[13px] font-medium">{base?.name ?? "Base"}</span>
+        <h1 className="text-foreground text-[13px] font-medium">{base?.name ?? "Base"}</h1>
         {base && <span className="text-muted-foreground text-[11px]">{base.embedder_model}</span>}
       </header>
 

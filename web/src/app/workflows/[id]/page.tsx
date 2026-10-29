@@ -125,7 +125,7 @@ export default function WorkflowEditPage() {
             Workflows
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="text-foreground font-medium">{data?.name ?? "Workflow"}</span>
+          <h1 className="text-foreground font-medium">{data?.name ?? "Workflow"}</h1>
         </nav>
         <div className="flex items-center gap-3">
           {save.isError && (
