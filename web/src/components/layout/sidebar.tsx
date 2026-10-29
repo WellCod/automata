@@ -8,6 +8,7 @@ import {
   BookOpen,
   KeyRound,
   LayoutGrid,
+  LockKeyhole,
   LogOut,
   Plug,
   ShieldCheck,
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/integracoes", label: "Integrações", icon: KeyRound, exact: true },
   { href: "/alertas", label: "Alertas", icon: Bell, exact: true, ownerOnly: true },
   { href: "/usuarios", label: "Usuários", icon: UserCog, exact: true, ownerOnly: true },
+  { href: "/chaves", label: "Chaves", icon: LockKeyhole, exact: true, ownerOnly: true },
 ];
 
 function LogoMark() {

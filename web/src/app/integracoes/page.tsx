@@ -278,6 +278,14 @@ function IntegrationRow({ item, names }: { item: Integration; names: Record<stri
           >
             {status}
           </span>
+          {status === "ativo" && !item.on_current_key && (
+            <span
+              className="ml-1 text-[11px] text-amber-600 dark:text-amber-400"
+              title="Assinado com a chave JWT anterior ou antes do kid: emita um novo antes de tirar a chave anterior"
+            >
+              chave anterior
+            </span>
+          )}
         </span>
         {resources.length > 0 && (
           <span className="text-muted-foreground text-[13px]">

@@ -303,6 +303,7 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 | **Headers** | HSTS, CSP com `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`. |
 | **Saída** | Servidores MCP, webhooks, destinos de aviso e conectores de conhecimento passam pelo mesmo filtro: só https, sem host que resolva para IP interno, conferido no cadastro e a cada chamada, sem seguir redirect. URLs e segredos ficam cifrados com Fernet. A telemetria do Agno fica desligada. |
 | **Integrações** | Token de consumidor com escopo por recurso: roda só os agentes liberados e, se marcado, a suíte de testes deles, sem acesso a configuração. |
+| **Troca de chaves** | A chave JWT e a chave dos segredos aceitam uma anterior só para ler durante a troca, e um comando recifra os segredos. A página Chaves mostra ao owner os tokens de integração e os segredos que ainda dependem da chave velha. Integrações marca esses tokens ([ADR-0026](docs/adr/0026-rotacao-de-chaves.md)). |
 | **Dado pessoal** | Memória do usuário mascarada antes de gravar, lida só pelo agente que guardou, com retenção e exclusão pelo owner e pelo próprio usuário. Credencial de conector e memórias de usuários finais são só do owner. |
 
 ---
