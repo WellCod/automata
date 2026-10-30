@@ -1685,6 +1685,10 @@ export interface components {
       conversation?: components["schemas"]["ConversationSettings"];
       memory?: components["schemas"]["MemorySettings"];
       run?: components["schemas"]["RunControls"];
+      /** Output Schema */
+      output_schema?: {
+        [key: string]: unknown;
+      } | null;
       /** Metadata */
       metadata?: {
         [key: string]: unknown;
@@ -1895,6 +1899,7 @@ export interface components {
         | components["schemas"]["JudgeCheck"]
         | components["schemas"]["BlockedCheck"]
         | components["schemas"]["StepsCheck"]
+        | components["schemas"]["SchemaCheck"]
       )[];
       /** Source Run Id */
       source_run_id?: string | null;
@@ -1924,6 +1929,7 @@ export interface components {
         | components["schemas"]["JudgeCheck"]
         | components["schemas"]["BlockedCheck"]
         | components["schemas"]["StepsCheck"]
+        | components["schemas"]["SchemaCheck"]
       )[];
       /** Source Run Id */
       source_run_id: string | null;
@@ -1960,6 +1966,7 @@ export interface components {
         | components["schemas"]["JudgeCheck"]
         | components["schemas"]["BlockedCheck"]
         | components["schemas"]["StepsCheck"]
+        | components["schemas"]["SchemaCheck"]
       )[];
       /** Judge Criteria */
       judge_criteria: string | null;
@@ -3006,6 +3013,17 @@ export interface components {
       page: number;
       /** Page Size */
       page_size: number;
+    };
+    /**
+     * SchemaCheck
+     * @description A resposta valida contra o JSON Schema da versão testada (ADR-0027).
+     */
+    SchemaCheck: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "schema";
     };
     /** SearchComparison */
     SearchComparison: {
