@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 27
+# Roadmap — Fases 4 a 28
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -588,7 +588,8 @@ if __name__ == "__main__":
 | 24 — Revisão humana no workflow | #175–#178 | Etapa que pausa para aprovação antes de rodar ou depois da saída | Fases 12 e 15 |
 | 25 — Conectores de conhecimento | #179–#183 | GitHub, S3 e SharePoint na base, com sincronização e reindexação agendada de URL | Fases 13 e 18 |
 | 26 — Memória do usuário | #184–#188 | Fatos sobre o usuário entre sessões, por agente, com retenção, PII mascarado e exclusão | Fases 14 e 20 |
-| 27 — Rotação de chaves | #191 em diante | Chave JWT e chave dos segredos trocadas sem derrubar sessões nem integrações | Fases 11, 12 e 17 |
+| 27 — Rotação de chaves | #191–#196 | Chave JWT e chave dos segredos trocadas sem derrubar sessões nem integrações | Fases 11, 12 e 17 |
+| 28 — Auditoria 2026-10-29 | #197 em diante | Scan de PII que travava a API, vazamentos de leitura, SSRF por rebinding, painel no celular e acessibilidade | Fase 27 |
 
 Fases 4 a 26 estão na `main` (estado em 2026-10-22). Fica pendente a ação manual da Fase 11 (rotação da chave JWT e das senhas).
 
@@ -1099,3 +1100,37 @@ Decisão em [ADR-0026](adr/0026-rotacao-de-chaves.md). A chave JWT e a chave dos
 - Sem a chave anterior, o token antigo recebe 401.
 - Depois do comando de recifrar, todos os segredos abrem só com a chave atual, e rodar de novo não muda nada.
 - O estado da rotação chega a zero depois de reemitir os tokens de integração e recifrar os segredos.
+
+## Fase 28 — Auditoria 2026-10-29
+
+Segunda rodada de verificação, sobre a `main` em `9909b4c`: UI e UX nas 66 telas do painel (desktop e celular, claro e escuro), segurança da API e do painel, e levantamento de features. Os achados abaixo foram conferidos no código; os de segurança mais graves, reproduzidos. As features ficaram para a Fase 29.
+
+### Segurança
+
+- [ ] **Alta.** O scan de dados pessoais (`app/guardrails/pii.py`) é quadrático: 8 mil caracteres levam 2 s, e o tempo quadruplica quando o tamanho dobra. Ele roda no event loop e antes do limite de tamanho, e também na máscara da memória. Uma mensagem de cerca de 100 KB para um agente com guardrail de PII ou memória trava a API, que tem um worker só.
+- [ ] **Média.** `GET /api/v1/approvals` exige só `metrics:read`. Qualquer viewer vê os runs pausados de todos os usuários, com os argumentos das tools e a saída das etapas.
+- [ ] **Média.** Remover um usuário apaga a linha que guardava o corte de sessão (`tokens_valid_after`). O JWT dele volta a valer até vencer.
+- [ ] **Média.** A checagem de rede interna resolve o DNS, e o httpx resolve de novo ao conectar. Um domínio com TTL 0 alterna o IP entre as duas resoluções (DNS rebinding). A lista de bloqueio também deixa passar `100.64.0.0/10`.
+- [ ] **Baixa.** O BFF repassa o IP que o cliente informa (`x-real-ip`, primeiro hop do `X-Forwarded-For`), o que permite contornar o limite de login por IP. Cinco tentativas por minuto com o e-mail de alguém travam o login dessa pessoa.
+- [ ] **Baixa.** A busca e a comparação na base geram custo de embedding e de HyDE sem limite de taxa.
+- [ ] **Baixa.** O conector S3 sem chave usa a credencial da máquina, inclusive com `endpoint_url` de terceiro.
+- [ ] **Baixa.** O log grava o e-mail de toda tentativa de login. A busca na base e o teste de servidor MCP devolvem ao cliente o texto da exceção.
+
+### UI e UX
+
+- [ ] O painel não funciona no celular. A barra lateral tem 200 px fixos, sem breakpoint, e corta o conteúdo em 375 px.
+- [ ] As páginas de agente, time, workflow e base não têm `h1`.
+- [ ] Faltam rótulos acessíveis na busca e no filtro de Agentes, nas datas do Analytics e no seletor das páginas de agente e de time.
+- [ ] O texto branco do botão primário sobre o azul fica em 3,68:1, abaixo dos 4,5:1 do AA.
+- [ ] Há alvos de clique com menos de 24 px nas listas de execuções e nas integrações.
+- [ ] O Analytics mostra o custo com 4 casas ("US$ 46,6832") e o tempo com ponto ("4.5s"); o resto do painel usa pt-BR.
+- [ ] A aba Testes faz o console mostrar 404, porque o agendamento ainda não existe.
+
+**Critério de aceite da fase:**
+
+- Uma mensagem de 200 KB para um agente com PII ligada responde em menos de 1 s, e o `/health` segue respondendo durante o scan.
+- O viewer só vê nas Aprovações os runs dele.
+- Depois de desativar e remover um usuário, o token dele recebe 401.
+- Uma URL cujo DNS muda entre a checagem e a conexão não alcança rede interna.
+- Em 375 px o painel abre o menu por um botão, e nenhuma página corta conteúdo.
+- O audit de acessibilidade das 66 telas não aponta campo sem rótulo nem página sem `h1`.
