@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session
 from app.db import get_engine
 from app.guardrails.input import BlockLog
 from app.mcp.client import McpUnavailable, connect_strict
-from app.pricing import cost_or_estimate
+from app.pricing import answered_by, run_cost
 from app.repositories.run import RunRepository
 from app.repositories.usage import UsageRepository
 
@@ -327,7 +327,8 @@ class RunTracking:
         evaluation = current_eval_run.get()
         return RunRecord(
             agent_config_id=self.automata_config_id,
-            model_id=self.automata_model_id,
+            # com reserva, o modelo que respondeu (ADR-0027)
+            model_id=answered_by(metrics, self.automata_model_id),
             user_id=kwargs.get("user_id")
             or (evaluation.actor if evaluation else None)
             or "anonymous",
@@ -338,13 +339,8 @@ class RunTracking:
             input_tokens=int(getattr(metrics, "input_tokens", 0) or 0),
             output_tokens=int(getattr(metrics, "output_tokens", 0) or 0),
             total_tokens=int(getattr(metrics, "total_tokens", 0) or 0),
-            # Anthropic e OpenAI não informam custo: estimado pela tabela (ADR-0021)
-            cost=cost_or_estimate(
-                getattr(metrics, "cost", None),
-                self.automata_model_id,
-                int(getattr(metrics, "input_tokens", 0) or 0),
-                int(getattr(metrics, "output_tokens", 0) or 0),
-            ),
+            # Anthropic e OpenAI não informam custo: tabela por modelo (ADR-0021, ADR-0027)
+            cost=run_cost(metrics, self.automata_model_id),
             session_id=kwargs.get("session_id") or (output.session_id if output else None),
             pending_tools=_pending_tools(output),
             parent_run_id=current_workflow_run.get(),

@@ -144,6 +144,16 @@ class RunControls(BaseModel):
 
     # chamadas além do limite voltam ao modelo como erro, sem executar a tool
     tool_call_limit: int | None = Field(default=None, ge=1, le=100)
+    # repete só a chamada ao provedor que falhou, com espera de 1, 2 e 4 s; o run, nunca
+    provider_retries: int = Field(default=0, ge=0, le=3)
+    # em ordem, quando o principal falha de vez (5xx, rede) ou responde 429
+    fallback_models: list[str] = Field(default_factory=list, max_length=2)
+
+    @model_validator(mode="after")
+    def reservas_unicas(self) -> "RunControls":
+        if len(self.fallback_models) != len(set(self.fallback_models)):
+            raise ValueError("modelo reserva repetido")
+        return self
 
 
 class TeamSettings(BaseModel):

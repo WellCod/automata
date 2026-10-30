@@ -10,6 +10,8 @@ from agno.compaction.compaction import Compaction
 from agno.db.base import AsyncBaseDb, BaseDb
 from agno.factory.utils import FactoryValidationError, RequestContext
 from agno.guardrails.base import BaseGuardrail
+from agno.models.base import Model
+from agno.models.fallback import FallbackConfig
 from agno.team import Team, TeamMode
 from agno.team.factory import TeamFactory
 from agno.tools.function import Function
@@ -18,7 +20,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.agents.memory import memory_kwargs
-from app.agents.models_map import resolve_model
+from app.agents.models_map import demo_replay, resolve_model
 from app.agents.tracking import TrackedAgent, TrackedTeam
 from app.budget import BudgetGuardrail, hard_limit
 from app.db import get_engine
@@ -175,6 +177,24 @@ def required_model(payload: ConfigPayload) -> str:
     return payload.model_id
 
 
+def model_for(model_id: str, payload: ConfigPayload) -> Model:
+    """Modelo com o retry do provedor da versão (ADR-0027). O replay da demo não falha."""
+    model = resolve_model(model_id, payload.capabilities)
+    if payload.run.provider_retries and not demo_replay():
+        model.retries = payload.run.provider_retries
+        model.delay_between_retries = 1
+        model.exponential_backoff = True
+    return model
+
+
+def fallback_for(payload: ConfigPayload) -> FallbackConfig | None:
+    """Reservas em erro do provedor e em 429; erro 4xx do cliente não troca de modelo."""
+    if not payload.run.fallback_models or demo_replay():
+        return None
+    models: list[Model | str] = [model_for(mid, payload) for mid in payload.run.fallback_models]
+    return FallbackConfig(on_error=models, on_rate_limit=list(models))
+
+
 def agent_from(
     config_id: UUID,
     resolved: ResolvedVersion,
@@ -192,7 +212,8 @@ def agent_from(
         # em time, a descrição é o que o líder usa para decidir a quem delegar
         description=resolved.description,
         role=resolved.description,
-        model=resolve_model(required_model(payload), payload.capabilities),
+        model=model_for(required_model(payload), payload),
+        fallback_config=fallback_for(payload),
         instructions=build_instructions(payload, resolved.bases),
         tools=[*resolved.mcp_tools, *resolved.knowledge_tools],
         # membro de time não tem orçamento próprio: o consumo dele conta no time
@@ -278,7 +299,8 @@ def team_from(config_id: UUID, resolved: ResolvedTeam) -> TrackedTeam:
         id=str(config_id),
         name=leader.name,
         description=leader.description,
-        model=resolve_model(required_model(leader.payload), leader.payload.capabilities),
+        model=model_for(required_model(leader.payload), leader.payload),
+        fallback_config=fallback_for(leader.payload),
         instructions=build_instructions(leader.payload, leader.bases),
         tools=[*leader.mcp_tools, *leader.knowledge_tools],
         pre_hooks=pre_hooks_for(config_id, leader, blocks, budget=True),

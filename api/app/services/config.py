@@ -151,6 +151,7 @@ class ConfigService:
         if payload.conversation.compaction and config.kind != ConfigKind.agent:
             # o Team do Agno 3.1.8 não aceita compaction (ADR-0019)
             errors.append("só agente compacta a conversa")
+        errors += self._fallback_errors(payload)
         if config.kind == ConfigKind.workflow and payload.run != RunControls():
             # quem chama modelo e tool são os agentes e times das etapas, cada um com o seu
             errors.append("workflow não tem controle de run próprio")
@@ -159,6 +160,22 @@ class ConfigService:
             errors.append("só agente guarda memória do usuário")
         if errors:
             raise ValueError("; ".join(errors))
+
+    @staticmethod
+    def _fallback_errors(payload: ConfigPayload) -> list[str]:
+        """Reserva da matriz, diferente do principal e com o que o agente liga (ADR-0027)."""
+        errors: list[str] = []
+        for model_id in payload.run.fallback_models:
+            if model_id == payload.model_id:
+                errors.append(f"modelo reserva '{model_id}' é o próprio modelo principal")
+                continue
+            try:
+                missing = validate_capabilities(model_id, payload.capabilities)
+            except ValueError as exc:
+                errors.append(f"modelo reserva: {exc}")
+                continue
+            errors += [f"modelo reserva: {e}" for e in missing]
+        return errors
 
     def _model_errors(self, config: AgentConfig, payload: ConfigPayload) -> list[str]:
         if config.kind == ConfigKind.workflow:
