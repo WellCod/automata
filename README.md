@@ -114,6 +114,8 @@ O agente lembra a conversa: leva ao modelo os últimos turnos da mesma sessão. 
 
 Entre conversas, a **memória do usuário** guarda o que a pessoa contou, como o tamanho que veste ou o horário que prefere para entrega. Cada agente só lê o que ele mesmo guardou, e só para o mesmo usuário. Documento, cartão, e-mail e telefone saem mascarados antes de gravar. Conversa sem usuário identificado não gera memória, e a memória vence depois do prazo de retenção. O owner apaga tudo de um usuário num agente, para atender pedido de exclusão, e cada usuário vê e apaga as próprias.
 
+Cada versão também controla o **run**: um limite de chamadas de tool corta o laço de um modelo que insiste numa tool que falha. O retry repete só a chamada ao provedor, nunca a tool que já rodou. Até dois **modelos reserva** entram quando o principal cai ou responde 429, desde que façam tudo o que o agente liga, e o custo sai pelo preço do modelo que respondeu. Com um **JSON Schema**, o agente responde em objeto no lugar de texto, e a suíte confere a resposta contra ele ([ADR-0027](docs/adr/0027-controle-do-run.md)).
+
 <p align="center"><img src="docs/img/memoria.png" alt="Memórias que um agente guardou, por usuário" width="600"></p>
 
 ### Guardrails por agente
@@ -328,6 +330,7 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 | Evals contínuos | Validação do agendamento (cron, fuso, intervalo mínimo de 1 hora), próximo horário no fuso certo, escopo por recurso dos tokens de integração, `verdict` que o pipeline lê e montagem da sugestão de caso (máscara, tools com erro fora). | Todo PR |
 | Avisos de regressão | Transições que avisam e as que ficam em silêncio (falha seguida de falha, verde seguido de verde), assinatura HMAC conferida pelo receptor e corpo com `text` e `content`. | Todo PR |
 | Compactação | Versão sem a seção fica sem compactação, limite e turnos passados ao Agno, resumo pelo modelo do agente e limites recusados. O ponta a ponta, com o resumo chegando ao modelo acima do limite, roda na suíte de runtime. | Todo PR |
+| Controle do run | Com modelos falsos e o Agent de verdade: o laço de tool para no limite com resposta, o 503 se repete sem repetir a tool, o 429 cai na reserva e o custo sai pela tabela dela, o 401 não troca de modelo e a resposta estruturada chega como objeto e valida. | Todo PR |
 | Recuperação | O documento certo volta entre os 3 primeiros trechos. A versão literal roda em todo PR com cada estratégia de busca (simples, MMR, recência), e nenhuma pode errar. A semântica, com Voyage, roda à noite, aceita recall@3 de 80% e compara as estratégias (HyDE incluso, com chave de modelo) com a busca simples. | PR e noturna |
 | Confiabilidade | Tool calls com LLM real. | Noturna |
 
