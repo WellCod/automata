@@ -2971,6 +2971,13 @@ export interface components {
     RunControls: {
       /** Tool Call Limit */
       tool_call_limit?: number | null;
+      /**
+       * Provider Retries
+       * @default 0
+       */
+      provider_retries: number;
+      /** Fallback Models */
+      fallback_models?: string[];
     };
     /** RunTrace */
     RunTrace: {

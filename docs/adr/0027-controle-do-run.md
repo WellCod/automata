@@ -34,7 +34,7 @@ Verificado no Agno 3.1.8 instalado:
 
 Com isso, a troca não muda o que o agente sabe fazer.
 
-**O custo segue o modelo que respondeu.** O tracking passa a somar o custo por modelo a partir de `RunMetrics.details`. Quando o provedor não informa custo, a estimativa (ADR-0021) usa a tabela de preço de cada modelo, e o run guarda qual modelo respondeu. O medidor que embrulha o modelo também embrulha as reservas.
+**O custo segue o modelo que respondeu.** O tracking passa a somar o custo por modelo a partir de `RunMetrics.details`. Quando o provedor não informa custo, a estimativa (ADR-0021) usa a tabela de preço de cada modelo, e o run guarda qual modelo respondeu. O Agno já separa o consumo de cada modelo nos detalhes do run, então a reserva não precisa de medidor próprio.
 
 **Saída estruturada por JSON Schema.** `output_schema` no payload é validado na escrita:
 

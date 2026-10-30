@@ -1142,7 +1142,7 @@ Decisão em [ADR-0027](adr/0027-controle-do-run.md). Uma seção `run` no payloa
 
 - [x] `docs(adr)`: ADR-0027 e esta seção
 - [x] `feat(api)`: limite de chamadas de tool por run no agente e no líder do time
-- [ ] `feat(api)`: retry do provedor e modelo reserva, com o custo pelo modelo que respondeu
+- [x] `feat(api)`: retry do provedor e modelo reserva, com o custo pelo modelo que respondeu
 - [ ] `feat(api)`: saída estruturada por JSON Schema e checagem `schema` na suíte
 - [ ] `feat(web)`: limite, resiliência e saída estruturada na configuração do agente
 - [ ] `test(api)`: evals do controle do run
