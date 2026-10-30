@@ -56,6 +56,25 @@ def _load_cutoffs() -> dict[str, float]:
         return {str(r.id): r.tokens_valid_after.timestamp() for r in rows}
 
 
+def _load_users() -> set[str]:
+    with Session(get_engine()) as session:
+        return {str(i) for i in session.scalars(select(User.id))}
+
+
+def _user_exists(sub: str) -> bool:
+    with Session(get_engine()) as session:
+        return session.get(User, UUID(sub)) is not None
+
+
+def _panel_user(sub: str) -> bool:
+    """Usuário do painel tem sub em UUID; integração usa `integration:<id>`."""
+    try:
+        UUID(sub)
+    except ValueError:
+        return False
+    return True
+
+
 def _load_revoked() -> set[str]:
     now = datetime.now(UTC)
     with Session(get_engine()) as session:
@@ -72,6 +91,9 @@ class RevokedTokens:
         self._lock = threading.Lock()
         self._revoked: set[str] = set()
         self._cutoffs: dict[str, float] = {}
+        # None até a primeira carga: sem ela, banco fora do ar no boot recusaria todo mundo
+        self._users: set[str] | None = None
+        self._missing: set[str] = set()
         self._loaded_at: float | None = None
 
     def is_revoked(self, jti: str | None, sub: str | None = None, iat: float | None = None) -> bool:
@@ -84,12 +106,37 @@ class RevokedTokens:
         cutoff = self._cutoffs.get(sub) if sub else None
         # iat é em segundos inteiros: o corte vale até o fim do segundo da mudança, para
         # nenhum token anterior escapar (login nesse mesmo segundo precisa ser refeito)
-        return cutoff is not None and iat is not None and iat < math.ceil(cutoff)
+        if cutoff is not None and iat is not None and iat < math.ceil(cutoff):
+            return True
+        return sub is not None and self._removed(sub)
+
+    def _removed(self, sub: str) -> bool:
+        """Usuário removido perde o corte junto com a linha: o token dele cai por não existir.
+
+        Id fora do cache (recém-criado ou removido) é conferido no banco pela chave
+        primária; o resultado fica no cache até a próxima recarga.
+        """
+        if not _panel_user(sub):
+            return False
+        with self._lock:
+            if self._users is None or sub in self._users:
+                return False
+            if sub in self._missing:
+                return True
+        try:
+            exists = _user_exists(sub)
+        except Exception as exc:
+            logger.warning("falha ao conferir usuário do token", extra={"error": str(exc)})
+            return False
+        with self._lock:
+            (self._users if exists else self._missing).add(sub)
+        return not exists
 
     def refresh(self) -> None:
         try:
             revoked = _load_revoked()
             cutoffs = _load_cutoffs()
+            users = _load_users()
         except Exception as exc:
             # Mantém a última lista e só tenta de novo após o TTL: sem isso, banco
             # fora do ar somaria um timeout de conexão a cada request com token
@@ -100,6 +147,8 @@ class RevokedTokens:
         with self._lock:
             self._revoked = revoked
             self._cutoffs = cutoffs
+            self._users = users
+            self._missing = set()
             self._loaded_at = monotonic()
 
     def revoke_now(self, jti: str) -> None:
