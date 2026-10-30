@@ -163,7 +163,9 @@ class RunRepository:
             for r in self._session.execute(children)
         }
 
-    def list_paused(self, config_ids: list[UUID] | None = None) -> list[AgentRun]:
+    def list_paused(
+        self, config_ids: list[UUID] | None = None, *, user_id: str | None = None
+    ) -> list[AgentRun]:
         stmt = (
             select(AgentRun)
             .where(
@@ -175,6 +177,8 @@ class RunRepository:
         )
         if config_ids is not None:
             stmt = stmt.where(AgentRun.agent_config_id.in_(config_ids))
+        if user_id is not None:
+            stmt = stmt.where(AgentRun.user_id == user_id)
         return list(self._session.scalars(stmt))
 
     def list_by_config(

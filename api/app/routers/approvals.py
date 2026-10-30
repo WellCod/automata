@@ -11,11 +11,11 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from app.authz import Scope, require_scopes
+from app.authz import Scope, require_scopes, sees_everyone
 from app.db import SessionDep
 from app.models.config import AgentConfig
 from app.repositories.run import RunRepository
@@ -60,10 +60,14 @@ class ApprovalItem(BaseModel):
 
 @router.get("", response_model=list[ApprovalItem])
 def list_pending(
+    request: Request,
     session: SessionDep,
     agent_id: UUID | None = Query(default=None),  # noqa: B008
 ) -> list[ApprovalItem]:
-    runs = RunRepository(session).list_paused([agent_id] if agent_id else None)
+    # a pendência traz argumentos de tool e saída de etapa, que são dados da conversa:
+    # cada um vê as suas, o owner vê todas (o continue do Agno também exige o dono)
+    user_id = None if sees_everyone(request) else str(getattr(request.state, "user_id", ""))
+    runs = RunRepository(session).list_paused([agent_id] if agent_id else None, user_id=user_id)
     ids = list({r.agent_config_id for r in runs})
     configs = {c.id: c for c in session.scalars(select(AgentConfig).where(AgentConfig.id.in_(ids)))}
     return [
