@@ -1111,10 +1111,10 @@ Segunda rodada de verificação, sobre a `main` em `9909b4c`: UI e UX nas 66 tel
 - [x] **Média.** `GET /api/v1/approvals` exige só `metrics:read`. Qualquer viewer vê os runs pausados de todos os usuários, com os argumentos das tools e a saída das etapas.
 - [x] **Média.** Remover um usuário apaga a linha que guardava o corte de sessão (`tokens_valid_after`). O JWT dele volta a valer até vencer.
 - [x] **Média.** A checagem de rede interna resolve o DNS, e o httpx resolve de novo ao conectar. Um domínio com TTL 0 alterna o IP entre as duas resoluções (DNS rebinding). A lista de bloqueio também deixa passar `100.64.0.0/10`.
-- [ ] **Baixa.** O BFF repassa o IP que o cliente informa (`x-real-ip`, primeiro hop do `X-Forwarded-For`), o que permite contornar o limite de login por IP. Cinco tentativas por minuto com o e-mail de alguém travam o login dessa pessoa.
-- [ ] **Baixa.** A busca e a comparação na base geram custo de embedding e de HyDE sem limite de taxa.
-- [ ] **Baixa.** O conector S3 sem chave usa a credencial da máquina, inclusive com `endpoint_url` de terceiro.
-- [ ] **Baixa.** O log grava o e-mail de toda tentativa de login. A busca na base e o teste de servidor MCP devolvem ao cliente o texto da exceção.
+- [x] **Baixa.** O BFF repassa o IP que o cliente informa (`x-real-ip`, primeiro hop do `X-Forwarded-For`), o que permite contornar o limite de login por IP. Cinco tentativas por minuto com o e-mail de alguém travam o login dessa pessoa.
+- [x] **Baixa.** A busca e a comparação na base geram custo de embedding e de HyDE sem limite de taxa.
+- [x] **Baixa.** O conector S3 sem chave usa a credencial da máquina, inclusive com `endpoint_url` de terceiro.
+- [x] **Baixa.** O log grava o e-mail de toda tentativa de login. A busca na base e o teste de servidor MCP devolvem ao cliente o texto da exceção (o do MCP fica: as mensagens são nossas e servem para o owner corrigir a URL ou a credencial).
 
 ### UI e UX
 

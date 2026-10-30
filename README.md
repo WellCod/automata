@@ -298,7 +298,7 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 | **CSRF** | `Origin` conferido contra `Host` em todo método que não é seguro. |
 | **Revogação** | Logout revoga o `jti`. Mudar papel, desativar ou trocar senha corta na hora as sessões da pessoa. |
 | **Papéis e scopes** | `owner`, `editor`, `viewer`. Toda rota, própria ou do AgentOS, exige scope. |
-| **Rate limit** | Login limitado por e-mail e por IP no Redis. `X-Forwarded-For` só vale vindo de proxy listado em `TRUSTED_PROXIES`. |
+| **Rate limit** | Login limitado por e-mail e IP, por e-mail e por IP no Redis, sem deixar ninguém travar a conta de outro. `X-Forwarded-For` só vale vindo de proxy listado em `TRUSTED_PROXIES`, e o painel só repassa o IP do cabeçalho de `CLIENT_IP_HEADER`. Busca de teste na base limitada por usuário. |
 | **Superfície** | Login com e-mail inexistente também roda argon2, para a latência não revelar contas. `/docs` e `/openapi.json` só em desenvolvimento. |
 | **Headers** | HSTS, CSP com `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`. |
 | **Saída** | Servidores MCP, webhooks, destinos de aviso e conectores de conhecimento passam pelo mesmo filtro: só https, sem host que resolva para IP interno, conferido no cadastro e a cada chamada, sem seguir redirect. URLs e segredos ficam cifrados com Fernet. A telemetria do Agno fica desligada. |

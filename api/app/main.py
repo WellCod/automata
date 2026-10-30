@@ -217,6 +217,8 @@ def create_app(
     outer: FastAPI = FastAPI(title="automata", lifespan=_lifespan_for(protected), **docs)  # type: ignore[arg-type]
     outer.state.rate_limiter = make_rate_limiter(settings.redis_url, limit=5, window=60)
     outer.state.revoked_tokens = revoked
+    # as rotas protegidas rodam no app do AgentOS e limitam a busca na base com o mesmo
+    protected.state.rate_limiter = outer.state.rate_limiter
     outer.add_middleware(SyncPublishedAgentsMiddleware, published=published)
     if enable_auth:
         outer.add_middleware(RevocationMiddleware, revoked=revoked)

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { clientIp } from "@/lib/bff/client-ip";
 
@@ -7,16 +7,30 @@ function req(headers: Record<string, string>): NextRequest {
   return new NextRequest("http://localhost/api/auth/login", { headers });
 }
 
+const forged = { "x-real-ip": "1.1.1.1", "x-forwarded-for": "6.6.6.6, 3.3.3.3" };
+
+afterEach(() => vi.unstubAllEnvs());
+
 describe("clientIp", () => {
-  it("prefere x-real-ip", () => {
-    expect(clientIp(req({ "x-real-ip": "1.1.1.1", "x-forwarded-for": "2.2.2.2" }))).toBe("1.1.1.1");
+  it("sem proxy configurado não repassa o que o cliente mandou", () => {
+    vi.stubEnv("CLIENT_IP_HEADER", "");
+    vi.stubEnv("VERCEL", "");
+    expect(clientIp(req(forged))).toBeNull();
   });
 
-  it("usa o primeiro hop do x-forwarded-for", () => {
-    expect(clientIp(req({ "x-forwarded-for": "3.3.3.3, 10.0.0.1" }))).toBe("3.3.3.3");
+  it("no Vercel usa o x-real-ip que a borda sobrescreve", () => {
+    vi.stubEnv("CLIENT_IP_HEADER", "");
+    vi.stubEnv("VERCEL", "1");
+    expect(clientIp(req(forged))).toBe("1.1.1.1");
   });
 
-  it("retorna null sem cabeçalhos", () => {
+  it("atrás de proxy próprio usa o último hop, que o proxy acrescentou", () => {
+    vi.stubEnv("CLIENT_IP_HEADER", "x-forwarded-for");
+    expect(clientIp(req(forged))).toBe("3.3.3.3");
+  });
+
+  it("retorna null sem o cabeçalho escolhido", () => {
+    vi.stubEnv("CLIENT_IP_HEADER", "x-real-ip");
     expect(clientIp(req({}))).toBeNull();
   });
 });

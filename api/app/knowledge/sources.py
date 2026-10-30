@@ -149,6 +149,10 @@ class S3Source:
 
         if self.settings.endpoint_url:
             check_url(self.settings.endpoint_url)
+            # sem chave o boto3 usa a credencial da máquina (papel IAM) e mandaria
+            # a assinatura dela para um endpoint que não é da AWS
+            if not self._secret.get("access_key_id"):
+                raise SourceError("S3 com endpoint próprio precisa de access key no conector")
         kwargs: dict[str, Any] = {
             "region_name": self.settings.region or None,
             "endpoint_url": self.settings.endpoint_url or None,
