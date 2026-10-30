@@ -52,6 +52,12 @@ class ToolsCheck(BaseModel):
         return v
 
 
+class SchemaCheck(BaseModel):
+    """A resposta valida contra o JSON Schema da versão testada (ADR-0027)."""
+
+    type: Literal["schema"] = "schema"
+
+
 class JudgeCheck(BaseModel):
     """Critério avaliado por um modelo juiz (AgentAsJudgeEval do Agno)."""
 
@@ -92,15 +98,15 @@ class StepsCheck(BaseModel):
 
 
 EvalCheck = Annotated[
-    TextCheck | ToolsCheck | JudgeCheck | BlockedCheck | StepsCheck,
+    TextCheck | ToolsCheck | JudgeCheck | BlockedCheck | StepsCheck | SchemaCheck,
     Field(discriminator="type"),
 ]
 
 # o que cada tipo de config aceita: tools e bloqueio são de cada etapa do workflow,
 # e etapas só existem no workflow
 CHECKS_BY_KIND: dict[str, frozenset[str]] = {
-    "agent": frozenset({"text", "tools", "judge", "blocked"}),
-    "team": frozenset({"text", "tools", "judge", "blocked"}),
+    "agent": frozenset({"text", "tools", "judge", "blocked", "schema"}),
+    "team": frozenset({"text", "tools", "judge", "blocked", "schema"}),
     "workflow": frozenset({"text", "judge", "steps"}),
 }
 
@@ -138,7 +144,7 @@ class EvalCaseInput(BaseModel):
     @model_validator(mode="after")
     def um_por_tipo_no_runner(self) -> "EvalCaseInput":
         # o Case do Agno tem um campo de critério e um de tools; texto vira um scorer só
-        for kind in ("tools", "judge", "steps"):
+        for kind in ("tools", "judge", "steps", "schema"):
             if sum(1 for c in self.checks if c.type == kind) > 1:
                 raise ValueError(f"no máximo uma checagem do tipo {kind} por caso")
         # run barrado não tem resposta para comparar, julgar ou conferir tools

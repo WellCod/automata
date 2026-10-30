@@ -23,8 +23,8 @@ function wrapper({ children }: { children: React.ReactNode }) {
 describe("checagens", () => {
   it("um tools e um juiz por caso, texto quantos couberem até 5", () => {
     const one: EvalCheck[] = [newCheck("tools"), newCheck("judge")];
-    expect(availableTypes(one)).toEqual(["text"]);
-    expect(availableTypes([newCheck("text")])).toEqual(["text", "tools", "judge"]);
+    expect(availableTypes(one)).toEqual(["text", "schema"]);
+    expect(availableTypes([newCheck("text")])).toEqual(["text", "tools", "judge", "schema"]);
     expect(availableTypes(Array.from({ length: 5 }, () => newCheck("text")))).toEqual([]);
   });
 
@@ -39,7 +39,7 @@ describe("checagens", () => {
   });
 
   it("bloqueio só entra em caso sem outra checagem", () => {
-    expect(availableTypes([])).toEqual(["text", "tools", "judge", "blocked"]);
+    expect(availableTypes([])).toEqual(["text", "tools", "judge", "blocked", "schema"]);
     expect(availableTypes([newCheck("text")])).not.toContain("blocked");
     expect(availableTypes([newCheck("blocked")])).toEqual([]);
     const base = { name: "frete", input: "E o frete?" };

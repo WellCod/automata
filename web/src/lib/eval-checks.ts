@@ -6,7 +6,9 @@ export type ToolsCheck = Schemas["ToolsCheck"];
 export type JudgeCheck = Schemas["JudgeCheck"];
 export type BlockedCheck = Schemas["BlockedCheck"];
 export type StepsCheck = Schemas["StepsCheck"];
-export type EvalCheck = TextCheck | ToolsCheck | JudgeCheck | BlockedCheck | StepsCheck;
+export type SchemaCheck = Schemas["SchemaCheck"];
+export type EvalCheck =
+  TextCheck | ToolsCheck | JudgeCheck | BlockedCheck | StepsCheck | SchemaCheck;
 export type SuiteKind = "agent" | "team" | "workflow";
 export type BlockRule = NonNullable<BlockedCheck["rule"]>;
 export type EvalCase = Schemas["EvalCaseResponse"];
@@ -35,13 +37,14 @@ export const CHECK_LABEL: Record<EvalCheck["type"], string> = {
   judge: "Critério do juiz",
   blocked: "Bloqueio do guardrail",
   steps: "Etapas que rodaram",
+  schema: "Resposta no schema",
 };
 
 // mesmo recorte de CHECKS_BY_KIND em app/schemas/eval.py: tools e bloqueio são de
 // cada etapa do workflow, e etapas só existem nele (ADR-0022)
 const TYPES_BY_KIND: Record<SuiteKind, EvalCheck["type"][]> = {
-  agent: ["text", "tools", "judge", "blocked"],
-  team: ["text", "tools", "judge", "blocked"],
+  agent: ["text", "tools", "judge", "blocked", "schema"],
+  team: ["text", "tools", "judge", "blocked", "schema"],
   workflow: ["text", "judge", "steps"],
 };
 
@@ -60,6 +63,7 @@ export function newCheck(type: EvalCheck["type"]): EvalCheck {
   if (type === "tools") return { type, tools: [], allow_additional: true };
   if (type === "blocked") return { type, rule: null };
   if (type === "steps") return { type, steps: [], exclusive: false };
+  if (type === "schema") return { type };
   return { type, criteria: "", mode: "binary", threshold: 7 };
 }
 

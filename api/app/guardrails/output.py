@@ -9,6 +9,7 @@ mensagem do assistente que vai para a sessão) antes de levantar. No stream o
 texto já foi entregue enquanto era gerado: ali o hook só marca o run.
 """
 
+import json
 from collections.abc import Callable
 from typing import Any
 
@@ -46,6 +47,9 @@ def output_guardrail(
     # o Agno passa só os argumentos que a função declara, pelo nome
     def check_output(run_output: Any) -> None:
         content = getattr(run_output, "content", None)
+        # com saída estruturada a resposta é objeto (ADR-0027): o dado pessoal está nos valores
+        if isinstance(content, dict | list):
+            content = json.dumps(content, ensure_ascii=False)
         if not isinstance(content, str) or not content:
             return
         detail = _violation(content, settings)

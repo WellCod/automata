@@ -92,6 +92,14 @@ function CheckFields({
       </div>
     );
   }
+  if (check.type === "schema") {
+    return (
+      <p className="text-muted-foreground text-[12px]">
+        A resposta precisa validar contra o JSON Schema da versão testada. Sem schema na versão, a
+        checagem fica não avaliada.
+      </p>
+    );
+  }
   if (check.type === "steps") {
     return (
       <div className="flex flex-col gap-1.5">

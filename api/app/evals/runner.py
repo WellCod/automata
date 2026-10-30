@@ -7,6 +7,7 @@ pela mesma factory dos runs reais a partir da versão pedida. O resultado de cad
 """
 
 import asyncio
+import json
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -20,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.agents import models_map
 from app.agents.factory import agent_from, load_team, load_version, team_from
+from app.agents.output_schema import schema_verdict
 from app.agents.tracking import EvalContext, TrackedWorkflow, current_eval_run
 from app.agents.workflow_factory import build_nodes, load_workflow, rule_matches
 from app.budget import RULE_BUDGET
@@ -35,6 +37,7 @@ from app.schemas.eval import (
     BlockedCheck,
     EvalCaseInput,
     JudgeCheck,
+    SchemaCheck,
     StepsCheck,
     TextCheck,
     ToolsCheck,
@@ -50,6 +53,9 @@ JUDGE_WITHOUT_MODEL = "execução sem modelo de juiz"
 
 
 def _text(content: Any) -> str:
+    if isinstance(content, dict | list):
+        # saída estruturada: as regras de texto valem sobre o JSON
+        return json.dumps(content, ensure_ascii=False)
     return "" if content is None else str(content)
 
 
@@ -62,9 +68,16 @@ def steps_verdict(check: StepsCheck, ran: list[str]) -> dict[str, Any]:
 class TextScorer:
     """Checagens de texto, e de etapas no workflow, como `Scorer` do Agno: todas precisam passar."""
 
-    def __init__(self, checks: list[TextCheck], steps: StepsCheck | None = None) -> None:
+    def __init__(
+        self,
+        checks: list[TextCheck],
+        steps: StepsCheck | None = None,
+        schema: dict[str, Any] | None = None,
+    ) -> None:
         self._checks = checks
         self._steps = steps
+        # o JSON Schema da versão testada, quando o caso tem a checagem `schema`
+        self._schema = schema
 
     def verdicts(self, content: str) -> list[dict[str, Any]]:
         return [
@@ -88,6 +101,13 @@ class TextScorer:
                 failed.append("não rodou " + ", ".join(steps["missing"]))
             if steps["extra"]:
                 failed.append("rodou fora da lista " + ", ".join(steps["extra"]))
+        if self._schema is not None:
+            verdict = schema_verdict(self._schema, getattr(run, "content", None))
+            detail["schema"] = verdict
+            total += 1
+            ok += verdict["passed"]
+            if not verdict["passed"]:
+                failed.append("fora do schema: " + "; ".join(verdict["errors"]))
         return Score(
             value=ok / total,
             passed=ok == total,
@@ -133,6 +153,13 @@ def _steps(spec: EvalCaseInput) -> StepsCheck | None:
     return next((c for c in spec.checks if isinstance(c, StepsCheck)), None)
 
 
+def _schema_check(spec: EvalCaseInput) -> SchemaCheck | None:
+    return next((c for c in spec.checks if isinstance(c, SchemaCheck)), None)
+
+
+NO_SCHEMA = "a versão testada não tem saída estruturada"
+
+
 def _runner_for(config_id: UUID, kind: str, version_id: UUID, actor: str) -> tuple[str, Any]:
     """Instância nova por caso: casos não compartilham sessão, estado nem conexão MCP."""
     if kind == "workflow":
@@ -170,10 +197,18 @@ def plan_case(
     if judge is not None and judge_unavailable is not None:
         skipped["judge"] = judge_unavailable
     case_id = UUID(snapshot["id"]) if snapshot.get("id") else None
-    if not text and tools is None and not use_judge and blocked is None and steps is None:
+    wants_schema = _schema_check(spec) is not None
+    nothing = not text and tools is None and not use_judge and blocked is None and steps is None
+    if nothing and not wants_schema:
         # o Case do Agno recusa caso sem checagem; nada roda e o caso fica não avaliado
         return PlannedCase(position, case_id, spec.name, spec, None, skipped)
     field, runner = _runner_for(config_id, kind, version_id, actor)
+    schema = getattr(runner, "output_schema", None) if wants_schema else None
+    if wants_schema and not isinstance(schema, dict):
+        skipped["schema"] = NO_SCHEMA
+        schema = None
+        if nothing:
+            return PlannedCase(position, case_id, spec.name, spec, None, skipped)
     target = {field: runner}
     session_args = _context_args(runner, spec.context, actor)
     agno_case = Case(
@@ -184,8 +219,8 @@ def plan_case(
         allow_additional_tool_calls=tools.allow_additional if tools else True,
         scorer=AnsweredScorer()
         if blocked is not None
-        else TextScorer(text, steps)
-        if text or steps is not None
+        else TextScorer(text, steps, schema)
+        if text or steps is not None or schema is not None
         else None,
         criteria=judge.criteria if judge is not None and use_judge else None,
         judge_mode=JudgeMode(judge.mode) if judge is not None else JudgeMode.BINARY,
@@ -271,6 +306,17 @@ def result_from(planned: PlannedCase, result: CaseResult | None) -> EvalResult:
                 "mode": judge.mode,
                 "score": result.judge_score if result else None,
                 "reason": (result.judge_reason if result else None) or planned.skipped.get("judge"),
+            }
+        )
+    if _schema_check(planned.spec) is not None:
+        detail = (result.score.detail or {}) if result and result.score else {}
+        verdict = detail.get("schema") or {}
+        checks.append(
+            {
+                "type": "schema",
+                "passed": verdict.get("passed") if verdict else None,
+                "errors": verdict.get("errors", []),
+                "reason": planned.skipped.get("schema"),
             }
         )
     blocked = _blocked(planned.spec)

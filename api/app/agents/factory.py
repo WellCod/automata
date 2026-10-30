@@ -225,6 +225,7 @@ def agent_from(
         # com compactação, a janela vai até o limite e o num_history_runs deixa de valer
         compaction=compaction_for(payload.conversation),
         tool_call_limit=payload.run.tool_call_limit,
+        output_schema=payload.output_schema,
         **memory_kwargs(str(config_id), payload.memory, memory_user if tracked else None),
     )
     if isinstance(agent, TrackedAgent):
@@ -310,6 +311,7 @@ def team_from(config_id: UUID, resolved: ResolvedTeam) -> TrackedTeam:
         max_iterations=settings.max_iterations,
         share_member_interactions=settings.share_member_interactions,
         tool_call_limit=leader.payload.run.tool_call_limit,
+        output_schema=leader.payload.output_schema,
         add_history_to_context=True,
         num_history_runs=HISTORY_RUNS,
     )

@@ -194,6 +194,8 @@ class ConfigPayload(BaseModel):
     conversation: ConversationSettings = Field(default_factory=ConversationSettings)
     memory: MemorySettings = Field(default_factory=MemorySettings)
     run: RunControls = Field(default_factory=RunControls)
+    # JSON Schema da resposta (ADR-0027); com ele o agente devolve objeto, não texto
+    output_schema: dict[str, Any] | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     # Em time: modelo, instruções e MCP acima são do líder
     team: TeamSettings | None = None

@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from app.agents.capabilities import validate_capabilities
+from app.agents.output_schema import schema_problems
 from app.guardrails.input import moderation_available
 from app.knowledge.embedders import demo_replay
 from app.models.config import AgentConfig, AgentConfigVersion
@@ -152,6 +153,7 @@ class ConfigService:
             # o Team do Agno 3.1.8 não aceita compaction (ADR-0019)
             errors.append("só agente compacta a conversa")
         errors += self._fallback_errors(payload)
+        errors += self._schema_errors(config, payload)
         if config.kind == ConfigKind.workflow and payload.run != RunControls():
             # quem chama modelo e tool são os agentes e times das etapas, cada um com o seu
             errors.append("workflow não tem controle de run próprio")
@@ -160,6 +162,18 @@ class ConfigService:
             errors.append("só agente guarda memória do usuário")
         if errors:
             raise ValueError("; ".join(errors))
+
+    @staticmethod
+    def _schema_errors(config: AgentConfig, payload: ConfigPayload) -> list[str]:
+        if payload.output_schema is None:
+            return []
+        if config.kind == ConfigKind.workflow:
+            return ["workflow não tem saída estruturada própria"]
+        errors = schema_problems(payload.output_schema)
+        if not payload.capabilities.structured_output:
+            # a capability é o que valida o modelo e as reservas contra a matriz
+            errors.append("schema de saída exige a capability structured_output ligada")
+        return errors
 
     @staticmethod
     def _fallback_errors(payload: ConfigPayload) -> list[str]:

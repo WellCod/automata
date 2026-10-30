@@ -109,6 +109,11 @@ function checkSummary(check: EvalResult["checks"][number]): string {
     if (extra.length) parts.push(`fora da lista: ${extra.join(", ")}`);
     return parts.join(" · ");
   }
+  if (type === "schema") {
+    if (check.reason) return String(check.reason);
+    const errors = (check.errors as string[] | undefined) ?? [];
+    return errors.length ? errors.join(" · ") : "a resposta valida contra o schema";
+  }
   if (type === "blocked") {
     const expected = check.rule ? blockLabel(String(check.rule)) : "qualquer regra";
     return check.blocked_by

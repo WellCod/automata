@@ -21,6 +21,8 @@ dependencies = [
     "beautifulsoup4>=4.15.0",
     "aiofiles>=25.1.0",
     "boto3>=1.40",
+    # já vinha pelo agno; declarado porque a saída estruturada valida schema e resposta
+    "jsonschema>=4.26",
 ]
 
 [dependency-groups]
@@ -48,6 +50,11 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 # boto3 não traz tipos; o conector de S3 só usa list_objects_v2 e get_object
 module = ["boto3", "boto3.*", "botocore", "botocore.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# jsonschema não traz tipos; só Draft202012Validator e SchemaError são usados
+module = ["jsonschema", "jsonschema.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
