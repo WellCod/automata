@@ -20,7 +20,7 @@ from urllib.parse import quote
 
 import httpx
 
-from app.mcp.egress import check_url
+from app.mcp.egress import check_url, guarded_client
 from app.schemas.knowledge_connector import GitHubSettings, S3Settings, SharePointSettings
 
 TIMEOUT_S = 30.0
@@ -101,9 +101,8 @@ class GitHubSource:
 
     def _get(self, url: str, **headers: str) -> httpx.Response:
         check_url(url)
-        resp = httpx.get(
-            url, headers={**self._headers, **headers}, timeout=TIMEOUT_S, follow_redirects=False
-        )
+        with guarded_client(timeout=TIMEOUT_S) as client:
+            resp = client.get(url, headers={**self._headers, **headers})
         _raise_for(resp, f"GitHub {self.settings.repo}")
         return resp
 
@@ -207,7 +206,7 @@ class SharePointSource:
         self.truncated = False
         self._secret = secret
         # injetável nos testes; em produção, sem seguir redirect
-        self._http = client or httpx.Client(timeout=TIMEOUT_S, follow_redirects=False)
+        self._http = client or guarded_client(timeout=TIMEOUT_S)
         self._token: str | None = None
 
     def _auth(self) -> dict[str, str]:
