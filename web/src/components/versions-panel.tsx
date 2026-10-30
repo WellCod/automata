@@ -75,6 +75,28 @@ function diffPayload(a: ConfigPayload, b: ConfigPayload): string[] {
       diffs.push(`capabilities.${k}`);
     }
   }
+  // controle do run e schema (ADR-0027): mudar o schema muda o contrato de quem integra
+  const runA: Partial<NonNullable<ConfigPayload["run"]>> = a.run ?? {};
+  const runB: Partial<NonNullable<ConfigPayload["run"]>> = b.run ?? {};
+  if ((runA.tool_call_limit ?? null) !== (runB.tool_call_limit ?? null))
+    diffs.push(
+      `limite de tools: ${runA.tool_call_limit ?? "sem"} → ${runB.tool_call_limit ?? "sem"}`,
+    );
+  if ((runA.provider_retries ?? 0) !== (runB.provider_retries ?? 0))
+    diffs.push(`retry do provedor: ${runA.provider_retries ?? 0} → ${runB.provider_retries ?? 0}`);
+  const fallA = (runA.fallback_models ?? []).join(", ") || "nenhum";
+  const fallB = (runB.fallback_models ?? []).join(", ") || "nenhum";
+  if (fallA !== fallB) diffs.push(`modelos reserva: ${fallA} → ${fallB}`);
+  const schemaA = a.output_schema ? JSON.stringify(a.output_schema) : null;
+  const schemaB = b.output_schema ? JSON.stringify(b.output_schema) : null;
+  if (schemaA !== schemaB)
+    diffs.push(
+      schemaA === null
+        ? "schema de saída ligado"
+        : schemaB === null
+          ? "schema de saída desligado"
+          : "schema de saída alterado",
+    );
   return diffs;
 }
 

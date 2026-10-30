@@ -19,6 +19,12 @@ import { KnowledgeSelector } from "@/components/knowledge-selector";
 import { McpToolsSelector } from "@/components/mcp-tools-selector";
 import { MetricsPanel } from "@/components/metrics-panel";
 import { ModelSelector } from "@/components/model-selector";
+import {
+  DEFAULT_RUN,
+  type RunControls,
+  RunControlsEditor,
+  withRunDefaults,
+} from "@/components/run-controls-editor";
 import { RunsPanel } from "@/components/runs-panel";
 import { TeamMembersPicker, usePublishedAgents } from "@/components/team-members-picker";
 import { TestPanel } from "@/components/test-panel";
@@ -79,6 +85,8 @@ const schema = z.object({
   ),
   // validado pela API (ADR-0013); o editor só monta o objeto
   guardrails: z.custom<Guardrails>(),
+  // limite de tools, retry e reserva do líder (ADR-0027), validados pela API
+  run: z.custom<RunControls>(),
   team: z.object({
     mode: z.enum(["coordinate", "route", "broadcast", "tasks"]),
     members: z
@@ -146,6 +154,7 @@ export default function TeamEditPage() {
       mcp_servers: [],
       knowledge: [],
       guardrails: DEFAULT_GUARDRAILS,
+      run: DEFAULT_RUN,
       team: {
         mode: "coordinate",
         members: [],
@@ -183,6 +192,7 @@ export default function TeamEditPage() {
         max_results: k.max_results ?? 5,
       })),
       guardrails: withDefaults(p?.guardrails),
+      run: withRunDefaults(p?.run),
       team: {
         mode: p?.team?.mode ?? "coordinate",
         members: (p?.team?.members ?? []).map((m) => ({
@@ -211,8 +221,9 @@ export default function TeamEditPage() {
             knowledge: values.knowledge,
             guardrails: values.guardrails,
             metadata: data?.payload?.metadata ?? {},
-            // limite de tools do líder (ADR-0027): sem campo aqui, repassa o da versão
-            run: data?.payload?.run,
+            run: values.run,
+            // schema do líder só pela API por enquanto: repassa o da versão (ADR-0027)
+            output_schema: data?.payload?.output_schema,
             team: values.team,
           },
         },
@@ -417,6 +428,19 @@ export default function TeamEditPage() {
               control={form.control}
               render={({ field }) => (
                 <GuardrailsEditor value={field.value} onChange={field.onChange} />
+              )}
+            />
+
+            <Controller
+              name="run"
+              control={form.control}
+              render={({ field }) => (
+                <RunControlsEditor
+                  value={field.value}
+                  onChange={field.onChange}
+                  modelId={form.watch("model_id")}
+                  capabilities={capabilities}
+                />
               )}
             />
           </form>
