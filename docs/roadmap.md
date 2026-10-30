@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 28
+# Roadmap — Fases 4 a 29
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -589,7 +589,8 @@ if __name__ == "__main__":
 | 25 — Conectores de conhecimento | #179–#183 | GitHub, S3 e SharePoint na base, com sincronização e reindexação agendada de URL | Fases 13 e 18 |
 | 26 — Memória do usuário | #184–#188 | Fatos sobre o usuário entre sessões, por agente, com retenção, PII mascarado e exclusão | Fases 14 e 20 |
 | 27 — Rotação de chaves | #191–#196 | Chave JWT e chave dos segredos trocadas sem derrubar sessões nem integrações | Fases 11, 12 e 17 |
-| 28 — Auditoria 2026-10-29 | #197 em diante | Scan de PII que travava a API, vazamentos de leitura, SSRF por rebinding, painel no celular e acessibilidade | Fase 27 |
+| 28 — Auditoria 2026-10-29 | #197–#204 | Scan de PII que travava a API, vazamentos de leitura, SSRF por rebinding, painel no celular e acessibilidade | Fase 27 |
+| 29 — Controle do run | #205 em diante | Limite de tools por run, retry do provedor com modelo reserva e saída estruturada por JSON Schema | Fases 16, 21 e 22 |
 
 Fases 4 a 26 estão na `main` (estado em 2026-10-22). Fica pendente a ação manual da Fase 11 (rotação da chave JWT e das senhas).
 
@@ -1134,3 +1135,22 @@ Segunda rodada de verificação, sobre a `main` em `9909b4c`: UI e UX nas 66 tel
 - Uma URL cujo DNS muda entre a checagem e a conexão não alcança rede interna.
 - Em 375 px o painel abre o menu por um botão, e nenhuma página corta conteúdo.
 - O audit de acessibilidade das 66 telas não aponta campo sem rótulo nem página sem `h1`.
+
+## Fase 29 — Controle do run
+
+Decisão em [ADR-0027](adr/0027-controle-do-run.md). Uma seção `run` no payload, versionada, com limite de chamadas de tool por run, retry só da chamada ao provedor, até dois modelos reserva validados contra as capabilities do agente e saída estruturada por JSON Schema, com checagem própria na suíte. O custo passa a seguir o modelo que respondeu.
+
+- [x] `docs(adr)`: ADR-0027 e esta seção
+- [ ] `feat(api)`: limite de chamadas de tool por run no agente e no líder do time
+- [ ] `feat(api)`: retry do provedor e modelo reserva, com o custo pelo modelo que respondeu
+- [ ] `feat(api)`: saída estruturada por JSON Schema e checagem `schema` na suíte
+- [ ] `feat(web)`: limite, resiliência e saída estruturada na configuração do agente
+- [ ] `test(api)`: evals do controle do run
+
+**Critério de aceite da fase:**
+
+- Um agente com uma tool que sempre falha para no limite de chamadas, e o run termina com resposta, não com erro.
+- Com `provider_retries`, um 503 seguido de sucesso vira um run com sucesso, e a tool chamada antes da falha não roda de novo.
+- Com o principal respondendo 429, a reserva responde, e o custo do run sai pela tabela da reserva.
+- Um modelo reserva sem visão é recusado na escrita de um agente com visão ligada.
+- Um agente com schema devolve JSON que valida contra ele, e a checagem `schema` da suíte reprova uma resposta fora do schema.
