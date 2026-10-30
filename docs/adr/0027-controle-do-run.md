@@ -1,6 +1,6 @@
 # ADR-0027 — Controle do run: limite de tools, retry do provedor com modelo reserva e saída estruturada
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-10-30
 
 ## Contexto
