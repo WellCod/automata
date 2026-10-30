@@ -443,6 +443,8 @@ def pending_steps(requirements: list[Any] | None) -> list[dict[str, Any]] | None
     out: list[dict[str, Any]] = []
     for req in active:
         after = bool(getattr(req, "requires_output_review", False))
+        # revisão da volta de laço (ADR-0028): a saída é a da volta que acabou
+        loop = getattr(req, "step_type", None) == "Loop"
         step_output = getattr(req, "step_output", None)
         content = getattr(step_output, "content", None) if step_output is not None else None
         timeout_at = getattr(req, "timeout_at", None)
@@ -450,7 +452,7 @@ def pending_steps(requirements: list[Any] | None) -> list[dict[str, Any]] | None
             {
                 "step_id": req.step_id,
                 "step_name": req.step_name,
-                "when": "after" if after else "before",
+                "when": "loop" if loop else "after" if after else "before",
                 "message": (req.output_review_message if after else req.confirmation_message)
                 or None,
                 "output": str(content)[:PENDING_OUTPUT_CHARS] if after and content else None,

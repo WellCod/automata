@@ -161,6 +161,20 @@ def human_review_for(node: StepNode) -> HumanReview:
     )
 
 
+def loop_review_for(node: LoopNode) -> HumanReview | None:
+    """Revisão ao fim de cada volta (ADR-0028): recusar sempre pede outra volta."""
+    if node.review is None:
+        return None
+    hours = node.review.timeout_hours
+    return HumanReview(
+        requires_iteration_review=True,
+        iteration_review_message=node.review.message.strip() or None,
+        on_reject=OnReject.retry,
+        timeout=hours * 3600 if hours else None,
+        on_timeout=OnTimeout.cancel,
+    )
+
+
 def build_nodes(nodes: list[WorkflowNode], resolved: ResolvedWorkflow) -> list[Any]:
     built: list[Any] = []
     for node in nodes:
@@ -185,6 +199,7 @@ def build_nodes(nodes: list[WorkflowNode], resolved: ResolvedWorkflow) -> list[A
                     steps=build_nodes(node.steps, resolved),
                     max_iterations=node.max_iterations,
                     end_condition=loop_end_condition(node.until) if node.until else None,
+                    human_review=loop_review_for(node),
                 )
             )
     return built
