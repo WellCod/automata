@@ -79,6 +79,25 @@ class RunRepository:
         self._session.flush()
         return run
 
+    def pending_step_ids(self, run_id: str) -> set[str]:
+        stmt = select(AgentRun.pending_steps).where(AgentRun.run_id == run_id)
+        steps = self._session.scalar(stmt)
+        return {str(s.get("step_id")) for s in steps or []}
+
+    def append_reviews(self, run_id: str, entries: list[dict[str, Any]]) -> None:
+        """Acrescenta ao registro do run; a lista só cresce (ADR-0028)."""
+        run = self._session.scalars(select(AgentRun).where(AgentRun.run_id == run_id)).first()
+        if run is None:
+            return
+        run.review_log = [*(run.review_log or []), *entries]
+
+    def reviews(self, run_id: str) -> tuple[str | None, list[dict[str, Any]]] | None:
+        """Dono do run e o registro das decisões; None quando o run não existe."""
+        row = self._session.execute(
+            select(AgentRun.user_id, AgentRun.review_log).where(AgentRun.run_id == run_id)
+        ).first()
+        return None if row is None else (row.user_id, list(row.review_log or []))
+
     def upsert(
         self,
         *,

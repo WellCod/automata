@@ -37,6 +37,8 @@ class AgentRun(Base):
     pending_tools: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
     # etapas do workflow esperando revisão humana (ADR-0023); resumo, não o requisito do Agno
     pending_steps: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    # decisões humanas no workflow, com quem decidiu e o antes e depois da edição (ADR-0028)
+    review_log: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
     # status=blocked: regra de guardrail que barrou (ADR-0013) e o detalhe dela
     # (tipos de dado, termo configurado); nunca o valor que o usuário mandou
     blocked_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
