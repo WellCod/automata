@@ -7,7 +7,7 @@ from app.models.config import AgentConfig, AgentConfigVersion
 from app.repositories.config import ConfigRepository
 from app.repositories.knowledge_base import KnowledgeBaseRepository
 from app.repositories.mcp_server import McpServerRepository
-from app.schemas.config import ConfigKind, ConfigPayload, ConfigPayloadStatus
+from app.schemas.config import ConfigKind, ConfigPayload, ConfigPayloadStatus, RunControls
 from app.schemas.workflow import step_nodes
 
 
@@ -151,6 +151,9 @@ class ConfigService:
         if payload.conversation.compaction and config.kind != ConfigKind.agent:
             # o Team do Agno 3.1.8 não aceita compaction (ADR-0019)
             errors.append("só agente compacta a conversa")
+        if config.kind == ConfigKind.workflow and payload.run != RunControls():
+            # quem chama modelo e tool são os agentes e times das etapas, cada um com o seu
+            errors.append("workflow não tem controle de run próprio")
         if payload.memory.enabled and config.kind != ConfigKind.agent:
             # memória do líder e dos membros se misturariam (ADR-0025)
             errors.append("só agente guarda memória do usuário")

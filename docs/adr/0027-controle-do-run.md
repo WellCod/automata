@@ -55,7 +55,7 @@ A caixa "Saída estruturada" deixa de ser uma flag solta: ela fica ligada sempre
 
 ## Consequências
 
-- Um laço de tool para no limite, e a resposta sai com o que o modelo já tinha. O modo teste e a árvore de execução mostram que o limite foi atingido.
+- Um laço de tool para no limite. Cada chamada além dele volta ao modelo como erro de limite, sem executar, e o modelo responde com o que já tinha. A árvore de execução mostra as chamadas que rodaram.
 - Um 429 passageiro deixa de virar falha, e o pico de erro cai junto. A reserva custa o preço dela, e o analytics passa a separar o consumo por modelo.
 - Com a reserva, a resposta pode vir de outro provedor, com outro estilo. A suíte agendada (ADR-0016) roda com o principal. A reserva entra na mesma suíte quando o agente é testado com o principal fora do ar, e isso fica a cargo de quem configura.
 - A integração recebe JSON validado pelo provedor e pela suíte. Mudar o schema é mudar o contrato com quem integra, e o diff da versão mostra isso.

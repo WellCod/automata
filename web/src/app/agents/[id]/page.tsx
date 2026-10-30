@@ -266,6 +266,8 @@ export default function AgentEditPage() {
             guardrails: values.guardrails,
             conversation: values.conversation,
             memory: values.memory,
+            // ainda sem campos no formulário: repassa o que a versão tem (ADR-0027)
+            run: data?.payload?.run,
             metadata: data?.payload?.metadata ?? {},
           },
         },

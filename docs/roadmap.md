@@ -1141,7 +1141,7 @@ Segunda rodada de verificação, sobre a `main` em `9909b4c`: UI e UX nas 66 tel
 Decisão em [ADR-0027](adr/0027-controle-do-run.md). Uma seção `run` no payload, versionada, com limite de chamadas de tool por run, retry só da chamada ao provedor, até dois modelos reserva validados contra as capabilities do agente e saída estruturada por JSON Schema, com checagem própria na suíte. O custo passa a seguir o modelo que respondeu.
 
 - [x] `docs(adr)`: ADR-0027 e esta seção
-- [ ] `feat(api)`: limite de chamadas de tool por run no agente e no líder do time
+- [x] `feat(api)`: limite de chamadas de tool por run no agente e no líder do time
 - [ ] `feat(api)`: retry do provedor e modelo reserva, com o custo pelo modelo que respondeu
 - [ ] `feat(api)`: saída estruturada por JSON Schema e checagem `schema` na suíte
 - [ ] `feat(web)`: limite, resiliência e saída estruturada na configuração do agente
