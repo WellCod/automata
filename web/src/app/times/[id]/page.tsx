@@ -211,6 +211,8 @@ export default function TeamEditPage() {
             knowledge: values.knowledge,
             guardrails: values.guardrails,
             metadata: data?.payload?.metadata ?? {},
+            // limite de tools do líder (ADR-0027): sem campo aqui, repassa o da versão
+            run: data?.payload?.run,
             team: values.team,
           },
         },

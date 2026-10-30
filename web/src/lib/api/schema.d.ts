@@ -1684,6 +1684,7 @@ export interface components {
       capabilities?: components["schemas"]["CapabilityFlags"];
       conversation?: components["schemas"]["ConversationSettings"];
       memory?: components["schemas"]["MemorySettings"];
+      run?: components["schemas"]["RunControls"];
       /** Metadata */
       metadata?: {
         [key: string]: unknown;
@@ -2962,6 +2963,14 @@ export interface components {
       embedding_tokens: number;
       /** Embedding Cost */
       embedding_cost?: number | null;
+    };
+    /**
+     * RunControls
+     * @description Controle do run (ADR-0027). Padrão vazio: nenhum agente publicado muda sem versão nova.
+     */
+    RunControls: {
+      /** Tool Call Limit */
+      tool_call_limit?: number | null;
     };
     /** RunTrace */
     RunTrace: {

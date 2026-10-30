@@ -139,6 +139,13 @@ class MemorySettings(BaseModel):
     retention_days: int = Field(default=90, ge=1, le=365)
 
 
+class RunControls(BaseModel):
+    """Controle do run (ADR-0027). Padrão vazio: nenhum agente publicado muda sem versão nova."""
+
+    # chamadas além do limite voltam ao modelo como erro, sem executar a tool
+    tool_call_limit: int | None = Field(default=None, ge=1, le=100)
+
+
 class TeamSettings(BaseModel):
     """Seção de time do payload. Só existe em config de kind=team."""
 
@@ -176,6 +183,7 @@ class ConfigPayload(BaseModel):
     capabilities: CapabilityFlags = Field(default_factory=CapabilityFlags)
     conversation: ConversationSettings = Field(default_factory=ConversationSettings)
     memory: MemorySettings = Field(default_factory=MemorySettings)
+    run: RunControls = Field(default_factory=RunControls)
     metadata: dict[str, Any] = Field(default_factory=dict)
     # Em time: modelo, instruções e MCP acima são do líder
     team: TeamSettings | None = None
