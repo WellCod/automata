@@ -12,6 +12,8 @@ from typing import Literal
 
 PiiType = Literal["cpf", "cnpj", "cartao", "email", "telefone"]
 PII_TYPES: tuple[PiiType, ...] = ("cpf", "cnpj", "cartao", "email", "telefone")
+# acima disso o guardrail barra a mensagem sem varrer (cerca de 0,1 s no teto)
+PII_SCAN_MAX_CHARS = 100_000
 
 _LABEL: dict[PiiType, str] = {
     "cpf": "[CPF removido]",
@@ -77,7 +79,12 @@ _PATTERNS: dict[PiiType, tuple[re.Pattern[str], Callable[[str], bool] | None]] =
     "cnpj": (re.compile(r"(?<!\d)\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}(?!\d)"), cnpj_valido),
     "cpf": (re.compile(r"(?<!\d)\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?!\d)"), cpf_valido),
     "cartao": (re.compile(r"(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)"), luhn_valido),
-    "email": (re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"), None),
+    # limites do RFC 5321 (64 antes do @, rótulo de até 63): sem eles a busca volta
+    # sobre a sequência inteira a cada posição e fica quadrática no tamanho do texto
+    "email": (
+        re.compile(r"[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63}){1,8}"),
+        None,
+    ),
     # celular e fixo com DDD; exige formatação ou +55 para não casar com qualquer número
     "telefone": (
         re.compile(

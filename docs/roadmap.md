@@ -1107,7 +1107,7 @@ Segunda rodada de verificação, sobre a `main` em `9909b4c`: UI e UX nas 66 tel
 
 ### Segurança
 
-- [ ] **Alta.** O scan de dados pessoais (`app/guardrails/pii.py`) é quadrático: 8 mil caracteres levam 2 s, e o tempo quadruplica quando o tamanho dobra. Ele roda no event loop e antes do limite de tamanho, e também na máscara da memória. Uma mensagem de cerca de 100 KB para um agente com guardrail de PII ou memória trava a API, que tem um worker só.
+- [x] **Alta.** O scan de dados pessoais (`app/guardrails/pii.py`) é quadrático: 8 mil caracteres levam 2 s, e o tempo quadruplica quando o tamanho dobra. Ele roda no event loop e antes do limite de tamanho, e também na máscara da memória. Uma mensagem de cerca de 100 KB para um agente com guardrail de PII ou memória trava a API, que tem um worker só.
 - [ ] **Média.** `GET /api/v1/approvals` exige só `metrics:read`. Qualquer viewer vê os runs pausados de todos os usuários, com os argumentos das tools e a saída das etapas.
 - [ ] **Média.** Remover um usuário apaga a linha que guardava o corte de sessão (`tokens_valid_after`). O JWT dele volta a valer até vencer.
 - [ ] **Média.** A checagem de rede interna resolve o DNS, e o httpx resolve de novo ao conectar. Um domínio com TTL 0 alterna o IP entre as duas resoluções (DNS rebinding). A lista de bloqueio também deixa passar `100.64.0.0/10`.

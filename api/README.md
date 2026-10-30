@@ -272,6 +272,7 @@ Regras por agente, no payload versionado (`guardrails`), tudo desligado por padr
 | `blocked_message` | O que o usuário vê quando bloqueia |
 
 - Dados pessoais rodam primeiro: o input fica mascarado mesmo quando outra regra bloqueia. O Agno grava o run bloqueado com o input, então a sessão guarda a versão mascarada.
+- O scan de dados pessoais é linear no tamanho do texto: os padrões têm limite de repetição, e o e-mail usa os tamanhos do RFC 5321. Mensagem acima de 100 mil caracteres (`PII_SCAN_MAX_CHARS`) é barrada como `input_too_long` sem ser varrida, porque o `re` segura o GIL e pararia a API. Na memória, o input cru gravado pelo Agno é cortado nesse teto antes da máscara.
 - Bloqueio: run com status `ERROR` e `content` igual à mensagem de bloqueio; no stream, `RunError` com `error_id` (`pii_detected`, `prompt_injection`, `off_topic`, `input_not_allowed`) e `additional_data.rule` com o motivo.
 - As regras são `BaseGuardrail` próprias (`app/guardrails/`): os guardrails prontos do Agno só têm padrões dos EUA e lista de injeção em inglês.
 - **Saída**: sem stream (integrações REST e MCP), a resposta é trocada pela mensagem de bloqueio, e a mensagem do assistente gravada na sessão também, antes de sair. **Com stream (modo teste, chat), o texto já foi entregue enquanto era gerado**: o run só fica marcado como bloqueado (`output_not_allowed`). O Agno só troca o conteúdo pela mensagem da exceção quando ele está vazio, por isso o hook troca antes de levantar.

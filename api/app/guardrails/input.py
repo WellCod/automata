@@ -16,7 +16,7 @@ from agno.guardrails.base import BaseGuardrail
 from agno.run.agent import RunInput
 from agno.run.team import TeamRunInput
 
-from app.guardrails.pii import PiiType, find_pii, mask
+from app.guardrails.pii import PII_SCAN_MAX_CHARS, PiiType, find_pii, mask
 from app.schemas.config import GuardrailSettings
 
 AnyInput = RunInput | TeamRunInput
@@ -139,6 +139,16 @@ class PiiGuardrail(_Guardrail):
     def _check(self, run_input: AnyInput) -> None:
         if not isinstance(run_input.input_content, str):
             return
+        size = len(run_input.input_content)
+        # o scan é linear mas segura o GIL: texto acima do teto é barrado sem ser lido
+        if size > PII_SCAN_MAX_CHARS:
+            raise _block(
+                self.blocked_message,
+                CheckTrigger.INPUT_NOT_ALLOWED,
+                RULE_LENGTH,
+                size=size,
+                limit=PII_SCAN_MAX_CHARS,
+            )
         matches = find_pii(run_input.input_content, self.types)
         if not matches:
             return
