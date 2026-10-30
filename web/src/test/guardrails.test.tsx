@@ -9,6 +9,8 @@ import {
   GuardrailsEditor,
   withDefaults,
 } from "@/components/guardrails-editor";
+// import no topo: carregar a página (com o Recharts) dentro do teste estourava os 5 s com a máquina cheia
+import AnalyticsPage from "@/app/analytics/page";
 import { RunsPanel } from "@/components/runs-panel";
 import { TestPanel } from "@/components/test-panel";
 
@@ -154,7 +156,6 @@ describe("bloqueios no analytics", () => {
   });
 
   it("mostra o card de bloqueios separado das falhas", async () => {
-    const { default: AnalyticsPage } = await import("@/app/analytics/page");
     vi.mocked(client.GET).mockImplementation(async (path: string) => {
       if (path.includes("by-agent")) {
         return {

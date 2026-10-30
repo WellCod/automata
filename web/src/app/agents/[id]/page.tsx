@@ -42,6 +42,13 @@ import {
   MemoryEditor,
   withMemoryDefaults,
 } from "@/components/memory-editor";
+import { type OutputSchema, OutputSchemaEditor } from "@/components/output-schema-editor";
+import {
+  DEFAULT_RUN,
+  type RunControls,
+  RunControlsEditor,
+  withRunDefaults,
+} from "@/components/run-controls-editor";
 import { MetricsPanel } from "@/components/metrics-panel";
 import { ModelSelector } from "@/components/model-selector";
 import { RunsPanel } from "@/components/runs-panel";
@@ -98,6 +105,9 @@ const schema = z.object({
   conversation: z.custom<Conversation>(),
   // memória do usuário (ADR-0025), validada pela API
   memory: z.custom<Memory>(),
+  // controle do run e saída estruturada (ADR-0027), validados pela API
+  run: z.custom<RunControls>(),
+  output_schema: z.custom<OutputSchema | null>(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -207,6 +217,8 @@ export default function AgentEditPage() {
       guardrails: DEFAULT_GUARDRAILS,
       conversation: DEFAULT_CONVERSATION,
       memory: DEFAULT_MEMORY,
+      run: DEFAULT_RUN,
+      output_schema: null,
     },
   });
 
@@ -246,6 +258,8 @@ export default function AgentEditPage() {
       guardrails: withDefaults(data.payload?.guardrails),
       conversation: withConversationDefaults(data.payload?.conversation),
       memory: withMemoryDefaults(data.payload?.memory),
+      run: withRunDefaults(data.payload?.run),
+      output_schema: (data.payload?.output_schema as OutputSchema | null | undefined) ?? null,
     });
   }, [data, reset]);
 
@@ -266,8 +280,8 @@ export default function AgentEditPage() {
             guardrails: values.guardrails,
             conversation: values.conversation,
             memory: values.memory,
-            // ainda sem campos no formulário: repassa o que a versão tem (ADR-0027)
-            run: data?.payload?.run,
+            run: values.run,
+            output_schema: values.output_schema,
             metadata: data?.payload?.metadata ?? {},
           },
         },
@@ -326,6 +340,8 @@ export default function AgentEditPage() {
       guardrails: values.guardrails,
       conversation: values.conversation,
       memory: values.memory,
+      run: values.run,
+      output_schema: values.output_schema,
       metadata: data?.payload?.metadata ?? {},
     };
   };
@@ -419,6 +435,9 @@ export default function AgentEditPage() {
                     onChange={(modelId, caps) => {
                       field.onChange(modelId);
                       form.setValue("capabilities", caps, { shouldValidate: true });
+                      // sem a capability, o schema seria recusado na escrita (ADR-0027)
+                      if (!caps.structured_output && form.getValues("output_schema") != null)
+                        form.setValue("output_schema", null, { shouldDirty: true });
                     }}
                     error={fieldState.error?.message}
                   />
@@ -462,6 +481,39 @@ export default function AgentEditPage() {
                 control={form.control}
                 render={({ field }) => (
                   <MemoryEditor value={field.value} onChange={field.onChange} />
+                )}
+              />
+
+              <Controller
+                name="run"
+                control={form.control}
+                render={({ field }) => (
+                  <RunControlsEditor
+                    value={field.value}
+                    onChange={field.onChange}
+                    modelId={form.watch("model_id")}
+                    capabilities={form.watch("capabilities")}
+                  />
+                )}
+              />
+
+              <Controller
+                name="output_schema"
+                control={form.control}
+                render={({ field }) => (
+                  <OutputSchemaEditor
+                    value={field.value}
+                    modelId={form.watch("model_id")}
+                    onChange={(schema) => {
+                      field.onChange(schema);
+                      // o schema é o que dá sentido à capability (ADR-0027)
+                      form.setValue(
+                        "capabilities",
+                        { ...form.getValues("capabilities"), structured_output: schema != null },
+                        { shouldDirty: true },
+                      );
+                    }}
+                  />
                 )}
               />
 
