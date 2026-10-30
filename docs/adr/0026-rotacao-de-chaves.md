@@ -1,6 +1,6 @@
 # ADR-0026 — Rotação da chave JWT e da chave dos segredos sem derrubar sessões nem integrações
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-10-29
 
 ## Contexto
