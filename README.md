@@ -370,7 +370,8 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0024](docs/adr/0024-conectores-de-conhecimento.md) | Conectores de conhecimento (GitHub, S3, SharePoint) e reindexação agendada |
 | [0025](docs/adr/0025-memoria-do-usuario.md) | Memória do usuário entre sessões, por agente, com retenção, PII mascarado e exclusão |
 | [0026](docs/adr/0026-rotacao-de-chaves.md) | Rotação da chave JWT e da chave dos segredos sem derrubar sessões nem integrações |
-| [0027](docs/adr/0027-controle-do-run.md) | Controle do run: limite de tools, retry do provedor com modelo reserva e saída estruturada (proposto, Fase 29) |
+| [0027](docs/adr/0027-controle-do-run.md) | Controle do run: limite de tools, retry do provedor com modelo reserva e saída estruturada |
+| [0028](docs/adr/0028-revisao-humana-completa.md) | Revisão humana completa: saída editada, revisão por volta de laço e registro das decisões (proposto, Fase 30) |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 
