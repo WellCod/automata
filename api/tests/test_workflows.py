@@ -410,3 +410,28 @@ def test_revisao_dentro_de_conteiner_e_recusada(client: TestClient) -> None:
         },
     )
     assert resp.status_code == 422 and "revisão da saída" in resp.text
+
+
+def test_saida_editada_segue_e_fica_no_registro(client: TestClient) -> None:
+    wf, analise = _review_workflow(
+        client, "reembolso editado", {"when": "after", "on_reject": "retry"}
+    )
+    out = _run(client, wf, "quero reembolso")
+    assert out["status"] == "PAUSED", out
+    # recusa com motivo, depois edita: as duas decisões entram no registro, na ordem
+    again = _decide(client, wf, out, confirmed=False, rejection_feedback="CPF 529.982.247-25")
+    assert again["status"] == "PAUSED", again
+    done = _decide(client, wf, out, confirmed=True, edited_output="análise revisada: R$ 210")
+    assert done["status"] == "COMPLETED", done
+    # o modelo da análise rodou duas vezes (a recusa refez); a edição não chamou de novo
+    assert _runs(client, analise) == 2
+    steps = {s["step_name"]: s for s in done.get("step_results", [])}
+    assert steps["analise"]["content"] == "análise revisada: R$ 210"
+
+    log = client.get(f"/api/v1/runs/{out['run_id']}/reviews").json()
+    assert [e["decision"] for e in log] == ["rejected", "edited"]
+    assert log[0]["feedback"] == "CPF [CPF removido]"
+    assert log[1]["before"] == "análise técnica ok"
+    assert log[1]["after"] == "análise revisada: R$ 210"
+    assert all(e["step_name"] == "analise" and e["by"] == "desconhecido" for e in log)
+    assert client.get("/api/v1/runs/nao-existe/reviews").status_code == 404

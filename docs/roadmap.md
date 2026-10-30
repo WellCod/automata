@@ -1161,7 +1161,7 @@ Decisão em [ADR-0027](adr/0027-controle-do-run.md). Uma seção `run` no payloa
 Decisão em [ADR-0028](adr/0028-revisao-humana-completa.md). O revisor corrige a saída da etapa em vez de pedir para refazer. Num laço, ele decide a cada volta se segue ou se pede outra com comentário. Cada decisão fica registrada no run, com quem decidiu, quando, o motivo e, na edição, o texto antes e depois.
 
 - [x] `docs(adr)`: ADR-0028 e esta seção
-- [ ] `feat(api)`: saída editada na aprovação e registro das decisões humanas no run
+- [x] `feat(api)`: saída editada na aprovação e registro das decisões humanas no run
 - [ ] `feat(api)`: revisão por volta de laço no workflow
 - [ ] `feat(web)`: edição da saída com diff, revisão por volta no editor e histórico das decisões
 - [ ] `test(api)`: evals da revisão humana completa

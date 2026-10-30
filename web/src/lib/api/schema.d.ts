@@ -1065,6 +1065,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/runs/{run_id}/reviews": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Run Reviews
+     * @description Decisões humanas do run do workflow (ADR-0028), na ordem em que aconteceram.
+     *
+     *     O antes e depois da edição é conteúdo da conversa: mesma regra do trace, só o
+     *     dono do run ou o owner.
+     */
+    get: operations["get_run_reviews_api_v1_runs__run_id__reviews_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/usage/rollup": {
     parameters: {
       query?: never;
@@ -2935,6 +2958,28 @@ export interface components {
       hyde: boolean;
       /** Hyde Model */
       hyde_model?: string | null;
+    };
+    /** ReviewEntry */
+    ReviewEntry: {
+      /** Step Id */
+      step_id: string;
+      /** Step Name */
+      step_name?: string | null;
+      /** Decision */
+      decision: string;
+      /** By */
+      by: string;
+      /**
+       * At
+       * Format: date-time
+       */
+      at: string;
+      /** Feedback */
+      feedback?: string | null;
+      /** Before */
+      before?: string | null;
+      /** After */
+      after?: string | null;
     };
     /** RollbackInput */
     RollbackInput: {
@@ -5879,6 +5924,37 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["RunTrace"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_run_reviews_api_v1_runs__run_id__reviews_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        run_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReviewEntry"][];
         };
       };
       /** @description Validation Error */
