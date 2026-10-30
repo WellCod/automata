@@ -94,7 +94,7 @@ function StepVersion({
       aria-label={`Versão de ${label}`}
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value || null)}
-      className={inputCls}
+      className={`${inputCls} max-w-full min-w-0`}
     >
       <option value="">Versão vigente</option>
       {stale && <option value={value}>Versão fixada indisponível</option>}
@@ -133,7 +133,7 @@ function StepFields({
             version_id: null,
           });
         }}
-        className={`${inputCls} min-w-48`}
+        className={`${inputCls} w-full min-w-0 sm:w-auto sm:min-w-48`}
       >
         <option value="">Escolha um agente ou time</option>
         {missing && <option value={key}>Não publicado ou removido</option>}
@@ -168,7 +168,7 @@ function StepFields({
         aria-label={`Se ${node.name} falhar`}
         value={node.on_error}
         onChange={(e) => onChange({ ...node, on_error: e.target.value as StepNode["on_error"] })}
-        className={inputCls}
+        className={`${inputCls} max-w-full min-w-0`}
       >
         <option value="stop">Se falhar, para o fluxo</option>
         <option value="continue">Se falhar, segue</option>
@@ -371,7 +371,7 @@ function NodeCard({
       className="border-border bg-card flex flex-col gap-2 rounded border p-3"
       aria-label={`${meta.label} ${node.name}`}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
         <Icon className="text-accent h-3.5 w-3.5 flex-none" aria-hidden />
         <span className="text-muted-foreground w-16 flex-none text-[11px]">{meta.label}</span>
         <input
@@ -379,7 +379,7 @@ function NodeCard({
           value={node.name}
           maxLength={60}
           onChange={(e) => onChange({ ...node, name: e.target.value })}
-          className={`${inputCls} min-w-0 flex-1`}
+          className={`${inputCls} min-w-28 flex-1`}
         />
         <Button
           type="button"

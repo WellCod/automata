@@ -85,6 +85,8 @@ Tamanhos: `default` (h-8), `sm` (h-7), `xs` (h-6), `icon`. Seletor de opção (p
 ## Navegação lateral
 
 - Largura fixa de 200px, fundo `--sidebar`.
+- Abaixo de `md` (768px) vira gaveta: uma barra de topo de 44px, que rola com a página, traz o botão de menu. A gaveta fecha com Esc, com clique fora e ao navegar. Páginas de detalhe empilham o painel lateral (Testar, Suíte) abaixo de `lg`.
+- `fieldset` tem `min-width: 0` no CSS base: o padrão do navegador é a largura do conteúdo, e um `select` largo vazava a tela no celular.
 - Item: ícone 16px e rótulo 13px, altura 32px; ativo em azul, sem fundo.
 - Rodapé: e-mail de quem está logado, seletor de tema e sair. Itens só de owner (Usuários) não aparecem para os outros papéis.
 

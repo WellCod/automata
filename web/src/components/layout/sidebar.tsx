@@ -15,6 +15,7 @@ import {
   UserCog,
   Users,
   Workflow,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -36,7 +37,9 @@ const navItems = [
   { href: "/chaves", label: "Chaves", icon: LockKeyhole, exact: true, ownerOnly: true },
 ];
 
-function LogoMark() {
+export const SIDEBAR_ID = "menu-lateral";
+
+export function LogoMark() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
       <rect width="18" height="18" rx="4" className="fill-accent" />
@@ -48,7 +51,7 @@ function LogoMark() {
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const { data: pending } = usePendingApprovals();
@@ -62,10 +65,27 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="border-sidebar-border bg-sidebar fixed inset-y-0 left-0 z-20 flex w-[200px] flex-col border-r">
+    <aside
+      id={SIDEBAR_ID}
+      aria-label="Menu"
+      className={cn(
+        "border-sidebar-border bg-sidebar fixed inset-y-0 left-0 z-30 flex w-[200px] flex-col border-r transition-transform md:translate-x-0",
+        open ? "translate-x-0" : "-translate-x-full",
+      )}
+    >
       <div className="border-sidebar-border flex h-11 items-center gap-2 border-b px-3">
         <LogoMark />
         <span className="text-foreground text-[13px] font-medium tracking-tight">automata</span>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar menu"
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 ml-auto flex h-8 w-8 items-center justify-center rounded focus-visible:ring-2 focus-visible:outline-none md:hidden"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <nav className="flex-1 px-3 py-2">
