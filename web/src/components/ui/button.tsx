@@ -12,13 +12,15 @@ const buttonVariants = cva(
         // secundário: contorno neutro
         default: "border-border bg-background text-foreground hover:bg-muted",
         // ação principal da tela
-        strong: "border-transparent bg-accent text-accent-foreground hover:bg-accent/90",
+        strong:
+          "border-transparent bg-accent-solid text-accent-foreground hover:bg-accent-solid/90",
         // criar, publicar: destaque sem competir com a principal
         accent: "border-accent/40 bg-accent/10 text-accent hover:bg-accent/15",
         // cancelar, editar, opções de seletor
         muted:
           "border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
-        destructive: "border-transparent bg-destructive text-white hover:bg-destructive/90",
+        destructive:
+          "border-transparent bg-destructive-solid text-white hover:bg-destructive-solid/90",
         // excluir antes da confirmação
         subtleDestructive:
           "border-border bg-transparent text-muted-foreground hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive",

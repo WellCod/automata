@@ -334,7 +334,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Read Schedule */
+    /**
+     * Read Schedule
+     * @description `null` quando a suíte não tem agendamento: é o estado normal, não um erro.
+     */
     get: operations["read_schedule_api_v1_configs__config_id__eval_schedule_get"];
     /** Save Schedule */
     put: operations["save_schedule_api_v1_configs__config_id__eval_schedule_put"];
@@ -4173,7 +4176,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["EvalScheduleResponse"];
+          "application/json": components["schemas"]["EvalScheduleResponse"] | null;
         };
       };
       /** @description Validation Error */

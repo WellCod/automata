@@ -81,11 +81,8 @@ export function useEvalSchedule(configId: string) {
     queryKey: ["eval-schedule", configId],
     queryFn: async () => {
       const res = await client.GET("/api/v1/configs/{config_id}/eval-schedule", path(configId));
-      if (res.error) {
-        // suíte sem agendamento responde 404
-        if (res.response?.status === 404) return null;
-        throw new Error("Falha ao carregar o agendamento");
-      }
+      if (res.error) throw new Error("Falha ao carregar o agendamento");
+      // null: suíte sem agendamento
       return res.data ?? null;
     },
   });

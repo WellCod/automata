@@ -390,7 +390,7 @@ O gate é a flag `agent_config.require_passing_evals` (migration 0022), fora da 
 
 ### Agendamento
 
-`/api/v1/configs/{id}/eval-schedule` (ADR-0016, migration 0025) guarda um agendamento por config: `GET` lê, `PUT` cria ou troca e `DELETE` apaga. Ler pede `evals:read`; gravar, `evals:write`. O corpo é `{cron_expr, timezone, target, judge_model, enabled}`:
+`/api/v1/configs/{id}/eval-schedule` (ADR-0016, migration 0025) guarda um agendamento por config: `GET` lê (`null` sem agendamento), `PUT` cria ou troca e `DELETE` apaga. Ler pede `evals:read`; gravar, `evals:write`. O corpo é `{cron_expr, timezone, target, judge_model, enabled}`:
 - `timezone` padrão `America/Sao_Paulo` e `target` padrão `current`, para o agendamento seguir a vigente depois de cada publicação.
 - O cron tem 5 campos e é validado com `agno.scheduler.cron`. Cron vazio é recusado. O intervalo mínimo entre horários seguidos é 1 hora, conferido nos próximos 48 horários.
 - A gravação já recusa o que o horário recusaria: caso com juiz sem `judge_model` ou modelo sem saída estruturada. Desligado, `next_run_at` fica nulo.

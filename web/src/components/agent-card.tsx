@@ -56,7 +56,7 @@ export function AgentCard({ agent, suite }: Props) {
         </span>
         <Link
           href={`/agents/${agent.id}`}
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 shrink-0 rounded transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 -m-1 shrink-0 rounded p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
           aria-label={`Abrir ${agent.name}`}
         >
           <ArrowUpRight className="h-4 w-4" aria-hidden />

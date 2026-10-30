@@ -184,7 +184,8 @@ def test_desligar_e_apagar(client: TestClient) -> None:
     assert scheduler.poll_once() == []
 
     assert client.delete(f"/api/v1/configs/{agent}/eval-schedule").status_code == 204
-    assert client.get(f"/api/v1/configs/{agent}/eval-schedule").status_code == 404
+    gone = client.get(f"/api/v1/configs/{agent}/eval-schedule")
+    assert gone.status_code == 200 and gone.json() is None
 
 
 def _tick(agent: str) -> str:

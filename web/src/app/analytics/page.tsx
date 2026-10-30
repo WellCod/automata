@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDuration, formatTotalUsd } from "@/lib/format";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import client from "@/lib/api/client";
@@ -19,25 +20,10 @@ const PERIODS = [
 
 type Period = (typeof PERIODS)[number]["value"];
 
-function formatMs(ms: number | null): string {
-  if (ms === null) return "—";
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)} k`;
   return String(n);
-}
-
-function formatCost(cost: number | null): string {
-  if (cost === null) return "—";
-  return cost.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 4,
-  });
 }
 
 function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
@@ -110,6 +96,7 @@ function PeriodSelector({
       <div className="flex items-center gap-1">
         <input
           type="date"
+          aria-label="Data inicial"
           value={filter.custom?.start ?? ""}
           onChange={(e) => handleDateChange("start", e.target.value)}
           className={`border-border bg-background text-foreground rounded border px-2 py-1 text-[12px] ${
@@ -119,6 +106,7 @@ function PeriodSelector({
         <span className="text-muted-foreground text-[11px]">até</span>
         <input
           type="date"
+          aria-label="Data final"
           value={filter.custom?.end ?? ""}
           onChange={(e) => handleDateChange("end", e.target.value)}
           min={filter.custom?.start ?? undefined}
@@ -226,12 +214,12 @@ export default function AnalyticsPage() {
           />
           <SummaryCard
             label="Tempo de resposta típico"
-            value={formatMs(summary.p50_ms)}
+            value={formatDuration(summary.p50_ms)}
             hint="metade das respostas foi mais rápida"
           />
           <SummaryCard
             label="Tempo de resposta no pico"
-            value={formatMs(summary.p95_ms)}
+            value={formatDuration(summary.p95_ms)}
             hint="95% das respostas ficaram abaixo disso"
           />
           <SummaryCard
@@ -241,10 +229,10 @@ export default function AnalyticsPage() {
           />
           <SummaryCard
             label="Custo estimado"
-            value={formatCost(summary.total_cost)}
+            value={formatTotalUsd(summary.total_cost)}
             hint={
               summary.embedding_tokens > 0
-                ? `modelos; + ${formatCost(summary.embedding_cost ?? null)} em embeddings (${formatTokens(summary.embedding_tokens)} tokens)`
+                ? `modelos; + ${formatTotalUsd(summary.embedding_cost ?? null)} em embeddings (${formatTokens(summary.embedding_tokens)} tokens)`
                 : "baseado no consumo de tokens"
             }
           />
@@ -303,7 +291,7 @@ export default function AnalyticsPage() {
                       {formatTokens(row.total_tokens)}
                     </td>
                     <td className="text-foreground px-4 py-2 text-right">
-                      {formatCost(row.total_cost)}
+                      {formatTotalUsd(row.total_cost)}
                     </td>
                   </tr>
                 ))}

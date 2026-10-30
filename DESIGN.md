@@ -27,10 +27,12 @@ Cinzas neutros (zinc) para superfícies, texto e bordas. Azul só em ação prin
 | `--muted-foreground` | `#71717A` | `#A1A1AA` | Texto secundário |
 | `--text-label` | `#52525B` | `#A1A1AA` | Rótulo de par rótulo/valor |
 | `--accent` | `#2563EB` | `#3B82F6` | Ação principal, foco, link, item ativo |
+| `--accent-solid` | `#2563EB` | `#2563EB` | Fundo do botão `strong`, com texto branco |
 | `--destructive` | `#DC2626` | `#EF4444` | Erro, ação destrutiva |
+| `--destructive-solid` | `#DC2626` | `#DC2626` | Fundo do botão `destructive`, com texto branco (4.8:1) |
 | `--ring` | igual ao accent | igual ao accent | Anel de foco |
 
-Contraste (WCAG AA, 4.5:1 para texto): `--muted-foreground` passa nos dois modos (`#71717A` sobre branco 4.8:1; `#A1A1AA` sobre `#09090B` 7.9:1). O texto branco sobre o accent passa nos dois.
+Contraste (WCAG AA, 4.5:1 para texto): `--muted-foreground` passa nos dois modos (`#71717A` sobre branco 4.8:1; `#A1A1AA` sobre `#09090B` 7.9:1). O texto branco vai sobre `--accent-solid` (5.2:1 nos dois modos). No escuro, o `#3B82F6` do accent fica em 3.7:1 com branco, então ele serve só como cor de texto e de borda.
 
 Estados com cor própria usam o par claro/escuro do Tailwind: pendente `text-amber-700` / `dark:text-amber-400`, sucesso `text-green-600` / `dark:text-green-500`. Nunca `amber-400` no claro (contraste baixo).
 

@@ -130,7 +130,7 @@ function ResultItem({ result }: { result: EvalResult }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex items-center gap-2 text-left text-[13px]"
+        className="flex min-h-8 items-center gap-2 text-left text-[13px]"
       >
         <ResultIcon status={result.status} />
         <span className="text-foreground font-medium">{result.case_name}</span>

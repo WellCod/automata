@@ -384,13 +384,12 @@ def _schedule(s: EvalSchedule) -> EvalScheduleResponse:
     )
 
 
-@schedule_router.get("", response_model=EvalScheduleResponse)
-def read_schedule(config_id: UUID, session: SessionDep) -> EvalScheduleResponse:
+@schedule_router.get("", response_model=EvalScheduleResponse | None)
+def read_schedule(config_id: UUID, session: SessionDep) -> EvalScheduleResponse | None:
+    """`null` quando a suíte não tem agendamento: é o estado normal, não um erro."""
     _config_or_404(session, config_id)
     schedule = EvalScheduleRepository(session).get(config_id)
-    if schedule is None:
-        raise HTTPException(status_code=404, detail="Suíte sem agendamento")
-    return _schedule(schedule)
+    return _schedule(schedule) if schedule is not None else None
 
 
 @schedule_router.put("", response_model=EvalScheduleResponse, dependencies=_WRITE)
