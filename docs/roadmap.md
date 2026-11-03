@@ -1179,7 +1179,7 @@ Decisão em [ADR-0028](adr/0028-revisao-humana-completa.md). O revisor corrige a
 Decisão em [ADR-0029](adr/0029-chunking-por-base-e-compressao.md). Cada base escolhe como o conteúdo é cortado: pela recursiva de hoje, por títulos, por parágrafos ou em tamanho fixo, com a sobreposição ajustável. Quem configura vê os trechos numa prévia, sem custo, e reprocessa a base com a estratégia nova. Arquivo e texto passam a guardar o original para isso. No agente e no líder do time, o resultado das tools pode ser comprimido por um modelo antes de seguir no contexto, com o custo medido no run.
 
 - [x] `docs(adr)`: ADR-0029 e esta seção
-- [ ] `feat(api)`: estratégia de corte por base, prévia dos trechos e reprocessamento com o original guardado
+- [x] `feat(api)`: estratégia de corte por base, prévia dos trechos e reprocessamento com o original guardado
 - [ ] `feat(api)`: compressão do resultado de tool no agente e no líder do time
 - [ ] `feat(web)`: corte e prévia na página da base e compressão no controle do run
 - [ ] `test(api)`: evals do corte por base e da compressão

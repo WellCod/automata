@@ -3,28 +3,38 @@
 import logging
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from sqlalchemy import select
 
 from app.agents.capabilities import get_capabilities
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.knowledge.embedders import EMBEDDERS, is_configured
+from app.knowledge.ingest import IngestError, read_documents
+from app.knowledge.reprocess import plan_reprocess, reprocess
 from app.knowledge.search import SearchOutcome, search_base
 from app.knowledge.search import search as run_search
 from app.models.knowledge_base import KnowledgeBase
+from app.models.knowledge_content import KnowledgeContent, KnowledgeContentOriginal
 from app.proxy import get_client_ip
 from app.repositories.embedding_usage import EmbeddingTotals, EmbeddingUsageRepository
 from app.repositories.knowledge_base import KnowledgeBaseRepository
+from app.routers.knowledge_contents import to_response as content_response
 from app.schemas.knowledge_base import (
+    ChunkingSettings,
+    ChunkPreview,
+    ChunkPreviewInput,
     EmbedderInfo,
     KnowledgeBaseCreate,
     KnowledgeBaseResponse,
     KnowledgeBaseUpdate,
+    ReprocessResult,
     RetrievalSettings,
     SearchComparison,
     SearchHit,
     SearchInput,
     SearchResult,
+    overlap_problem,
 )
 from app.settings import get_settings
 
@@ -49,6 +59,7 @@ def to_response(b: KnowledgeBase, usage: EmbeddingTotals | None = None) -> Knowl
         dimensions=b.dimensions,
         chunk_size=b.chunk_size,
         retrieval=RetrievalSettings.model_validate(b.retrieval or {}),
+        chunking=ChunkingSettings.model_validate(b.chunking or {}),
         embedding_tokens=usage.tokens if usage else 0,
         embedding_cost=usage.cost if usage else None,
         updated_by=b.updated_by,
@@ -131,6 +142,7 @@ def create_base(
         dimensions=spec.dimensions,
         chunk_size=body.chunk_size,
         retrieval=(body.retrieval or RetrievalSettings()).model_dump(),
+        chunking=(body.chunking or ChunkingSettings()).model_dump(),
         vector_table=f"kb_{base_id.hex}",
         updated_by=_actor(request),
     )
@@ -155,7 +167,12 @@ def update_base(
         raise HTTPException(status_code=409, detail="Já existe base com esse nome")
     base.name = body.name
     base.description = body.description
+    chunking = body.chunking or ChunkingSettings.model_validate(base.chunking or {})
+    problem = overlap_problem(body.chunk_size, chunking)
+    if problem:
+        raise HTTPException(status_code=422, detail=problem)
     base.chunk_size = body.chunk_size
+    base.chunking = chunking.model_dump()
     if body.retrieval is not None:
         base.retrieval = body.retrieval.model_dump()
     base.updated_by = _actor(request)
@@ -233,4 +250,68 @@ def compare_search(
         with_strategy=_result(with_strategy),
         without_strategy=_result(without_strategy),
         retrieval=RetrievalSettings.model_validate(base.retrieval or {}),
+    )
+
+
+_PREVIEW_CHUNKS = 20
+
+
+@router.post("/{base_id}/chunk-preview", response_model=ChunkPreview, dependencies=_WRITE)
+def chunk_preview(base_id: UUID, body: ChunkPreviewInput, session: SessionDep) -> ChunkPreview:
+    """Trechos que um texto ou conteúdo daria com o corte escolhido, sem embedding (ADR-0029)."""
+    base = _get_or_404(KnowledgeBaseRepository(session), base_id)
+    chunk_size = body.chunk_size or base.chunk_size
+    chunking = body.chunking or ChunkingSettings.model_validate(base.chunking or {})
+    problem = overlap_problem(chunk_size, chunking)
+    if problem:
+        raise HTTPException(status_code=422, detail=problem)
+    if body.text is not None:
+        name, extension, data = "prévia", "txt", body.text.encode()
+    else:
+        content = session.get(KnowledgeContent, body.content_id)
+        if content is None or content.base_id != base_id:
+            raise HTTPException(status_code=404, detail="Conteúdo não encontrado")
+        original = session.scalar(
+            select(KnowledgeContentOriginal.data).where(
+                KnowledgeContentOriginal.content_id == content.id
+            )
+        )
+        if original is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Prévia só de arquivo ou texto enviado com o original guardado",
+            )
+        name, extension, data = content.name, content.extension, original
+    try:
+        docs = read_documents(name, extension, data, chunk_size, chunking)
+    except (IngestError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return ChunkPreview(
+        chunks=[d.content for d in docs[:_PREVIEW_CHUNKS]],
+        total=len(docs),
+        chunk_size=chunk_size,
+        chunking=chunking,
+    )
+
+
+@router.post(
+    "/{base_id}/reprocess", response_model=ReprocessResult, status_code=202, dependencies=_WRITE
+)
+def reprocess_base(
+    base_id: UUID, session: SessionDep, background: BackgroundTasks
+) -> ReprocessResult:
+    """Reindexa o conteúdo da base com o corte atual; o embedding é cobrado de novo."""
+    _get_or_404(KnowledgeBaseRepository(session), base_id)
+    plan = plan_reprocess(session, base_id)
+    session.commit()
+    if plan.queued:
+        background.add_task(reprocess, plan.queued)
+    logger.info(
+        "base reprocessada",
+        extra={"base_id": str(base_id), "queued": len(plan.queued), "skipped": plan.skipped},
+    )
+    return ReprocessResult(
+        queued=len(plan.queued),
+        needs_upload=[content_response(c) for c in plan.needs_upload],
+        skipped=plan.skipped,
     )

@@ -21,6 +21,7 @@ from app.authz import Scope, require_scopes
 from app.db import SessionDep, get_engine
 from app.knowledge.fetch import FetchFailed, fetch_url
 from app.knowledge.ingest import CONTENT_TYPES, ingest, remove_chunks
+from app.knowledge.reprocess import save_original
 from app.knowledge.schedule import next_at, refresh_url
 from app.mcp.egress import EgressDenied, check_url
 from app.models.knowledge_base import KnowledgeBase
@@ -180,6 +181,8 @@ def upload_file(
             created_by=_actor(request),
         ),
     )
+    save_original(session, content.id, data)
+    session.commit()
     background.add_task(ingest, content.id, data)
     return to_response(content)
 
@@ -241,6 +244,8 @@ def add_text(
             created_by=_actor(request),
         ),
     )
+    save_original(session, content.id, data)
+    session.commit()
     background.add_task(ingest, content.id, data)
     return to_response(content)
 

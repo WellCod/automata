@@ -5,7 +5,7 @@ from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSchedule
 from app.models.integration import IntegrationToken
 from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_connector import KnowledgeConnector
-from app.models.knowledge_content import KnowledgeContent
+from app.models.knowledge_content import KnowledgeContent, KnowledgeContentOriginal
 from app.models.mcp_server import McpServer
 from app.models.revoked_token import RevokedToken
 from app.models.run import AgentRun
@@ -28,6 +28,7 @@ __all__ = [
     "KnowledgeBase",
     "KnowledgeConnector",
     "KnowledgeContent",
+    "KnowledgeContentOriginal",
     "McpServer",
     "RevokedToken",
     "UsageEvent",

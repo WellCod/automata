@@ -336,3 +336,146 @@ def test_busca_com_embedder_quebrado_da_502(
     # o detalhe do provedor fica no log; a resposta só aponta onde olhar
     assert "chave do embedder inválida" not in resp.text
     assert "confira a chave do embedder" in resp.text
+
+
+# --- corte por base e reprocessamento (ADR-0029) ---
+
+_MANUAL = (
+    "# Férias\nTrinta dias por ano, em até três períodos.\n\n"
+    "# Reembolso\nAté cinco dias úteis no cartão de origem.\n\n"
+    "# Senha\nExpira em noventa dias."
+)
+
+
+def _chunks(base_id: str, content_id: str) -> list[str]:
+    from sqlalchemy import select
+
+    vector_db = vector_db_for(_base(base_id))
+    with Session(get_engine()) as session:
+        rows = session.execute(
+            select(vector_db.table.c.content).where(vector_db.table.c.content_id == content_id)
+        )
+        return sorted(r[0] for r in rows)
+
+
+def _text(client: TestClient, base_id: str, text: str) -> str:
+    resp = client.post(
+        f"/api/v1/knowledge-bases/{base_id}/contents/text", json={"name": "Manual", "text": text}
+    )
+    assert resp.status_code == 202, resp.text
+    content_id: str = resp.json()["id"]
+    return content_id
+
+
+def _put_chunking(client: TestClient, base_id: str, chunking: dict[str, Any]) -> Any:
+    base = client.get(f"/api/v1/knowledge-bases/{base_id}").json()
+    return client.put(
+        f"/api/v1/knowledge-bases/{base_id}",
+        json={
+            "name": base["name"],
+            "description": base["description"],
+            "chunk_size": base["chunk_size"],
+            "chunking": chunking,
+        },
+    )
+
+
+def test_corte_por_titulos_abre_um_trecho_por_secao(client: TestClient, base_id: str) -> None:
+    assert client.get(f"/api/v1/knowledge-bases/{base_id}").json()["chunking"] == {
+        "strategy": "recursive",
+        "overlap": None,
+        "heading_level": 2,
+    }
+    resp = _put_chunking(client, base_id, {"strategy": "headings", "heading_level": 1})
+    assert resp.status_code == 200, resp.text
+    content_id = _text(client, base_id, _MANUAL)
+    chunks = _chunks(base_id, content_id)
+    assert len(chunks) == 3
+    assert [c.split("\n", 1)[0] for c in chunks] == ["# Férias", "# Reembolso", "# Senha"]
+
+
+def test_previa_nao_grava_nem_cobra(client: TestClient, base_id: str) -> None:
+    resp = client.post(
+        f"/api/v1/knowledge-bases/{base_id}/chunk-preview",
+        json={"text": _MANUAL, "chunking": {"strategy": "headings", "heading_level": 1}},
+    )
+    assert resp.status_code == 200, resp.text
+    preview = resp.json()
+    assert preview["total"] == 3 and preview["chunks"][1].startswith("# Reembolso")
+    # sem estratégia no corpo vale a da base: a recursiva junta o manual curto num trecho só
+    plain = client.post(
+        f"/api/v1/knowledge-bases/{base_id}/chunk-preview", json={"text": _MANUAL}
+    ).json()
+    assert plain["total"] == 1 and plain["chunking"]["strategy"] == "recursive"
+    assert client.get(f"/api/v1/knowledge-bases/{base_id}/contents").json() == []
+    assert client.get(f"/api/v1/knowledge-bases/{base_id}").json()["embedding_tokens"] == 0
+    both = client.post(
+        f"/api/v1/knowledge-bases/{base_id}/chunk-preview",
+        json={"text": "x", "content_id": "00000000-0000-0000-0000-000000000000"},
+    )
+    assert both.status_code == 422
+
+
+def test_sobreposicao_acima_de_30_por_cento_recusada(client: TestClient, base_id: str) -> None:
+    resp = _put_chunking(client, base_id, {"strategy": "fixed", "overlap": 900})
+    assert resp.status_code == 422 and "30%" in resp.text
+    created = client.post(
+        "/api/v1/knowledge-bases",
+        json={
+            "name": f"x {os.urandom(3).hex()}",
+            "slug": f"x_{os.urandom(3).hex()}",
+            "chunk_size": 1000,
+            "chunking": {"overlap": 301},
+        },
+    )
+    assert created.status_code == 422
+
+
+def test_reprocessa_com_o_corte_novo_e_aponta_o_que_falta(
+    client: TestClient, base_id: str, site: str
+) -> None:
+    text_id = _text(client, base_id, _MANUAL)
+    url = _add_url(client, base_id, f"{site}/manual")
+    assert len(_chunks(base_id, text_id)) == 1
+    # enviado antes da Fase 31: sem original guardado
+    with Session(get_engine()) as session:
+        legacy = KnowledgeContent(
+            base_id=UUID(base_id),
+            name="antigo",
+            source_type="file",
+            source="antigo.pdf",
+            extension="pdf",
+            status="completed",
+            created_by="x",
+        )
+        session.add(legacy)
+        session.commit()
+        legacy_id = str(legacy.id)
+
+    preview = client.post(
+        f"/api/v1/knowledge-bases/{base_id}/chunk-preview",
+        json={"content_id": text_id, "chunking": {"strategy": "headings", "heading_level": 1}},
+    )
+    assert preview.status_code == 200 and preview.json()["total"] == 3
+    assert (
+        client.post(
+            f"/api/v1/knowledge-bases/{base_id}/chunk-preview", json={"content_id": legacy_id}
+        ).status_code
+        == 422
+    )
+
+    assert _put_chunking(client, base_id, {"strategy": "headings", "heading_level": 1}).is_success
+    resp = client.post(f"/api/v1/knowledge-bases/{base_id}/reprocess")
+    assert resp.status_code == 202, resp.text
+    result = resp.json()
+    assert result["queued"] == 2 and result["skipped"] == 0
+    assert [c["id"] for c in result["needs_upload"]] == [legacy_id]
+
+    contents = {
+        c["id"]: c for c in client.get(f"/api/v1/knowledge-bases/{base_id}/contents").json()
+    }
+    assert contents[text_id]["status"] == "completed", contents[text_id]["status_message"]
+    assert contents[text_id]["chunk_count"] == 3
+    assert contents[url["id"]]["status"] == "completed"
+    assert contents[legacy_id]["status"] == "completed"
+    assert len(_chunks(base_id, text_id)) == 3
