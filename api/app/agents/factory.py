@@ -167,7 +167,7 @@ def pre_hooks_for(
     hooks: list[BaseGuardrail] = []
     if budget and resolved.budget_limit_usd is not None:
         hooks.append(BudgetGuardrail(config_id, resolved.budget_limit_usd, blocks))
-    hooks.extend(input_guardrails(resolved.payload.guardrails, blocks))
+    hooks.extend(input_guardrails(resolved.payload.guardrails, blocks, config_id))
     return hooks or None
 
 

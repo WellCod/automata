@@ -295,9 +295,16 @@ class ConfigService:
 
     def _guardrail_errors(self, payload: ConfigPayload) -> list[str]:
         # sem a chave, a moderação falharia a cada mensagem em produção
+        errors: list[str] = []
         if payload.guardrails.moderation and not (moderation_available() or demo_replay()):
-            return ["moderação exige OPENAI_API_KEY na API"]
-        return []
+            errors.append("moderação exige OPENAI_API_KEY na API")
+        classifier = payload.guardrails.classifier
+        if classifier is not None:
+            try:
+                get_capabilities(classifier.model_id)
+            except ValueError as exc:
+                errors.append(f"modelo do classificador: {exc}")
+        return errors
 
     def _knowledge_errors(self, payload: ConfigPayload) -> list[str]:
         if not payload.knowledge:

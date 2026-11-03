@@ -12,8 +12,9 @@ from uuid import UUID
 from agno.run import RunContext
 from agno.tools.function import Function
 
-from app.knowledge.search import Caller, search
+from app.knowledge.search import search
 from app.models.knowledge_base import KnowledgeBase
+from app.side_usage import Caller
 
 logger = logging.getLogger(__name__)
 

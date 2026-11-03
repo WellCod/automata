@@ -10,6 +10,7 @@ import os
 import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
+from uuid import UUID
 
 from agno.exceptions import CheckTrigger, InputCheckError
 from agno.guardrails.base import BaseGuardrail
@@ -235,10 +236,11 @@ def moderation_available() -> bool:
 
 
 def input_guardrails(
-    settings: GuardrailSettings, log: BlockLog | None = None
+    settings: GuardrailSettings, log: BlockLog | None = None, config_id: UUID | None = None
 ) -> list[BaseGuardrail]:
     """Ordem: dados pessoais primeiro, para o input ficar mascarado mesmo quando
-    outra regra bloqueia; moderação por último, porque é a única que sai da API."""
+    outra regra bloqueia; depois as regras por termo, que não custam nada; o
+    classificador e a moderação por último, porque saem da API."""
     msg = settings.blocked_message
     hooks: list[BaseGuardrail] = []
     if settings.pii.mode != "off" and settings.pii.types:
@@ -252,6 +254,11 @@ def input_guardrails(
         hooks.append(
             TermsGuardrail(msg, settings.blocked_topics, CheckTrigger.OFF_TOPIC, RULE_TOPIC, log)
         )
+    if settings.classifier is not None:
+        from app.guardrails.classifier import ClassifierGuardrail, classifier_enabled
+
+        if classifier_enabled():
+            hooks.append(ClassifierGuardrail(settings.classifier, msg, log, config_id))
     if settings.moderation:
         hooks.append(ModerationGuardrail(msg, log))
     return hooks

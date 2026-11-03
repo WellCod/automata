@@ -276,6 +276,7 @@ Regras por agente, no payload versionado (`guardrails`), tudo desligado por padr
 | `blocked_topics` | Termos que bloqueiam a mensagem (3 a 100 caracteres) |
 | `max_input_chars` | Tamanho máximo da mensagem (50 a 100 000) |
 | `moderation` | API de moderação da OpenAI; exige `OPENAI_API_KEY` (400 ao salvar sem ela). Uma chamada por mensagem, com o texto saindo da instância |
+| `classifier` | Classificador por modelo (ADR-0030): `model_id` da matriz (400 fora dela), `checks` entre `injection`, `toxicity` e `off_topic` (este exige `scope`, o que o agente atende) e `on_failure` (`allow`, padrão, ou `block`). Roda depois das regras por termo e antes da moderação, com uma chamada por mensagem e timeout de 10 s. A mensagem vai delimitada como dado; resposta fora do JSON pedido conta como falha. Os tokens viram `usage_event` do agente com o `run_id` (`app/side_usage.py`, o mesmo caminho do HyDE). No modo de demonstração não roda |
 | `output.pii`, `output.pii_types`, `output.blocked_terms` | Resposta com dado pessoal ou termo proibido. Vira `post_hook` (os guardrails prontos do Agno não funcionam como post_hook) |
 | `blocked_message` | O que o usuário vê quando bloqueia |
 
@@ -284,7 +285,7 @@ Regras por agente, no payload versionado (`guardrails`), tudo desligado por padr
 - Bloqueio: run com status `ERROR` e `content` igual à mensagem de bloqueio; no stream, `RunError` com `error_id` (`pii_detected`, `prompt_injection`, `off_topic`, `input_not_allowed`) e `additional_data.rule` com o motivo.
 - As regras são `BaseGuardrail` próprias (`app/guardrails/`): os guardrails prontos do Agno só têm padrões dos EUA e lista de injeção em inglês.
 - **Saída**: sem stream (integrações REST e MCP), a resposta é trocada pela mensagem de bloqueio, e a mensagem do assistente gravada na sessão também, antes de sair. **Com stream (modo teste, chat), o texto já foi entregue enquanto era gerado**: o run só fica marcado como bloqueado (`output_not_allowed`). O Agno só troca o conteúdo pela mensagem da exceção quando ele está vazio, por isso o hook troca antes de levantar.
-- Run barrado vira `status=blocked` em `agent_run`, com `blocked_by` (`pii_detected`, `prompt_injection`, `off_topic`, `input_too_long`, `moderation`) e `block_detail` (tipos de dado ou termo configurado, nunca o valor enviado). O motivo vem de um registro (`BlockLog`) que a factory liga aos guardrails e ao `TrackedAgent`/`TrackedTeam`: o `RunOutput` bloqueado só traz a mensagem. Bloqueio conta em `total_runs` e não em `error_rate`; `GET /api/v1/configs/{id}/metrics` e `/api/v1/metrics/summary` trazem `blocked_runs` e `blocked_by` (contagem por motivo), `/by-agent` traz `blocked_runs` e `/timeseries` traz `blocked_count` por dia.
+- Run barrado vira `status=blocked` em `agent_run`, com `blocked_by` (`pii_detected`, `prompt_injection`, `off_topic`, `input_too_long`, `moderation`, `classifier`) e `block_detail` (tipos de dado ou termo configurado, nunca o valor enviado). O motivo vem de um registro (`BlockLog`) que a factory liga aos guardrails e ao `TrackedAgent`/`TrackedTeam`: o `RunOutput` bloqueado só traz a mensagem. Bloqueio conta em `total_runs` e não em `error_rate`; `GET /api/v1/configs/{id}/metrics` e `/api/v1/metrics/summary` trazem `blocked_runs` e `blocked_by` (contagem por motivo), `/by-agent` traz `blocked_runs` e `/timeseries` traz `blocked_count` por dia.
 
 ## Árvore de execução
 
@@ -334,7 +335,7 @@ Um caso tem `name` (único na config, até 80 caracteres), `input` (até 4000) e
 - `text`: `kind` = `contains`, `not_contains`, `starts_with`, `empty` ou `not_empty`, e `value`. É a mesma regra dos workflows, comparada sem diferenciar maiúsculas, sobre a resposta. Quantas quiser.
 - `tools`: `tools` (1 a 10 nomes, como o agente expõe: `buscar_<slug>` das bases e as tools MCP com prefixo) e `allow_additional` (padrão `true`). No máximo uma por caso.
 - `judge`: `criteria` (10 a 1000 caracteres), `mode` (`binary` ou `numeric`) e `threshold` (1 a 10, só no numérico). No máximo uma por caso.
-- `blocked` (ADR-0022): o caso passa quando o guardrail barra o run. `rule` opcional exige a regra: `pii_detected`, `prompt_injection`, `off_topic`, `input_too_long`, `moderation` ou `output_not_allowed`. Sempre sozinha no caso, porque um run barrado não tem resposta para checar (422 com outra checagem).
+- `blocked` (ADR-0022): o caso passa quando o guardrail barra o run. `rule` opcional exige a regra: `pii_detected`, `prompt_injection`, `off_topic`, `input_too_long`, `moderation`, `classifier` ou `output_not_allowed`. Sempre sozinha no caso, porque um run barrado não tem resposta para checar (422 com outra checagem).
 - `schema` (ADR-0027): a resposta precisa validar contra o JSON Schema da versão testada. Os erros, até cinco com o caminho do campo, ficam no resultado. Versão sem schema deixa a checagem não avaliada, com o motivo.
 - `steps` (ADR-0022, só workflow): `steps` (1 a 20 nomes de etapa) que precisam ter rodado e `exclusive` (padrão `false`), que reprova se rodar qualquer etapa fora da lista. Só etapas contam, não paralelo, condição ou laço. No máximo uma por caso.
 

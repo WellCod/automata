@@ -15,10 +15,9 @@ from app.knowledge.runtime import metered as metered_embedder
 from app.knowledge.runtime import vector_db_for
 from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_content import KnowledgeContent
-from app.pricing import cost_or_estimate
 from app.repositories.embedding_usage import record_embedding_usage
-from app.repositories.usage import UsageRepository
 from app.schemas.knowledge_base import RetrievalSettings
+from app.side_usage import Caller, record_side_usage
 
 logger = logging.getLogger(__name__)
 
@@ -38,15 +37,6 @@ class SearchOutcome:
     # texto que foi de fato buscado: a resposta hipotética, com HyDE ligado
     searched: str
     hyde_tokens: int = 0
-
-
-@dataclass(frozen=True)
-class Caller:
-    """Run que fez a busca, para o consumo do HyDE cair no agente certo."""
-
-    agent_config_id: UUID
-    user_id: str
-    run_id: str | None = None
 
 
 def search_base(
@@ -69,27 +59,6 @@ def _hyde(base: KnowledgeBase, query: str) -> tuple[str, JudgeUsage | None, str 
     return HyDE(model=model).transform(query), usage, settings.hyde_model
 
 
-def _record_hyde(caller: Caller, model_id: str, usage: JudgeUsage) -> None:
-    if not usage.total_tokens:
-        return
-    from app.agents.tracking import current_eval_run
-
-    evaluation = current_eval_run.get()
-    with Session(get_engine()) as session:
-        UsageRepository(session).record_event(
-            agent_config_id=caller.agent_config_id,
-            user_id=evaluation.actor if evaluation else caller.user_id,
-            model_id=model_id,
-            input_tokens=usage.input_tokens,
-            output_tokens=usage.output_tokens,
-            total_tokens=usage.total_tokens,
-            cost=cost_or_estimate(usage.cost, model_id, usage.input_tokens, usage.output_tokens),
-            run_id=caller.run_id,
-            eval_run_id=evaluation.eval_run_id if evaluation else None,
-        )
-        session.commit()
-
-
 def search(
     base: KnowledgeBase,
     query: str,
@@ -101,7 +70,7 @@ def search(
     """`plain` ignora a estratégia da base: é o lado "sem" da comparação da busca de teste."""
     searched, usage, hyde_model = (query, None, None) if plain else _hyde(base, query)
     if usage is not None and hyde_model is not None and caller is not None:
-        _record_hyde(caller, hyde_model, usage)
+        record_side_usage(caller, hyde_model, usage)
     hyde_tokens = usage.total_tokens if usage is not None else 0
     reranker = None if plain else reranker_for(base)
     vector_db = vector_db_for(base, "query", with_dates=reranker is not None)
