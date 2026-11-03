@@ -59,6 +59,7 @@ class RunRepository:
         parent_run_id: str | None = None,
         eval_run_id: UUID | None = None,
         pending_steps: list[dict[str, Any]] | None = None,
+        screened_tools: list[dict[str, Any]] | None = None,
     ) -> AgentRun:
         run = AgentRun(
             agent_config_id=agent_config_id,
@@ -74,6 +75,7 @@ class RunRepository:
             parent_run_id=parent_run_id,
             eval_run_id=eval_run_id,
             pending_steps=pending_steps,
+            screened_tools=screened_tools,
         )
         self._session.add(run)
         self._session.flush()
@@ -114,6 +116,7 @@ class RunRepository:
         parent_run_id: str | None = None,
         eval_run_id: UUID | None = None,
         pending_steps: list[dict[str, Any]] | None = None,
+        screened_tools: list[dict[str, Any]] | None = None,
     ) -> AgentRun:
         """Atualiza o run de mesmo run_id (pausado e retomado) ou cria um novo."""
         existing = None
@@ -138,11 +141,15 @@ class RunRepository:
                 parent_run_id=parent_run_id,
                 eval_run_id=eval_run_id,
                 pending_steps=pending_steps,
+                screened_tools=screened_tools,
             )
         existing.status = status
         existing.error = error
         existing.pending_tools = pending_tools
         existing.pending_steps = pending_steps
+        if screened_tools:
+            # o continue do run pausado traz só as retiradas da rodada nova
+            existing.screened_tools = [*(existing.screened_tools or []), *screened_tools]
         existing.blocked_by = blocked_by
         existing.block_detail = block_detail
         existing.session_id = session_id or existing.session_id

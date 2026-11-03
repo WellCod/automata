@@ -27,6 +27,7 @@ from app.budget import BudgetGuardrail, hard_limit
 from app.db import get_engine
 from app.guardrails.input import BlockLog, input_guardrails
 from app.guardrails.output import output_guardrail
+from app.guardrails.tool_results import tool_screen
 from app.knowledge.tools import knowledge_instructions, knowledge_tool
 from app.mcp.client import build_mcp_tools
 from app.mcp.egress import EgressDenied
@@ -199,6 +200,12 @@ def fallback_for(payload: ConfigPayload) -> FallbackConfig | None:
     return FallbackConfig(on_error=models, on_rate_limit=list(models))
 
 
+def tool_hooks_for(config_id: UUID, payload: ConfigPayload, blocks: BlockLog) -> list[Any] | None:
+    """Exame do resultado de tool (ADR-0030); as retiradas vão para o registro do run."""
+    screen = tool_screen(payload.guardrails, blocks, config_id)
+    return screen.hooks() if screen is not None else None
+
+
 def compression_for(payload: ConfigPayload) -> CompressionManager | None:
     """Compressão do resultado de tool (ADR-0029); o consumo entra no RunMetrics do run."""
     settings = payload.run.compress_tool_results
@@ -243,6 +250,7 @@ def agent_from(
         # com compactação, a janela vai até o limite e o num_history_runs deixa de valer
         compaction=compaction_for(payload.conversation),
         tool_call_limit=payload.run.tool_call_limit,
+        tool_hooks=tool_hooks_for(config_id, payload, blocks),
         compression_manager=compression_for(payload),
         output_schema=payload.output_schema,
         **memory_kwargs(str(config_id), payload.memory, memory_user if tracked else None),
@@ -330,6 +338,7 @@ def team_from(config_id: UUID, resolved: ResolvedTeam) -> TrackedTeam:
         max_iterations=settings.max_iterations,
         share_member_interactions=settings.share_member_interactions,
         tool_call_limit=leader.payload.run.tool_call_limit,
+        tool_hooks=tool_hooks_for(config_id, leader.payload, blocks),
         compression_manager=compression_for(leader.payload),
         output_schema=leader.payload.output_schema,
         add_history_to_context=True,

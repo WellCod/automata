@@ -89,6 +89,7 @@ class RunRecord:
     parent_run_id: str | None = None
     eval_run_id: UUID | None = None
     pending_steps: list[dict[str, Any]] | None = None
+    screened_tools: list[dict[str, Any]] | None = None
 
 
 # run do workflow em andamento; etapas (inclusive ramos paralelos, que copiam o contexto)
@@ -123,6 +124,7 @@ def persist(record: RunRecord) -> None:
             parent_run_id=record.parent_run_id,
             eval_run_id=record.eval_run_id,
             pending_steps=record.pending_steps,
+            screened_tools=record.screened_tools,
         )
         if record.total_tokens:
             UsageRepository(session).record_event(
@@ -354,6 +356,9 @@ class RunTracking:
             eval_run_id=evaluation.eval_run_id if evaluation else None,
             blocked_by=block.rule if final_status == "blocked" and block else None,
             block_detail=block.detail if final_status == "blocked" and block else None,
+            screened_tools=list(self.automata_blocks.screened)
+            if self.automata_blocks is not None and self.automata_blocks.screened
+            else None,
         )
 
     @staticmethod
