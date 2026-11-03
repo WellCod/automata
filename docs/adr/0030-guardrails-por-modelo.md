@@ -1,6 +1,6 @@
 # ADR-0030 — Classificador por modelo na entrada e exame do conteúdo de terceiros
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-11-03
 
 ## Contexto

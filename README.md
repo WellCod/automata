@@ -380,7 +380,7 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0027](docs/adr/0027-controle-do-run.md) | Controle do run: limite de tools, retry do provedor com modelo reserva e saída estruturada |
 | [0028](docs/adr/0028-revisao-humana-completa.md) | Revisão humana completa: saída editada, revisão por volta de laço e registro das decisões |
 | [0029](docs/adr/0029-chunking-por-base-e-compressao.md) | Chunking por base com prévia e reprocessamento, e compressão do resultado de tool |
-| [0030](docs/adr/0030-guardrails-por-modelo.md) | Classificador por modelo na entrada e exame do resultado de tool e dos documentos (proposto, Fase 32) |
+| [0030](docs/adr/0030-guardrails-por-modelo.md) | Classificador por modelo na entrada e exame do resultado de tool e dos documentos |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 

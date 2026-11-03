@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 32
+# Roadmap — Fases 4 a 33
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -1210,3 +1210,41 @@ Decisão em [ADR-0030](adr/0030-guardrails-por-modelo.md). Um modelo escolhido c
 - Um PDF com instrução embutida aparece na base com trechos suspeitos.
 - Com o classificador fora do ar, a falha aberta deixa o run seguir e a fechada bloqueia com o motivo.
 - Classificador com modelo fora da matriz, ou `off_topic` sem escopo, é recusado na escrita.
+
+## Fase 33 — Auditoria 2026-11-03
+
+Terceira rodada de verificação, sobre a `main` em `1884e19`, com foco no que entrou nas Fases 29 a 32: UI e UX nas 66 telas do painel (desktop e celular, claro e escuro) e segurança da API. Os achados foram conferidos no código. Os dois altos foram reproduzidos.
+
+### Segurança
+
+- [ ] **Alta.** O schema de saída (ADR-0027) só tem limite de tamanho. Um schema de 1,6 KB com `allOf` em cadeia de `$ref` passa na escrita, e a conferência dele na suíte passa de 2 minutos para validar `{}`. Ela roda no event loop, então a API trava. Um `pattern` catastrófico tem o mesmo efeito, e um `$ref` recursivo derruba a checagem com exceção.
+- [ ] **Alta.** O corte por títulos (ADR-0029) põe a linha do título inteira no início de cada pedaço de uma seção grande. Um título de 40 mil caracteres numa linha só vira 9 milhões de caracteres em trechos, cada um com mais de 40 mil. Com 2 MB, a ingestão, a prévia ou o reprocessamento matam a API por falta de memória.
+- [ ] **Média.** O exame do resultado de tool só lê os primeiros 100 mil caracteres, e o classificador os primeiros 20 mil, de tool ou da mensagem. O modelo recebe o texto inteiro, então a instrução posta depois do teto passa.
+- [ ] **Média.** O texto examinado pode quebrar o formato da resposta do classificador, e o regex guloso de JSON trata isso como falha, que por padrão deixa passar. No exame de tool, a falha sempre deixa passar, sem olhar o `on_failure`.
+- [ ] **Média.** O `normalize` não remove caracteres invisíveis (categoria `Cf`, como o espaço de largura zero). Um termo com um deles no meio passa pelas listas da entrada, do exame de tool e da varredura.
+- [ ] **Média.** O exame de tool pelo classificador faz uma chamada por resultado, sem teto por run quando o agente não tem limite de tools. O orçamento só é checado antes do run.
+- [ ] **Média.** O reprocessamento carrega todos os originais da base na memória de uma vez e não tem limite de frequência. Duas chamadas ao mesmo tempo reprocessam o mesmo conteúdo em paralelo, e os trechos antigos são apagados antes de existirem os novos.
+- [ ] **Média.** A prévia por `content_id` lê e corta o original inteiro, de até 20 MB, numa rota síncrona e sem limite de frequência.
+- [ ] **Média.** Imagens no resultado de tool e na mensagem não passam pelo exame nem pelo classificador.
+- [ ] **Baixa.** Os itens abaixo, todos do classificador e do exame de tool:
+  - a marca de fim da mensagem em maiúscula não é escapada;
+  - o modelo do classificador é resolvido fora do `try`, então um modelo removido do catálogo deixa passar mesmo com falha fechada;
+  - o consumo do exame de tool é gravado no banco de forma síncrona dentro do gancho assíncrono;
+  - o trecho registrado é recortado antes de mascarar, e um dado pessoal na borda do recorte escapa.
+- [ ] **Baixa.** O registro de revisões (ADR-0028) tira o texto "antes", o nome da etapa e o tipo do corpo da requisição, e não do run gravado. A gravação também não é atômica, e dois continues ao mesmo tempo podem perder uma entrada. No continue pela fila durável, quem decidiu fica sem registro.
+
+### UI e UX
+
+Sem achados. As 66 telas não têm botão sem nome, campo sem rótulo, página sem `h1` nem conteúdo vazando em 375 px. Os alertas de alvo pequeno são checkboxes dentro de rótulo clicável. Os de contraste são o falso positivo das cores `oklch`. Os prints do README são da Fase 26 e saem regerados.
+
+- [ ] `docs`: README com os prints das telas atuais
+
+**Critério de aceite da fase:**
+
+- O schema em cadeia de `$ref` é recusado na escrita, e um schema aceito que demore é cortado por timeout, sem travar o `/health`.
+- Um markdown de 2 MB com um título numa linha só é indexado com trechos do tamanho configurado.
+- Uma instrução embutida depois do caractere 100 mil de um resultado de tool é retirada.
+- Uma resposta do classificador fora do formato bloqueia, na entrada e no exame de tool.
+- "Ignore previous instructions" com um espaço de largura zero no meio é pega.
+- Duas chamadas seguidas de reprocessamento enfileiram o conteúdo uma vez só, e a segunda dentro do intervalo recebe 429.
+- O registro de revisões grava o "antes" do run, mesmo que o cliente mande outro texto.
