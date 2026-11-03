@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.agents import models_map
 from app.agents.factory import agent_from, load_team, load_version, team_from
-from app.agents.output_schema import schema_verdict
+from app.agents.output_schema import aschema_verdict
 from app.agents.tracking import EvalContext, TrackedWorkflow, current_eval_run
 from app.agents.workflow_factory import build_nodes, load_workflow, rule_matches
 from app.budget import RULE_BUDGET
@@ -102,7 +102,7 @@ class TextScorer:
             if steps["extra"]:
                 failed.append("rodou fora da lista " + ", ".join(steps["extra"]))
         if self._schema is not None:
-            verdict = schema_verdict(self._schema, getattr(run, "content", None))
+            verdict = await aschema_verdict(self._schema, getattr(run, "content", None))
             detail["schema"] = verdict
             total += 1
             ok += verdict["passed"]

@@ -1217,7 +1217,7 @@ Terceira rodada de verificação, sobre a `main` em `1884e19`, com foco no que e
 
 ### Segurança
 
-- [ ] **Alta.** O schema de saída (ADR-0027) só tem limite de tamanho. Um schema de 1,6 KB com `allOf` em cadeia de `$ref` passa na escrita, e a conferência dele na suíte passa de 2 minutos para validar `{}`. Ela roda no event loop, então a API trava. Um `pattern` catastrófico tem o mesmo efeito, e um `$ref` recursivo derruba a checagem com exceção.
+- [x] **Alta.** O schema de saída (ADR-0027) só tem limite de tamanho. Um schema de 1,6 KB com `allOf` em cadeia de `$ref` passa na escrita, e a conferência dele na suíte passa de 2 minutos para validar `{}`. Ela roda no event loop, então a API trava. Um `pattern` catastrófico tem o mesmo efeito, e um `$ref` recursivo derruba a checagem com exceção.
 - [ ] **Alta.** O corte por títulos (ADR-0029) põe a linha do título inteira no início de cada pedaço de uma seção grande. Um título de 40 mil caracteres numa linha só vira 9 milhões de caracteres em trechos, cada um com mais de 40 mil. Com 2 MB, a ingestão, a prévia ou o reprocessamento matam a API por falta de memória.
 - [ ] **Média.** O exame do resultado de tool só lê os primeiros 100 mil caracteres, e o classificador os primeiros 20 mil, de tool ou da mensagem. O modelo recebe o texto inteiro, então a instrução posta depois do teto passa.
 - [ ] **Média.** O texto examinado pode quebrar o formato da resposta do classificador, e o regex guloso de JSON trata isso como falha, que por padrão deixa passar. No exame de tool, a falha sempre deixa passar, sem olhar o `on_failure`.
