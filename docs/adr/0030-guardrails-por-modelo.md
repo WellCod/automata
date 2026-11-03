@@ -31,7 +31,7 @@ Ele roda como pre-hook, depois das regras por termo, porque elas não custam nad
 
 **Exame do resultado de tool.** `guardrails.tool_results`, desligado por padrão, com estes campos:
 
-- `terms`: liga a lista de termos de injeção do ADR-0013, mais os termos extras do agente, sobre o texto normalizado.
+- `terms`: liga a lista de termos de injeção do ADR-0013, os termos extras do agente e uma lista própria de instruções dirigidas ao assistente ("instruções para a IA", "envie os dados do cliente", "new instructions:"), sobre o texto normalizado. Essa lista fica fora da regra de entrada porque o próprio usuário pode escrever assim.
 - `classifier`: passa também pelo classificador, só com a checagem `injection`, e exige o classificador configurado.
 
 Um `tool_hook` próprio, síncrono e assíncrono, roda a tool, examina o texto do resultado (os primeiros 100 mil caracteres, o mesmo teto do scan de dados pessoais) e, se achar instrução embutida, devolve no lugar um aviso: "resultado de `<tool>` retirado: possível instrução embutida". O run segue, porque o modelo responde com o que tem, como no limite de tools (ADR-0027). Cada retirada fica em `agent_run.screened_tools` (migration 0038), com a tool, a regra e o trecho que disparou. Vale no agente e no líder do time. Membros de time seguem a própria configuração.
@@ -50,4 +50,4 @@ Um `tool_hook` próprio, síncrono e assíncrono, roda a tool, examina o texto d
 - Cada mensagem com classificador ligado custa uma chamada de modelo a mais e soma latência. Por isso ele é opcional e mostra o custo no agente.
 - Falha aberta é o padrão: o classificador fora do ar não derruba o atendimento, e a falha fica no log. Quem precisa do contrário escolhe `block`.
 - O exame do resultado de tool por termos é barato e pega o óbvio; com o classificador, cada tool chamada custa uma checagem a mais.
-- A lista de termos é a mesma em três lugares (entrada, resultado de tool e ingestão), então uma melhora nela vale para todos.
+- A lista de termos do ADR-0013 vale nos três lugares (entrada, resultado de tool e ingestão), e a de conteúdo de terceiros nos dois últimos, então uma melhora nelas vale para todos.

@@ -106,6 +106,15 @@ class ClassifierRule(BaseModel):
         return self
 
 
+class ToolResultScreening(BaseModel):
+    """Resultado de tool examinado antes de voltar ao modelo (ADR-0030)."""
+
+    # termos de injeção do ADR-0013, os de conteúdo de terceiros e os extras do agente
+    terms: bool = True
+    # também pelo classificador, só com a checagem injection: uma chamada por tool
+    classifier: bool = False
+
+
 class GuardrailSettings(BaseModel):
     """Regras de entrada do agente (ADR-0013). Tudo desligado por padrão."""
 
@@ -118,6 +127,7 @@ class GuardrailSettings(BaseModel):
     # API de moderação da OpenAI: uma chamada por mensagem, com o texto saindo da instância
     moderation: bool = False
     classifier: ClassifierRule | None = None
+    tool_results: ToolResultScreening | None = None
     output: OutputRule = Field(default_factory=OutputRule)
     blocked_message: str = Field(default=DEFAULT_BLOCKED_MESSAGE, min_length=1, max_length=500)
 

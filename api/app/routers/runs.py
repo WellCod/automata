@@ -16,6 +16,14 @@ router = APIRouter(
 )
 
 
+class ScreenedTool(BaseModel):
+    """Resultado de tool retirado (ADR-0030); o trecho fica só no banco."""
+
+    tool: str
+    rule: str
+    term: str | None = None
+
+
 class AgentRunResponse(BaseModel):
     id: UUID
     agent_config_id: UUID
@@ -25,6 +33,7 @@ class AgentRunResponse(BaseModel):
     duration_ms: int | None
     error: str | None
     blocked_by: str | None = None
+    screened_tools: list[ScreenedTool] = []
     # só em run de workflow: etapas que rodaram e consumo somado delas
     steps: int | None = None
     total_tokens: int | None = None
@@ -113,6 +122,7 @@ def list_runs(
                 duration_ms=r.duration_ms,
                 error=r.error,
                 blocked_by=r.blocked_by,
+                screened_tools=[ScreenedTool.model_validate(s) for s in r.screened_tools or []],
                 steps=consumo.get(r.run_id or "", (None, None, None))[0],
                 total_tokens=consumo.get(r.run_id or "", (None, None, None))[1],
                 cost=consumo.get(r.run_id or "", (None, None, None))[2],

@@ -299,6 +299,11 @@ class ConfigService:
         if payload.guardrails.moderation and not (moderation_available() or demo_replay()):
             errors.append("moderação exige OPENAI_API_KEY na API")
         classifier = payload.guardrails.classifier
+        screening = payload.guardrails.tool_results
+        if screening is not None and screening.classifier and classifier is None:
+            errors.append("o exame de tool pelo classificador exige o classificador configurado")
+        if screening is not None and not (screening.terms or screening.classifier):
+            errors.append("exame de tool sem termos nem classificador não examina nada")
         if classifier is not None:
             try:
                 get_capabilities(classifier.model_id)
