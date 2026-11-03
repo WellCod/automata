@@ -51,3 +51,9 @@ Um `tool_hook` próprio, síncrono e assíncrono, roda a tool, examina o texto d
 - Falha aberta é o padrão: o classificador fora do ar não derruba o atendimento, e a falha fica no log. Quem precisa do contrário escolhe `block`.
 - O exame do resultado de tool por termos é barato e pega o óbvio; com o classificador, cada tool chamada custa uma checagem a mais.
 - A lista de termos do ADR-0013 vale nos três lugares (entrada, resultado de tool e ingestão), e a de conteúdo de terceiros nos dois últimos, então uma melhora nelas vale para todos.
+- Correções da auditoria da Fase 33:
+  - O classificador vê o começo e o fim de um texto maior que o teto, e a resposta dele precisa ser um objeto JSON e nada mais. Resposta fora do formato bloqueia sempre, porque o texto classificado pode provocá-la.
+  - O resultado de tool acima de 100 mil caracteres é cortado antes do exame, então o modelo não recebe trecho sem exame.
+  - O exame de tool segue o `on_failure` e classifica até 20 resultados por run. Acima disso, conta como classificador indisponível.
+  - O `normalize` tira caracteres invisíveis.
+  - Imagem, na mensagem ou no resultado de tool, não passa pelo classificador, que é textual. É risco aceito: quem precisa barrá-la desliga visão no agente.

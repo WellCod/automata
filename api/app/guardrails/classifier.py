@@ -59,6 +59,11 @@ class ClassifierUnavailable(Exception):
     pass
 
 
+class ClassifierBadOutput(ClassifierUnavailable):
+    """Resposta fora do formato. O texto classificado pode provocar isso de propósito,
+    então bloqueia sempre, sem olhar `on_failure` (auditoria da Fase 33)."""
+
+
 @dataclass(frozen=True)
 class Verdict:
     block: bool
@@ -85,29 +90,42 @@ def system_prompt(checks: list[ClassifierCheck], scope: str) -> str:
     return "\n".join(lines)
 
 
+_MARK = re.compile(r"<\s*/?\s*mensagem\s*>", re.IGNORECASE)
+_FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL)
+
+
+def window(text: str, limit: int) -> str:
+    """Começo e fim do texto: a instrução posta depois do teto também é vista."""
+    if len(text) <= limit:
+        return text
+    half = limit // 2
+    return f"{text[:half]}\n[... trecho do meio omitido ...]\n{text[-half:]}"
+
+
 def user_message(text: str) -> str:
-    # a marca de fechamento dentro do texto não pode encerrar o bloco antes da hora
-    body = text[:MAX_CLASSIFIED_CHARS].replace("</mensagem>", "</ mensagem>")
+    # nenhuma marca do texto pode abrir ou fechar o bloco antes da hora
+    body = _MARK.sub("[marca removida]", window(text, MAX_CLASSIFIED_CHARS))
     return f"<mensagem>\n{body}\n</mensagem>"
 
 
 def parse_verdict(content: Any, checks: list[ClassifierCheck]) -> Verdict:
-    if not isinstance(content, str):
-        raise ClassifierUnavailable("resposta vazia do classificador")
-    match = re.search(r"\{.*\}", content, re.DOTALL)
-    if match is None:
-        raise ClassifierUnavailable("resposta do classificador sem JSON")
+    if not isinstance(content, str) or not content.strip():
+        raise ClassifierBadOutput("resposta vazia do classificador")
+    # a resposta inteira precisa ser um objeto só: JSON no meio de outro texto pode ter
+    # vindo da mensagem classificada, ecoada pelo modelo
+    raw = content.strip()
+    fenced = _FENCE.match(raw)
     try:
-        data = json.loads(match.group(0))
+        data = json.loads(fenced.group(1) if fenced else raw)
     except json.JSONDecodeError as exc:
-        raise ClassifierUnavailable("JSON inválido do classificador") from exc
+        raise ClassifierBadOutput("resposta do classificador fora do JSON pedido") from exc
     verdict = data.get("verdict") if isinstance(data, dict) else None
     if verdict not in ("allow", "block"):
-        raise ClassifierUnavailable("veredito fora do formato")
+        raise ClassifierBadOutput("veredito fora do formato")
     category = data.get("category")
     if verdict == "block" and category not in checks:
         # bloqueio por categoria que o agente não ligou não vale
-        raise ClassifierUnavailable(f"categoria fora das checagens: {category}")
+        raise ClassifierBadOutput(f"categoria fora das checagens: {category}")
     reason = str(data.get("reason") or "")[:300]
     return Verdict(verdict == "block", category if verdict == "block" else None, reason)
 
@@ -172,7 +190,17 @@ class ClassifierGuardrail(_Guardrail):
         except Exception as exc:
             logger.warning("consumo do classificador não gravado", extra={"error": str(exc)})
 
-    def _decide(self, verdict: Verdict | None, failure: str | None) -> None:
+    def _decide(
+        self, verdict: Verdict | None, failure: str | None, bad_output: bool = False
+    ) -> None:
+        if failure is not None and bad_output:
+            raise _block(
+                self.blocked_message,
+                CheckTrigger.INPUT_NOT_ALLOWED,
+                RULE_CLASSIFIER,
+                category="invalid_output",
+                reason=failure[:300],
+            )
         if failure is not None:
             logger.warning(
                 "classificador indisponível",
@@ -196,9 +224,9 @@ class ClassifierGuardrail(_Guardrail):
                 reason=verdict.reason,
             )
 
-    def _guarded(self, verdict: Verdict | None, failure: str | None) -> None:
+    def _guarded(self, verdict: Verdict | None, failure: str | None, bad: bool) -> None:
         try:
-            self._decide(verdict, failure)
+            self._decide(verdict, failure, bad)
         except InputCheckError as exc:
             self._note(exc)
             raise
@@ -207,24 +235,31 @@ class ClassifierGuardrail(_Guardrail):
         text = run_input.input_content_string()
         if not text.strip():
             return
-        model, usage = self._model()
-        verdict, failure = None, None
+        verdict, failure, bad, usage = None, None, False, None
         try:
+            # o modelo resolvido aqui dentro: fora do catálogo, cai em on_failure
+            model, usage = self._model()
             verdict = classify(model, self.rule, text)
         except ClassifierUnavailable as exc:
+            failure, bad = str(exc), isinstance(exc, ClassifierBadOutput)
+        except ValueError as exc:
             failure = str(exc)
-        self._record(usage, run_context)
-        self._guarded(verdict, failure)
+        if usage is not None:
+            self._record(usage, run_context)
+        self._guarded(verdict, failure, bad)
 
     async def async_check(self, run_input: AnyInput, run_context: RunContext | None = None) -> None:
         text = run_input.input_content_string()
         if not text.strip():
             return
-        model, usage = self._model()
-        verdict, failure = None, None
+        verdict, failure, bad, usage = None, None, False, None
         try:
+            model, usage = self._model()
             verdict = await aclassify(model, self.rule, text)
         except ClassifierUnavailable as exc:
+            failure, bad = str(exc), isinstance(exc, ClassifierBadOutput)
+        except ValueError as exc:
             failure = str(exc)
-        await asyncio.to_thread(self._record, usage, run_context)
-        self._guarded(verdict, failure)
+        if usage is not None:
+            await asyncio.to_thread(self._record, usage, run_context)
+        self._guarded(verdict, failure, bad)

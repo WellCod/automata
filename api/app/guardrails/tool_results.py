@@ -9,6 +9,7 @@ resultado, e a síncrona descarta gancho `async`. Por isso há os dois: o síncr
 repassa a corrotina sem olhar, e o assíncrono examina.
 """
 
+import asyncio
 import json
 import logging
 from collections.abc import Callable
@@ -28,7 +29,12 @@ logger = logging.getLogger(__name__)
 
 RULE_TOOL_TERMS = "tool_injection_terms"
 RULE_TOOL_CLASSIFIER = "tool_injection_classifier"
+RULE_TOOL_UNCHECKED = "tool_not_classified"
 EXCERPT_CHARS = 200
+# o modelo só recebe o que foi examinado: o resto do resultado é cortado
+MAX_TOOL_RESULT_CHARS = PII_SCAN_MAX_CHARS
+# chamadas ao classificador por run; acima disso conta como classificador indisponível
+MAX_TOOL_CLASSIFICATIONS = 20
 
 # instrução dirigida ao assistente dentro de conteúdo de terceiros (página, e-mail,
 # documento); fora da lista de entrada, onde o próprio usuário pode escrever assim
@@ -87,10 +93,21 @@ def term_hit(text: str, terms: list[str]) -> str | None:
 
 
 def excerpt(text: str, term: str | None) -> str:
-    folded = normalize(text)
-    start = max(folded.find(term) - 40, 0) if term else 0
-    piece = text[start : start + EXCERPT_CHARS]
-    return mask(piece, find_pii(piece))
+    # máscara antes do recorte: dado pessoal na borda do recorte não escapa
+    masked = mask(text, find_pii(text))
+    start = max(masked.lower().find(term) - 40, 0) if term and term in masked.lower() else 0
+    return masked[start : start + EXCERPT_CHARS]
+
+
+def capped(result: Any) -> Any:
+    """Resultado acima do teto vira texto cortado, para nada chegar ao modelo sem exame."""
+    text = result_text(result)
+    if text is None or len(text) <= MAX_TOOL_RESULT_CHARS:
+        return result
+    return (
+        f"{text[:MAX_TOOL_RESULT_CHARS]}\n"
+        f"[resultado cortado em {MAX_TOOL_RESULT_CHARS} caracteres pelo exame de tool]"
+    )
 
 
 @dataclass
@@ -101,6 +118,8 @@ class ToolScreen:
     rule: ClassifierRule | None
     log: BlockLog
     config_id: UUID | None = None
+    # instância por run (a factory monta o agente a cada request)
+    classified: int = 0
 
     def _note(self, tool: str, rule: str, text: str, term: str | None) -> None:
         self.log.screened.append(
@@ -128,26 +147,44 @@ class ToolScreen:
         text = result_text(result)
         if text is None or self.rule is None:
             return result
-        from app.guardrails.classifier import ClassifierUnavailable, aclassify
+        from app.guardrails.classifier import (
+            ClassifierBadOutput,
+            ClassifierUnavailable,
+            aclassify,
+        )
         from app.side_usage import Caller, record_side_usage
 
-        model, usage = self._model()
-        try:
-            verdict = await aclassify(model, self.rule, text)
-        except ClassifierUnavailable as exc:
-            # sem veredito o resultado segue: os termos já passaram por ele
-            logger.warning("classificador de tool indisponível", extra={"error": str(exc)})
-            verdict = None
-        if self.config_id is not None:
+        verdict, usage, failure = None, None, None
+        if self.classified >= MAX_TOOL_CLASSIFICATIONS:
+            failure = f"mais de {MAX_TOOL_CLASSIFICATIONS} resultados classificados no run"
+        else:
+            self.classified += 1
+            try:
+                model, usage = self._model()
+                verdict = await aclassify(model, self.rule, text)
+            except ClassifierBadOutput:
+                # resposta fora do formato pode ter sido provocada pelo próprio resultado
+                self._note(tool, RULE_TOOL_CLASSIFIER, text, None)
+                return warning_for(tool)
+            except (ClassifierUnavailable, ValueError) as exc:
+                failure = str(exc)
+        if usage is not None and self.config_id is not None:
             caller = Caller(
                 self.config_id,
                 (run_context.user_id if run_context else None) or "anonymous",
                 run_context.run_id if run_context else None,
             )
             try:
-                record_side_usage(caller, self.rule.model_id, usage)
+                await asyncio.to_thread(record_side_usage, caller, self.rule.model_id, usage)
             except Exception as exc:
                 logger.warning("consumo do classificador não gravado", extra={"error": str(exc)})
+        if failure is not None:
+            logger.warning("classificador de tool indisponível", extra={"error": failure})
+            if self.rule.on_failure == "block":
+                self._note(tool, RULE_TOOL_UNCHECKED, text, None)
+                return warning_for(tool)
+            # falha aberta: os termos já passaram pelo resultado
+            return result
         if verdict is None or not verdict.block:
             return result
         self._note(tool, RULE_TOOL_CLASSIFIER, text, None)
@@ -167,7 +204,7 @@ class ToolScreen:
             result = function_call(**arguments)
             if isawaitable(result):
                 return result
-            return self.by_terms(function_name, result)
+            return self.by_terms(function_name, capped(result))
 
         async def screen_async(
             function_name: str,
@@ -178,6 +215,7 @@ class ToolScreen:
             result = function_call(**arguments)
             if isawaitable(result):
                 result = await result
+            result = capped(result)
             screened = self.by_terms(function_name, result)
             if screened is not result:
                 return screened

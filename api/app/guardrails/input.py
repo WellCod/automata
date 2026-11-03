@@ -57,7 +57,11 @@ INJECTION_TERMS: tuple[str, ...] = (
 
 def normalize(text: str) -> str:
     decomposed = unicodedata.normalize("NFKD", text.lower())
-    stripped = "".join(c for c in decomposed if not unicodedata.combining(c))
+    # sem acento e sem caractere invisível (largura zero, marcas de direção), que
+    # partiria o termo sem mudar o que o modelo lê (auditoria da Fase 33)
+    stripped = "".join(
+        c for c in decomposed if not unicodedata.combining(c) and unicodedata.category(c) != "Cf"
+    )
     return " ".join(stripped.split())
 
 
