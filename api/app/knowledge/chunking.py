@@ -16,6 +16,10 @@ from agno.knowledge.document.base import Document
 
 from app.schemas.knowledge_base import ChunkingSettings
 
+# título repetido em cada pedaço de uma seção grande: comprido, ele domina o trecho e o
+# total cresce com o quadrado do texto (auditoria da Fase 33)
+MAX_TITLE_CHARS = 200
+
 
 def overlap_for(chunk_size: int, settings: ChunkingSettings) -> int:
     return chunk_size // 10 if settings.overlap is None else settings.overlap
@@ -44,7 +48,8 @@ class HeadingChunking(ChunkingStrategy):
         for i, start in enumerate(starts):
             end = starts[i + 1] if i + 1 < len(starts) else len(text)
             section = text[start:end]
-            out.append((section.split("\n", 1)[0].strip(), section))
+            title = section.split("\n", 1)[0].strip()
+            out.append((title if len(title) <= MAX_TITLE_CHARS else None, section))
         return out
 
     def chunk(self, document: Document) -> list[Document]:
@@ -59,7 +64,8 @@ class HeadingChunking(ChunkingStrategy):
                     p.content
                     for p in self._fallback.chunk(Document(name=document.name, content=body))
                 ]
-                if title:
+                # o título só entra se couber sem passar muito do tamanho do trecho
+                if title and len(title) <= self.chunk_size // 4:
                     pieces = [p if p.startswith(title) else f"{title}\n{p}" for p in pieces]
             for piece in pieces:
                 number = len(chunks) + 1

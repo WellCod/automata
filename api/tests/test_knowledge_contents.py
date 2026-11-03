@@ -505,3 +505,51 @@ def test_pdf_com_instrucao_embutida_fica_marcado_e_indexado(
         f"/api/v1/knowledge-bases/{base_id}/contents/{_text(client, base_id, _MANUAL)}"
     ).json()
     assert clean["suspect_chunks"] == 0
+
+
+# --- reprocessamento e prévia com limite (auditoria da Fase 33) ---
+
+
+def test_reprocessar_com_embedder_quebrado_mantem_os_trechos(
+    client: TestClient, base_id: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    text_id = _text(client, base_id, _MANUAL)
+    before = _chunks(base_id, text_id)
+    assert before
+    monkeypatch.setattr(
+        "app.knowledge.runtime.build_embedder", lambda *a: _BrokenEmbedder(dimensions=256)
+    )
+    assert client.post(f"/api/v1/knowledge-bases/{base_id}/reprocess").status_code == 202
+    content = client.get(f"/api/v1/knowledge-bases/{base_id}/contents/{text_id}").json()
+    assert content["status"] == "completed"
+    assert content["status_message"].startswith("reprocessamento falhou, seguem os trechos")
+    assert content["chunk_count"] == len(before)
+    assert _chunks(base_id, text_id) == before
+
+
+def test_reprocessar_de_novo_no_mesmo_minuto_recebe_429(client: TestClient, base_id: str) -> None:
+    _text(client, base_id, _MANUAL)
+    assert client.post(f"/api/v1/knowledge-bases/{base_id}/reprocess").status_code == 202
+    assert client.post(f"/api/v1/knowledge-bases/{base_id}/reprocess").status_code == 429
+
+
+def test_reprocessamento_reivindica_cada_conteudo_uma_vez(client: TestClient, base_id: str) -> None:
+    from app.knowledge.reprocess import plan_reprocess
+
+    text_id = _text(client, base_id, _MANUAL)
+    with Session(get_engine()) as first, Session(get_engine()) as second:
+        claimed = plan_reprocess(first, UUID(base_id))
+        first.commit()
+        again = plan_reprocess(second, UUID(base_id))
+        second.commit()
+    assert claimed.queued == [UUID(text_id)]
+    assert again.queued == [] and again.skipped == 1
+
+
+def test_previa_de_original_grande_recusada(client: TestClient, base_id: str) -> None:
+    big = "Política de troca. " * 120_000
+    text_id = _text(client, base_id, big)
+    resp = client.post(
+        f"/api/v1/knowledge-bases/{base_id}/chunk-preview", json={"content_id": text_id}
+    )
+    assert resp.status_code == 422 and "2 MB" in resp.text
