@@ -33,6 +33,29 @@ class RetrievalSettings(BaseModel):
         return self
 
 
+class ChunkingSettings(BaseModel):
+    """Como o conteúdo da base é cortado em trechos (ADR-0029); vale para novas ingestões."""
+
+    # recursive: o corte de antes; headings: uma seção de markdown por trecho;
+    # paragraphs: junta parágrafos até o tamanho; fixed: tamanho fixo
+    strategy: Literal["recursive", "headings", "paragraphs", "fixed"] = "recursive"
+    # caracteres repetidos entre trechos vizinhos; vazio = 10% do tamanho do trecho
+    overlap: int | None = Field(default=None, ge=0)
+    # só em headings: até que nível de título abre um trecho (# = 1)
+    heading_level: int = Field(default=2, ge=1, le=3)
+
+
+MAX_OVERLAP_RATIO = 0.3
+
+
+def overlap_problem(chunk_size: int, chunking: ChunkingSettings | None) -> str | None:
+    if chunking is None or chunking.overlap is None:
+        return None
+    if chunking.overlap > chunk_size * MAX_OVERLAP_RATIO:
+        return f"A sobreposição passa de 30% do tamanho do trecho ({chunk_size})"
+    return None
+
+
 class KnowledgeBaseUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     description: str = Field(
@@ -41,6 +64,15 @@ class KnowledgeBaseUpdate(BaseModel):
     chunk_size: int = Field(default=2000, ge=200, le=8000, description="Vale para novas ingestões")
     # ausente no PUT mantém a estratégia gravada; na criação vale a busca simples
     retrieval: RetrievalSettings | None = None
+    # ausente no PUT mantém o corte gravado; na criação vale a recursiva
+    chunking: ChunkingSettings | None = None
+
+    @model_validator(mode="after")
+    def sobreposicao_menor(self) -> "KnowledgeBaseUpdate":
+        problem = overlap_problem(self.chunk_size, self.chunking)
+        if problem:
+            raise ValueError(problem)
+        return self
 
 
 class KnowledgeBaseCreate(KnowledgeBaseUpdate):
@@ -60,6 +92,7 @@ class KnowledgeBaseResponse(BaseModel):
     dimensions: int
     chunk_size: int
     retrieval: RetrievalSettings
+    chunking: ChunkingSettings
     # ingestão e buscas desde a criação (ADR-0012)
     embedding_tokens: int = 0
     embedding_cost: float | None = None
@@ -111,6 +144,38 @@ class KnowledgeContentResponse(BaseModel):
     external_path: str | None = None
     refresh_every_hours: int | None = None
     next_refresh_at: datetime | None = None
+
+
+class ChunkPreviewInput(BaseModel):
+    """Texto colado ou um conteúdo da base; a estratégia vazia é a gravada na base."""
+
+    text: str | None = Field(default=None, min_length=1, max_length=50_000)
+    content_id: UUID | None = None
+    chunk_size: int | None = Field(default=None, ge=200, le=8000)
+    chunking: ChunkingSettings | None = None
+
+    @model_validator(mode="after")
+    def uma_origem(self) -> "ChunkPreviewInput":
+        if (self.text is None) == (self.content_id is None):
+            raise ValueError("Mande um texto ou um conteúdo da base")
+        return self
+
+
+class ChunkPreview(BaseModel):
+    chunks: list[str]
+    # trechos que o conteúdo inteiro daria; a lista traz só os primeiros
+    total: int
+    chunk_size: int
+    chunking: ChunkingSettings
+
+
+class ReprocessResult(BaseModel):
+    # reprocessados em background
+    queued: int
+    # arquivo ou texto enviado antes da Fase 31, sem original guardado
+    needs_upload: list["KnowledgeContentResponse"]
+    # em processamento agora: ficam como estão
+    skipped: int
 
 
 class SearchInput(BaseModel):

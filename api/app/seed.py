@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.knowledge import demo_content
 from app.knowledge.embedders import EMBEDDERS, is_configured
 from app.knowledge.ingest import ingest
+from app.knowledge.reprocess import save_original
 from app.models.config import AgentConfig
 from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_content import KnowledgeContent
@@ -477,6 +478,10 @@ def seed_knowledge(session: Session) -> None:
         for name, text in demo_content.DOCUMENTS.items()
     ]
     session.add_all(contents)
+    session.flush()
+    # com o original guardado, a base da demo pode ser reprocessada com outro corte
+    for content in contents:
+        save_original(session, content.id, demo_content.DOCUMENTS[content.name].encode())
     session.commit()
     for content in contents:
         ingest(content.id, demo_content.DOCUMENTS[content.name].encode())

@@ -11,7 +11,6 @@ import logging
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from agno.knowledge.chunking.recursive import RecursiveChunking
 from agno.knowledge.document.base import Document
 from agno.knowledge.reader.base import Reader
 from agno.knowledge.reader.reader_factory import ReaderFactory
@@ -21,10 +20,12 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.db import get_engine
+from app.knowledge.chunking import strategy_for
 from app.knowledge.runtime import metered, vector_db_for
 from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_content import KnowledgeContent
 from app.repositories.embedding_usage import record_embedding_usage
+from app.schemas.knowledge_base import ChunkingSettings
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +48,10 @@ class IngestError(ValueError):
     pass
 
 
-def _reader(extension: str, chunk_size: int) -> Reader:
+def _reader(extension: str, chunk_size: int, chunking: ChunkingSettings) -> Reader:
     reader = ReaderFactory.get_reader_for_extension(f".{extension}")
     reader.chunk = True
-    reader.chunking_strategy = RecursiveChunking(chunk_size=chunk_size, overlap=chunk_size // 10)
+    reader.chunking_strategy = strategy_for(chunk_size, chunking)
     return reader
 
 
@@ -61,12 +62,18 @@ def _html_to_text(data: bytes) -> str:
     return "\n".join(line.strip() for line in soup.get_text("\n").splitlines() if line.strip())
 
 
-def read_documents(name: str, extension: str, data: bytes, chunk_size: int) -> list[Document]:
+def read_documents(
+    name: str,
+    extension: str,
+    data: bytes,
+    chunk_size: int,
+    chunking: ChunkingSettings | None = None,
+) -> list[Document]:
     if extension == "html":
         extension, data = "txt", _html_to_text(data).encode()
     stream = io.BytesIO(data)
     stream.name = f"{name}.{extension}"
-    docs = _reader(extension, chunk_size).read(stream, name=name)
+    docs = _reader(extension, chunk_size, chunking or ChunkingSettings()).read(stream, name=name)
     docs = [d for d in docs if d.content and d.content.strip()]
     if not docs:
         raise IngestError("nenhum texto extraído do conteúdo")
@@ -121,7 +128,8 @@ def ingest(content_id: UUID, data: bytes) -> None:
             if content is None or base is None:
                 return
             session.expunge_all()
-        docs = read_documents(content.name, content.extension, data, base.chunk_size)
+        chunking = ChunkingSettings.model_validate(base.chunking or {})
+        docs = read_documents(content.name, content.extension, data, base.chunk_size, chunking)
         vector_db = vector_db_for(base)
         vector_db.create()
         # o insert do PgVector loga e pula trecho cujo embedding falha; embedar o

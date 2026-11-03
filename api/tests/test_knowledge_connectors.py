@@ -231,6 +231,52 @@ def test_github_sincroniza_pela_versao_remota(
     assert _chunks(base_id) == 0
 
 
+def test_reprocessa_arquivo_do_conector_pela_listagem(
+    client: TestClient, base_id: str, github: FakeGitHub
+) -> None:
+    github.files = {
+        "docs/manual.md": "# Troca\nTrinta dias.\n\n# Frete\nGrátis acima de R$ 200.",
+        "docs/sumiu.md": "Vai sair da origem.",
+    }
+    base = f"/api/v1/knowledge-bases/{base_id}/connectors"
+    connector = client.post(
+        base,
+        json={
+            "kind": "github",
+            "name": "Manual",
+            "settings": {"repo": "acme/docs", "path": "docs", "api_url": github.url},
+            "secret": {"token": "ghp_segredo"},
+        },
+    ).json()
+    client.post(f"{base}/{connector['id']}/sync")
+    assert _chunks(base_id) == 2
+    info = client.get(f"/api/v1/knowledge-bases/{base_id}").json()
+    resp = client.put(
+        f"/api/v1/knowledge-bases/{base_id}",
+        json={
+            "name": info["name"],
+            "chunk_size": info["chunk_size"],
+            "chunking": {"strategy": "headings", "heading_level": 1},
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    del github.files["docs/sumiu.md"]
+    github.downloads.clear()
+
+    result = client.post(f"/api/v1/knowledge-bases/{base_id}/reprocess").json()
+    assert result["queued"] == 2 and result["needs_upload"] == []
+    contents = {
+        c["external_path"]: c
+        for c in client.get(f"/api/v1/knowledge-bases/{base_id}/contents").json()
+    }
+    assert contents["manual.md"]["status"] == "completed"
+    assert contents["manual.md"]["chunk_count"] == 2
+    # o reprocessamento não sincroniza: o que sumiu da origem vira falha com o motivo
+    assert contents["sumiu.md"]["status"] == "failed"
+    assert "origem" in contents["sumiu.md"]["status_message"]
+    assert len(github.downloads) == 1
+
+
 def test_conector_invalido_e_recusado(client: TestClient, base_id: str) -> None:
     base = f"/api/v1/knowledge-bases/{base_id}/connectors"
     sharepoint = {
