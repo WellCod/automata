@@ -117,18 +117,18 @@ def get_run_reviews(run_id: str, request: Request) -> list[ReviewEntry]:
         if not sees_everyone(request) and owner_id != getattr(request.state, "user_id", None):
             raise HTTPException(status_code=403, detail="Permissão insuficiente")
         # o registro guarda o id, que não muda; o painel mostra o e-mail de agora
-        emails = _emails(session, {e.get("by") for e in entries})
+        emails = _emails(session, {str(e.get("by")) for e in entries})
     return [
-        ReviewEntry.model_validate({**e, "by": emails.get(e.get("by"), e.get("by"))})
+        ReviewEntry.model_validate({**e, "by": emails.get(str(e.get("by")), e.get("by"))})
         for e in entries
     ]
 
 
-def _emails(session: Session, ids: set[Any]) -> dict[str, str]:
+def _emails(session: Session, ids: set[str]) -> dict[str, str]:
     uuids = []
     for value in ids:
         with contextlib.suppress(TypeError, ValueError):
-            uuids.append(UUID(str(value)))
+            uuids.append(UUID(value))
     if not uuids:
         return {}
     rows = session.execute(select(User.id, User.email).where(User.id.in_(uuids)))
