@@ -3,9 +3,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 import { decideWorkflowStep, type StepDecision, usePendingApprovals } from "@/lib/api/approvals";
 import type { components } from "@/lib/api/schema.d.ts";
+import { ReviewHistory } from "@/components/review-history";
+import { StepReviewActions } from "@/components/step-review-actions";
 import { Button } from "@/components/ui/button";
 
 type ApprovalItem = components["schemas"]["ApprovalItem"];
@@ -14,14 +15,20 @@ function when(iso: string): string {
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+const WHEN_TEXT: Record<"before" | "after" | "loop", string> = {
+  before: " espera confirmação para rodar",
+  after: " terminou e espera aprovação da saída",
+  loop: " terminou uma volta e espera a decisão de seguir ou pedir outra",
+};
+
 function WorkflowApprovalCard({ item }: { item: ApprovalItem }) {
   const queryClient = useQueryClient();
-  const [feedback, setFeedback] = useState("");
+  const active = item.steps[item.steps.length - 1];
   const decide = useMutation({
     mutationFn: (decision: StepDecision) =>
       decideWorkflowStep(item.agent_id, item.run_id, item.session_id, decision),
     onSuccess: () => {
-      setFeedback("");
+      void queryClient.invalidateQueries({ queryKey: ["run-reviews", item.run_id] });
       void queryClient.invalidateQueries({ queryKey: ["approvals"] });
       void queryClient.invalidateQueries({ queryKey: ["runs", item.agent_id] });
     },
@@ -47,9 +54,7 @@ function WorkflowApprovalCard({ item }: { item: ApprovalItem }) {
         <div key={step.step_id ?? step.step_name} className="flex flex-col gap-1.5">
           <p className="text-foreground text-[13px]">
             Etapa <strong>{step.step_name}</strong>
-            {step.when === "after"
-              ? " terminou e espera aprovação da saída"
-              : " espera confirmação para rodar"}
+            {WHEN_TEXT[step.when]}
             {step.retry_count > 0 && ` · tentativa ${step.retry_count + 1}`}
           </p>
           {step.message && <p className="text-muted-foreground text-[13px]">{step.message}</p>}
@@ -65,36 +70,21 @@ function WorkflowApprovalCard({ item }: { item: ApprovalItem }) {
           )}
         </div>
       ))}
-      <textarea
-        aria-label="Motivo da recusa"
-        value={feedback}
-        rows={2}
-        maxLength={1000}
-        placeholder="Motivo da recusa (opcional; vai para a etapa quando ela é refeita)"
-        onChange={(e) => setFeedback(e.target.value)}
-        className="border-border text-foreground placeholder:text-muted-foreground focus:border-accent rounded border bg-[var(--input)] px-3 py-1.5 text-[13px] focus:outline-none"
-      />
       {decide.isError && (
         <p className="text-destructive text-[13px]" role="alert">
           {decide.error.message}
         </p>
       )}
-      <div className="flex gap-2">
-        <Button
-          disabled={decide.isPending}
-          onClick={() => decide.mutate({ approve: true })}
-          variant="strong"
-        >
-          Aprovar
-        </Button>
-        <Button
-          disabled={decide.isPending}
-          onClick={() => decide.mutate({ approve: false, feedback })}
-          variant="destructive"
-        >
-          Recusar
-        </Button>
-      </div>
+      {active && (
+        <StepReviewActions
+          key={`${active.step_id}-${active.retry_count}`}
+          when={active.when}
+          output={active.output}
+          busy={decide.isPending}
+          onDecide={(decision) => decide.mutate(decision)}
+        />
+      )}
+      <ReviewHistory runId={item.run_id} />
     </li>
   );
 }

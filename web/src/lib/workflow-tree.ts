@@ -115,6 +115,18 @@ export function reviewsInsideContainers(nodes: WorkflowNode[]): string[] {
     .map((n) => n.name);
 }
 
+// laço com revisão por volta (ADR-0028): no nível principal e com uma etapa simples
+export function loopReviewErrors(nodes: WorkflowNode[]): string[] {
+  const errors: string[] = [];
+  for (const n of nodes.flatMap((top) => allNodes(children(top))))
+    if (n.type === "loop" && n.review)
+      errors.push(`O laço "${n.name}" com revisão precisa estar no nível principal.`);
+  for (const n of nodes)
+    if (n.type === "loop" && n.review && (n.steps.length !== 1 || n.steps[0].type !== "step"))
+      errors.push(`O laço "${n.name}" com revisão por volta precisa de uma etapa só.`);
+  return errors;
+}
+
 // mesmas regras estruturais da API, para avisar antes de salvar
 export function structureErrors(nodes: WorkflowNode[]): string[] {
   const errors: string[] = [];
@@ -136,6 +148,7 @@ export function structureErrors(nodes: WorkflowNode[]): string[] {
   if (countSteps(nodes) > MAX_STEPS) errors.push(`No máximo ${MAX_STEPS} etapas.`);
   for (const name of reviewsInsideContainers(nodes))
     errors.push(`"${name}" está dentro de um contêiner: revisão humana só no nível principal.`);
+  errors.push(...loopReviewErrors(nodes));
   if (nodes.at(-1)?.type === "parallel")
     errors.push("O workflow não pode terminar num paralelo: junte os ramos numa etapa.");
   return [...new Set(errors)];

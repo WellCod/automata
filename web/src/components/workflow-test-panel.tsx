@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { decideWorkflowStep, type StepDecision } from "@/lib/api/approvals";
+import { StepReviewActions } from "@/components/step-review-actions";
 import { blockLabel } from "@/lib/guardrail-labels";
 import { readSse } from "@/lib/sse";
 import {
@@ -61,7 +62,6 @@ export function WorkflowTestPanel({ workflowId, draftVersionId }: Props) {
   const [useDraft, setUseDraft] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const running = progress.status === "running";
-  const [feedback, setFeedback] = useState("");
   const [deciding, setDeciding] = useState(false);
 
   async function decide(decision: StepDecision) {
@@ -75,7 +75,6 @@ export function WorkflowTestPanel({ workflowId, draftVersionId }: Props) {
         progress.sessionId,
         decision,
       );
-      setFeedback("");
       setProgress((p) => applyContinue(p, output));
     } catch (e) {
       setFailure(e instanceof Error ? e.message : "Falha ao registrar a decisão.");
@@ -210,9 +209,11 @@ export function WorkflowTestPanel({ workflowId, draftVersionId }: Props) {
         >
           <p className="text-foreground">
             <strong>{progress.pending.stepName}</strong>
-            {progress.pending.when === "after"
-              ? " terminou e espera aprovação da saída."
-              : " espera confirmação para rodar."}
+            {progress.pending.when === "loop"
+              ? " terminou uma volta: siga ou peça outra."
+              : progress.pending.when === "after"
+                ? " terminou e espera aprovação da saída."
+                : " espera confirmação para rodar."}
           </p>
           {progress.pending.message && (
             <p className="text-muted-foreground">{progress.pending.message}</p>
@@ -222,32 +223,14 @@ export function WorkflowTestPanel({ workflowId, draftVersionId }: Props) {
               {progress.pending.output}
             </pre>
           )}
-          <textarea
-            aria-label="Motivo da recusa no teste"
-            value={feedback}
-            rows={2}
-            placeholder="Motivo da recusa (opcional)"
-            onChange={(e) => setFeedback(e.target.value)}
-            className="border-border text-foreground placeholder:text-muted-foreground focus:border-accent rounded border bg-[var(--input)] px-2 py-1 focus:outline-none"
+          <StepReviewActions
+            key={`${progress.pending.stepName}-${progress.pending.output ?? ""}`}
+            when={progress.pending.when}
+            output={progress.pending.output}
+            busy={deciding}
+            size="xs"
+            onDecide={(decision) => void decide(decision)}
           />
-          <div className="flex gap-2">
-            <Button
-              size="xs"
-              variant="strong"
-              disabled={deciding}
-              onClick={() => void decide({ approve: true })}
-            >
-              Aprovar
-            </Button>
-            <Button
-              size="xs"
-              variant="destructive"
-              disabled={deciding}
-              onClick={() => void decide({ approve: false, feedback })}
-            >
-              Recusar
-            </Button>
-          </div>
         </div>
       )}
 

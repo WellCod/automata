@@ -116,6 +116,8 @@ Entre conversas, a **memória do usuário** guarda o que a pessoa contou, como o
 
 Cada versão também controla o **run**: um limite de chamadas de tool corta o laço de um modelo que insiste numa tool que falha. O retry repete só a chamada ao provedor, nunca a tool que já rodou. Até dois **modelos reserva** entram quando o principal cai ou responde 429, desde que façam tudo o que o agente liga, e o custo sai pelo preço do modelo que respondeu. Com um **JSON Schema**, o agente responde em objeto no lugar de texto, e a suíte confere a resposta contra ele ([ADR-0027](docs/adr/0027-controle-do-run.md)).
 
+Na revisão humana do workflow, quem aprova pode **editar a saída** da etapa, com o diff à vista, e o texto corrigido segue para a próxima etapa sem nova chamada ao modelo. Num laço de rascunho, a pessoa decide a **cada volta** se segue ou pede outra, com um comentário. Cada decisão fica registrada no run, com quem decidiu, quando, o motivo e o antes e depois da edição ([ADR-0028](docs/adr/0028-revisao-humana-completa.md)).
+
 <p align="center"><img src="docs/img/memoria.png" alt="Memórias que um agente guardou, por usuário" width="600"></p>
 
 ### Guardrails por agente
