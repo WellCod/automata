@@ -254,11 +254,26 @@ def compare_search(
 
 
 _PREVIEW_CHUNKS = 20
+# a prévia lê e corta o original inteiro, numa rota síncrona (auditoria da Fase 33)
+_PREVIEW_LIMIT = 20
+PREVIEW_MAX_BYTES = 2 * 1024 * 1024
+# cada reprocessamento embeda a base inteira de novo
+_REPROCESS_LIMIT = 1
+
+
+def _limit(request: Request, key: str, limit: int) -> None:
+    limiter = getattr(request.app.state, "rate_limiter", None)
+    if limiter is not None:
+        limiter.check(key, limit=limit)
 
 
 @router.post("/{base_id}/chunk-preview", response_model=ChunkPreview, dependencies=_WRITE)
-def chunk_preview(base_id: UUID, body: ChunkPreviewInput, session: SessionDep) -> ChunkPreview:
+def chunk_preview(
+    base_id: UUID, body: ChunkPreviewInput, session: SessionDep, request: Request
+) -> ChunkPreview:
     """Trechos que um texto ou conteúdo daria com o corte escolhido, sem embedding (ADR-0029)."""
+    user = getattr(request.state, "user_id", None) or get_client_ip(request)
+    _limit(request, f"kb-preview:{user}", _PREVIEW_LIMIT)
     base = _get_or_404(KnowledgeBaseRepository(session), base_id)
     chunk_size = body.chunk_size or base.chunk_size
     chunking = body.chunking or ChunkingSettings.model_validate(base.chunking or {})
@@ -281,6 +296,11 @@ def chunk_preview(base_id: UUID, body: ChunkPreviewInput, session: SessionDep) -
                 status_code=422,
                 detail="Prévia só de arquivo ou texto enviado com o original guardado",
             )
+        if len(original) > PREVIEW_MAX_BYTES:
+            raise HTTPException(
+                status_code=422,
+                detail="Prévia de conteúdo até 2 MB: cole um trecho do documento",
+            )
         name, extension, data = content.name, content.extension, original
     try:
         docs = read_documents(name, extension, data, chunk_size, chunking)
@@ -298,10 +318,11 @@ def chunk_preview(base_id: UUID, body: ChunkPreviewInput, session: SessionDep) -
     "/{base_id}/reprocess", response_model=ReprocessResult, status_code=202, dependencies=_WRITE
 )
 def reprocess_base(
-    base_id: UUID, session: SessionDep, background: BackgroundTasks
+    base_id: UUID, session: SessionDep, background: BackgroundTasks, request: Request
 ) -> ReprocessResult:
     """Reindexa o conteúdo da base com o corte atual; o embedding é cobrado de novo."""
     _get_or_404(KnowledgeBaseRepository(session), base_id)
+    _limit(request, f"kb-reprocess:{base_id}", _REPROCESS_LIMIT)
     plan = plan_reprocess(session, base_id)
     session.commit()
     if plan.queued:

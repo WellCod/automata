@@ -234,3 +234,17 @@ async def test_abaixo_do_gatilho_nada_e_comprimido() -> None:
     await Agent(model=main, tools=[rastrear_pedido], compression_manager=manager).arun("pedido?")
     assert main.seen == [BIG_RESULT]
     assert summarizer.prompts == []
+
+
+def test_titulo_comprido_nao_se_repete_nos_pedacos() -> None:
+    # achado da auditoria da Fase 33: título numa linha só repetido em cada pedaço
+    text = "# " + "x" * 40_000
+    chunks = HeadingChunking(200, 20, 1).chunk(Document(name="d", content=text))
+    assert max(len(c.content) for c in chunks) <= 200
+    assert sum(len(c.content) for c in chunks) < len(text) * 2
+    # título curto continua no início de cada pedaço
+    section = "# Troca\n" + "Regra de troca sem fim. " * 100
+    pieces = [
+        c.content for c in HeadingChunking(300, 30, 1).chunk(Document(name="d", content=section))
+    ]
+    assert len(pieces) > 1 and all(p.startswith("# Troca") for p in pieces)

@@ -105,6 +105,18 @@ def _finish(
         session.commit()
 
 
+def keep_previous(content_id: UUID, error: str) -> None:
+    """Reprocessamento que falhou antes de trocar os trechos: o documento segue como estava."""
+    message = f"reprocessamento falhou, seguem os trechos anteriores: {error}"
+    with Session(get_engine()) as session:
+        session.execute(
+            update(KnowledgeContent)
+            .where(KnowledgeContent.id == content_id)
+            .values(status="completed", status_message=message[:_MAX_MESSAGE])
+        )
+        session.commit()
+
+
 def count_chunks(base: KnowledgeBase, content_id: UUID) -> int:
     vector_db = vector_db_for(base)
     if not vector_db.table_exists():
@@ -124,10 +136,15 @@ def remove_chunks(base: KnowledgeBase, content_id: UUID) -> None:
         vector_db.delete_by_content_id(str(content_id))
 
 
-def ingest(content_id: UUID, data: bytes) -> None:
-    """Processa o conteúdo já registrado como processing. Nunca levanta: grava a falha."""
+def ingest(content_id: UUID, data: bytes, *, replace: bool = False) -> None:
+    """Processa o conteúdo já registrado como processing. Nunca levanta: grava a falha.
+
+    `replace` troca os trechos antigos só depois de o embedder responder: reprocessar
+    com a chave errada não deixa o documento sem trecho nenhum.
+    """
     base: KnowledgeBase | None = None
     vector_db: PgVector | None = None
+    removed = False
     try:
         with Session(get_engine()) as session:
             content = session.get(KnowledgeContent, content_id)
@@ -143,6 +160,9 @@ def ingest(content_id: UUID, data: bytes) -> None:
         # primeiro aqui faz o erro real (chave inválida, cota) virar a mensagem.
         # O MeteredEmbedder guarda esse vetor: o insert não paga de novo
         docs[0].embed(vector_db.embedder)
+        if replace:
+            remove_chunks(base, content_id)
+            removed = True
         for doc in docs:
             doc.content_id = str(content_id)
             doc.meta_data = {
@@ -172,7 +192,10 @@ def ingest(content_id: UUID, data: bytes) -> None:
         )
     except Exception as exc:
         logger.warning("ingestão falhou", extra={"content_id": str(content_id), "error": str(exc)})
-        _finish(content_id, status="failed", message=str(exc)[:_MAX_MESSAGE])
+        if replace and not removed:
+            keep_previous(content_id, str(exc))
+        else:
+            _finish(content_id, status="failed", message=str(exc)[:_MAX_MESSAGE])
     finally:
         # cobra também o que foi gasto antes de uma falha no meio
         if base is not None and vector_db is not None:
