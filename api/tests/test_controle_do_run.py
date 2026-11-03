@@ -379,3 +379,83 @@ def test_modelo_da_compressao_precisa_ser_da_matriz() -> None:
     assert errors(model_id="gpt-4o-mini") == []
     [problem] = errors(model_id="modelo-inventado")
     assert problem.startswith("modelo da compressão:") and "não suportado" in problem
+
+
+# --- schema de saída com custo limitado (auditoria da Fase 33) ---
+
+
+def _chain(levels: int, fanout: int = 2) -> dict[str, object]:
+    defs: dict[str, object] = {
+        f"l{i}": {"allOf": [{"$ref": f"#/$defs/l{i + 1}"} for _ in range(fanout)]}
+        for i in range(levels)
+    }
+    defs[f"l{levels}"] = {"type": "object"}
+    return {"type": "object", "$defs": defs, "allOf": [{"$ref": "#/$defs/l0"}]}
+
+
+def test_ref_em_cadeia_exponencial_recusado_na_escrita() -> None:
+    from app.agents.output_schema import schema_problems
+
+    # 2 níveis expandem para poucos nós; 6 níveis de 4 ramos passam de 4 mil, ainda rasos
+    assert schema_problems(_chain(2)) == []
+    [problem] = schema_problems(_chain(6, fanout=4))
+    assert "nós" in problem
+    # a cadeia do achado da auditoria: 22 níveis de 2 ramos
+    [problem] = schema_problems(_chain(22))
+    assert problem.startswith("schema de saída:")
+
+
+@pytest.mark.parametrize(
+    ("schema", "trecho"),
+    [
+        ({"type": "object", "properties": {"a": {"$ref": "#/properties/a"}}}, "recursivo"),
+        ({"type": "object", "properties": {"a": {"$ref": "https://exemplo.com/s.json"}}}, "#/"),
+        ({"type": "object", "properties": {"a": {"$ref": "#/nao/existe"}}}, "não encontrado"),
+        (
+            {"type": "object", "properties": {"a": {"type": "string", "pattern": "^(a|aa)+$"}}},
+            "aninhado",
+        ),
+        ({"type": "object", "patternProperties": {"(x+)+": {}}}, "aninhado"),
+        ({"type": "object", "properties": {"a": {"type": "string", "pattern": "a" * 201}}}, "200"),
+    ],
+)
+def test_ref_e_pattern_perigosos_recusados(schema: dict[str, object], trecho: str) -> None:
+    from app.agents.output_schema import schema_problems
+
+    [problem] = schema_problems(schema)
+    assert trecho in problem
+
+
+def test_schema_comum_continua_aceito() -> None:
+    from app.agents.output_schema import schema_problems
+
+    schema = {
+        "type": "object",
+        "$defs": {"cep": {"type": "string", "pattern": r"^\d{5}-\d{3}$"}},
+        "properties": {
+            "categoria": {"enum": ["troca", "reembolso"]},
+            "entrega": {"$ref": "#/$defs/cep"},
+            "retirada": {"$ref": "#/$defs/cep"},
+        },
+        "required": ["categoria"],
+    }
+    assert schema_problems(schema) == []
+
+
+async def test_conferencia_na_suite_tem_prazo_e_nao_quebra(monkeypatch: pytest.MonkeyPatch) -> None:
+    import time
+
+    import app.agents.output_schema as output_schema
+
+    monkeypatch.setattr(output_schema, "VALIDATION_TIMEOUT_SECONDS", 0.2)
+    monkeypatch.setattr(output_schema, "schema_verdict", lambda s, c: time.sleep(2) or {})
+    slow = await output_schema.aschema_verdict({"type": "object"}, "{}")
+    assert slow["passed"] is False and "passou de" in slow["errors"][0]
+
+    monkeypatch.undo()
+    # gravado antes dos limites: $ref recursivo vira falha do caso, não exceção na suíte
+    loop = {"type": "object", "properties": {"a": {"$ref": "#/properties/a"}}}
+    broken = await output_schema.aschema_verdict(loop, '{"a": {"a": 1}}')
+    assert broken["passed"] is False
+    huge = await output_schema.aschema_verdict({"type": "object"}, {"x": "y" * 300_000})
+    assert huge["errors"] == ["resposta grande demais para conferir"]
