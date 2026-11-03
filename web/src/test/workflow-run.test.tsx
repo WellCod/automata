@@ -174,6 +174,7 @@ describe("workflowUsage", () => {
       status: "success",
       duration_ms: 10,
       error: null,
+      screened_tools: [],
       created_at: "2026-10-19T00:00:00Z",
     };
     // Intl separa a moeda com espaço não separável

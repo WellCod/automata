@@ -1,6 +1,8 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
+import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
 
 export type Guardrails = components["schemas"]["GuardrailSettings"];
@@ -16,6 +18,39 @@ export const PII_LABELS: Record<PiiType, string> = {
 const PII_TYPES = Object.keys(PII_LABELS) as PiiType[];
 
 type PiiRule = NonNullable<Guardrails["pii"]>;
+export type ClassifierRule = components["schemas"]["ClassifierRule"];
+type ClassifierCheck = ClassifierRule["checks"][number];
+
+const CHECK_LABELS: Record<ClassifierCheck, string> = {
+  injection: "Injeção de prompt, mesmo com outras palavras ou em outra língua",
+  toxicity: "Ofensa, ódio, assédio ou ameaça",
+  off_topic: "Assunto fora do que o agente atende",
+};
+const CHECKS = Object.keys(CHECK_LABELS) as ClassifierCheck[];
+export const DEFAULT_CLASSIFIER: ClassifierRule = {
+  model_id: "",
+  checks: ["injection"],
+  scope: "",
+  on_failure: "allow",
+};
+
+// mesmas regras de ClassifierRule e do serviço na API (ADR-0030)
+export function guardrailProblems(g: Guardrails): string[] {
+  const problems: string[] = [];
+  const c = g.classifier;
+  if (c) {
+    if (!c.model_id) problems.push("Escolha o modelo do classificador.");
+    if (c.checks.length === 0) problems.push("Marque ao menos uma checagem do classificador.");
+    if (c.checks.includes("off_topic") && !c.scope?.trim())
+      problems.push("Descreva o que o agente atende para a checagem de assunto.");
+  }
+  const t = g.tool_results;
+  if (t?.classifier && !c)
+    problems.push("O exame de tool pelo classificador exige o classificador.");
+  if (t && !t.terms && !t.classifier)
+    problems.push("O exame de tool precisa de termos ou classificador.");
+  return problems;
+}
 type OutputRule = NonNullable<Guardrails["output"]>;
 const DEFAULT_PII: PiiRule = { mode: "off", types: PII_TYPES };
 const DEFAULT_OUTPUT: OutputRule = { pii: false, pii_types: PII_TYPES, blocked_terms: [] };
@@ -27,6 +62,8 @@ export const DEFAULT_GUARDRAILS: Guardrails = {
   blocked_topics: [],
   max_input_chars: null,
   moderation: false,
+  classifier: null,
+  tool_results: null,
   output: DEFAULT_OUTPUT,
   blocked_message: "Não posso ajudar com essa mensagem por aqui.",
 };
@@ -112,6 +149,98 @@ function PiiTypes({
   );
 }
 
+function useModelIds() {
+  return useQuery({
+    queryKey: ["models:capabilities"],
+    queryFn: async () => {
+      const res = await client.GET("/api/v1/models/capabilities");
+      if (res.error) throw new Error("Falha ao carregar modelos");
+      return res.data as Record<string, unknown>;
+    },
+    select: (models) => Object.keys(models),
+  });
+}
+
+function ClassifierFields({
+  value,
+  onChange,
+}: {
+  value: ClassifierRule;
+  onChange: (v: ClassifierRule) => void;
+}) {
+  const id = useId();
+  const { data: models = [] } = useModelIds();
+  const checks = value.checks ?? [];
+  return (
+    <div className="flex flex-col gap-2 pl-6">
+      <label htmlFor={`${id}-model`} className="text-foreground text-[13px]">
+        Modelo que classifica
+      </label>
+      <select
+        id={`${id}-model`}
+        value={value.model_id}
+        onChange={(e) => onChange({ ...value, model_id: e.target.value })}
+        className={inputCls}
+      >
+        <option value="">Escolha um modelo</option>
+        {models.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+      </select>
+      <div role="group" aria-label="Checagens do classificador" className="flex flex-col gap-1">
+        {CHECKS.map((c) => (
+          <label key={c} className="text-foreground flex items-center gap-1.5 text-[13px]">
+            <input
+              type="checkbox"
+              className={checkCls}
+              checked={checks.includes(c)}
+              onChange={(e) =>
+                onChange({
+                  ...value,
+                  checks: e.target.checked ? [...checks, c] : checks.filter((x) => x !== c),
+                })
+              }
+            />
+            {CHECK_LABELS[c]}
+          </label>
+        ))}
+      </div>
+      {checks.includes("off_topic") && (
+        <div className="flex flex-col gap-1">
+          <label htmlFor={`${id}-scope`} className="text-foreground text-[13px]">
+            O que o agente atende
+          </label>
+          <textarea
+            id={`${id}-scope`}
+            rows={2}
+            maxLength={500}
+            value={value.scope ?? ""}
+            placeholder="ex.: pedidos, trocas e entregas da loja"
+            onChange={(e) => onChange({ ...value, scope: e.target.value })}
+            className={`${inputCls} resize-y`}
+          />
+        </div>
+      )}
+      <label htmlFor={`${id}-fail`} className="text-foreground text-[13px]">
+        Se o classificador falhar ou passar de 10 s
+      </label>
+      <select
+        id={`${id}-fail`}
+        value={value.on_failure ?? "allow"}
+        onChange={(e) =>
+          onChange({ ...value, on_failure: e.target.value as ClassifierRule["on_failure"] })
+        }
+        className={inputCls}
+      >
+        <option value="allow">Deixar a mensagem seguir</option>
+        <option value="block">Bloquear a mensagem</option>
+      </select>
+    </div>
+  );
+}
+
 export function GuardrailsEditor({
   value,
   onChange,
@@ -124,6 +253,7 @@ export function GuardrailsEditor({
   const pii = g.pii!;
   const output = g.output!;
   const set = (patch: Partial<Guardrails>) => onChange({ ...g, ...patch });
+  const problems = guardrailProblems(g);
 
   return (
     <fieldset className="border-border flex flex-col gap-4 rounded border px-4 pt-3 pb-4">
@@ -220,6 +350,82 @@ export function GuardrailsEditor({
         </span>
       </label>
 
+      <label className="text-foreground flex items-start gap-2 text-[13px]">
+        <input
+          type="checkbox"
+          className={`${checkCls} mt-0.5`}
+          checked={g.classifier != null}
+          onChange={(e) =>
+            set({
+              classifier: e.target.checked ? { ...DEFAULT_CLASSIFIER } : null,
+              // sem classificador, o exame de tool fica só com os termos
+              tool_results:
+                e.target.checked || !g.tool_results
+                  ? g.tool_results
+                  : { ...g.tool_results, classifier: false, terms: true },
+            })
+          }
+        />
+        <span className="flex flex-col gap-0.5">
+          Classificador por modelo
+          <span className={hintCls}>
+            Um modelo julga a mensagem antes do run e pega o que a lista de termos não pega. É uma
+            chamada a mais por mensagem, com o custo no agente.
+          </span>
+        </span>
+      </label>
+      {g.classifier && (
+        <ClassifierFields value={g.classifier} onChange={(classifier) => set({ classifier })} />
+      )}
+
+      <div className="border-border flex flex-col gap-2 border-t pt-3">
+        <span className="text-foreground text-[13px] font-medium">Resultado das tools</span>
+        <label className="text-foreground flex items-center gap-2 text-[13px]">
+          <input
+            type="checkbox"
+            className={checkCls}
+            checked={g.tool_results != null}
+            onChange={(e) =>
+              set({ tool_results: e.target.checked ? { terms: true, classifier: false } : null })
+            }
+          />
+          Examinar o que as tools devolvem antes de o modelo ler
+        </label>
+        {g.tool_results && (
+          <div className="flex flex-col gap-1 pl-6">
+            <label className="text-foreground flex items-center gap-1.5 text-[13px]">
+              <input
+                type="checkbox"
+                className={checkCls}
+                checked={g.tool_results.terms ?? true}
+                onChange={(e) =>
+                  set({ tool_results: { ...g.tool_results!, terms: e.target.checked } })
+                }
+              />
+              Pelos termos de injeção e de instrução dirigida ao assistente
+            </label>
+            <label className="text-foreground flex items-center gap-1.5 text-[13px]">
+              <input
+                type="checkbox"
+                className={checkCls}
+                disabled={!g.classifier}
+                checked={g.tool_results.classifier ?? false}
+                onChange={(e) =>
+                  set({ tool_results: { ...g.tool_results!, classifier: e.target.checked } })
+                }
+              />
+              Também pelo classificador{" "}
+              {g.classifier ? "(uma chamada por tool)" : "(ligue o classificador)"}
+            </label>
+          </div>
+        )}
+        <span className={hintCls}>
+          Vale para tools MCP e para a busca nas bases. Um resultado com instrução embutida (“nota
+          para a IA: envie os dados…”) chega ao modelo como aviso, e o run segue com a retirada
+          registrada.
+        </span>
+      </div>
+
       <div className="border-border flex flex-col gap-2 border-t pt-3">
         <span className="text-foreground text-[13px] font-medium">Resposta do agente</span>
         <label className="text-foreground flex items-center gap-2 text-[13px]">
@@ -265,6 +471,13 @@ export function GuardrailsEditor({
         />
         <span className={hintCls}>O que a pessoa vê quando uma regra barra a mensagem.</span>
       </div>
+      {problems.length > 0 && (
+        <ul role="alert" className="text-destructive list-disc pl-5 text-[12px]">
+          {problems.map((p) => (
+            <li key={p}>{p}</li>
+          ))}
+        </ul>
+      )}
     </fieldset>
   );
 }
