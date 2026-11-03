@@ -139,6 +139,17 @@ class MemorySettings(BaseModel):
     retention_days: int = Field(default=90, ge=1, le=365)
 
 
+class ToolCompression(BaseModel):
+    """Resultado de tool resumido por um modelo antes de seguir no contexto (ADR-0029)."""
+
+    # comprime quando há esse número de resultados ainda inteiros no contexto
+    after_results: int = Field(default=3, ge=1, le=10)
+    # ou quando o contexto passa desse número de tokens
+    token_limit: int | None = Field(default=None, ge=2000, le=200_000)
+    # vazio = o modelo do próprio agente
+    model_id: str | None = Field(default=None, max_length=64)
+
+
 class RunControls(BaseModel):
     """Controle do run (ADR-0027). Padrão vazio: nenhum agente publicado muda sem versão nova."""
 
@@ -148,6 +159,8 @@ class RunControls(BaseModel):
     provider_retries: int = Field(default=0, ge=0, le=3)
     # em ordem, quando o principal falha de vez (5xx, rede) ou responde 429
     fallback_models: list[str] = Field(default_factory=list, max_length=2)
+    # vazio = resultado de tool inteiro no contexto, como antes
+    compress_tool_results: ToolCompression | None = None
 
     @model_validator(mode="after")
     def reservas_unicas(self) -> "RunControls":

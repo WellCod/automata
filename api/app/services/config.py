@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from app.agents.capabilities import validate_capabilities
+from app.agents.capabilities import get_capabilities, validate_capabilities
 from app.agents.output_schema import schema_problems
 from app.guardrails.input import moderation_available
 from app.knowledge.embedders import demo_replay
@@ -153,6 +153,7 @@ class ConfigService:
             # o Team do Agno 3.1.8 não aceita compaction (ADR-0019)
             errors.append("só agente compacta a conversa")
         errors += self._fallback_errors(payload)
+        errors += self._compression_errors(payload)
         errors += self._schema_errors(config, payload)
         if config.kind == ConfigKind.workflow and payload.run != RunControls():
             # quem chama modelo e tool são os agentes e times das etapas, cada um com o seu
@@ -190,6 +191,18 @@ class ConfigService:
                 continue
             errors += [f"modelo reserva: {e}" for e in missing]
         return errors
+
+    @staticmethod
+    def _compression_errors(payload: ConfigPayload) -> list[str]:
+        """Modelo da compressão só da matriz (ADR-0029); ele recebe só texto."""
+        settings = payload.run.compress_tool_results
+        if settings is None or settings.model_id is None:
+            return []
+        try:
+            get_capabilities(settings.model_id)
+        except ValueError as exc:
+            return [f"modelo da compressão: {exc}"]
+        return []
 
     def _model_errors(self, config: AgentConfig, payload: ConfigPayload) -> list[str]:
         if config.kind == ConfigKind.workflow:

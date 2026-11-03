@@ -283,3 +283,99 @@ def test_guardrail_de_saida_olha_dentro_do_json() -> None:
     limpo = RunOutput(content={"categoria": "troca"})
     hook(run_output=limpo)
     assert limpo.content == {"categoria": "troca"}
+
+
+# --- compressão do resultado de tool (ADR-0029) ---
+
+
+def test_compressao_desligada_por_padrao_e_faixas() -> None:
+    assert _payload().run.compress_tool_results is None
+    defaults = _payload(compress_tool_results={}).run.compress_tool_results
+    assert defaults is not None
+    assert (defaults.after_results, defaults.token_limit, defaults.model_id) == (3, None, None)
+    for bad in ({"after_results": 0}, {"after_results": 11}, {"token_limit": 1999}):
+        with pytest.raises(ValidationError):
+            _payload(compress_tool_results=bad)
+
+
+def test_agente_e_lider_do_time_recebem_a_compressao(monkeypatch: pytest.MonkeyPatch) -> None:
+    from agno.models.anthropic import Claude
+
+    from app.agents.factory import ResolvedTeam, ResolvedVersion, agent_from, team_from
+
+    monkeypatch.setenv("DEMO_REPLAY", "false")
+    get_settings.cache_clear()
+    payload = ConfigPayload.model_validate(
+        {
+            "model_id": "claude-sonnet-4-6",
+            "capabilities": {"extended_thinking": True},
+            "run": {
+                "provider_retries": 1,
+                "compress_tool_results": {
+                    "after_results": 1,
+                    "token_limit": 50_000,
+                    "model_id": "claude-haiku-4-5",
+                },
+            },
+        }
+    )
+    agent = agent_from(uuid4(), ResolvedVersion("a", "Use para a", payload), tracked=False)
+    manager = agent.compression_manager
+    assert manager is not None and manager.compress_tool_results
+    assert (manager.compress_tool_results_limit, manager.compress_token_limit) == (1, 50_000)
+    assert isinstance(manager.model, Claude) and manager.model.id == "claude-haiku-4-5"
+    # o modelo da compressão só resume: sem extended thinking, com o retry da versão
+    assert manager.model.thinking is None and manager.model.retries == 1
+
+    own = agent_from(
+        uuid4(),
+        ResolvedVersion("b", "Use para b", _payload(compress_tool_results={})),
+        tracked=False,
+    )
+    # sem modelo próprio, o Agno usa o do agente
+    assert own.compression_manager is not None
+    assert own.compression_manager.model is own.model
+    assert (
+        agent_from(
+            uuid4(), ResolvedVersion("c", "Use para c", _payload()), tracked=False
+        ).compression_manager
+        is None
+    )
+
+    member_id = uuid4()
+    leader = ConfigPayload.model_validate(
+        {
+            "model_id": "claude-sonnet-4-6",
+            "run": {"compress_tool_results": {"after_results": 2}},
+            "team": {"members": [{"agent_id": str(member_id)}]},
+        }
+    )
+    team = team_from(
+        uuid4(),
+        ResolvedTeam(
+            leader=ResolvedVersion("t", "Use para t", leader),
+            members=[(member_id, ResolvedVersion("m", "Use para m", _payload()))],
+        ),
+    )
+    assert team.compression_manager is not None
+    assert team.compression_manager.compress_tool_results_limit == 2
+    # membro segue a própria configuração
+    assert team.members[0].compression_manager is None  # type: ignore[union-attr]
+
+
+def test_demo_sem_compressao() -> None:
+    from app.agents.factory import compression_for
+
+    assert compression_for(_payload(compress_tool_results={"after_results": 1})) is None
+
+
+def test_modelo_da_compressao_precisa_ser_da_matriz() -> None:
+    from app.services.config import ConfigService
+
+    def errors(**compression: object) -> list[str]:
+        return ConfigService._compression_errors(_payload(compress_tool_results=compression))
+
+    assert errors() == []
+    assert errors(model_id="gpt-4o-mini") == []
+    [problem] = errors(model_id="modelo-inventado")
+    assert problem.startswith("modelo da compressão:") and "não suportado" in problem
