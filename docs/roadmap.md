@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 29
+# Roadmap — Fases 4 a 30
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -590,7 +590,8 @@ if __name__ == "__main__":
 | 26 — Memória do usuário | #184–#188 | Fatos sobre o usuário entre sessões, por agente, com retenção, PII mascarado e exclusão | Fases 14 e 20 |
 | 27 — Rotação de chaves | #191–#196 | Chave JWT e chave dos segredos trocadas sem derrubar sessões nem integrações | Fases 11, 12 e 17 |
 | 28 — Auditoria 2026-10-29 | #197–#204 | Scan de PII que travava a API, vazamentos de leitura, SSRF por rebinding, painel no celular e acessibilidade | Fase 27 |
-| 29 — Controle do run | #205 em diante | Limite de tools por run, retry do provedor com modelo reserva e saída estruturada por JSON Schema | Fases 16, 21 e 22 |
+| 29 — Controle do run | #205–#210 | Limite de tools por run, retry do provedor com modelo reserva e saída estruturada por JSON Schema | Fases 16, 21 e 22 |
+| 30 — Revisão humana completa | #211 em diante | Saída editada na aprovação, revisão por volta de laço e registro de quem decidiu cada pausa | Fases 24 e 28 |
 
 Fases 4 a 26 estão na `main` (estado em 2026-10-22). Fica pendente a ação manual da Fase 11 (rotação da chave JWT e das senhas).
 
@@ -1154,3 +1155,21 @@ Decisão em [ADR-0027](adr/0027-controle-do-run.md). Uma seção `run` no payloa
 - Com o principal respondendo 429, a reserva responde, e o custo do run sai pela tabela da reserva.
 - Um modelo reserva sem visão é recusado na escrita de um agente com visão ligada.
 - Um agente com schema devolve JSON que valida contra ele, e a checagem `schema` da suíte reprova uma resposta fora do schema.
+
+## Fase 30 — Revisão humana completa
+
+Decisão em [ADR-0028](adr/0028-revisao-humana-completa.md). O revisor corrige a saída da etapa em vez de pedir para refazer. Num laço, ele decide a cada volta se segue ou se pede outra com comentário. Cada decisão fica registrada no run, com quem decidiu, quando, o motivo e, na edição, o texto antes e depois.
+
+- [x] `docs(adr)`: ADR-0028 e esta seção
+- [ ] `feat(api)`: saída editada na aprovação e registro das decisões humanas no run
+- [ ] `feat(api)`: revisão por volta de laço no workflow
+- [ ] `feat(web)`: edição da saída com diff, revisão por volta no editor e histórico das decisões
+- [ ] `test(api)`: evals da revisão humana completa
+
+**Critério de aceite da fase:**
+
+- O revisor troca "R$ 120" por "R$ 210" na saída da etapa de análise, e a etapa seguinte recebe o texto editado sem chamar o modelo de novo.
+- O registro do run mostra a edição, com quem fez, quando, e o antes e o depois mascarados.
+- Num laço de rascunho com revisão por volta, pedir outra volta com comentário roda a volta seguinte com o comentário. Aprovar encerra o laço e segue o workflow.
+- Laço com duas etapas por volta, ou dentro de condição, é recusado na escrita com revisão por volta.
+- Viewer só vê o registro dos próprios runs.
