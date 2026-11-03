@@ -1,6 +1,6 @@
 # ADR-0029 — Chunking por base e compressão do resultado de tool
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-11-03
 
 ## Contexto
