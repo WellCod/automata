@@ -55,6 +55,7 @@ export const BLOCK_RULES: BlockRule[] = [
   "off_topic",
   "input_too_long",
   "moderation",
+  "classifier",
   "output_not_allowed",
 ];
 

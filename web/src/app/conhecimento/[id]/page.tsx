@@ -52,9 +52,20 @@ function StatusBadge({ content }: { content: KnowledgeContent }) {
   if (content.status === "failed") {
     return <span className="text-destructive text-[11px]">falhou</span>;
   }
+  const suspects = content.suspect_chunks ?? 0;
   return (
-    <span className="text-accent text-[11px]">
-      {content.chunk_count} trecho{content.chunk_count === 1 ? "" : "s"}
+    <span className="flex items-center gap-1.5 text-[11px]">
+      <span className="text-accent">
+        {content.chunk_count} trecho{content.chunk_count === 1 ? "" : "s"}
+      </span>
+      {suspects > 0 && (
+        <span
+          className="text-amber-600 dark:text-amber-400"
+          title="Trechos com instrução dirigida ao assistente. Seguem indexados; o exame do resultado de tool decide no run."
+        >
+          {suspects} com instrução embutida
+        </span>
+      )}
     </span>
   );
 }

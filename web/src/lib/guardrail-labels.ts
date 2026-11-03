@@ -5,6 +5,7 @@ export const BLOCK_LABELS: Record<string, string> = {
   off_topic: "Tópico proibido",
   input_too_long: "Mensagem longa demais",
   moderation: "Moderação",
+  classifier: "Classificador",
   output_not_allowed: "Resposta barrada",
   // orçamento do mês estourado com bloqueio ligado (ADR-0021)
   budget_exceeded: "Orçamento do mês",
@@ -24,4 +25,11 @@ export function blockedHint(byRule: Record<string, number>): string {
     .slice(0, 2)
     .map(([rule, n]) => `${blockLabel(rule)} ${n}`);
   return top.length ? top.join(" · ") : "mensagens barradas por guardrail";
+}
+
+// resultados de tool retirados por instrução embutida (ADR-0030); o trecho fica só no banco
+export function screenedText(items: { tool: string }[]): string {
+  const tools = [...new Set(items.map((i) => i.tool))].join(", ");
+  const n = items.length;
+  return `${n} resultado${n === 1 ? "" : "s"} de tool retirado${n === 1 ? "" : "s"} por instrução embutida: ${tools}`;
 }

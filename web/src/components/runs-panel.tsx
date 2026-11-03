@@ -16,7 +16,7 @@ import { ReviewHistory } from "@/components/review-history";
 import { RunTrace } from "@/components/run-trace";
 import { Button } from "@/components/ui/button";
 import client from "@/lib/api/client";
-import { blockLabel } from "@/lib/guardrail-labels";
+import { blockLabel, screenedText } from "@/lib/guardrail-labels";
 import type { components } from "@/lib/api/schema.d.ts";
 
 type AgentRunResponse = components["schemas"]["AgentRunResponse"];
@@ -118,6 +118,14 @@ function RunItem({
           <span className="text-muted-foreground text-[11px]">{formatDate(run.created_at)}</span>
         </div>
       </button>
+      {(run.screened_tools ?? []).length > 0 && (
+        <p
+          className="text-[11px] text-amber-600 dark:text-amber-400"
+          aria-label="Resultados retirados"
+        >
+          {screenedText(run.screened_tools ?? [])}
+        </p>
+      )}
       {run.steps != null && (
         <p className="text-muted-foreground text-[11px]" aria-label="Consumo das etapas">
           {workflowUsage(run)}

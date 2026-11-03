@@ -1451,6 +1451,11 @@ export interface components {
             error: string | null;
             /** Blocked By */
             blocked_by?: string | null;
+            /**
+             * Screened Tools
+             * @default []
+             */
+            screened_tools: components["schemas"]["ScreenedTool"][];
             /** Steps */
             steps?: number | null;
             /** Total Tokens */
@@ -1576,7 +1581,7 @@ export interface components {
              */
             type: "blocked";
             /** Rule */
-            rule?: ("pii_detected" | "prompt_injection" | "off_topic" | "input_too_long" | "moderation" | "output_not_allowed") | null;
+            rule?: ("pii_detected" | "prompt_injection" | "off_topic" | "input_too_long" | "moderation" | "classifier" | "output_not_allowed") | null;
         };
         /** Body_upload_file_api_v1_knowledge_bases__base_id__contents_file_post */
         Body_upload_file_api_v1_knowledge_bases__base_id__contents_file_post: {
@@ -1692,6 +1697,27 @@ export interface components {
              * @default 2
              */
             heading_level: number;
+        };
+        /**
+         * ClassifierRule
+         * @description Classificador por modelo na entrada (ADR-0030): uma chamada por mensagem.
+         */
+        ClassifierRule: {
+            /** Model Id */
+            model_id: string;
+            /** Checks */
+            checks: ("injection" | "toxicity" | "off_topic")[];
+            /**
+             * Scope
+             * @default
+             */
+            scope: string;
+            /**
+             * On Failure
+             * @default allow
+             * @enum {string}
+             */
+            on_failure: "allow" | "block";
         };
         /** ConditionNode */
         ConditionNode: {
@@ -2364,6 +2390,8 @@ export interface components {
              * @default false
              */
             moderation: boolean;
+            classifier?: components["schemas"]["ClassifierRule"] | null;
+            tool_results?: components["schemas"]["ToolResultScreening"] | null;
             output?: components["schemas"]["OutputRule"];
             /**
              * Blocked Message
@@ -2671,6 +2699,11 @@ export interface components {
             status_message: string | null;
             /** Chunk Count */
             chunk_count: number;
+            /**
+             * Suspect Chunks
+             * @default 0
+             */
+            suspect_chunks: number;
             /** Created By */
             created_by: string;
             /**
@@ -3108,6 +3141,18 @@ export interface components {
              */
             type: "schema";
         };
+        /**
+         * ScreenedTool
+         * @description Resultado de tool retirado (ADR-0030); o trecho fica só no banco.
+         */
+        ScreenedTool: {
+            /** Tool */
+            tool: string;
+            /** Rule */
+            rule: string;
+            /** Term */
+            term?: string | null;
+        };
         /** SearchComparison */
         SearchComparison: {
             with_strategy: components["schemas"]["SearchResult"];
@@ -3316,6 +3361,22 @@ export interface components {
             token_limit?: number | null;
             /** Model Id */
             model_id?: string | null;
+        };
+        /**
+         * ToolResultScreening
+         * @description Resultado de tool examinado antes de voltar ao modelo (ADR-0030).
+         */
+        ToolResultScreening: {
+            /**
+             * Terms
+             * @default true
+             */
+            terms: boolean;
+            /**
+             * Classifier
+             * @default false
+             */
+            classifier: boolean;
         };
         /**
          * ToolsCheck
