@@ -97,3 +97,40 @@ def test_viewer_ve_so_as_proprias_pendencias(client: TestClient) -> None:
 
     everyone = client.get("/api/v1/approvals", headers=owner).json()
     assert sorted(i["user_id"] for i in everyone) == ["ana", "bruno"]
+
+
+def test_registro_das_revisoes_so_para_o_dono_e_o_owner(client: TestClient) -> None:
+    from app.db import get_engine
+    from app.models.run import AgentRun
+    from app.schemas.user import ROLE_SCOPES, UserRole
+
+    owner = _h("owner", ["agent_os:admin"])
+    config = {"name": "fluxo", "description": "Use para fluxo"}
+    config_id = client.post("/api/v1/configs", json=config, headers=owner).json()["id"]
+    entry = {
+        "step_id": "s1",
+        "step_name": "analise",
+        "decision": "edited",
+        "by": "ana",
+        "at": "2026-10-30T10:00:00+00:00",
+        "before": "R$ 120",
+        "after": "R$ 210",
+    }
+    with Session(get_engine()) as session:
+        session.add(
+            AgentRun(
+                agent_config_id=config_id,
+                user_id="ana",
+                run_id="run-revisado",
+                status="success",
+                review_log=[entry],
+            )
+        )
+        session.commit()
+
+    viewer = ROLE_SCOPES[UserRole.viewer]
+    mine = client.get("/api/v1/runs/run-revisado/reviews", headers=_h("ana", viewer))
+    assert mine.status_code == 200 and mine.json()[0]["after"] == "R$ 210"
+    other = client.get("/api/v1/runs/run-revisado/reviews", headers=_h("bruno", viewer))
+    assert other.status_code == 403
+    assert client.get("/api/v1/runs/run-revisado/reviews", headers=owner).status_code == 200

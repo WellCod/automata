@@ -22,7 +22,7 @@ Verificado no Agno 3.1.8 instalado:
 
 ## Decisão
 
-**Saída editada na aprovação.** O painel manda o requisito ativo com `edited_output` pelo mesmo `continue` do AgentOS. Nenhuma rota própria decide aprovação, como no ADR-0023. A edição vale para etapa com revisão depois da saída e é texto, com até 20 mil caracteres. Etapa de agente com saída estruturada (ADR-0027) é editada como JSON e precisa continuar válida contra o schema.
+**Saída editada na aprovação.** O painel manda o requisito ativo com `edited_output` pelo mesmo `continue` do AgentOS. Nenhuma rota própria decide aprovação, como no ADR-0023. A edição vale para etapa com revisão depois da saída e é texto, com até 20 mil caracteres. Se o agente da etapa tem saída estruturada (ADR-0027), o JSON editado segue como texto: quem edita é responsável por mantê-lo no formato, e a suíte do workflow pega a regressão.
 
 **Revisão por volta de laço.** O nó `loop` do payload ganha `review`, com mensagem e prazo opcionais. Ele vira `HumanReview(requires_iteration_review=True, on_reject="retry")`. A validação na escrita exige:
 

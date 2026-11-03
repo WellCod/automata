@@ -487,10 +487,25 @@ class TrackedWorkflow(Workflow):
             return await super().acontinue_run(*args, **kwargs)
         paused = kwargs.get("run_response")
         run_id = kwargs.get("run_id") or getattr(paused, "run_id", None)
+        if run_id is not None:
+            # antes de retomar: a decisão vale mesmo que o resto do workflow falhe (ADR-0028)
+            await self._record_reviews(run_id, kwargs.get("step_requirements"))
         track = {**kwargs, "run_id": run_id}
         if kwargs.get("stream"):
             return self._track_stream(await super().acontinue_run(*args, **kwargs), track)
         return await self._track_output(super().acontinue_run(*args, **kwargs), track)
+
+    @staticmethod
+    async def _record_reviews(run_id: str, requirements: list[Any] | None) -> None:
+        from app.agents.reviews import record_reviews
+        from app.integrations import current_actor
+
+        try:
+            await asyncio.to_thread(record_reviews, run_id, requirements, current_actor.get())
+        except Exception as exc:
+            # sem banco o registro se perde, mas a decisão de quem aprovou segue
+            detail = {"run_id": run_id, "error": str(exc)}
+            logger.warning("falha ao registrar a revisão", extra=detail)
 
     def _record(
         self,

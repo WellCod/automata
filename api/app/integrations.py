@@ -8,6 +8,7 @@ com cache curto, e o middleware recusa o token antes de chegar ao Agno.
 import logging
 import math
 import threading
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from time import monotonic
 from uuid import UUID
@@ -160,6 +161,11 @@ class RevokedTokens:
             self._cutoffs[sub] = at
 
 
+# quem faz a request, pelo sub do token: o continue do AgentOS não recebe o usuário e o
+# registro das revisões precisa dele (ADR-0028). A assinatura é conferida logo depois
+current_actor: ContextVar[str | None] = ContextVar("current_actor", default=None)
+
+
 class RevocationMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: object, revoked: RevokedTokens) -> None:
         super().__init__(app)  # type: ignore[arg-type]
@@ -184,5 +190,12 @@ class RevocationMiddleware(BaseHTTPMiddleware):
             )
             if revoked:
                 return JSONResponse({"detail": "Token revogado"}, status_code=401)
-        response: Response = await call_next(request)  # type: ignore[operator]
+            if isinstance(sub, str):
+                token = current_actor.set(sub)
+                try:
+                    response: Response = await call_next(request)  # type: ignore[operator]
+                finally:
+                    current_actor.reset(token)
+                return response
+        response = await call_next(request)  # type: ignore[operator]
         return response

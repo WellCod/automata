@@ -11,9 +11,12 @@ from typing import Any
 from agno.os.routers.traces.schemas import TraceDetail
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.authz import Scope, require_scopes, sees_everyone
+from app.db import get_engine
+from app.repositories.run import RunRepository
 
 router = APIRouter(
     prefix="/api/v1/runs",
@@ -82,3 +85,31 @@ async def get_run_trace(run_id: str, request: Request) -> RunTrace:
         error_count=data["error_count"],
         tree=[TraceSpan.model_validate(node) for node in data["tree"]],
     )
+
+
+class ReviewEntry(BaseModel):
+    step_id: str
+    step_name: str | None = None
+    decision: str
+    by: str
+    at: datetime
+    feedback: str | None = None
+    before: str | None = None
+    after: str | None = None
+
+
+@router.get("/{run_id}/reviews", response_model=list[ReviewEntry])
+def get_run_reviews(run_id: str, request: Request) -> list[ReviewEntry]:
+    """Decisões humanas do run do workflow (ADR-0028), na ordem em que aconteceram.
+
+    O antes e depois da edição é conteúdo da conversa: mesma regra do trace, só o
+    dono do run ou o owner.
+    """
+    with Session(get_engine()) as session:
+        found = RunRepository(session).reviews(run_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Run não encontrado")
+    owner_id, entries = found
+    if not sees_everyone(request) and owner_id != getattr(request.state, "user_id", None):
+        raise HTTPException(status_code=403, detail="Permissão insuficiente")
+    return [ReviewEntry.model_validate(e) for e in entries]
