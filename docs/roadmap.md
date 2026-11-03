@@ -1181,7 +1181,7 @@ Decisão em [ADR-0029](adr/0029-chunking-por-base-e-compressao.md). Cada base es
 - [x] `docs(adr)`: ADR-0029 e esta seção
 - [x] `feat(api)`: estratégia de corte por base, prévia dos trechos e reprocessamento com o original guardado
 - [x] `feat(api)`: compressão do resultado de tool no agente e no líder do time
-- [ ] `feat(web)`: corte e prévia na página da base e compressão no controle do run
+- [x] `feat(web)`: corte e prévia na página da base e compressão no controle do run
 - [ ] `test(api)`: evals do corte por base e da compressão
 
 **Critério de aceite da fase:**

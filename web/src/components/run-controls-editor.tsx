@@ -6,11 +6,19 @@ import type { components } from "@/lib/api/schema.d.ts";
 import type { CapabilityFlags } from "@/components/model-selector";
 
 export type RunControls = components["schemas"]["RunControls"];
+export type ToolCompression = components["schemas"]["ToolCompression"];
+
+export const DEFAULT_COMPRESSION: ToolCompression = {
+  after_results: 3,
+  token_limit: null,
+  model_id: null,
+};
 
 export const DEFAULT_RUN: RunControls = {
   tool_call_limit: null,
   provider_retries: 0,
   fallback_models: [],
+  compress_tool_results: null,
 };
 
 export function withRunDefaults(value: Partial<RunControls> | undefined): RunControls {
@@ -58,6 +66,14 @@ export function RunControlsEditor({
   });
   const fallbacks = value.fallback_models ?? [];
   const limited = value.tool_call_limit != null;
+  const compression = value.compress_tool_results ?? null;
+
+  function setCompression(patch: Partial<ToolCompression>) {
+    onChange({
+      ...value,
+      compress_tool_results: { ...DEFAULT_COMPRESSION, ...(compression ?? {}), ...patch },
+    });
+  }
 
   function setFallback(i: number, modelId: string) {
     const next = [...fallbacks];
@@ -149,6 +165,77 @@ export function RunControlsEditor({
         <p className="text-muted-foreground text-[12px]">
           Usados em ordem quando o modelo principal falha de vez ou responde 429. Credencial errada
           (401, 403) não troca de modelo. A reserva é cobrada pelo preço dela.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="text-foreground flex items-center gap-2 text-[13px]">
+          <input
+            type="checkbox"
+            checked={compression != null}
+            onChange={(e) =>
+              onChange({
+                ...value,
+                compress_tool_results: e.target.checked ? { ...DEFAULT_COMPRESSION } : null,
+              })
+            }
+          />
+          Comprimir o resultado das tools
+        </label>
+        {compression && (
+          <div className="flex flex-col gap-2 pl-6">
+            <label className="text-foreground flex flex-wrap items-center gap-2 text-[13px]">
+              Depois de
+              <input
+                type="number"
+                aria-label="Resultados antes de comprimir"
+                min={1}
+                max={10}
+                value={compression.after_results ?? 3}
+                onChange={(e) => setCompression({ after_results: Number(e.target.value) })}
+                className={`${inputCls} w-16`}
+              />
+              resultados inteiros no contexto
+            </label>
+            <label className="text-foreground flex flex-wrap items-center gap-2 text-[13px]">
+              ou acima de
+              <input
+                type="number"
+                aria-label="Tokens no contexto antes de comprimir"
+                min={2000}
+                max={200000}
+                step={1000}
+                placeholder="sem teto"
+                value={compression.token_limit ?? ""}
+                onChange={(e) =>
+                  setCompression({ token_limit: e.target.value ? Number(e.target.value) : null })
+                }
+                className={`${inputCls} w-28`}
+              />
+              tokens
+            </label>
+            <label className="text-foreground flex flex-wrap items-center gap-2 text-[13px]">
+              Modelo que resume
+              <select
+                aria-label="Modelo da compressão"
+                value={compression.model_id ?? ""}
+                onChange={(e) => setCompression({ model_id: e.target.value || null })}
+                className={`${inputCls} max-w-full min-w-0 sm:w-72`}
+              >
+                <option value="">O do próprio agente</option>
+                {Object.keys(models ?? {}).map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+        <p className="text-muted-foreground text-[12px]">
+          Um modelo resume o que as tools devolveram antes de seguir no contexto, mantendo números,
+          valores, datas e identificadores. Economiza tokens quando as tools devolvem muito texto,
+          mas o resumo pode perder um detalhe. A chamada de compressão entra no custo do run.
         </p>
       </div>
     </fieldset>
