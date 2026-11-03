@@ -7,6 +7,7 @@ from uuid import UUID
 from agno.agent import Agent
 from agno.agent.factory import AgentFactory
 from agno.compaction.compaction import Compaction
+from agno.compression.manager import CompressionManager
 from agno.db.base import AsyncBaseDb, BaseDb
 from agno.factory.utils import FactoryValidationError, RequestContext
 from agno.guardrails.base import BaseGuardrail
@@ -177,9 +178,12 @@ def required_model(payload: ConfigPayload) -> str:
     return payload.model_id
 
 
-def model_for(model_id: str, payload: ConfigPayload) -> Model:
-    """Modelo com o retry do provedor da versão (ADR-0027). O replay da demo não falha."""
-    model = resolve_model(model_id, payload.capabilities)
+def model_for(model_id: str, payload: ConfigPayload, *, plain: bool = False) -> Model:
+    """Modelo com o retry do provedor da versão (ADR-0027). O replay da demo não falha.
+
+    `plain` deixa de fora o extended thinking: o modelo auxiliar só resume texto.
+    """
+    model = resolve_model(model_id, None if plain else payload.capabilities)
     if payload.run.provider_retries and not demo_replay():
         model.retries = payload.run.provider_retries
         model.delay_between_retries = 1
@@ -193,6 +197,20 @@ def fallback_for(payload: ConfigPayload) -> FallbackConfig | None:
         return None
     models: list[Model | str] = [model_for(mid, payload) for mid in payload.run.fallback_models]
     return FallbackConfig(on_error=models, on_rate_limit=list(models))
+
+
+def compression_for(payload: ConfigPayload) -> CompressionManager | None:
+    """Compressão do resultado de tool (ADR-0029); o consumo entra no RunMetrics do run."""
+    settings = payload.run.compress_tool_results
+    if settings is None or demo_replay():
+        return None
+    return CompressionManager(
+        # sem modelo próprio o Agno usa o do agente, já com o retry da versão
+        model=model_for(settings.model_id, payload, plain=True) if settings.model_id else None,
+        compress_tool_results=True,
+        compress_tool_results_limit=settings.after_results,
+        compress_token_limit=settings.token_limit,
+    )
 
 
 def agent_from(
@@ -225,6 +243,7 @@ def agent_from(
         # com compactação, a janela vai até o limite e o num_history_runs deixa de valer
         compaction=compaction_for(payload.conversation),
         tool_call_limit=payload.run.tool_call_limit,
+        compression_manager=compression_for(payload),
         output_schema=payload.output_schema,
         **memory_kwargs(str(config_id), payload.memory, memory_user if tracked else None),
     )
@@ -311,6 +330,7 @@ def team_from(config_id: UUID, resolved: ResolvedTeam) -> TrackedTeam:
         max_iterations=settings.max_iterations,
         share_member_interactions=settings.share_member_interactions,
         tool_call_limit=leader.payload.run.tool_call_limit,
+        compression_manager=compression_for(leader.payload),
         output_schema=leader.payload.output_schema,
         add_history_to_context=True,
         num_history_runs=HISTORY_RUNS,
