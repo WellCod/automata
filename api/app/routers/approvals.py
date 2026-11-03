@@ -38,8 +38,9 @@ class PendingTool(BaseModel):
 class PendingStep(BaseModel):
     step_id: str | None
     step_name: str | None
-    # before: confirma antes de rodar; after: aprova a saída antes da próxima etapa
-    when: Literal["before", "after"]
+    # before: confirma antes de rodar; after: aprova a saída antes da próxima etapa;
+    # loop: aprova a volta (encerra o laço) ou pede outra com comentário (ADR-0028)
+    when: Literal["before", "after", "loop"]
     message: str | None
     output: str | None
     timeout_at: datetime | None

@@ -2716,6 +2716,22 @@ export interface components {
        */
       max_iterations: number;
       until?: components["schemas"]["WorkflowRule"] | null;
+      review?: components["schemas"]["LoopReview"] | null;
+    };
+    /**
+     * LoopReview
+     * @description Pausa ao fim de cada volta, menos a última (ADR-0028).
+     *
+     *     Aprovar encerra o laço e segue o workflow; recusar pede outra volta com o comentário.
+     */
+    LoopReview: {
+      /**
+       * Message
+       * @default
+       */
+      message: string;
+      /** Timeout Hours */
+      timeout_hours?: number | null;
     };
     /**
      * McpServerBinding
@@ -2881,7 +2897,7 @@ export interface components {
        * When
        * @enum {string}
        */
-      when: "before" | "after";
+      when: "before" | "after" | "loop";
       /** Message */
       message: string | null;
       /** Output */

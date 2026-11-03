@@ -435,3 +435,88 @@ def test_saida_editada_segue_e_fica_no_registro(client: TestClient) -> None:
     assert log[1]["after"] == "análise revisada: R$ 210"
     assert all(e["step_name"] == "analise" and e["by"] == "desconhecido" for e in log)
     assert client.get("/api/v1/runs/nao-existe/reviews").status_code == 404
+
+
+def test_revisao_por_volta_pede_outra_e_encerra_o_laco(client: TestClient) -> None:
+    rascunho = _agent(client, "rascunho por volta", "claude-sonnet-4-6")
+    resposta = _agent(client, "resposta por volta", "claude-opus-4-7")
+    wf = _publish(
+        client,
+        "workflow",
+        "laço revisado",
+        {
+            "workflow": {
+                "steps": [
+                    {
+                        "type": "loop",
+                        "name": "rascunhos",
+                        "steps": [_step("rascunho", rascunho)],
+                        "max_iterations": 3,
+                        "review": {"message": "A volta ficou boa?"},
+                    },
+                    _step("final", resposta),
+                ]
+            }
+        },
+    )
+    out = _run(client, wf, "escreva o aviso")
+    assert out["status"] == "PAUSED", out
+    [pending] = _workflow_run(wf).pending_steps
+    assert pending["when"] == "loop" and pending["message"] == "A volta ficou boa?"
+
+    again = _decide(client, wf, out, confirmed=False, rejection_feedback="mais curto")
+    assert again["status"] == "PAUSED", again
+    assert _runs(client, rascunho) == 2
+    done = _decide(client, wf, out, confirmed=True)
+    assert done["status"] == "COMPLETED", done
+    # aprovar a volta encerra o laço: nada de terceira volta, e a etapa final roda
+    assert _runs(client, rascunho) == 2
+    assert done["content"] == "consolidado: pronto"
+    log = client.get(f"/api/v1/runs/{out['run_id']}/reviews").json()
+    assert [(e["decision"], e.get("feedback")) for e in log] == [
+        ("loop_again", "mais curto"),
+        ("loop_done", None),
+    ]
+
+
+def test_revisao_por_volta_so_no_nivel_principal_e_com_uma_etapa(client: TestClient) -> None:
+    agent = _agent(client, "volta inválida", "claude-haiku-4-5")
+    body = {"name": "laço inválido", "description": "x"}
+    wf = client.post("/api/v1/configs", json={**body, "kind": "workflow"}).json()["id"]
+    review = {"message": "ok?"}
+    loop = {"type": "loop", "name": "voltas", "review": review}
+    cases = [
+        ([{**loop, "steps": [_step("a", agent), _step("b", agent)]}], "uma etapa só"),
+        (
+            [
+                {
+                    **loop,
+                    "steps": [
+                        {
+                            "type": "parallel",
+                            "name": "p",
+                            "branches": [_step("a", agent), _step("b", agent)],
+                        }
+                    ],
+                },
+                _step("fim", agent),
+            ],
+            "uma etapa só",
+        ),
+        (
+            [
+                {
+                    "type": "condition",
+                    "name": "se",
+                    "rule": {"kind": "always"},
+                    "steps": [{**loop, "steps": [_step("a", agent)]}],
+                }
+            ],
+            "nível principal",
+        ),
+    ]
+    for steps, expected in cases:
+        resp = client.put(
+            f"/api/v1/configs/{wf}/draft", json={**body, "payload": {"workflow": {"steps": steps}}}
+        )
+        assert resp.status_code == 422 and expected in resp.text, resp.text

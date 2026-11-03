@@ -80,6 +80,17 @@ class ConditionNode(BaseModel):
     else_steps: list["WorkflowNode"] = Field(default_factory=list)
 
 
+class LoopReview(BaseModel):
+    """Pausa ao fim de cada volta, menos a última (ADR-0028).
+
+    Aprovar encerra o laço e segue o workflow; recusar pede outra volta com o comentário.
+    """
+
+    message: str = Field(default="", max_length=300)
+    # vazio = sem prazo; vencido, o workflow é cancelado
+    timeout_hours: int | None = Field(default=None, ge=1, le=168)
+
+
 class LoopNode(BaseModel):
     type: Literal["loop"] = "loop"
     name: _Name
@@ -87,6 +98,7 @@ class LoopNode(BaseModel):
     max_iterations: int = Field(default=3, ge=1, le=10)
     # avaliada na saída da última etapa de cada volta; None roda até max_iterations
     until: WorkflowRule | None = None
+    review: LoopReview | None = None
 
 
 WorkflowNode = Annotated[
@@ -129,6 +141,23 @@ def _reviews_inside_containers(nodes: list["WorkflowNode"]) -> list[str]:
     ]
 
 
+def _loop_review_problems(nodes: list["WorkflowNode"]) -> list[str]:
+    """Laço com revisão por volta: no nível principal e com uma etapa simples por volta.
+
+    A retomada do Agno 3.1.8 supõe uma etapa por volta; com mais, os resultados voltam
+    trocados. Fora do nível principal vale a mesma regra das etapas (ADR-0023).
+    """
+    problems: list[str] = []
+    for node, depth in walk(nodes):
+        if not isinstance(node, LoopNode) or node.review is None:
+            continue
+        if depth > 1:
+            problems.append(f"laço '{node.name}' com revisão precisa estar no nível principal")
+        elif len(node.steps) != 1 or not isinstance(node.steps[0], StepNode):
+            problems.append(f"laço '{node.name}' com revisão por volta precisa de uma etapa só")
+    return problems
+
+
 class WorkflowSettings(BaseModel):
     """Seção de workflow do payload. Só existe em config de kind=workflow."""
 
@@ -151,6 +180,9 @@ class WorkflowSettings(BaseModel):
             raise ValueError(
                 f"revisão humana só em etapa do nível principal do workflow: {revisadas}"
             )
+        problems = _loop_review_problems(self.steps)
+        if problems:
+            raise ValueError("; ".join(problems))
         if isinstance(self.steps[-1], ParallelNode):
             # a saída final seria só a do último ramo
             raise ValueError("o workflow não pode terminar num paralelo: adicione uma etapa depois")
