@@ -136,6 +136,8 @@ class KnowledgeContentResponse(BaseModel):
     status: Literal["processing", "completed", "failed"]
     status_message: str | None
     chunk_count: int
+    # trechos com instrução embutida para o assistente (ADR-0030); seguem indexados
+    suspect_chunks: int = 0
     created_by: str
     created_at: datetime
     updated_at: datetime

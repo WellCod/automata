@@ -128,7 +128,7 @@ Regras de entrada e saída versionadas junto com o agente. O bloqueio acontece a
 - **Injeção de prompt:** detectada em português e inglês, sem diferenciar acento.
 - **Outras regras:** tópicos proibidos, tamanho máximo e moderação opcional da OpenAI.
 - **Classificador por modelo:** um modelo escolhido julga a mensagem antes do run e pega a injeção que a lista de termos não pega, a toxicidade e o pedido fora do que o agente atende, descrito em texto. Se o classificador cair, o agente segue ou bloqueia, conforme configurado, e o custo da checagem entra no agente ([ADR-0030](docs/adr/0030-guardrails-por-modelo.md)).
-- **Conteúdo de terceiros:** o resultado das tools, inclusive MCP e busca da base, é examinado antes de voltar ao modelo. Uma página ou um documento com instrução embutida para o assistente chega como aviso, e o run segue com a retirada registrada.
+- **Conteúdo de terceiros:** o resultado das tools, inclusive MCP e busca da base, é examinado antes de voltar ao modelo. Uma página ou um documento com instrução embutida para o assistente chega como aviso, e o run segue com a retirada registrada. Na ingestão, o documento que tem trechos com instrução embutida fica marcado na base, para quem cuida dela ver de onde a injeção vem.
 - **Na resposta:** dado pessoal ou termo proibido troca a resposta antes de ela sair.
 
 Execuções barradas aparecem como **bloqueadas**, com a regra, separadas de falha no analytics.

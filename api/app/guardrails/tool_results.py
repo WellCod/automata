@@ -50,6 +50,17 @@ THIRD_PARTY_TERMS: tuple[str, ...] = (
 )
 
 
+def third_party_terms() -> list[str]:
+    """Termos fixos para conteúdo de terceiros, sem os extras de um agente."""
+    return [t for t in (normalize(t) for t in (*INJECTION_TERMS, *THIRD_PARTY_TERMS)) if t]
+
+
+def suspect_count(texts: list[str]) -> int:
+    """Trechos com instrução embutida, para marcar o documento na base (ADR-0030)."""
+    terms = third_party_terms()
+    return sum(1 for text in texts if term_hit(text, terms) is not None)
+
+
 def warning_for(tool: str) -> str:
     return (
         f"[resultado de {tool} retirado: possível instrução embutida. "
