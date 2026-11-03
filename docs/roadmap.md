@@ -1197,7 +1197,7 @@ Decisão em [ADR-0029](adr/0029-chunking-por-base-e-compressao.md). Cada base es
 Decisão em [ADR-0030](adr/0030-guardrails-por-modelo.md). Um modelo escolhido classifica a mensagem do usuário antes do run, procurando injeção, toxicidade ou assunto fora do que o agente atende. O resultado das tools, inclusive MCP e busca da base, é examinado antes de voltar ao modelo: o que traz instrução embutida é retirado, e o run segue com o aviso. Na ingestão, os trechos com termos de injeção são contados e o documento fica marcado na base.
 
 - [x] `docs(adr)`: ADR-0030 e esta seção
-- [ ] `feat(api)`: classificador por modelo como regra de entrada, com falha aberta ou fechada e custo no agente
+- [x] `feat(api)`: classificador por modelo como regra de entrada, com falha aberta ou fechada e custo no agente
 - [ ] `feat(api)`: resultado de tool examinado antes de voltar ao modelo, com a retirada registrada no run
 - [ ] `feat(api)`: varredura de injeção nos trechos indexados
 - [ ] `feat(web)`: classificador e exame de tool nos guardrails, documentos suspeitos na base e resultado retirado no run

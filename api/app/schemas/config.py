@@ -84,6 +84,28 @@ class OutputRule(BaseModel):
 DEFAULT_BLOCKED_MESSAGE = "Não posso ajudar com essa mensagem por aqui."
 
 
+ClassifierCheck = Literal["injection", "toxicity", "off_topic"]
+
+
+class ClassifierRule(BaseModel):
+    """Classificador por modelo na entrada (ADR-0030): uma chamada por mensagem."""
+
+    model_id: str = Field(min_length=1, max_length=64)
+    checks: list[ClassifierCheck] = Field(min_length=1, max_length=3)
+    # o que o agente atende, em texto; obrigatório com off_topic
+    scope: str = Field(default="", max_length=500)
+    # classificador fora do ar ou sem resposta em 10 s: deixa passar ou bloqueia
+    on_failure: Literal["allow", "block"] = "allow"
+
+    @model_validator(mode="after")
+    def escopo_com_off_topic(self) -> "ClassifierRule":
+        if len(self.checks) != len(set(self.checks)):
+            raise ValueError("checagem repetida no classificador")
+        if "off_topic" in self.checks and not self.scope.strip():
+            raise ValueError("o classificador de assunto precisa do escopo do agente")
+        return self
+
+
 class GuardrailSettings(BaseModel):
     """Regras de entrada do agente (ADR-0013). Tudo desligado por padrão."""
 
@@ -95,6 +117,7 @@ class GuardrailSettings(BaseModel):
     max_input_chars: int | None = Field(default=None, ge=50, le=100_000)
     # API de moderação da OpenAI: uma chamada por mensagem, com o texto saindo da instância
     moderation: bool = False
+    classifier: ClassifierRule | None = None
     output: OutputRule = Field(default_factory=OutputRule)
     blocked_message: str = Field(default=DEFAULT_BLOCKED_MESSAGE, min_length=1, max_length=500)
 

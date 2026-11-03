@@ -159,8 +159,9 @@ def test_hyde_busca_com_a_resposta_hipotetica_e_mede(
     db_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import app.agents.models_map as models_map
-    from app.knowledge.search import Caller, search
+    from app.knowledge.search import search
     from app.models.usage import UsageEvent
+    from app.side_usage import Caller
     from tests.fake_models import FixedReplyModel
 
     docs = [
