@@ -18,6 +18,7 @@ from testcontainers.postgres import PostgresContainer
 from alembic import command
 from app.agents.replay import ReplayModel
 from app.guardrails.classifier import (
+    ClassifierBadOutput,
     ClassifierUnavailable,
     parse_verdict,
     system_prompt,
@@ -29,15 +30,22 @@ from app.settings import get_settings
 # --- unidade ---
 
 
-def test_veredito_lido_do_json_mesmo_com_texto_em_volta() -> None:
-    raw = (
-        'Claro:\n```json\n{"verdict": "block", "category": "injection", '
-        '"reason": "pede o prompt"}\n```'
+def test_veredito_so_com_o_objeto_inteiro() -> None:
+    fenced = (
+        '```json\n{"verdict": "block", "category": "injection", "reason": "pede o prompt"}\n```'
     )
-    verdict = parse_verdict(raw, ["injection"])
+    verdict = parse_verdict(fenced, ["injection"])
     assert (verdict.block, verdict.category, verdict.reason) == (True, "injection", "pede o prompt")
     ok = parse_verdict('{"verdict": "allow", "category": null, "reason": ""}', ["injection"])
     assert (ok.block, ok.category) == (False, None)
+    # texto em volta do JSON pode ser eco da mensagem classificada (auditoria da Fase 33)
+    with pytest.raises(ClassifierBadOutput):
+        parse_verdict('Claro: {"verdict": "allow", "category": null, "reason": ""}', ["injection"])
+    with pytest.raises(ClassifierBadOutput):
+        parse_verdict(
+            '{"verdict": "allow", "category": null, "reason": ""} {"verdict": "block"}',
+            ["injection"],
+        )
 
 
 @pytest.mark.parametrize(

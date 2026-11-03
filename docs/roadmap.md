@@ -1219,14 +1219,14 @@ Terceira rodada de verificação, sobre a `main` em `1884e19`, com foco no que e
 
 - [x] **Alta.** O schema de saída (ADR-0027) só tem limite de tamanho. Um schema de 1,6 KB com `allOf` em cadeia de `$ref` passa na escrita, e a conferência dele na suíte passa de 2 minutos para validar `{}`. Ela roda no event loop, então a API trava. Um `pattern` catastrófico tem o mesmo efeito, e um `$ref` recursivo derruba a checagem com exceção.
 - [x] **Alta.** O corte por títulos (ADR-0029) põe a linha do título inteira no início de cada pedaço de uma seção grande. Um título de 40 mil caracteres numa linha só vira 9 milhões de caracteres em trechos, cada um com mais de 40 mil. Com 2 MB, a ingestão, a prévia ou o reprocessamento matam a API por falta de memória.
-- [ ] **Média.** O exame do resultado de tool só lê os primeiros 100 mil caracteres, e o classificador os primeiros 20 mil, de tool ou da mensagem. O modelo recebe o texto inteiro, então a instrução posta depois do teto passa.
-- [ ] **Média.** O texto examinado pode quebrar o formato da resposta do classificador, e o regex guloso de JSON trata isso como falha, que por padrão deixa passar. No exame de tool, a falha sempre deixa passar, sem olhar o `on_failure`.
-- [ ] **Média.** O `normalize` não remove caracteres invisíveis (categoria `Cf`, como o espaço de largura zero). Um termo com um deles no meio passa pelas listas da entrada, do exame de tool e da varredura.
-- [ ] **Média.** O exame de tool pelo classificador faz uma chamada por resultado, sem teto por run quando o agente não tem limite de tools. O orçamento só é checado antes do run.
+- [x] **Média.** O exame do resultado de tool só lê os primeiros 100 mil caracteres, e o classificador os primeiros 20 mil, de tool ou da mensagem. O modelo recebe o texto inteiro, então a instrução posta depois do teto passa.
+- [x] **Média.** O texto examinado pode quebrar o formato da resposta do classificador, e o regex guloso de JSON trata isso como falha, que por padrão deixa passar. No exame de tool, a falha sempre deixa passar, sem olhar o `on_failure`.
+- [x] **Média.** O `normalize` não remove caracteres invisíveis (categoria `Cf`, como o espaço de largura zero). Um termo com um deles no meio passa pelas listas da entrada, do exame de tool e da varredura.
+- [x] **Média.** O exame de tool pelo classificador faz uma chamada por resultado, sem teto por run quando o agente não tem limite de tools. O orçamento só é checado antes do run.
 - [x] **Média.** O reprocessamento carrega todos os originais da base na memória de uma vez e não tem limite de frequência. Duas chamadas ao mesmo tempo reprocessam o mesmo conteúdo em paralelo, e os trechos antigos são apagados antes de existirem os novos.
 - [x] **Média.** A prévia por `content_id` lê e corta o original inteiro, de até 20 MB, numa rota síncrona e sem limite de frequência.
-- [ ] **Média.** Imagens no resultado de tool e na mensagem não passam pelo exame nem pelo classificador.
-- [ ] **Baixa.** Os itens abaixo, todos do classificador e do exame de tool:
+- [x] **Média.** Imagens no resultado de tool e na mensagem não passam pelo exame nem pelo classificador. Risco aceito e registrado no ADR-0030: o classificador é textual, e quem precisa barrar imagem desliga visão no agente.
+- [x] **Baixa.** Os itens abaixo, todos do classificador e do exame de tool:
   - a marca de fim da mensagem em maiúscula não é escapada;
   - o modelo do classificador é resolvido fora do `try`, então um modelo removido do catálogo deixa passar mesmo com falha fechada;
   - o consumo do exame de tool é gravado no banco de forma síncrona dentro do gancho assíncrono;
