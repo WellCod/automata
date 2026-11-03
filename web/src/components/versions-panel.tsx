@@ -62,6 +62,16 @@ const STATUS_CLS: Record<string, string> = {
   published: "text-accent",
 };
 
+function compressionText(
+  c: NonNullable<ConfigPayload["run"]>["compress_tool_results"] | undefined,
+): string {
+  if (!c) return "desligada";
+  const parts = [`após ${c.after_results ?? 3}`];
+  if (c.token_limit) parts.push(`${c.token_limit} tokens`);
+  if (c.model_id) parts.push(c.model_id);
+  return parts.join(", ");
+}
+
 function diffPayload(a: ConfigPayload, b: ConfigPayload): string[] {
   const diffs: string[] = [];
   if (a.model_id !== b.model_id) diffs.push(`modelo: ${a.model_id} → ${b.model_id}`);
@@ -87,6 +97,9 @@ function diffPayload(a: ConfigPayload, b: ConfigPayload): string[] {
   const fallA = (runA.fallback_models ?? []).join(", ") || "nenhum";
   const fallB = (runB.fallback_models ?? []).join(", ") || "nenhum";
   if (fallA !== fallB) diffs.push(`modelos reserva: ${fallA} → ${fallB}`);
+  const compA = compressionText(runA.compress_tool_results);
+  const compB = compressionText(runB.compress_tool_results);
+  if (compA !== compB) diffs.push(`compressão de tool: ${compA} → ${compB}`);
   const schemaA = a.output_schema ? JSON.stringify(a.output_schema) : null;
   const schemaB = b.output_schema ? JSON.stringify(b.output_schema) : null;
   if (schemaA !== schemaB)

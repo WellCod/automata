@@ -6,6 +6,14 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+  type ChunkingSettings,
+  ChunkingFields,
+  ChunkPreviewPanel,
+  DEFAULT_CHUNKING,
+  overlapProblem,
+  ReprocessBase,
+} from "@/components/chunking-settings";
 import { KnowledgeConnectors } from "@/components/knowledge-connectors";
 import { DEFAULT_RETRIEVAL, RetrievalFields } from "@/components/retrieval-settings";
 import { Button } from "@/components/ui/button";
@@ -484,13 +492,18 @@ function Settings({ base }: { base: KnowledgeBase }) {
     ...DEFAULT_RETRIEVAL,
     ...base.retrieval,
   });
+  const savedChunking: ChunkingSettings = { ...DEFAULT_CHUNKING, ...base.chunking };
+  const [chunking, setChunking] = useState<ChunkingSettings>(savedChunking);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const chunkingDirty =
+    chunkSize !== base.chunk_size || JSON.stringify(chunking) !== JSON.stringify(savedChunking);
+  const chunkingProblem = overlapProblem(chunkSize, chunking);
 
   const save = useMutation({
     mutationFn: async () => {
       const res = await client.PUT("/api/v1/knowledge-bases/{base_id}", {
         params: { path: { base_id: base.id } },
-        body: { name, description, chunk_size: chunkSize, retrieval },
+        body: { name, description, chunk_size: chunkSize, retrieval, chunking },
       });
       if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar"));
     },
@@ -547,20 +560,29 @@ function Settings({ base }: { base: KnowledgeBase }) {
             O agente lê a descrição para decidir quando buscar aqui.
           </FieldDescription>
         </Field>
-        <Field>
-          <FieldLabel htmlFor="kb-edit-chunk">Tamanho do trecho (caracteres)</FieldLabel>
-          <input
-            id="kb-edit-chunk"
-            type="number"
-            min={200}
-            max={8000}
-            step={100}
-            value={chunkSize}
-            onChange={(e) => setChunkSize(Number(e.target.value))}
-            className={inputCls}
-          />
-          <FieldDescription>Vale para documentos enviados depois da mudança.</FieldDescription>
-        </Field>
+        <fieldset className="border-border flex min-w-0 flex-col gap-3 rounded border px-4 pt-3 pb-4">
+          <legend className="px-1 text-[13px] font-medium">Corte em trechos</legend>
+          <Field>
+            <FieldLabel htmlFor="kb-edit-chunk">Tamanho do trecho (caracteres)</FieldLabel>
+            <input
+              id="kb-edit-chunk"
+              type="number"
+              min={200}
+              max={8000}
+              step={100}
+              value={chunkSize}
+              onChange={(e) => setChunkSize(Number(e.target.value))}
+              className={inputCls}
+            />
+          </Field>
+          <ChunkingFields value={chunking} onChange={setChunking} chunkSize={chunkSize} />
+          <FieldDescription>
+            Vale para o que for enviado depois de salvar. Para aplicar ao que já está na base, salve
+            e reprocesse.
+          </FieldDescription>
+          <ChunkPreviewPanel baseId={base.id} chunkSize={chunkSize} chunking={chunking} />
+          <ReprocessBase baseId={base.id} dirty={chunkingDirty} />
+        </fieldset>
         <Field>
           <RetrievalFields value={retrieval} onChange={setRetrieval} />
           <FieldDescription>
@@ -618,7 +640,11 @@ function Settings({ base }: { base: KnowledgeBase }) {
             Remover base
           </Button>
         )}
-        <Button type="submit" variant="strong" disabled={save.isPending}>
+        <Button
+          type="submit"
+          variant="strong"
+          disabled={save.isPending || chunkingProblem !== null}
+        >
           {save.isPending ? "Salvando…" : "Salvar"}
         </Button>
       </div>
