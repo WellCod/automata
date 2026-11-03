@@ -54,4 +54,5 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0026](0026-rotacao-de-chaves.md) | Rotação da chave JWT e da chave dos segredos com uma chave anterior aceita na leitura | Aceito |
 | [0027](0027-controle-do-run.md) | Controle do run: limite de tools, retry do provedor com modelo reserva e saída estruturada | Aceito |
 | [0028](0028-revisao-humana-completa.md) | Revisão humana completa: saída editada, revisão por volta de laço e registro das decisões | Aceito |
-| [0029](0029-chunking-por-base-e-compressao.md) | Chunking por base com prévia e reprocessamento, e compressão do resultado de tool | Proposto |
+| [0029](0029-chunking-por-base-e-compressao.md) | Chunking por base com prévia e reprocessamento, e compressão do resultado de tool | Aceito |
+| [0030](0030-guardrails-por-modelo.md) | Classificador por modelo na entrada e exame do resultado de tool e dos documentos | Proposto |
