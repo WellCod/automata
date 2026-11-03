@@ -20,6 +20,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.db import get_engine
+from app.guardrails.tool_results import suspect_count
 from app.knowledge.chunking import strategy_for
 from app.knowledge.runtime import metered, vector_db_for
 from app.models.knowledge_base import KnowledgeBase
@@ -87,8 +88,14 @@ def _finish(
     message: str | None,
     chunks: int = 0,
     digest: str | None = None,
+    suspects: int = 0,
 ) -> None:
-    values: dict[str, object] = {"status": status, "status_message": message, "chunk_count": chunks}
+    values: dict[str, object] = {
+        "status": status,
+        "status_message": message,
+        "chunk_count": chunks,
+        "suspect_chunks": suspects,
+    }
     if digest is not None:
         values["content_hash"] = digest
     with Session(get_engine()) as session:
@@ -149,7 +156,16 @@ def ingest(content_id: UUID, data: bytes) -> None:
         if stored < len(docs):
             vector_db.delete_by_content_id(str(content_id))
             raise IngestError(f"{len(docs) - stored} de {len(docs)} trechos não foram indexados")
-        _finish(content_id, status="completed", message=None, chunks=stored, digest=digest)
+        # o trecho segue indexado: quem decide no run é o exame do resultado de tool
+        suspects = suspect_count([d.content for d in docs])
+        _finish(
+            content_id,
+            status="completed",
+            message=None,
+            chunks=stored,
+            digest=digest,
+            suspects=suspects,
+        )
         logger.info(
             "conteúdo indexado",
             extra={"content_id": str(content_id), "base_id": str(base.id), "chunks": stored},

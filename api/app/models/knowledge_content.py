@@ -44,6 +44,8 @@ class KnowledgeContent(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="processing")
     status_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # trechos com termo de injeção na última ingestão (ADR-0030)
+    suspect_chunks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
     # origem remota (ADR-0024): o conector, o caminho lá e a versão lá
     connector_id: Mapped[uuid.UUID | None] = mapped_column(

@@ -56,6 +56,7 @@ def to_response(c: KnowledgeContent) -> KnowledgeContentResponse:
         status=c.status,
         status_message=c.status_message,
         chunk_count=c.chunk_count,
+        suspect_chunks=c.suspect_chunks,
         created_by=c.created_by,
         created_at=c.created_at,
         updated_at=c.updated_at,
