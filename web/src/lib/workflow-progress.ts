@@ -24,7 +24,8 @@ export interface StepProgress {
 // etapa esperando revisão humana (ADR-0023), lida do requisito ativo do run
 export interface PendingReview {
   stepName: string;
-  when: "before" | "after";
+  // loop: fim de uma volta do laço com revisão (ADR-0028)
+  when: "before" | "after" | "loop";
   message?: string;
   output?: string;
 }
@@ -107,10 +108,11 @@ export function pendingFrom(requirements: unknown): PendingReview | null {
   const active = requirements[requirements.length - 1] as Record<string, unknown>;
   if (active.confirmed === true || active.confirmed === false) return null;
   const after = active.requires_output_review === true;
+  const loop = active.step_type === "Loop";
   const output = (active.step_output ?? {}) as { content?: unknown };
   return {
     stepName: str(active.step_name) ?? "etapa",
-    when: after ? "after" : "before",
+    when: loop ? "loop" : after ? "after" : "before",
     message: str(after ? active.output_review_message : active.confirmation_message),
     output: after ? str(output.content) : undefined,
   };

@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, Bot, GitBranch, Plus, Repeat, Split, Trash2 } from 
 import client from "@/lib/api/client";
 import {
   MAX_BRANCHES,
+  type LoopNode,
   MAX_DEPTH,
   type NodeType,
   RULE_KINDS,
@@ -188,6 +189,59 @@ function StepFields({
       </label>
       {(ctx.reviewable || node.review) && (
         <ReviewFields node={node} onChange={onChange} reviewable={ctx.reviewable} />
+      )}
+    </div>
+  );
+}
+
+// revisão por volta (ADR-0028): no nível principal e com uma etapa simples por volta,
+// o limite da retomada do Agno; a API confere de novo na escrita
+function LoopReviewFields({
+  node,
+  onChange,
+  reviewable,
+}: {
+  node: LoopNode;
+  onChange: (n: LoopNode) => void;
+  reviewable: boolean;
+}) {
+  const single = node.steps.length === 1 && node.steps[0].type === "step";
+  const allowed = reviewable && single;
+  const on = node.review != null;
+  return (
+    <div className="flex flex-col gap-1.5 text-[12px]">
+      <label className="text-foreground flex items-center gap-1.5">
+        <input
+          type="checkbox"
+          checked={on}
+          disabled={!allowed && !on}
+          onChange={(e) =>
+            onChange({
+              ...node,
+              review: e.target.checked ? { message: "", timeout_hours: null } : null,
+            })
+          }
+        />
+        Pausar ao fim de cada volta para alguém seguir ou pedir outra
+      </label>
+      {!allowed && (
+        <p className="text-muted-foreground">
+          {reviewable
+            ? "Disponível com uma etapa só dentro do laço."
+            : "Disponível só em laço no nível principal do workflow."}
+        </p>
+      )}
+      {on && (
+        <input
+          aria-label={`Mensagem da revisão de ${node.name}`}
+          value={node.review?.message ?? ""}
+          maxLength={300}
+          placeholder="O que conferir em cada volta (opcional)"
+          onChange={(e) =>
+            onChange({ ...node, review: { ...node.review, message: e.target.value } })
+          }
+          className={inputCls}
+        />
       )}
     </div>
   );
@@ -497,6 +551,7 @@ function NodeCard({
               Parar antes quando a resposta cumprir uma regra
             </label>
           </div>
+          <LoopReviewFields node={node} onChange={onChange} reviewable={ctx.reviewable} />
           {node.until && (
             <RuleFields
               rule={node.until}

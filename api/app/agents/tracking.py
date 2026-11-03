@@ -56,6 +56,13 @@ _WORKFLOW_END_EVENTS = {
     "WorkflowError": "error",
     "WorkflowCancelled": "cancelled",
     "WorkflowPaused": "paused",
+    # no stream em primeiro plano o WorkflowPaused é montado pela rota do AgentOS depois do
+    # gerador (Agno 3.1.8): aqui só passa a pausa da etapa, sem os requisitos
+    "StepPaused": "paused",
+    "StepOutputReview": "paused",
+    "StepExecutorPaused": "paused",
+    "ConditionPaused": "paused",
+    "RouterPaused": "paused",
 }
 
 AnyOutput = RunOutput | TeamRunOutput
@@ -587,6 +594,11 @@ class TrackedWorkflow(Workflow):
                 if name in _WORKFLOW_END_EVENTS:
                     last_event = name
                     error = getattr(event, "error", None) or error
+                elif (
+                    name == "StepStarted" and _WORKFLOW_END_EVENTS.get(last_event or "") == "paused"
+                ):
+                    # pausa da etapa já decidida no mesmo stream: o fluxo seguiu
+                    last_event = None
                 if name == "WorkflowPaused":
                     pending = pending_steps(getattr(event, "step_requirements", None))
                 yield event
@@ -604,4 +616,16 @@ class TrackedWorkflow(Workflow):
             await RunTracking._save(self._record(kwargs, start, None, run_id, "error", str(exc)))
             return
         status = _WORKFLOW_END_EVENTS.get(last_event or "", "success")
+        if status == "paused" and pending is None and run_id is not None:
+            pending = await self._pending_from_db(run_id, kwargs.get("session_id"))
         await RunTracking._save(self._record(kwargs, start, None, run_id, status, error, pending))
+
+    async def _pending_from_db(
+        self, run_id: str, session_id: str | None
+    ) -> list[dict[str, Any]] | None:
+        try:
+            paused = await self.aget_run_output(run_id, session_id=session_id)
+        except Exception as exc:
+            logger.warning("pausa sem requisitos", extra={"run_id": run_id, "error": str(exc)})
+            return None
+        return pending_steps(paused.step_requirements) if paused is not None else None

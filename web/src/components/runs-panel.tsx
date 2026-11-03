@@ -12,6 +12,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useState } from "react";
+import { ReviewHistory } from "@/components/review-history";
 import { RunTrace } from "@/components/run-trace";
 import { Button } from "@/components/ui/button";
 import client from "@/lib/api/client";
@@ -141,6 +142,7 @@ function RunItem({
               </Button>
             </div>
           )}
+          <ReviewHistory runId={run.run_id} />
           <RunTrace runId={run.run_id} />
         </div>
       )}

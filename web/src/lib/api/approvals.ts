@@ -17,6 +17,8 @@ export interface StepDecision {
   approve: boolean;
   // na recusa com "refaz com o motivo", vai para a etapa na nova tentativa
   feedback?: string;
+  // aprovação com a saída corrigida: segue no lugar da original (ADR-0028)
+  edited?: string;
 }
 
 /**
@@ -40,6 +42,7 @@ export async function decideWorkflowStep(
   const active = {
     ...requirements[requirements.length - 1],
     confirmed: decision.approve,
+    ...(decision.approve && decision.edited != null ? { edited_output: decision.edited } : {}),
     ...(!decision.approve && decision.feedback?.trim()
       ? { rejection_feedback: decision.feedback.trim() }
       : {}),

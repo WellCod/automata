@@ -102,6 +102,7 @@ def test_viewer_ve_so_as_proprias_pendencias(client: TestClient) -> None:
 def test_registro_das_revisoes_so_para_o_dono_e_o_owner(client: TestClient) -> None:
     from app.db import get_engine
     from app.models.run import AgentRun
+    from app.models.user import User
     from app.schemas.user import ROLE_SCOPES, UserRole
 
     owner = _h("owner", ["agent_os:admin"])
@@ -117,13 +118,18 @@ def test_registro_das_revisoes_so_para_o_dono_e_o_owner(client: TestClient) -> N
         "after": "R$ 210",
     }
     with Session(get_engine()) as session:
+        carla = User(email="carla@exemplo.com", hashed_password="x", role=UserRole.editor)
+        session.add(carla)
+        session.flush()
+        # quem decidiu fica pelo id; a leitura mostra o e-mail, e o que não é usuário passa igual
+        approved = {**entry, "decision": "approved", "by": str(carla.id)}
         session.add(
             AgentRun(
                 agent_config_id=config_id,
                 user_id="ana",
                 run_id="run-revisado",
                 status="success",
-                review_log=[entry],
+                review_log=[entry, approved],
             )
         )
         session.commit()
@@ -131,6 +137,7 @@ def test_registro_das_revisoes_so_para_o_dono_e_o_owner(client: TestClient) -> N
     viewer = ROLE_SCOPES[UserRole.viewer]
     mine = client.get("/api/v1/runs/run-revisado/reviews", headers=_h("ana", viewer))
     assert mine.status_code == 200 and mine.json()[0]["after"] == "R$ 210"
+    assert [e["by"] for e in mine.json()] == ["ana", "carla@exemplo.com"]
     other = client.get("/api/v1/runs/run-revisado/reviews", headers=_h("bruno", viewer))
     assert other.status_code == 403
     assert client.get("/api/v1/runs/run-revisado/reviews", headers=owner).status_code == 200
