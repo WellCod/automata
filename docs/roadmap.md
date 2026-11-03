@@ -1164,7 +1164,7 @@ Decisão em [ADR-0028](adr/0028-revisao-humana-completa.md). O revisor corrige a
 - [x] `feat(api)`: saída editada na aprovação e registro das decisões humanas no run
 - [x] `feat(api)`: revisão por volta de laço no workflow
 - [x] `feat(web)`: edição da saída com diff, revisão por volta no editor e histórico das decisões
-- [ ] `test(api)`: evals da revisão humana completa
+- [x] `test(api)`: evals da revisão humana completa
 
 **Critério de aceite da fase:**
 
