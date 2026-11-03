@@ -373,7 +373,8 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0025](docs/adr/0025-memoria-do-usuario.md) | Memória do usuário entre sessões, por agente, com retenção, PII mascarado e exclusão |
 | [0026](docs/adr/0026-rotacao-de-chaves.md) | Rotação da chave JWT e da chave dos segredos sem derrubar sessões nem integrações |
 | [0027](docs/adr/0027-controle-do-run.md) | Controle do run: limite de tools, retry do provedor com modelo reserva e saída estruturada |
-| [0028](docs/adr/0028-revisao-humana-completa.md) | Revisão humana completa: saída editada, revisão por volta de laço e registro das decisões (proposto, Fase 30) |
+| [0028](docs/adr/0028-revisao-humana-completa.md) | Revisão humana completa: saída editada, revisão por volta de laço e registro das decisões |
+| [0029](docs/adr/0029-chunking-por-base-e-compressao.md) | Chunking por base com prévia e reprocessamento, e compressão do resultado de tool (proposto, Fase 31) |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 

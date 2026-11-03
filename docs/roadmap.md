@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 30
+# Roadmap — Fases 4 a 31
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -1173,3 +1173,21 @@ Decisão em [ADR-0028](adr/0028-revisao-humana-completa.md). O revisor corrige a
 - Num laço de rascunho com revisão por volta, pedir outra volta com comentário roda a volta seguinte com o comentário. Aprovar encerra o laço e segue o workflow.
 - Laço com duas etapas por volta, ou dentro de condição, é recusado na escrita com revisão por volta.
 - Viewer só vê o registro dos próprios runs.
+
+## Fase 31 — Chunking por base e compressão
+
+Decisão em [ADR-0029](adr/0029-chunking-por-base-e-compressao.md). Cada base escolhe como o conteúdo é cortado: pela recursiva de hoje, por títulos, por parágrafos ou em tamanho fixo, com a sobreposição ajustável. Quem configura vê os trechos numa prévia, sem custo, e reprocessa a base com a estratégia nova. Arquivo e texto passam a guardar o original para isso. No agente e no líder do time, o resultado das tools pode ser comprimido por um modelo antes de seguir no contexto, com o custo medido no run.
+
+- [x] `docs(adr)`: ADR-0029 e esta seção
+- [ ] `feat(api)`: estratégia de corte por base, prévia dos trechos e reprocessamento com o original guardado
+- [ ] `feat(api)`: compressão do resultado de tool no agente e no líder do time
+- [ ] `feat(web)`: corte e prévia na página da base e compressão no controle do run
+- [ ] `test(api)`: evals do corte por base e da compressão
+
+**Critério de aceite da fase:**
+
+- Um manual com três seções em markdown, numa base `headings`, vira três trechos, cada um começando pelo título da seção.
+- A prévia de um texto com outra estratégia mostra os trechos sem gravar nada e sem consumo de embedding.
+- Depois de trocar a estratégia e reprocessar, um PDF enviado nesta fase volta indexado com o corte novo. Um arquivo enviado antes da fase aparece como "reenviar".
+- Num agente com compressão depois de 1 resultado, uma tool que devolve 20 mil caracteres chega ao modelo comprimida. O custo do run inclui a chamada de compressão.
+- Compressão com um modelo fora do catálogo é recusada na escrita.
