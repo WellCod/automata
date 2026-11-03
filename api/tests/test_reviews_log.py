@@ -25,6 +25,11 @@ def _req(**fields: Any) -> dict[str, Any]:
     return {"step_id": "s1", "step_name": "analise", **fields}
 
 
+def _stored(req: dict[str, Any], output: str | None = None) -> dict[str, dict[str, Any]]:
+    when = "loop" if req.get("step_type") == "Loop" else "after"
+    return {"s1": {"step_name": "analise", "when": when, "output": output}}
+
+
 @pytest.mark.parametrize(
     ("req", "decision"),
     [
@@ -38,7 +43,7 @@ def _req(**fields: Any) -> dict[str, Any]:
 def test_tipo_da_decisao(req: dict[str, Any], decision: str) -> None:
     from app.agents.reviews import review_entries
 
-    [entry] = review_entries([req], {"s1"}, "ana")
+    [entry] = review_entries([req], _stored(req), "ana")
     assert (entry["decision"], entry["by"]) == (decision, "ana")
 
 
@@ -47,11 +52,13 @@ def test_so_o_requisito_ativo_e_pendente_entra() -> None:
 
     old = _req(confirmed=False, rejection_feedback="faltou")
     active = _req(confirmed=True)
-    assert [e["decision"] for e in review_entries([old, active], {"s1"}, None)] == ["approved"]
+    assert [e["decision"] for e in review_entries([old, active], _stored(active), None)] == [
+        "approved"
+    ]
     # sem decisão ou fora das pendências do run, nada entra
-    assert review_entries([_req()], {"s1"}, None) == []
-    assert review_entries([active], {"outra"}, None) == []
-    assert review_entries([active], {"s1"}, None)[0]["by"] == "desconhecido"
+    assert review_entries([_req()], _stored(_req()), None) == []
+    assert review_entries([active], {}, None) == []
+    assert review_entries([active], _stored(active), None)[0]["by"] == "desconhecido"
 
 
 def test_edicao_guarda_antes_e_depois_mascarados_e_limitados() -> None:
@@ -59,10 +66,9 @@ def test_edicao_guarda_antes_e_depois_mascarados_e_limitados() -> None:
 
     req = _req(
         confirmed=True,
-        step_output=SimpleNamespace(content="cliente ana@x.io pediu R$ 120"),
         edited_output="cliente ana@x.io pediu R$ 210" + "x" * (REVIEW_TEXT_CHARS * 2),
     )
-    [entry] = review_entries([req], {"s1"}, "owner")
+    [entry] = review_entries([req], _stored(req, "cliente ana@x.io pediu R$ 120"), "owner")
     assert entry["before"] == "cliente [e-mail removido] pediu R$ 120"
     assert entry["after"].startswith("cliente [e-mail removido] pediu R$ 210")
     assert len(entry["after"]) <= REVIEW_TEXT_CHARS

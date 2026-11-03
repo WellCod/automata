@@ -39,6 +39,13 @@ def _req(**over: Any) -> dict[str, Any]:
     return {**base, **over}
 
 
+def _stored(req: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """A pausa como o tracking gravou no run: é dali que saem nome, tipo e o antes."""
+    when = "loop" if req.get("step_type") == "Loop" else "after"
+    output = (req.get("step_output") or {}).get("content")
+    return {req["step_id"]: {"step_name": req["step_name"], "when": when, "output": output}}
+
+
 # --- registro: cada decisão do revisor vira a entrada certa ---
 
 
@@ -55,34 +62,48 @@ def _req(**over: Any) -> dict[str, Any]:
     ],
 )
 def test_decisao_do_revisor_no_registro(req: dict[str, Any], decision: str) -> None:
-    [entry] = review_entries([req], {"s1"}, "ana")
+    [entry] = review_entries([req], _stored(req), "ana")
     assert entry["decision"] == decision
     assert entry["by"] == "ana"
 
 
 def test_sem_decisao_ou_fora_da_pausa_nao_entra() -> None:
-    assert review_entries([_req(confirmed=None)], {"s1"}, "ana") == []
+    assert review_entries([_req(confirmed=None)], _stored(_req()), "ana") == []
     # requisito que não estava pendente no run: a chamada repetida não duplica
-    assert review_entries([_req()], set(), "ana") == []
+    assert review_entries([_req()], {}, "ana") == []
     # só o último é o ativo; os anteriores voltam na lista já decididos
     old = _req(confirmed=False, rejection_feedback="faltou o valor")
-    [entry] = review_entries([old, _req()], {"s1"}, None)
+    [entry] = review_entries([old, _req()], _stored(_req()), None)
     assert entry["decision"] == "approved" and "feedback" not in entry
     assert entry["by"] == "desconhecido"
 
 
 def test_edicao_do_criterio_de_aceite_guarda_antes_e_depois() -> None:
-    [entry] = review_entries([_req(edited_output="valor R$ 210")], {"s1"}, "ana")
+    [entry] = review_entries([_req(edited_output="valor R$ 210")], _stored(_req()), "ana")
     assert (entry["before"], entry["after"]) == ("valor R$ 120", "valor R$ 210")
+
+
+def test_nome_tipo_e_antes_vem_do_run_e_nao_do_cliente() -> None:
+    # auditoria da Fase 33: o cliente manda o requisito, mas não decide o que o registro diz
+    lie = _req(
+        step_name="outra etapa",
+        step_type="Loop",
+        step_output={"content": "valor R$ 999"},
+        edited_output="valor R$ 210",
+    )
+    [entry] = review_entries([lie], _stored(_req()), "ana")
+    assert entry["step_name"] == "analise"
+    assert entry["decision"] == "edited"
+    assert entry["before"] == "valor R$ 120"
 
 
 def test_dado_pessoal_mascarado_e_texto_limitado() -> None:
     big = "CPF 529.982.247-25 " + "x" * (REVIEW_TEXT_CHARS + 10)
     [entry] = review_entries(
-        [_req(confirmed=False, rejection_feedback="cliente 529.982.247-25")], {"s1"}, "ana"
+        [_req(confirmed=False, rejection_feedback="cliente 529.982.247-25")], _stored(_req()), "ana"
     )
     assert "529.982.247-25" not in entry["feedback"]
-    [edited] = review_entries([_req(edited_output=big)], {"s1"}, "ana")
+    [edited] = review_entries([_req(edited_output=big)], _stored(_req()), "ana")
     assert "529.982.247-25" not in edited["after"]
     assert len(edited["after"]) == REVIEW_TEXT_CHARS
 

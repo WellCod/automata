@@ -497,13 +497,16 @@ class TrackedWorkflow(Workflow):
 
     async def acontinue_run(self, *args: Any, **kwargs: Any) -> Any:
         """Continue depois da revisão humana: atualiza o mesmo agent_run (ADR-0023)."""
-        if self.automata_config_id is None or kwargs.get("background"):
+        if self.automata_config_id is None:
             return await super().acontinue_run(*args, **kwargs)
         paused = kwargs.get("run_response")
         run_id = kwargs.get("run_id") or getattr(paused, "run_id", None)
         if run_id is not None:
-            # antes de retomar: a decisão vale mesmo que o resto do workflow falhe (ADR-0028)
+            # antes de retomar, ainda no contexto da request que sabe quem decidiu: a
+            # decisão vale mesmo que o resto falhe ou que o run siga na fila (ADR-0028)
             await self._record_reviews(run_id, kwargs.get("step_requirements"))
+        if kwargs.get("background"):
+            return await super().acontinue_run(*args, **kwargs)
         track = {**kwargs, "run_id": run_id}
         if kwargs.get("stream"):
             return self._track_stream(await super().acontinue_run(*args, **kwargs), track)

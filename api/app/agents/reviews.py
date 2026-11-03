@@ -5,6 +5,7 @@ rodadas anteriores. Só vira entrada o requisito ativo, o último, e só se esta
 no run: assim cada decisão entra uma vez, na ordem em que aconteceu.
 """
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -30,11 +31,11 @@ def _masked(value: Any) -> str | None:
     return mask(text, find_pii(text))[:REVIEW_TEXT_CHARS]
 
 
-def _decision(req: Any) -> str | None:
+def _decision(req: Any, loop: bool) -> str | None:
     confirmed = _get(req, "confirmed")
     if confirmed is None:
         return None
-    if _get(req, "step_type") == "Loop":
+    if loop:
         # aprovar a volta encerra o laço; recusar pede outra (Agno 3.1.8)
         return "loop_done" if confirmed else "loop_again"
     if confirmed and _get(req, "edited_output") is not None:
@@ -43,21 +44,25 @@ def _decision(req: Any) -> str | None:
 
 
 def review_entries(
-    requirements: list[Any] | None, pending_ids: set[str], actor: str | None
+    requirements: list[Any] | None, pending: Mapping[str, dict[str, Any]], actor: str | None
 ) -> list[dict[str, Any]]:
+    """`pending` são as etapas pausadas que o tracking gravou no run: o nome, o tipo e o
+    texto antes da edição vêm dali. Do cliente só valem a decisão, o motivo e a edição
+    (auditoria da Fase 33)."""
     at = datetime.now(UTC).isoformat()
     entries: list[dict[str, Any]] = []
     # revisão só no nível principal: uma pausa ativa por vez, e ela é o último requisito.
     # Os anteriores voltam na lista já decididos, às vezes com o mesmo step_id (refazer)
     for req in (requirements or [])[-1:]:
-        if str(_get(req, "step_id")) not in pending_ids:
+        stored = pending.get(str(_get(req, "step_id")))
+        if stored is None:
             continue
-        decision = _decision(req)
+        decision = _decision(req, stored.get("when") == "loop")
         if decision is None:
             continue
         entry: dict[str, Any] = {
             "step_id": str(_get(req, "step_id")),
-            "step_name": _get(req, "step_name"),
+            "step_name": stored.get("step_name"),
             "decision": decision,
             "by": actor or "desconhecido",
             "at": at,
@@ -66,8 +71,7 @@ def review_entries(
         if feedback:
             entry["feedback"] = feedback
         if decision == "edited":
-            step_output = _get(req, "step_output")
-            entry["before"] = _masked(_get(step_output, "content") if step_output else None)
+            entry["before"] = _masked(stored.get("output"))
             entry["after"] = _masked(_get(req, "edited_output"))
         entries.append(entry)
     return entries
@@ -77,7 +81,8 @@ def record_reviews(run_id: str, requirements: list[Any] | None, actor: str | Non
     """Grava as decisões desta rodada no run; devolve quantas entraram."""
     with Session(get_engine()) as session:
         repo = RunRepository(session)
-        entries = review_entries(requirements, repo.pending_step_ids(run_id), actor)
+        pending = {str(s.get("step_id")): s for s in repo.pending_steps(run_id)}
+        entries = review_entries(requirements, pending, actor)
         if entries:
             repo.append_reviews(run_id, entries)
             session.commit()
