@@ -1201,7 +1201,7 @@ Decisão em [ADR-0030](adr/0030-guardrails-por-modelo.md). Um modelo escolhido c
 - [x] `feat(api)`: resultado de tool examinado antes de voltar ao modelo, com a retirada registrada no run
 - [x] `feat(api)`: varredura de injeção nos trechos indexados
 - [x] `feat(web)`: classificador e exame de tool nos guardrails, documentos suspeitos na base e resultado retirado no run
-- [ ] `test(api)`: evals do classificador, do exame de tool e da varredura
+- [x] `test(api)`: evals do classificador, do exame de tool e da varredura
 
 **Critério de aceite da fase:**
 
