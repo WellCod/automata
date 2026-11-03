@@ -437,6 +437,30 @@ def test_saida_editada_segue_e_fica_no_registro(client: TestClient) -> None:
     assert client.get("/api/v1/runs/nao-existe/reviews").status_code == 404
 
 
+def test_pausa_no_stream_fica_pendente_e_registra_a_decisao(client: TestClient) -> None:
+    import json
+
+    wf, _ = _review_workflow(client, "reembolso no stream", {"when": "after"})
+    # o modo teste do painel roda em stream; o WorkflowPaused que o cliente recebe vem da
+    # rota, depois do gerador que o tracking acompanha
+    stream = client.post(f"/workflows/{wf}/runs", data={"message": "oi", "stream": "true"})
+    events = [
+        json.loads(line[len("data: ") :])
+        for line in stream.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    assert "StepOutputReview" in [e.get("event") for e in events]
+    out = {"run_id": events[0]["run_id"], "session_id": events[0]["session_id"]}
+    paused = _workflow_run(wf)
+    assert paused.status == "paused"
+    assert paused.pending_steps[0]["step_name"] == "analise"
+
+    done = _decide(client, wf, out, confirmed=True, edited_output="análise revisada")
+    assert done["status"] == "COMPLETED", done
+    log = client.get(f"/api/v1/runs/{out['run_id']}/reviews").json()
+    assert [e["decision"] for e in log] == ["edited"]
+
+
 def test_revisao_por_volta_pede_outra_e_encerra_o_laco(client: TestClient) -> None:
     rascunho = _agent(client, "rascunho por volta", "claude-sonnet-4-6")
     resposta = _agent(client, "resposta por volta", "claude-opus-4-7")
