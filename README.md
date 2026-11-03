@@ -276,6 +276,8 @@ flowchart LR
 - **Custo de embedding no metering.** `MeteredEmbedder` conta tokens de ingestão e de busca, com um cache curto para não pagar duas vezes pela mesma consulta.
 - **Demo sem chave.** No modo replay, um embedder local determinístico indexa e busca por palavra em comum.
 
+<p align="center"><img src="docs/img/corte.png" alt="Corte por títulos com a prévia dos trechos na configuração da base" width="560"></p>
+
 ### Evals por agente
 
 Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`), que roda um por vez com timeout e checa tools esperadas (`ReliabilityEval`), critério do juiz (`AgentAsJudgeEval`) e um `Scorer` próprio para as regras de texto ([ADR-0015](docs/adr/0015-evals-por-agente.md)).

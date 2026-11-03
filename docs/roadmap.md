@@ -1237,7 +1237,7 @@ Terceira rodada de verificação, sobre a `main` em `1884e19`, com foco no que e
 
 Sem achados. As 66 telas não têm botão sem nome, campo sem rótulo, página sem `h1` nem conteúdo vazando em 375 px. Os alertas de alvo pequeno são checkboxes dentro de rótulo clicável. Os de contraste são o falso positivo das cores `oklch`. Os prints do README são da Fase 26 e saem regerados.
 
-- [ ] `docs`: README com os prints das telas atuais
+- [x] `docs`: README com os prints das telas atuais
 
 **Critério de aceite da fase:**
 
