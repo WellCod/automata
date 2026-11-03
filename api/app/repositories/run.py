@@ -3,7 +3,8 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Date, cast, func, or_, select
+from sqlalchemy import Date, bindparam, cast, func, literal, or_, select, update
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 
 from app.models.run import AgentRun
@@ -81,17 +82,20 @@ class RunRepository:
         self._session.flush()
         return run
 
-    def pending_step_ids(self, run_id: str) -> set[str]:
+    def pending_steps(self, run_id: str) -> list[dict[str, Any]]:
         stmt = select(AgentRun.pending_steps).where(AgentRun.run_id == run_id)
-        steps = self._session.scalar(stmt)
-        return {str(s.get("step_id")) for s in steps or []}
+        return list(self._session.scalar(stmt) or [])
 
     def append_reviews(self, run_id: str, entries: list[dict[str, Any]]) -> None:
-        """Acrescenta ao registro do run; a lista só cresce (ADR-0028)."""
-        run = self._session.scalars(select(AgentRun).where(AgentRun.run_id == run_id)).first()
-        if run is None:
-            return
-        run.review_log = [*(run.review_log or []), *entries]
+        """Acrescenta ao registro do run num UPDATE só: dois continues ao mesmo tempo não
+        perdem entrada (ADR-0028, auditoria da Fase 33)."""
+        current = func.coalesce(AgentRun.review_log, cast(literal("[]"), JSONB))
+        added = bindparam("entries", entries, type_=JSONB)
+        self._session.execute(
+            update(AgentRun)
+            .where(AgentRun.run_id == run_id)
+            .values(review_log=current.op("||")(added))
+        )
 
     def reviews(self, run_id: str) -> tuple[str | None, list[dict[str, Any]]] | None:
         """Dono do run e o registro das decisões; None quando o run não existe."""

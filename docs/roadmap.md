@@ -1231,7 +1231,7 @@ Terceira rodada de verificação, sobre a `main` em `1884e19`, com foco no que e
   - o modelo do classificador é resolvido fora do `try`, então um modelo removido do catálogo deixa passar mesmo com falha fechada;
   - o consumo do exame de tool é gravado no banco de forma síncrona dentro do gancho assíncrono;
   - o trecho registrado é recortado antes de mascarar, e um dado pessoal na borda do recorte escapa.
-- [ ] **Baixa.** O registro de revisões (ADR-0028) tira o texto "antes", o nome da etapa e o tipo do corpo da requisição, e não do run gravado. A gravação também não é atômica, e dois continues ao mesmo tempo podem perder uma entrada. No continue pela fila durável, quem decidiu fica sem registro.
+- [x] **Baixa.** O registro de revisões (ADR-0028) tira o texto "antes", o nome da etapa e o tipo do corpo da requisição, e não do run gravado. A gravação também não é atômica, e dois continues ao mesmo tempo podem perder uma entrada. No continue pela fila durável, quem decidiu fica sem registro.
 
 ### UI e UX
 

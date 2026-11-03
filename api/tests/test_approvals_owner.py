@@ -141,3 +141,32 @@ def test_registro_das_revisoes_so_para_o_dono_e_o_owner(client: TestClient) -> N
     other = client.get("/api/v1/runs/run-revisado/reviews", headers=_h("bruno", viewer))
     assert other.status_code == 403
     assert client.get("/api/v1/runs/run-revisado/reviews", headers=owner).status_code == 200
+
+
+def test_registro_de_revisoes_acrescenta_sem_perder_entrada(client: TestClient) -> None:
+    from app.db import get_engine
+    from app.models.run import AgentRun
+    from app.repositories.run import RunRepository
+
+    owner = _h("owner", ["agent_os:admin"])
+    config = {"name": "fluxo concorrente", "description": "Use para fluxo"}
+    config_id = client.post("/api/v1/configs", json=config, headers=owner).json()["id"]
+    with Session(get_engine()) as session:
+        session.add(
+            AgentRun(agent_config_id=config_id, user_id="ana", run_id="run-dois", status="paused")
+        )
+        session.commit()
+    # a primeira sessão já leu o run quando a segunda grava: o UPDATE com || não
+    # sobrescreve com o que ela leu antes
+    with Session(get_engine()) as first:
+        stale = first.query(AgentRun).filter(AgentRun.run_id == "run-dois").one()
+        assert stale.review_log is None
+        with Session(get_engine()) as second:
+            RunRepository(second).append_reviews("run-dois", [{"step_id": "b", "decision": "x"}])
+            second.commit()
+        RunRepository(first).append_reviews("run-dois", [{"step_id": "a", "decision": "y"}])
+        first.commit()
+    with Session(get_engine()) as session:
+        found = RunRepository(session).reviews("run-dois")
+    assert found is not None
+    assert sorted(e["step_id"] for e in found[1]) == ["a", "b"]
