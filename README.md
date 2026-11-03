@@ -334,6 +334,7 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 | Avisos de regressão | Transições que avisam e as que ficam em silêncio (falha seguida de falha, verde seguido de verde), assinatura HMAC conferida pelo receptor e corpo com `text` e `content`. | Todo PR |
 | Compactação | Versão sem a seção fica sem compactação, limite e turnos passados ao Agno, resumo pelo modelo do agente e limites recusados. O ponta a ponta, com o resumo chegando ao modelo acima do limite, roda na suíte de runtime. | Todo PR |
 | Controle do run | Com modelos falsos e o Agent de verdade: o laço de tool para no limite com resposta, o 503 se repete sem repetir a tool, o 429 cai na reserva e o custo sai pela tabela dela, o 401 não troca de modelo e a resposta estruturada chega como objeto e valida. | Todo PR |
+| Corte e compressão | O manual com três seções vira três trechos com o título, o nível de título decide onde abre trecho, a seção grande é cortada com o título em cada pedaço e a base antiga mantém a recursiva com 10%. Com o Agent de verdade, o resultado de 20 mil caracteres chega ao modelo resumido e o resumo entra no custo do run. | Todo PR |
 | Recuperação | O documento certo volta entre os 3 primeiros trechos. A versão literal roda em todo PR com cada estratégia de busca (simples, MMR, recência), e nenhuma pode errar. A semântica, com Voyage, roda à noite, aceita recall@3 de 80% e compara as estratégias (HyDE incluso, com chave de modelo) com a busca simples. | PR e noturna |
 | Confiabilidade | Tool calls com LLM real. | Noturna |
 
