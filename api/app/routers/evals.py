@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import select
 
 from app.authz import Scope, require_resource_scope, require_scopes
@@ -25,6 +25,7 @@ from app.repositories.config import ConfigRepository
 from app.repositories.eval import EvalCaseRepository, EvalRunRepository, EvalScheduleRepository
 from app.schemas.config import ConfigPayload
 from app.schemas.eval import (
+    MAX_BATCH_SUGGESTIONS,
     MAX_CASES,
     CaseComparison,
     EvalCaseInput,
@@ -152,22 +153,72 @@ def suggest_case(
     is_admin = "agent_os:admin" in (getattr(request.state, "scopes", None) or [])
     if enforce and not is_admin and row.user_id != getattr(request.state, "user_id", None):
         raise HTTPException(status_code=403, detail="Só quem teve a conversa ou um admin")
-    db = get_db()
-    run = db.get_run(run_id)
-    if run is None or isinstance(run, dict):
+    found = _suggestion_from(get_db(), row)
+    if found is None:
         raise HTTPException(status_code=404, detail="A conversa deste run não está mais guardada")
+    return found
+
+
+def _suggestion_from(db: Any, row: AgentRun) -> EvalCaseSuggestion | None:
+    """Sugestão a partir do run guardado no Agno; None quando a conversa não existe mais."""
+    run = db.get_run(row.run_id)
+    if run is None or isinstance(run, dict):
+        return None
     previous = []
     if row.session_id:
         runs = db.get_runs(session_id=row.session_id, sort_by="created_at", sort_order="asc")
         previous = [
             r
             for r in (runs if isinstance(runs, list) else [])
-            if r.run_id != run_id
+            if r.run_id != row.run_id
             and not getattr(r, "parent_run_id", None)
             and (r.created_at or 0) <= (run.created_at or 0)
         ]
-    found = suggest(run, previous)
-    return EvalCaseSuggestion.model_validate(asdict(found))
+    return EvalCaseSuggestion.model_validate(asdict(suggest(run, previous)))
+
+
+@router.get("/suggestions", response_model=list[EvalCaseSuggestion], dependencies=_WRITE)
+def suggest_cases(
+    config_id: UUID,
+    request: Request,
+    session: SessionDep,
+    limit: int = Query(default=10, ge=1, le=MAX_BATCH_SUGGESTIONS),
+) -> list[EvalCaseSuggestion]:
+    """Sugestões em lote das conversas recentes (ADR-0038); nada é gravado."""
+    if _config_or_404(session, config_id).kind == "workflow":
+        raise HTTPException(status_code=422, detail="Run de workflow ainda não vira caso")
+    used = {
+        case.source_run_id
+        for case in EvalCaseRepository(session).list_by_config(config_id)
+        if case.source_run_id
+    }
+    query = (
+        select(AgentRun)
+        .where(
+            AgentRun.agent_config_id == config_id,
+            AgentRun.status == "success",
+            AgentRun.eval_run_id.is_(None),
+            AgentRun.parent_run_id.is_(None),
+        )
+        .order_by(AgentRun.created_at.desc())
+    )
+    # a sugestão traz a conversa: quem não é admin vê só as próprias
+    enforce = getattr(request.app.state, "enforce_scopes", False)
+    is_admin = "agent_os:admin" in (getattr(request.state, "scopes", None) or [])
+    if enforce and not is_admin:
+        query = query.where(AgentRun.user_id == getattr(request.state, "user_id", None))
+    db = get_db()
+    found: list[EvalCaseSuggestion] = []
+    # olha um lote maior: conversa já usada ou apagada do Agno fica de fora
+    for row in session.scalars(query.limit(limit * 3)):
+        if row.run_id in used:
+            continue
+        suggestion = _suggestion_from(db, row)
+        if suggestion is not None:
+            found.append(suggestion)
+        if len(found) >= limit:
+            break
+    return found
 
 
 @router.post("", response_model=EvalCaseResponse, status_code=201, dependencies=_WRITE)

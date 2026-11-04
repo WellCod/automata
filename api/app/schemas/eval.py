@@ -325,6 +325,9 @@ class EvalSuiteStatus(BaseModel):
     regressions: int
 
 
+MAX_BATCH_SUGGESTIONS = 20
+
+
 class EvalCaseSuggestion(BaseModel):
     """Caso montado de um run real; nada é gravado até o editor salvar pelo POST de casos."""
 

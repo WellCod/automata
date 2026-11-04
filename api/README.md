@@ -438,6 +438,11 @@ Um caso pode trazer `context`, com até 5 mensagens anteriores (ADR-0016, migrat
 
 Salvar usa o `POST` de casos com `source_run_id` (migration 0027), que fica no caso para mostrar de onde veio.
 
+`GET /api/v1/configs/{id}/eval-cases/suggestions?limit=10` (ADR-0038, até 20) traz sugestões em lote, montadas do mesmo jeito.
+- Fonte: as conversas mais recentes que terminaram bem, de primeiro nível e fora da suíte. Quem não é admin vê só as próprias.
+- Pula o run que já é `source_run_id` de algum caso e o que não está mais guardado no Agno.
+- Não grava nada, e workflow dá 422.
+
 O limite de uma checagem de tools e uma de juiz por caso vem do `Case` do runner de suíte do Agno, que tem um campo para cada. São até 50 casos por config. Run de workflow ainda não vira caso pela sugestão (422). Viewer lê (`evals:read`); editor cria, edita e apaga (`evals:write`).
 
 ### Execução da suíte
