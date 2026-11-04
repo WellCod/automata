@@ -1275,7 +1275,7 @@ Decisão em [ADR-0032](adr/0032-direitos-do-titular.md). O owner consulta o que 
 - [x] `feat(api)`: exclusão dos dados de um titular, com o id trocado por hash no consumo e nos runs
 - [x] `feat(api)`: padrões próprios na máscara de dados pessoais do agente
 - [x] `feat(web)`: página Titulares e padrões próprios nos guardrails
-- [ ] `test(api)`: evals de isolamento da exportação e da exclusão e da máscara própria
+- [x] `test(api)`: evals de isolamento da exportação e da exclusão e da máscara própria
 
 **Critério de aceite da fase:**
 
