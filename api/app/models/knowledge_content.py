@@ -12,7 +12,7 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.config import Base
@@ -46,6 +46,8 @@ class KnowledgeContent(Base):
     chunk_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # trechos com termo de injeção na última ingestão (ADR-0030)
     suspect_chunks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # campos próprios (ADR-0033), copiados para o meta_data de cada trecho em "fields"
+    fields: Mapped[dict[str, str] | None] = mapped_column(JSONB, nullable=True)
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
     # origem remota (ADR-0024): o conector, o caminho lá e a versão lá
     connector_id: Mapped[uuid.UUID | None] = mapped_column(

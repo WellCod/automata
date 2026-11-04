@@ -169,6 +169,8 @@ def ingest(content_id: UUID, data: bytes, *, replace: bool = False) -> None:
                 **(doc.meta_data or {}),
                 "content_id": str(content_id),
                 "source": content.source,
+                # filtros da busca (ADR-0033); sempre presente para o @> casar só com campo
+                "fields": content.fields or {},
             }
         digest = hashlib.sha256(data).hexdigest()
         vector_db.insert(content_hash=digest, documents=docs)

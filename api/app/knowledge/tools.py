@@ -12,8 +12,10 @@ from uuid import UUID
 from agno.run import RunContext
 from agno.tools.function import Function
 
+from app.knowledge.filters import clean_filters, describe, field_values
 from app.knowledge.search import search
 from app.models.knowledge_base import KnowledgeBase
+from app.schemas.knowledge_base import RetrievalSettings
 from app.side_usage import Caller
 
 logger = logging.getLogger(__name__)
@@ -28,12 +30,18 @@ def tool_name(base: KnowledgeBase) -> str:
 def knowledge_tool(
     base: KnowledgeBase, max_results: int, agent_config_id: UUID | None = None
 ) -> Function:
-    async def buscar(pergunta: str, run_context: RunContext) -> str:
-        """Busca trechos na base de conhecimento.
+    retrieval = RetrievalSettings.model_validate(base.retrieval or {})
+    known = field_values(base.id) if retrieval.agentic_filters else {}
 
-        Args:
-            pergunta: o que procurar, em linguagem natural.
-        """
+    async def run_search(
+        pergunta: str, run_context: RunContext, filtros: dict[str, str] | None = None
+    ) -> str:
+        notes: list[str] = []
+        kept: dict[str, str] = {}
+        if filtros:
+            kept, ignored = clean_filters(filtros, known)
+            if ignored:
+                notes.append("filtro ignorado, não existe nesta base: " + ", ".join(ignored))
         try:
             caller = (
                 Caller(
@@ -44,8 +52,12 @@ def knowledge_tool(
                 if agent_config_id
                 else None
             )
-            outcome = await asyncio.to_thread(search, base, pergunta, max_results, caller=caller)
+            outcome = await asyncio.to_thread(
+                search, base, pergunta, max_results, caller=caller, filters=kept or None
+            )
             hits = outcome.hits
+            if outcome.filters_dropped:
+                notes.append("nenhum trecho com esse filtro; resultado da busca sem filtro")
         except Exception as exc:
             logger.warning(
                 "busca do agente falhou", extra={"base_id": str(base.id), "error": str(exc)}
@@ -55,9 +67,14 @@ def knowledge_tool(
                 {"base": base.name, "erro": "base indisponível no momento", "trechos": []},
                 ensure_ascii=False,
             )
+        result: dict[str, object] = {"base": base.name}
+        if kept and not outcome.filters_dropped:
+            result["filtros"] = kept
+        if notes:
+            result["aviso"] = "; ".join(notes)
         return json.dumps(
             {
-                "base": base.name,
+                **result,
                 "trechos": [
                     {
                         "documento": h.content_name,
@@ -71,10 +88,35 @@ def knowledge_tool(
             ensure_ascii=False,
         )
 
-    fn = Function.from_callable(buscar, name=tool_name(base))
+    if known:
+
+        async def buscar_com_filtros(
+            pergunta: str, run_context: RunContext, filtros: dict[str, str] | None = None
+        ) -> str:
+            """Busca trechos na base de conhecimento.
+
+            Args:
+                pergunta: o que procurar, em linguagem natural.
+                filtros: campo e valor exatos para restringir a busca; opcional.
+            """
+            return await run_search(pergunta, run_context, filtros)
+
+        fn = Function.from_callable(buscar_com_filtros, name=tool_name(base))
+    else:
+
+        async def buscar(pergunta: str, run_context: RunContext) -> str:
+            """Busca trechos na base de conhecimento.
+
+            Args:
+                pergunta: o que procurar, em linguagem natural.
+            """
+            return await run_search(pergunta, run_context)
+
+        fn = Function.from_callable(buscar, name=tool_name(base))
     fn.description = (
         f"Busca trechos na base de conhecimento '{base.name}'. {base.description}".strip()
         + " Use antes de responder sobre os temas desta base."
+        + describe(known)
     )
     return fn
 

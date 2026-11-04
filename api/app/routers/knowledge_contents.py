@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.authz import Scope, require_scopes
 from app.db import SessionDep, get_engine
 from app.knowledge.fetch import FetchFailed, fetch_url
+from app.knowledge.filters import forget_field_values, set_chunk_fields
 from app.knowledge.ingest import CONTENT_TYPES, ingest, remove_chunks
 from app.knowledge.reprocess import save_original
 from app.knowledge.schedule import next_at, refresh_url
@@ -27,6 +28,7 @@ from app.mcp.egress import EgressDenied, check_url
 from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_content import KnowledgeContent
 from app.schemas.knowledge_base import (
+    ContentFieldsInput,
     ContentScheduleInput,
     KnowledgeContentResponse,
     TextContentInput,
@@ -64,6 +66,7 @@ def to_response(c: KnowledgeContent) -> KnowledgeContentResponse:
         external_path=c.external_path,
         refresh_every_hours=c.refresh_every_hours,
         next_refresh_at=c.next_refresh_at,
+        fields=c.fields,
     )
 
 
@@ -214,6 +217,7 @@ def add_url(
             created_by=_actor(request),
             refresh_every_hours=body.refresh_every_hours,
             next_refresh_at=next_at(body.refresh_every_hours),
+            fields=body.fields,
         ),
     )
     background.add_task(_ingest_url, content.id, url)
@@ -243,11 +247,29 @@ def add_text(
             size_bytes=len(data),
             status="processing",
             created_by=_actor(request),
+            fields=body.fields,
         ),
     )
     save_original(session, content.id, data)
     session.commit()
     background.add_task(ingest, content.id, data)
+    return to_response(content)
+
+
+@router.put("/{content_id}/fields", response_model=KnowledgeContentResponse, dependencies=_WRITE)
+def update_fields(
+    base_id: UUID, content_id: UUID, body: ContentFieldsInput, session: SessionDep
+) -> KnowledgeContentResponse:
+    """Campos do documento (ADR-0033): grava e atualiza os trechos já indexados, sem embedar."""
+    base = _base_or_404(session, base_id)
+    content = _content_or_404(session, base_id, content_id)
+    if content.status == "processing":
+        raise HTTPException(status_code=409, detail="Conteúdo em processamento")
+    content.fields = body.fields
+    session.commit()
+    set_chunk_fields(base, content_id, body.fields or {})
+    forget_field_values(base_id)
+    session.refresh(content)
     return to_response(content)
 
 

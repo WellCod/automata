@@ -44,7 +44,7 @@ O custo é por busca, não por token:
 
 Ele entra no consumo pelo `record_side_usage` (ADR-0030), na conta do agente que buscou, e a busca de teste mostra o valor.
 
-**Metadados por documento.** O `knowledge_content` ganha `metadata` (JSONB, migration 0043): até 10 campos. Cada campo tem:
+**Metadados por documento.** O `knowledge_content` ganha `fields` (JSONB, migration 0043; `metadata` é nome reservado no SQLAlchemy): até 10 campos. Cada campo tem:
 
 - nome de 1 a 40 caracteres, só minúsculas, dígitos e `_`;
 - valor em texto de até 100 caracteres.

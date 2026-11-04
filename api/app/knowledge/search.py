@@ -45,13 +45,20 @@ class SearchOutcome:
     hyde_tokens: int = 0
     # custo das buscas do cross-encoder (ADR-0033); None sem ele ou com falha
     rerank_cost: float | None = None
+    # filtro pedido sem nenhum trecho: a busca saiu sem ele (ADR-0033)
+    filters_dropped: bool = False
 
 
 def search_base(
-    base: KnowledgeBase, query: str, limit: int, *, agent_config_id: UUID | None = None
+    base: KnowledgeBase,
+    query: str,
+    limit: int,
+    *,
+    agent_config_id: UUID | None = None,
+    filters: dict[str, str] | None = None,
 ) -> list[Hit]:
     caller = Caller(agent_config_id, "agent") if agent_config_id else None
-    return search(base, query, limit, caller=caller).hits
+    return search(base, query, limit, caller=caller, filters=filters).hits
 
 
 def _hyde(base: KnowledgeBase, query: str) -> tuple[str, JudgeUsage | None, str | None]:
@@ -74,6 +81,7 @@ def search(
     *,
     caller: Caller | None = None,
     plain: bool = False,
+    filters: dict[str, str] | None = None,
 ) -> SearchOutcome:
     """`plain` ignora a estratégia da base: é o lado "sem" da comparação da busca de teste."""
     searched, usage, hyde_model = (query, None, None) if plain else _hyde(base, query)
@@ -95,7 +103,13 @@ def search(
     embedder = metered_embedder(vector_db)
     embedder.get_embedding_and_usage(searched)
     # o reranker só resgata trecho que foi buscado: pede um lote maior e corta depois
-    docs = vector_db.search(searched, limit=limit if plain else candidate_limit(base, limit))
+    batch = limit if plain else candidate_limit(base, limit)
+    docs = vector_db.search(searched, limit=batch, filters={"fields": filters} if filters else None)
+    filters_dropped = False
+    if filters and not docs:
+        # um filtro errado do modelo não pode virar "não há nada sobre isso"
+        docs = vector_db.search(searched, limit=batch)
+        filters_dropped = True
     rerank_cost: float | None = None
     if cross is not None:
         try:
@@ -156,4 +170,4 @@ def search(
                 score=float(score) if score is not None else None,
             )
         )
-    return SearchOutcome(hits, searched, hyde_tokens, rerank_cost)
+    return SearchOutcome(hits, searched, hyde_tokens, rerank_cost, filters_dropped)
