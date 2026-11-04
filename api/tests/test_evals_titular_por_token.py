@@ -68,15 +68,20 @@ def test_origem_pelo_ator(actor: str, source: str) -> None:
 
 
 def test_prazo_pelo_ambiente(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.data_subjects import due_date
-    from app.settings import get_settings
+    import app.data_subjects as data_subjects
 
     now = datetime(2026, 11, 4, 12, tzinfo=UTC)
-    assert due_date(now) - now == timedelta(days=15)
-    monkeypatch.setenv("DATA_SUBJECT_DEADLINE_DAYS", "10")
-    get_settings.cache_clear()
-    try:
-        assert due_date(now) - now == timedelta(days=10)
-    finally:
-        monkeypatch.delenv("DATA_SUBJECT_DEADLINE_DAYS")
-        get_settings.cache_clear()
+    for days in (15, 10):
+        # só o campo do prazo: o Settings inteiro exige banco e chaves que o eval não tem
+        monkeypatch.setattr(
+            data_subjects,
+            "get_settings",
+            lambda d=days: SimpleNamespace(data_subject_deadline_days=d),
+        )
+        assert data_subjects.due_date(now) - now == timedelta(days=days)
+
+
+def test_padrao_do_prazo_e_15_dias() -> None:
+    from app.settings import Settings
+
+    assert Settings.model_fields["data_subject_deadline_days"].default == 15
