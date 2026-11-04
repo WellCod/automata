@@ -186,7 +186,9 @@ def check_errors(session: Session, now: datetime) -> list[UUID]:
 def poll_once(now: datetime | None = None) -> None:
     """Uma rodada do poller: orçamento e pico de erro. Nunca levanta."""
     moment = now or datetime.now(UTC)
-    for check in (check_budgets, check_errors):
+    from app.caller_budget import check_caller_budgets
+
+    for check in (check_budgets, check_caller_budgets, check_errors):
         try:
             with Session(get_engine()) as session:
                 check(session, moment)

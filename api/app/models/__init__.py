@@ -1,4 +1,5 @@
 from app.models.alert import AlertDestination, AlertSent
+from app.models.caller_budget import CallerBudget
 from app.models.config import AgentConfig, AgentConfigVersion, Base
 from app.models.embedding_usage import EmbeddingUsage
 from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSchedule
@@ -15,6 +16,7 @@ from app.models.user import User, UserRole
 __all__ = [
     "AlertDestination",
     "AlertSent",
+    "CallerBudget",
     "AgentConfig",
     "AgentConfigVersion",
     "AgentRun",

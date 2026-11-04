@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 AlertEvent = Literal[
     "budget.warning",
     "budget.exceeded",
+    "caller_budget.warning",
+    "caller_budget.exceeded",
     "errors.spike",
     "suite.regressed",
     "suite.failing",

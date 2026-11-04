@@ -37,6 +37,8 @@ class Scope:
     INTEGRATIONS_WRITE = "integrations:write"
     # estado da rotação das chaves da instância (ADR-0026): só owner
     KEYS_ADMIN = "keys:admin"
+    # orçamento por quem chama (ADR-0031): só owner
+    BUDGETS_ADMIN = "budgets:admin"
 
 
 def require_resource_scope(resource: str, action: str) -> Callable[[Request], None]:

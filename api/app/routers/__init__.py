@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.routers.alerts import router as alerts_router
 from app.routers.approvals import router as approvals_router
 from app.routers.budget import router as budget_router
+from app.routers.caller_budgets import router as caller_budgets_router
 from app.routers.configs import router as configs_router
 from app.routers.evals import router as evals_router
 from app.routers.evals import runs_router as eval_runs_router
@@ -32,6 +33,7 @@ PROTECTED_ROUTERS: list[APIRouter] = [
     alerts_router,
     approvals_router,
     budget_router,
+    caller_budgets_router,
     configs_router,
     evals_router,
     eval_runs_router,

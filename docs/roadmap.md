@@ -1255,7 +1255,7 @@ Decisão em [ADR-0031](adr/0031-controle-de-custo-no-run.md). Um teto de custo p
 
 - [x] `docs(adr)`: ADR-0031 e esta seção
 - [x] `feat(api)`: teto de custo por run no agente e no líder do time, com o motivo da parada no run
-- [ ] `feat(api)`: orçamento mensal por usuário e por token de integração, com aviso e bloqueio
+- [x] `feat(api)`: orçamento mensal por usuário e por token de integração, com aviso e bloqueio
 - [ ] `feat(web)`: teto por run no controle do run, orçamento nas páginas Usuários e Integrações e parada pelo teto nas execuções
 - [ ] `test(api)`: evals do teto por run e do orçamento por quem chama
 

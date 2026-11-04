@@ -14,6 +14,8 @@ class UsageEvent(Base):
         Index("ix_usage_event_period_agent_config_id", "period", "agent_config_id"),
         Index("ix_usage_event_created_at", "created_at"),
         Index("ix_usage_event_eval_run_id", "eval_run_id"),
+        # orçamento por quem chama (ADR-0031)
+        Index("ix_usage_event_user_period", "user_id", "period"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
