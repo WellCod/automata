@@ -1337,3 +1337,19 @@ Decisão em [ADR-0034](adr/0034-guardrails-da-instancia-e-classificador-na-saida
 - Uma resposta que repete o prompt de sistema é trocada pela mensagem de bloqueio no não-stream, e o run fica `blocked` com a categoria `prompt_leak`.
 - Classificador de saída fora do ar com `on_failure: allow` deixa a resposta passar e registra a falha.
 
+## Fase 38 — Memória e conversa em time
+
+Decisão em [ADR-0035](adr/0035-memoria-e-conversa-em-time.md). O time passa a lembrar do cliente entre sessões, como o agente, com as memórias separadas por dono. A compactação ganha um modelo próprio para o resumo. A compactação no líder do time não entra: o `Team` do Agno 3.1.8 não tem o recurso.
+
+- [x] `docs(adr)`: ADR-0035 e esta seção
+- [ ] `feat(api)`: memória do usuário no time, separada por dono e mascarada como a do agente
+- [ ] `feat(api)`: modelo próprio para o resumo da compactação
+- [ ] `feat(web)`: memória na configuração do time e modelo do resumo na compactação
+- [ ] `test(api)`: evals da memória em time e do resumo com modelo próprio
+
+**Critério de aceite da fase:**
+
+- Um time com memória ligada grava o que o cliente disse e usa na sessão seguinte. Um agente do mesmo usuário não vê essa memória.
+- A retenção e a exclusão pelo painel valem para as memórias do time.
+- Com `summary_model`, o resumo sai desse modelo, e o custo do run soma o resumo pelo preço dele.
+
