@@ -289,6 +289,7 @@ Regras por agente, no payload versionado (`guardrails`), tudo desligado por padr
 | Campo | Regra |
 |---|---|
 | `pii.mode` = `mask` / `block`, `pii.types` | CPF e CNPJ com dígito verificador, cartão com Luhn, e-mail e telefone brasileiro (com DDD formatado ou +55). `mask` troca o dado por `[CPF removido]` e segue; `block` mascara e bloqueia. Número de pedido de 11 dígitos sem dígito verificador válido passa |
+| `pii.custom` | Até 10 padrões próprios (ADR-0032), cada um `{label, prefix, min_digits, max_digits}`. O prefixo tem até 10 letras, dígitos ou `-` e não casa dentro de outra palavra. Os dígitos vão de 4 a 20 e aceitam `.`, `-`, `/` ou espaço entre eles. O regex é montado pelo código, linear. Sai `[<label> removido]`. Os tipos prontos têm prioridade. Vale na entrada (com `mode` diferente de `off`), na memória do usuário (sempre) e no `output.pii`. Sem prefixo, qualquer número com essa quantidade de dígitos é mascarado |
 | `prompt_injection`, `injection_extra_terms` | Lista própria em português e inglês, comparada sem acento e sem maiúscula; os termos extras somam à lista |
 | `blocked_topics` | Termos que bloqueiam a mensagem (3 a 100 caracteres) |
 | `max_input_chars` | Tamanho máximo da mensagem (50 a 100 000) |

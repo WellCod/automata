@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.guardrails.pii import PII_TYPES, PiiType
+from app.guardrails.pii import PII_TYPES, CustomPattern, PiiType
 from app.schemas.workflow import WorkflowSettings
 
 
@@ -59,10 +59,53 @@ class KnowledgeBinding(BaseModel):
     max_results: int = Field(default=5, ge=1, le=20)
 
 
+class CustomPiiPattern(BaseModel):
+    """Dado pessoal da empresa (matrícula, contrato, protocolo) pelo formato (ADR-0032).
+
+    Sem regex livre: prefixo literal e a faixa de dígitos, montados em regex pelo código.
+    """
+
+    # vira "[<rótulo> removido]"
+    label: str = Field(min_length=1, max_length=30, pattern=r"^[\w ]+$")
+    # sem prefixo, qualquer número com essa quantidade de dígitos é mascarado
+    prefix: str = Field(default="", max_length=10, pattern=r"^[A-Za-z0-9-]*$")
+    min_digits: int = Field(ge=4, le=20)
+    max_digits: int = Field(ge=4, le=20)
+
+    @field_validator("label")
+    @classmethod
+    def rotulo_sem_espaco_nas_pontas(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("o rótulo precisa de texto")
+        return v.strip()
+
+    @model_validator(mode="after")
+    def faixa_valida(self) -> "CustomPiiPattern":
+        if self.min_digits > self.max_digits:
+            raise ValueError("o mínimo de dígitos passa do máximo")
+        return self
+
+    def compiled(self) -> CustomPattern:
+        return CustomPattern(self.label, self.prefix, self.min_digits, self.max_digits)
+
+
 class PiiRule(BaseModel):
     # off: não olha; mask: troca o dado por um marcador e segue; block: mascara e bloqueia
     mode: Literal["off", "mask", "block"] = "off"
     types: list[PiiType] = Field(default_factory=lambda: list(PII_TYPES))
+    # valem na entrada, na memória do usuário e no guardrail de saída
+    custom: list[CustomPiiPattern] = Field(default_factory=list, max_length=10)
+
+    @field_validator("custom")
+    @classmethod
+    def rotulos_unicos(cls, v: list[CustomPiiPattern]) -> list[CustomPiiPattern]:
+        labels = [p.label.lower() for p in v]
+        if len(labels) != len(set(labels)):
+            raise ValueError("rótulo repetido nos padrões próprios")
+        return v
+
+    def custom_patterns(self) -> tuple[CustomPattern, ...]:
+        return tuple(p.compiled() for p in self.custom)
 
 
 class OutputRule(BaseModel):

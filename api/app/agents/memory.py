@@ -14,7 +14,7 @@ from agno.db.postgres import PostgresDb
 from agno.db.schemas.memory import UserMemory
 from agno.memory import MemoryManager
 
-from app.guardrails.pii import PII_SCAN_MAX_CHARS, find_pii, mask
+from app.guardrails.pii import PII_SCAN_MAX_CHARS, CustomPattern, find_pii, mask
 from app.schemas.config import MemorySettings
 from app.settings import get_settings
 
@@ -25,22 +25,28 @@ CAPTURE_RULES = (
 )
 
 
-def _masked(text: str | None) -> str | None:
+# padrões próprios da máscara por agente (ADR-0032), da última versão montada: o banco
+# de memória é um só para a instância e a memória gravada traz o agent_id
+_custom_by_agent: dict[str, tuple[CustomPattern, ...]] = {}
+
+
+def _masked(text: str | None, custom: tuple[CustomPattern, ...] = ()) -> str | None:
     if not text:
         return text
     # o input cru que o Agno grava junto da memória pode ser enorme: acima do teto do
     # scan, guarda só o começo, que é o que serve para auditar de onde veio o fato
     if len(text) > PII_SCAN_MAX_CHARS:
         text = text[:PII_SCAN_MAX_CHARS]
-    return mask(text, find_pii(text))
+    return mask(text, find_pii(text, custom=custom))
 
 
 class MaskingDb(PostgresDb):
     """PostgresDb que mascara PII de toda memória antes de gravar."""
 
     def upsert_user_memory(self, memory: UserMemory, *args: Any, **kwargs: Any) -> Any:
-        memory.memory = _masked(memory.memory) or ""
-        memory.input = _masked(memory.input)
+        custom = _custom_by_agent.get(memory.agent_id or "", ())
+        memory.memory = _masked(memory.memory, custom) or ""
+        memory.input = _masked(memory.input, custom)
         return super().upsert_user_memory(memory, *args, **kwargs)
 
 
@@ -81,7 +87,12 @@ class AgentMemoryManager(MemoryManager):
         return self._read(user_id)
 
 
-def memory_kwargs(agent_id: str, settings: MemorySettings, user_id: str | None) -> dict[str, Any]:
+def memory_kwargs(
+    agent_id: str,
+    settings: MemorySettings,
+    user_id: str | None,
+    custom: tuple[CustomPattern, ...] = (),
+) -> dict[str, Any]:
     """Argumentos do Agent para a memória; vazio quando ela não vale neste run.
 
     Sem usuário a memória fica desligada: o Agno usaria "default" e juntaria pessoas
@@ -89,6 +100,7 @@ def memory_kwargs(agent_id: str, settings: MemorySettings, user_id: str | None) 
     """
     if not settings.enabled or not user_id:
         return {}
+    _custom_by_agent[agent_id] = custom
     instructions = CAPTURE_RULES
     if settings.instructions:
         instructions = f"{settings.instructions.strip()}\n\n{CAPTURE_RULES}"
