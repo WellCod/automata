@@ -23,6 +23,7 @@ dependencies = [
     "boto3>=1.40",
     # já vinha pelo agno; declarado porque a saída estruturada valida schema e resposta
     "jsonschema>=4.26",
+    "cohere>=5.15",
 ]
 
 [dependency-groups]

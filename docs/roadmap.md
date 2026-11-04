@@ -1308,7 +1308,7 @@ Itens que não entram, com o motivo no ADR de cada fase:
 Decisão em [ADR-0033](adr/0033-reranker-e-filtros-na-recuperacao.md). A base pode ordenar os candidatos por relevância com um cross-encoder (Cohere direto ou pelo Bedrock) antes do MMR ou da recência. Cada documento ganha campos próprios, como produto ou ano, e o modelo pode filtrar a busca por eles quando a conversa já diz o que procura.
 
 - [x] `docs(adr)`: ADR-0033, esta seção e o plano das Fases 36 a 42, ADR-0032 aceito
-- [ ] `feat(api)`: cross-encoder por base com cohere e bedrock, custo por busca no agente
+- [x] `feat(api)`: cross-encoder por base com cohere e bedrock, custo por busca no agente
 - [ ] `feat(api)`: metadados por documento nos trechos e filtros escolhidos pelo modelo na tool da base
 - [ ] `feat(web)`: cross-encoder e filtros na estratégia da base, campos do documento e filtros na busca de teste
 - [ ] `test(api)`: evals do cross-encoder e dos filtros

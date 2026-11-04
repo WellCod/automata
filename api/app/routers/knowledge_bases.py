@@ -12,6 +12,7 @@ from app.db import SessionDep
 from app.knowledge.embedders import EMBEDDERS, is_configured
 from app.knowledge.ingest import IngestError, read_documents
 from app.knowledge.reprocess import plan_reprocess, reprocess
+from app.knowledge.rerank import CROSS_ENCODER_PRICES, cross_encoder_available
 from app.knowledge.search import SearchOutcome, search_base
 from app.knowledge.search import search as run_search
 from app.models.knowledge_base import KnowledgeBase
@@ -21,9 +22,11 @@ from app.repositories.embedding_usage import EmbeddingTotals, EmbeddingUsageRepo
 from app.repositories.knowledge_base import KnowledgeBaseRepository
 from app.routers.knowledge_contents import to_response as content_response
 from app.schemas.knowledge_base import (
+    CROSS_ENCODER_MODELS,
     ChunkingSettings,
     ChunkPreview,
     ChunkPreviewInput,
+    CrossEncoderInfo,
     EmbedderInfo,
     KnowledgeBaseCreate,
     KnowledgeBaseResponse,
@@ -69,7 +72,15 @@ def to_response(b: KnowledgeBase, usage: EmbeddingTotals | None = None) -> Knowl
 
 
 def _check_retrieval(retrieval: RetrievalSettings | None) -> None:
-    if retrieval is None or not retrieval.hyde or retrieval.hyde_model is None:
+    if retrieval is None:
+        return
+    cross = retrieval.cross_encoder
+    if cross is not None and not cross_encoder_available(cross.provider):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Cross-encoder {cross.provider} não configurado na instância",
+        )
+    if not retrieval.hyde or retrieval.hyde_model is None:
         return
     try:
         get_capabilities(retrieval.hyde_model)
@@ -100,6 +111,19 @@ def list_embedders() -> list[EmbedderInfo]:
             default=spec.name == default,
         )
         for spec in EMBEDDERS.values()
+    ]
+
+
+@router.get("/cross-encoders", response_model=list[CrossEncoderInfo])
+def list_cross_encoders() -> list[CrossEncoderInfo]:
+    return [
+        CrossEncoderInfo(
+            provider=provider,
+            models=list(models),
+            configured=cross_encoder_available(provider),
+            price_per_search={m: CROSS_ENCODER_PRICES.get(f"{provider}:{m}", 0.0) for m in models},
+        )
+        for provider, models in CROSS_ENCODER_MODELS.items()
     ]
 
 
@@ -230,6 +254,7 @@ def _result(outcome: SearchOutcome) -> SearchResult:
         hits=[SearchHit(**hit.__dict__) for hit in outcome.hits],
         searched=outcome.searched,
         hyde_tokens=outcome.hyde_tokens,
+        rerank_cost=outcome.rerank_cost,
     )
 
 
