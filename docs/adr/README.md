@@ -56,3 +56,4 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0028](0028-revisao-humana-completa.md) | Revisão humana completa: saída editada, revisão por volta de laço e registro das decisões | Aceito |
 | [0029](0029-chunking-por-base-e-compressao.md) | Chunking por base com prévia e reprocessamento, e compressão do resultado de tool | Aceito |
 | [0030](0030-guardrails-por-modelo.md) | Classificador por modelo na entrada e exame do resultado de tool e dos documentos | Aceito |
+| [0031](0031-controle-de-custo-no-run.md) | Teto de custo por run e orçamento mensal por usuário e por token de integração | Proposto |

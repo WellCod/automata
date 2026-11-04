@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 33
+# Roadmap — Fases 4 a 34
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -1248,3 +1248,20 @@ Sem achados. As 66 telas não têm botão sem nome, campo sem rótulo, página s
 - "Ignore previous instructions" com um espaço de largura zero no meio é pega.
 - Duas chamadas seguidas de reprocessamento enfileiram o conteúdo uma vez só, e a segunda dentro do intervalo recebe 429.
 - O registro de revisões grava o "antes" do run, mesmo que o cliente mande outro texto.
+
+## Fase 34 — Controle de custo no run
+
+Decisão em [ADR-0031](adr/0031-controle-de-custo-no-run.md). Um teto de custo por run, conferido antes de cada tool, encerra o run com a resposta que o modelo já tem. Um orçamento mensal por quem chama limita o gasto de cada usuário do painel e de cada token de integração em todos os agentes, com aviso pelos destinos de alerta e bloqueio opcional.
+
+- [x] `docs(adr)`: ADR-0031 e esta seção
+- [ ] `feat(api)`: teto de custo por run no agente e no líder do time, com o motivo da parada no run
+- [ ] `feat(api)`: orçamento mensal por usuário e por token de integração, com aviso e bloqueio
+- [ ] `feat(web)`: teto por run no controle do run, orçamento nas páginas Usuários e Integrações e parada pelo teto nas execuções
+- [ ] `test(api)`: evals do teto por run e do orçamento por quem chama
+
+**Critério de aceite da fase:**
+
+- Um agente com teto de US$ 0,05 e uma tool em laço termina com resposta e `stop_reason = run_cost_limit`, passando do teto no máximo pelo custo de uma chamada.
+- Um token de integração com o orçamento estourado e bloqueio ligado recebe a mensagem de orçamento, e outro token segue no mesmo agente.
+- Um usuário do painel com 80% do orçamento gera um aviso só no mês.
+- O run parado pelo teto não entra na taxa de erro.
