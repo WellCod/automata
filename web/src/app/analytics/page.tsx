@@ -1,5 +1,6 @@
 "use client";
 
+import { ReconciliationPanel } from "@/components/reconciliation-panel";
 import { formatDuration, formatTotalUsd } from "@/lib/format";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -242,6 +243,8 @@ export default function AnalyticsPage() {
       <div className="mb-8">
         <MetricsCharts range={summaryQuery} />
       </div>
+
+      <ReconciliationPanel />
 
       <div>
         <h2 className="text-foreground mb-3 text-[13px] font-medium">

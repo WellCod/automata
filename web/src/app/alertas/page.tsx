@@ -89,7 +89,12 @@ function DestinationRow({ dest }: { dest: Destination }) {
         <div>
           <p className="text-foreground text-[13px] font-medium">{dest.name}</p>
           <p className="text-muted-foreground text-[11px]">
-            <code>{dest.host}</code> · criado por {dest.created_by}
+            {dest.kind === "email" ? (
+              <>E-mail para {(dest.emails ?? []).join(", ")}</>
+            ) : (
+              <code>{dest.host}</code>
+            )}{" "}
+            · criado por {dest.created_by}
           </p>
         </div>
         <div className="flex gap-2">
@@ -117,7 +122,7 @@ function DestinationRow({ dest }: { dest: Destination }) {
       />
       {dest.last_status && (
         <p
-          className={`text-[11px] ${dest.last_status.startsWith("HTTP 2") ? "text-muted-foreground" : "text-destructive"}`}
+          className={`text-[11px] ${dest.last_status.startsWith("HTTP 2") || dest.last_status === "SMTP enviado" ? "text-muted-foreground" : "text-destructive"}`}
         >
           Último envio: {dest.last_status}
           {dest.last_at && ` · ${when(dest.last_at)}`}
@@ -136,6 +141,20 @@ export default function AlertsPage() {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
+  const [kind, setKind] = useState<"webhook" | "email">("webhook");
+  const [emails, setEmails] = useState("");
+  const { data: channels } = useQuery({
+    queryKey: ["alert-destinations", "channels"],
+    queryFn: async () => {
+      const res = await client.GET("/api/v1/alert-destinations/channels");
+      if (res.error) throw new Error("Falha ao carregar os canais");
+      return res.data;
+    },
+  });
+  const emailList = emails
+    .split(/[\s,;]+/)
+    .map((e) => e.trim())
+    .filter(Boolean);
   const [events, setEvents] = useState<AlertEvent[]>(["budget.warning", "budget.exceeded"]);
   const [issued, setIssued] = useState<Issued | null>(null);
 
@@ -151,19 +170,25 @@ export default function AlertsPage() {
   const create = useMutation({
     mutationFn: async () => {
       const res = await client.POST("/api/v1/alert-destinations", {
-        body: { name: name.trim(), url: url.trim(), events },
+        body:
+          kind === "email"
+            ? { name: name.trim(), kind, emails: emailList, events }
+            : { name: name.trim(), kind, url: url.trim(), events },
       });
       if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao cadastrar o destino"));
       return res.data!;
     },
     onSuccess: (saved) => {
-      setIssued(saved);
+      // o destino por e-mail não tem segredo para mostrar
+      if (saved.secret) setIssued(saved);
       setName("");
       setUrl("");
+      setEmails("");
       void queryClient.invalidateQueries({ queryKey: ["alert-destinations"] });
     },
   });
-  const canCreate = name.trim() && url.trim() && events.length > 0 && !create.isPending;
+  const target = kind === "email" ? emailList.length > 0 && emailList.length <= 5 : !!url.trim();
+  const canCreate = name.trim() && target && events.length > 0 && !create.isPending;
 
   return (
     <div className="flex max-w-3xl flex-col gap-4 p-6">
@@ -196,14 +221,39 @@ export default function AlertsPage() {
           />
         </label>
         <label className="text-muted-foreground flex flex-col gap-1 text-[12px]">
-          URL do webhook
-          <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://hooks.slack.com/services/…"
+          Tipo
+          <select
+            value={kind}
+            onChange={(e) => setKind(e.target.value as "webhook" | "email")}
             className={inputCls}
-          />
+          >
+            <option value="webhook">Webhook</option>
+            <option value="email" disabled={!channels?.email}>
+              E-mail{channels?.email ? "" : " (SMTP não configurado)"}
+            </option>
+          </select>
         </label>
+        {kind === "email" ? (
+          <label className="text-muted-foreground flex flex-col gap-1 text-[12px]">
+            Endereços (até 5, separados por vírgula)
+            <input
+              value={emails}
+              onChange={(e) => setEmails(e.target.value)}
+              placeholder="financeiro@empresa.com, operacao@empresa.com"
+              className={inputCls}
+            />
+          </label>
+        ) : (
+          <label className="text-muted-foreground flex flex-col gap-1 text-[12px]">
+            URL do webhook
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://hooks.slack.com/services/…"
+              className={inputCls}
+            />
+          </label>
+        )}
         <EventPicker label="Eventos do novo destino" value={events} onChange={setEvents} />
         <div>
           <Button size="sm" variant="strong" type="submit" disabled={!canCreate}>
