@@ -18,6 +18,8 @@ AlertEvent = Literal[
     "data_subject.due",
     # run em background que falhou de vez (ADR-0037)
     "job.failed",
+    # custo estimado longe do informado pelo provedor num dia fechado (ADR-0037)
+    "cost.divergence",
 ]
 
 
