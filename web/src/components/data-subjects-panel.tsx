@@ -40,6 +40,19 @@ const STATUS_LABELS: Record<string, string> = {
   expired: "Arquivo vencido",
 };
 
+export const SOURCE_LABELS: Record<string, string> = {
+  panel: "Owner",
+  integration: "Integração",
+  self: "O próprio usuário",
+};
+
+/** Pedido ainda sem resposta depois do prazo legal (ADR-0036). */
+export function isOverdue(r: DataSubjectRequest, now: Date = new Date()): boolean {
+  return (
+    (r.status === "pending" || r.status === "running") && !!r.due_at && new Date(r.due_at) < now
+  );
+}
+
 const REQUESTS = ["data-subject-requests"];
 const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none";
@@ -188,7 +201,15 @@ function requestTotal(r: DataSubjectRequest): number {
   );
 }
 
-export function RequestsTable({ requests }: { requests: DataSubjectRequest[] }) {
+export function RequestsTable({
+  requests,
+  downloadHref = (id) => `/api/api/v1/data-subject-requests/${id}/download`,
+  showRequester = true,
+}: {
+  requests: DataSubjectRequest[];
+  downloadHref?: (id: string) => string;
+  showRequester?: boolean;
+}) {
   if (requests.length === 0)
     return <p className="text-muted-foreground text-[13px]">Nenhum pedido ainda.</p>;
   return (
@@ -199,8 +220,11 @@ export function RequestsTable({ requests }: { requests: DataSubjectRequest[] }) 
             <th className="py-1.5 pr-3 font-normal">Pedido</th>
             <th className="py-1.5 pr-3 font-normal">Titular</th>
             <th className="py-1.5 pr-3 font-normal">Situação</th>
-            <th className="hidden py-1.5 pr-3 font-normal sm:table-cell">Quem pediu</th>
+            {showRequester && (
+              <th className="hidden py-1.5 pr-3 font-normal sm:table-cell">Quem pediu</th>
+            )}
             <th className="py-1.5 pr-3 font-normal">Quando</th>
+            <th className="hidden py-1.5 pr-3 font-normal md:table-cell">Prazo</th>
             <th className="py-1.5 font-normal">
               <span className="sr-only">Arquivo</span>
             </th>
@@ -231,13 +255,26 @@ export function RequestsTable({ requests }: { requests: DataSubjectRequest[] }) 
                 )}
                 {r.error && <span className="text-destructive block text-[12px]">{r.error}</span>}
               </td>
-              <td className="hidden py-1.5 pr-3 break-all sm:table-cell">{r.requested_by}</td>
+              {showRequester && (
+                <td className="hidden py-1.5 pr-3 break-all sm:table-cell">
+                  {r.requested_by}
+                  <span className="text-muted-foreground block text-[11px]">
+                    {SOURCE_LABELS[r.source] ?? r.source}
+                  </span>
+                </td>
+              )}
               <td className="py-1.5 pr-3">{when(r.created_at)}</td>
+              <td
+                className={`hidden py-1.5 pr-3 md:table-cell ${isOverdue(r) ? "text-destructive font-medium" : ""}`}
+              >
+                {r.due_at ? new Date(r.due_at).toLocaleDateString("pt-BR") : "—"}
+                {isOverdue(r) && <span className="block text-[11px]">vencido</span>}
+              </td>
               <td className="py-1.5">
                 {r.kind === "export" && r.status === "done" && (
                   <a
                     className="text-accent underline"
-                    href={`/api/api/v1/data-subject-requests/${r.id}/download`}
+                    href={downloadHref(r.id)}
                     title={`Vale até ${when(r.expires_at)}`}
                   >
                     Baixar
