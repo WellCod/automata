@@ -617,6 +617,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/knowledge-bases/{base_id}/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Field Values
+         * @description Campos e valores dos documentos prontos da base: o que o modelo vê na tool.
+         */
+        get: operations["get_field_values_api_v1_knowledge_bases__base_id__fields_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge-bases/cross-encoders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Cross Encoders */
+        get: operations["list_cross_encoders_api_v1_knowledge_bases_cross_encoders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/knowledge-bases": {
         parameters: {
             query?: never;
@@ -890,6 +927,26 @@ export interface paths {
         put?: never;
         /** Add Text */
         post: operations["add_text_api_v1_knowledge_bases__base_id__contents_text_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge-bases/{base_id}/contents/{content_id}/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Fields
+         * @description Campos do documento (ADR-0033): grava e atualiza os trechos já indexados, sem embedar.
+         */
+        put: operations["update_fields_api_v1_knowledge_bases__base_id__contents__content_id__fields_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2028,6 +2085,13 @@ export interface components {
             /** Error */
             error: string | null;
         };
+        /** ContentFieldsInput */
+        ContentFieldsInput: {
+            /** Fields */
+            fields?: {
+                [key: string]: string;
+            } | null;
+        };
         /** ContentScheduleInput */
         ContentScheduleInput: {
             /** Refresh Every Hours */
@@ -2081,6 +2145,38 @@ export interface components {
             password: string;
             /** @default viewer */
             role: components["schemas"]["UserRole"];
+        };
+        /** CrossEncoderInfo */
+        CrossEncoderInfo: {
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "cohere" | "bedrock";
+            /** Models */
+            models: string[];
+            /** Configured */
+            configured: boolean;
+            /** Price Per Search */
+            price_per_search: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * CrossEncoderSettings
+         * @description Reranker que lê a pergunta e o trecho juntos (ADR-0033); o texto sai para o provedor.
+         */
+        CrossEncoderSettings: {
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "cohere" | "bedrock";
+            /**
+             * Model
+             * @default
+             */
+            model: string;
         };
         /**
          * CustomPiiPattern
@@ -2944,6 +3040,10 @@ export interface components {
             refresh_every_hours?: number | null;
             /** Next Refresh At */
             next_refresh_at?: string | null;
+            /** Fields */
+            fields?: {
+                [key: string]: string;
+            } | null;
         };
         /** LintWarning */
         LintWarning: {
@@ -3250,6 +3350,12 @@ export interface components {
             hyde: boolean;
             /** Hyde Model */
             hyde_model?: string | null;
+            cross_encoder?: components["schemas"]["CrossEncoderSettings"] | null;
+            /**
+             * Agentic Filters
+             * @default false
+             */
+            agentic_filters: boolean;
         };
         /** ReviewEntry */
         ReviewEntry: {
@@ -3408,6 +3514,10 @@ export interface components {
              * @default 5
              */
             max_results: number;
+            /** Filters */
+            filters?: {
+                [key: string]: string;
+            } | null;
         };
         /** SearchResult */
         SearchResult: {
@@ -3417,6 +3527,13 @@ export interface components {
             searched: string;
             /** Hyde Tokens */
             hyde_tokens: number;
+            /** Rerank Cost */
+            rerank_cost?: number | null;
+            /**
+             * Filters Dropped
+             * @default false
+             */
+            filters_dropped: boolean;
         };
         /** SecretsRotation */
         SecretsRotation: {
@@ -3571,6 +3688,10 @@ export interface components {
             name: string;
             /** Text */
             text: string;
+            /** Fields */
+            fields?: {
+                [key: string]: string;
+            } | null;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -3679,6 +3800,10 @@ export interface components {
             name?: string | null;
             /** Refresh Every Hours */
             refresh_every_hours?: number | null;
+            /** Fields */
+            fields?: {
+                [key: string]: string;
+            } | null;
         };
         /** UserResponse */
         UserResponse: {
@@ -5215,6 +5340,59 @@ export interface operations {
             };
         };
     };
+    get_field_values_api_v1_knowledge_bases__base_id__fields_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string[];
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_cross_encoders_api_v1_knowledge_bases_cross_encoders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrossEncoderInfo"][];
+                };
+            };
+        };
+    };
     list_bases_api_v1_knowledge_bases_get: {
         parameters: {
             query?: never;
@@ -5875,6 +6053,42 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeContentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_fields_api_v1_knowledge_bases__base_id__contents__content_id__fields_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_id: string;
+                content_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContentFieldsInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

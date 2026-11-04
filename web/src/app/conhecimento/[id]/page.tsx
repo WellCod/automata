@@ -16,6 +16,7 @@ import {
 } from "@/components/chunking-settings";
 import { KnowledgeConnectors } from "@/components/knowledge-connectors";
 import { DEFAULT_RETRIEVAL, RetrievalFields } from "@/components/retrieval-settings";
+import { DocumentFieldsEditor, FieldChips, parseFields } from "@/components/document-fields";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -73,6 +74,7 @@ function StatusBadge({ content }: { content: KnowledgeContent }) {
 function ContentRow({ baseId, content }: { baseId: string; content: KnowledgeContent }) {
   const queryClient = useQueryClient();
   const [confirm, setConfirm] = useState(false);
+  const [editingFields, setEditingFields] = useState(false);
   const remove = useMutation({
     mutationFn: async () => {
       const res = await client.DELETE("/api/v1/knowledge-bases/{base_id}/contents/{content_id}", {
@@ -129,6 +131,11 @@ function ContentRow({ baseId, content }: { baseId: string; content: KnowledgeCon
               Baixar de novo
             </Button>
           )}
+          {content.status !== "processing" && !editingFields && (
+            <Button size="xs" variant="muted" onClick={() => setEditingFields(true)}>
+              Campos
+            </Button>
+          )}
           {confirm ? (
             <>
               <Button size="xs" variant="destructive" onClick={() => remove.mutate()}>
@@ -155,6 +162,16 @@ function ContentRow({ baseId, content }: { baseId: string; content: KnowledgeCon
       )}
       {content.source_type === "connector" && content.external_path && (
         <span className="text-muted-foreground truncate text-[11px]">{content.external_path}</span>
+      )}
+      {!editingFields && <FieldChips fields={content.fields} />}
+      {editingFields && (
+        <DocumentFieldsEditor
+          baseId={baseId}
+          contentId={content.id}
+          name={content.name}
+          fields={content.fields}
+          onClose={() => setEditingFields(false)}
+        />
       )}
       {content.status === "failed" && content.status_message && (
         <p className="text-destructive text-[11px]" role="alert">
@@ -416,23 +433,46 @@ function ResultColumn({ title, result }: { title: string; result: SearchResult }
           &rdquo;
         </p>
       )}
+      {result.rerank_cost != null && (
+        <p className="text-muted-foreground text-[11px]">
+          Cross-encoder:{" "}
+          {result.rerank_cost.toLocaleString("pt-BR", {
+            style: "currency",
+            currency: "USD",
+            maximumFractionDigits: 4,
+          })}{" "}
+          nesta busca
+        </p>
+      )}
+      {result.filters_dropped && (
+        <p className="text-[11px] text-amber-600 dark:text-amber-400">
+          Nenhum trecho com esse filtro: a busca saiu sem ele, como faria o agente.
+        </p>
+      )}
       <HitList hits={result.hits} />
     </section>
   );
 }
 
 function hasStrategy(base: KnowledgeBase): boolean {
-  return base.retrieval.reranker !== "none" || base.retrieval.hyde;
+  return (
+    base.retrieval.reranker !== "none" ||
+    base.retrieval.hyde ||
+    base.retrieval.cross_encoder != null
+  );
 }
 
 function TestSearch({ base }: { base: KnowledgeBase }) {
   const [query, setQuery] = useState("");
   const [compare, setCompare] = useState(hasStrategy(base));
+  const [filterText, setFilterText] = useState("");
+  const { fields: filters, problems: filterProblems } = parseFields(filterText);
+  const filtersBody = Object.keys(filters).length ? filters : null;
   const search = useMutation({
     mutationFn: async (): Promise<SearchHit[]> => {
       const res = await client.POST("/api/v1/knowledge-bases/{base_id}/search", {
         params: { path: { base_id: base.id } },
-        body: { query, max_results: 5 },
+        body: { query, max_results: 5, filters: filtersBody },
       });
       if (res.error) throw new Error(apiErrorMessage(res.error, "Falha na busca"));
       return res.data!;
@@ -442,7 +482,7 @@ function TestSearch({ base }: { base: KnowledgeBase }) {
     mutationFn: async (): Promise<SearchComparison> => {
       const res = await client.POST("/api/v1/knowledge-bases/{base_id}/search/compare", {
         params: { path: { base_id: base.id } },
-        body: { query, max_results: 5 },
+        body: { query, max_results: 5, filters: filtersBody },
       });
       if (res.error) throw new Error(apiErrorMessage(res.error, "Falha na busca"));
       return res.data!;
@@ -459,7 +499,7 @@ function TestSearch({ base }: { base: KnowledgeBase }) {
         className="flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (query.trim()) active.mutate();
+          if (query.trim() && filterProblems.length === 0) active.mutate();
         }}
       >
         <input
@@ -473,6 +513,20 @@ function TestSearch({ base }: { base: KnowledgeBase }) {
           {active.isPending ? "Buscando…" : "Buscar"}
         </Button>
       </form>
+      <label className="text-muted-foreground flex flex-col gap-1 text-[12px]">
+        Filtros dos campos, como o agente passaria (opcional)
+        <input
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+          placeholder="produto=plano a, ano=2026"
+          className={inputCls}
+        />
+      </label>
+      {filterProblems.map((p) => (
+        <p key={p} className="text-destructive text-[11px]">
+          {p}
+        </p>
+      ))}
       <label className="text-muted-foreground flex items-center gap-2 text-[12px]">
         <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} />
         Comparar a estratégia da base com a busca simples

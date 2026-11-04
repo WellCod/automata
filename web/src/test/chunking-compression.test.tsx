@@ -59,6 +59,7 @@ beforeEach(() => {
     if (path.endsWith("/contents")) return { data: [], error: undefined } as never;
     if (path.endsWith("/capabilities")) return { data: MODELS, error: undefined } as never;
     if (path.endsWith("/connectors")) return { data: [], error: undefined } as never;
+    if (path.endsWith("/cross-encoders")) return { data: [], error: undefined } as never;
     return { data: base, error: undefined } as never;
   });
 });
