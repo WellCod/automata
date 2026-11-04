@@ -41,6 +41,8 @@ class Scope:
     BUDGETS_ADMIN = "budgets:admin"
     # dados de um titular (ADR-0032): só owner
     DATA_SUBJECTS_ADMIN = "data_subjects:admin"
+    # token de integração que pede pelo titular (ADR-0036): vê só os pedidos dele
+    DATA_SUBJECTS_REQUEST = "data_subjects:request"
     # piso de guardrails da instância (ADR-0034): só owner
     GUARDRAILS_ADMIN = "guardrails:admin"
 

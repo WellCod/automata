@@ -31,6 +31,8 @@ class IntegrationInput(BaseModel):
     team_ids: list[UUID] = Field(default_factory=list)
     # agentes e times cuja suíte de testes o token pode rodar e consultar
     eval_ids: list[UUID] = Field(default_factory=list)
+    # pedidos de exportação e exclusão de qualquer titular (ADR-0036)
+    data_subjects: bool = False
     expires_in_days: int = Field(default=30, ge=1, le=MAX_DAYS)
 
 
@@ -40,6 +42,7 @@ class IntegrationResponse(BaseModel):
     agent_ids: list[UUID]
     team_ids: list[UUID]
     eval_ids: list[UUID]
+    data_subjects: bool = False
     created_by: str
     created_at: datetime
     expires_at: datetime
@@ -61,6 +64,7 @@ def _to_response(t: IntegrationToken, kid: str | None = None) -> IntegrationResp
         agent_ids=[UUID(i) for i in t.agent_ids],
         team_ids=[UUID(i) for i in t.team_ids],
         eval_ids=[UUID(i) for i in t.eval_ids],
+        data_subjects="data_subjects:request" in (t.scopes or []),
         created_by=t.created_by,
         created_at=t.created_at,
         expires_at=t.expires_at,
@@ -97,7 +101,7 @@ def list_integrations(session: SessionDep) -> list[IntegrationResponse]:
 
 @router.post("", response_model=IssuedIntegration, status_code=201)
 def issue(body: IntegrationInput, session: SessionDep, request: Request) -> IssuedIntegration:
-    if not body.agent_ids and not body.team_ids and not body.eval_ids:
+    if not (body.agent_ids or body.team_ids or body.eval_ids or body.data_subjects):
         raise HTTPException(status_code=400, detail="Escolha ao menos um agente ou time")
     _check_resources(session, body.agent_ids, ConfigKind.agent)
     _check_resources(session, body.team_ids, ConfigKind.team)
@@ -106,7 +110,7 @@ def issue(body: IntegrationInput, session: SessionDep, request: Request) -> Issu
     token_id = uuid4()
     jti = uuid4().hex
     expires_in = timedelta(days=body.expires_in_days)
-    scopes = integration_scopes(body.agent_ids, body.team_ids, body.eval_ids)
+    scopes = integration_scopes(body.agent_ids, body.team_ids, body.eval_ids, body.data_subjects)
     row = IntegrationToken(
         id=token_id,
         name=body.name,

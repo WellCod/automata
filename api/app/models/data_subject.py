@@ -22,6 +22,8 @@ class DataSubjectRequest(Base):
     subject: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
     requested_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    # panel (owner), integration (token) ou self (o próprio usuário do painel), ADR-0036
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="panel")
     counts: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     # JSON compactado com gzip, só na exportação
     result: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True, deferred=True)
