@@ -68,6 +68,11 @@ Arquivos:
   - Time sem usuário fica sem memória.
   - A máscara usa os padrões próprios do time, e não os de outro dono.
   - O modelo do resumo herda o retry da versão.
+- `tests/test_evals_titular_por_token.py`: pedido do titular por token e pelo próprio usuário (ADR-0036).
+  - Matriz de acesso: só o owner e o token com a opção pedem. Editor, viewer, token sem a opção e token de agente recebem 403, e só o owner vê todos os pedidos.
+  - A opção só entra no token quando é pedida.
+  - Origem pelo ator.
+  - Prazo lido do ambiente.
 - `.github/workflows/evals-nightly.yml` — workflow agendado
 
 ## Metering
