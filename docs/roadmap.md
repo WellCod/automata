@@ -1393,7 +1393,7 @@ Decisão em [ADR-0037](adr/0037-operacao-fila-conciliacao-e-avisos.md). O owner 
 Decisão em [ADR-0038](adr/0038-workflow-e-suite.md). O workflow ganha um roteador com vários caminhos, a escolha do que cada etapa recebe e o histórico da conversa. A suíte confere a saída de uma etapa do meio, aceita turnos anteriores em caso de workflow e sugere casos em lote a partir das conversas.
 
 - [x] `docs(adr)`: ADR-0038 e esta seção
-- [ ] `feat(api)`: roteador por regras e entrada por etapa no workflow
+- [x] `feat(api)`: roteador por regras e entrada por etapa no workflow
 - [ ] `feat(api)`: histórico no workflow, turnos anteriores no caso e checagem de texto numa etapa
 - [ ] `feat(api)`: sugestões de casos em lote a partir das conversas
 - [ ] `feat(web)`: roteador, entrada e histórico no editor de workflow, etapa na checagem e casos em lote

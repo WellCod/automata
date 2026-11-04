@@ -379,9 +379,12 @@ Com `TRACING_ENABLED=true` (padrão), o AgentOS grava em banco, via OpenTelemetr
 Workflow é um config com `kind: "workflow"`, criado com `POST /api/v1/configs` e `"kind": "workflow"`. Tem rascunho, publicação, rollback e versões como agente e time. O payload não tem modelo (`model_id` fica `null`; o serviço recusa modelo em workflow e exige em agente e time). A estrutura vai na seção `workflow.steps`, uma árvore de nós com `type`:
 
 - `step`: `name`, `agent_id` **ou** `team_id`, `version_id` opcional (fixa a versão), `on_error` (`stop` para o fluxo, padrão; `continue` passa o erro adiante), `max_retries` (0 a 3) e `review` opcional (ADR-0023): `when` (`before` confirma antes de rodar, `after` aprova a saída), `message` (até 300), `on_reject` (`skip`, `cancel`, padrão, ou `retry`, só com `after`) e `timeout_hours` (1 a 168; vencido, cancela).
+  - Entrada da etapa (ADR-0038): `input` pode ser `previous` (padrão do Agno, a saída mais funda da etapa anterior), `original` (a mensagem do usuário) ou `template`. No `template` (até 2000 caracteres), `{entrada}` é a mensagem, `{anterior}` a saída anterior e `{etapa:Nome}` a saída de uma etapa que já rodou, achada também dentro de contêineres. Etapa citada que não existe dá erro na escrita.
+  - A montagem é uma subclasse de `Step` (`MappedStep`) que troca o `_prepare_message`. Ela está registrada no `STEP_TYPE_MAPPING` do Agno, que descreve a etapa pelo tipo exato.
 - `parallel`: `name` e `branches`, de 2 a 5 etapas `step` que recebem a mesma entrada.
 - `condition`: `name`, `rule`, `steps` e `else_steps` opcional.
 - `loop`: `name`, `steps`, `max_iterations` (1 a 10) e `until` opcional (regra avaliada na saída da última etapa de cada volta).
+- `router` (ADR-0038): `name`, `routes` (2 a 5 pares `rule` + `step`) e `default` opcional. Vira o `Router` do Agno com um selector nosso, que devolve o nome da etapa do primeiro caminho que casa. Sem nenhum, roda o padrão; sem padrão, nada roda e a saída anterior segue. Etapa dentro do roteador não tem revisão.
 
 Regras (`rule`/`until`) são próprias, sem CEL:
 - `kind`: `always`, `contains`, `not_contains`, `starts_with`, `empty` ou `not_empty`;

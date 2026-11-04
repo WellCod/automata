@@ -7,15 +7,17 @@ que o Agno não repassa às etapas por conta própria.
 """
 
 import asyncio
+import re
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
 from agno.db.base import AsyncBaseDb, BaseDb
 from agno.factory.utils import FactoryValidationError, RequestContext
-from agno.workflow import Condition, Loop, OnError, Parallel, Step, StepInput, StepOutput
+from agno.workflow import Condition, Loop, OnError, Parallel, Router, Step, StepInput, StepOutput
 from agno.workflow.factory import WorkflowFactory
-from agno.workflow.types import HumanReview, OnReject, OnTimeout
+from agno.workflow.types import HumanReview, OnReject, OnTimeout, StepType
+from agno.workflow.workflow import STEP_TYPE_MAPPING
 
 from app.agents.factory import (
     FactoryInput,
@@ -28,9 +30,11 @@ from app.agents.factory import (
 )
 from app.agents.tracking import RunTracking, TrackedWorkflow
 from app.schemas.workflow import (
+    STEP_REF,
     ConditionNode,
     LoopNode,
     ParallelNode,
+    RouterNode,
     StepNode,
     StepReview,
     WorkflowNode,
@@ -118,6 +122,65 @@ def load_workflow(config_id: UUID, version_id: UUID | None) -> ResolvedWorkflow:
     return ResolvedWorkflow(resolved.name, resolved.description, workflow.steps, executors)
 
 
+def _find(outputs: dict[str, StepOutput] | None, name: str) -> StepOutput | None:
+    """Saída de uma etapa pelo nome, também dentro de paralelo, condição, laço e roteador."""
+    pending = list((outputs or {}).values())
+    while pending:
+        output = pending.pop(0)
+        if output.step_name == name:
+            return output
+        pending.extend(output.steps or [])
+    return None
+
+
+def render_input(
+    mode: str, template: str | None, message: Any, outputs: dict[str, StepOutput] | None
+) -> Any:
+    """Entrada da etapa (ADR-0038); `previous` fica com a montagem do Agno."""
+    if mode == "original":
+        return message
+    previous = _deepest(list(outputs.values())[-1]) if outputs else ""
+
+    def named(match: re.Match[str]) -> str:
+        found = _find(outputs, match.group(1).strip())
+        return _deepest(found) if found else ""
+
+    text = STEP_REF.sub(named, template or "")
+    return text.replace("{entrada}", _text(message)).replace("{anterior}", previous)
+
+
+class MappedStep(Step):
+    """Etapa que escolhe o que o agente recebe, no lugar da saída anterior."""
+
+    def __init__(self, *args: Any, input_mode: str, template: str | None, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.input_mode = input_mode
+        self.template = template
+
+    def _prepare_message(
+        self, message: Any, previous_step_outputs: dict[str, StepOutput] | None = None
+    ) -> Any:
+        return render_input(self.input_mode, self.template, message, previous_step_outputs)
+
+
+# o Agno descreve as etapas pelo tipo exato (STEP_TYPE_MAPPING[type(step)]): sem isto a
+# subclasse quebra ao montar os dados do workflow
+STEP_TYPE_MAPPING[MappedStep] = StepType.STEP
+
+
+def router_selector(routes: list[tuple[WorkflowRule, str]], default: str | None) -> Any:
+    def select(step_input: StepInput) -> Any:
+        previous = step_input.get_last_step_content() or step_input.previous_step_content
+        for rule, name in routes:
+            text = step_input.input if rule.source == "input" else previous
+            if rule_matches(rule, _text(text)):
+                return name
+        # nenhum caminho: o padrão, ou nada roda e a saída anterior segue
+        return default if default else []
+
+    return select
+
+
 def _step(resolved: ResolvedStep) -> Step:
     node = resolved.node
     if resolved.agent is not None:
@@ -130,6 +193,15 @@ def _step(resolved: ResolvedStep) -> Step:
         kind = {"team": executor}
     # erro ou bloqueio na etapa vira exceção: on_error e max_retries do Agno passam a valer
     executor.automata_raise_on_error = True
+    if node.input != "previous":
+        return MappedStep(
+            name=node.name,
+            max_retries=node.max_retries,
+            human_review=human_review_for(node),
+            input_mode=node.input,
+            template=node.template,
+            **kind,
+        )
     return Step(
         name=node.name,
         max_retries=node.max_retries,
@@ -190,6 +262,18 @@ def build_nodes(nodes: list[WorkflowNode], resolved: ResolvedWorkflow) -> list[A
                     evaluator=condition_evaluator(node.rule),
                     steps=build_nodes(node.steps, resolved),
                     else_steps=build_nodes(node.else_steps, resolved) or None,
+                )
+            )
+        elif isinstance(node, RouterNode):
+            steps = [r.step for r in node.routes] + ([node.default] if node.default else [])
+            built.append(
+                Router(
+                    name=node.name,
+                    choices=[_step(resolved.executors[s.name]) for s in steps],
+                    selector=router_selector(
+                        [(r.rule, r.step.name) for r in node.routes],
+                        node.default.name if node.default else None,
+                    ),
                 )
             )
         elif isinstance(node, LoopNode):

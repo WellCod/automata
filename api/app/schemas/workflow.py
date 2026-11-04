@@ -1,5 +1,6 @@
 """Seção `workflow` do payload (ADR-0014): árvore de etapas sobre agentes e times publicados."""
 
+import re
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -58,18 +59,45 @@ class StepNode(BaseModel):
     on_error: Literal["stop", "continue"] = "stop"
     max_retries: int = Field(default=0, ge=0, le=3)
     review: StepReview | None = None
+    # o que a etapa recebe (ADR-0038): a saída anterior, a mensagem do usuário ou um texto
+    # com {entrada}, {anterior} e {etapa:Nome}
+    input: Literal["previous", "original", "template"] = "previous"
+    template: str | None = Field(default=None, max_length=2000)
 
     @model_validator(mode="after")
     def um_executor(self) -> "StepNode":
         if (self.agent_id is None) == (self.team_id is None):
             raise ValueError(f"etapa '{self.name}' precisa de um agente ou de um time")
+        if self.input == "template" and not (self.template or "").strip():
+            raise ValueError(f"etapa '{self.name}' com entrada por texto precisa do texto")
         return self
+
+
+STEP_REF = re.compile(r"\{etapa:([^{}]{1,60})\}")
+
+
+def template_refs(template: str | None) -> list[str]:
+    return [m.strip() for m in STEP_REF.findall(template or "")]
 
 
 class ParallelNode(BaseModel):
     type: Literal["parallel"] = "parallel"
     name: _Name
     branches: list[StepNode] = Field(min_length=2, max_length=5)
+
+
+class RouterRoute(BaseModel):
+    rule: WorkflowRule
+    step: StepNode
+
+
+class RouterNode(BaseModel):
+    """Vários caminhos por regra (ADR-0038): roda o primeiro que casa, ou o padrão."""
+
+    type: Literal["router"] = "router"
+    name: _Name
+    routes: list[RouterRoute] = Field(min_length=2, max_length=5)
+    default: StepNode | None = None
 
 
 class ConditionNode(BaseModel):
@@ -102,7 +130,7 @@ class LoopNode(BaseModel):
 
 
 WorkflowNode = Annotated[
-    StepNode | ParallelNode | ConditionNode | LoopNode, Field(discriminator="type")
+    StepNode | ParallelNode | ConditionNode | LoopNode | RouterNode, Field(discriminator="type")
 ]
 
 
@@ -113,6 +141,9 @@ def _children(node: "WorkflowNode") -> list["WorkflowNode"]:
         return [*node.steps, *node.else_steps]
     if isinstance(node, LoopNode):
         return list(node.steps)
+    if isinstance(node, RouterNode):
+        steps: list[WorkflowNode] = [r.step for r in node.routes]
+        return [*steps, node.default] if node.default else steps
     return []
 
 
@@ -183,6 +214,12 @@ class WorkflowSettings(BaseModel):
         problems = _loop_review_problems(self.steps)
         if problems:
             raise ValueError("; ".join(problems))
+        known = set(names)
+        faltando = sorted(
+            {ref for step in step_nodes(self.steps) for ref in template_refs(step.template)} - known
+        )
+        if faltando:
+            raise ValueError(f"o texto de entrada cita etapas que não existem: {faltando}")
         if isinstance(self.steps[-1], ParallelNode):
             # a saída final seria só a do último ramo
             raise ValueError("o workflow não pode terminar num paralelo: adicione uma etapa depois")
