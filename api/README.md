@@ -420,6 +420,8 @@ Um caso tem `name` (único na config, até 80 caracteres), `input` (até 4000) e
 - `blocked` (ADR-0022): o caso passa quando o guardrail barra o run. `rule` opcional exige a regra: `pii_detected`, `prompt_injection`, `off_topic`, `input_too_long`, `moderation`, `classifier` ou `output_not_allowed`. Sempre sozinha no caso, porque um run barrado não tem resposta para checar (422 com outra checagem).
 - `schema` (ADR-0027): a resposta precisa validar contra o JSON Schema da versão testada. Os erros, até cinco com o caminho do campo, ficam no resultado. Versão sem schema deixa a checagem não avaliada, com o motivo.
 - `steps` (ADR-0022, só workflow): `steps` (1 a 20 nomes de etapa) que precisam ter rodado e `exclusive` (padrão `false`), que reprova se rodar qualquer etapa fora da lista. Só etapas contam, não paralelo, condição ou laço. No máximo uma por caso.
+- Checagem de texto numa etapa (ADR-0038, só workflow): `text` com `step` olha a saída daquela etapa. O adaptador guarda `metadata.step_contents`; no laço vale a última volta. Etapa que não rodou falha a regra, e etapa que não existe no rascunho ou na versão vigente dá 422.
+- Turnos anteriores em workflow (ADR-0038): só com `workflow.history_runs` (0 a 5) maior que zero, que liga `add_workflow_history_to_steps` do Agno. Sem histórico, a escrita recusa. Os turnos rodam no próprio workflow, na sessão do caso, antes do turno avaliado.
 
 O tipo de config limita as checagens: agente e time aceitam `text`, `tools`, `judge`, `blocked` e `schema`; workflow aceita `text`, `judge` e `steps`, e caso de workflow não leva `context`, porque o workflow roda uma entrada por vez. Fora disso, 422.
 

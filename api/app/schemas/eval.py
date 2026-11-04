@@ -25,6 +25,8 @@ class TextCheck(BaseModel):
     type: Literal["text"] = "text"
     kind: TextKind
     value: str = Field(default="", max_length=200)
+    # só em workflow: a regra olha a saída desta etapa, e não a final (ADR-0038)
+    step: str | None = Field(default=None, min_length=1, max_length=60)
 
     def rule(self) -> WorkflowRule:
         return WorkflowRule(kind=self.kind, source="previous", value=self.value)
@@ -113,14 +115,27 @@ CHECKS_BY_KIND: dict[str, frozenset[str]] = {
 }
 
 
-def kind_problem(kind: str, spec: "EvalCaseInput") -> str | None:
+def kind_problem(
+    kind: str,
+    spec: "EvalCaseInput",
+    history_runs: int = 0,
+    step_names: set[str] | None = None,
+) -> str | None:
     """Motivo de o caso não servir a este tipo de config, ou None."""
     allowed = CHECKS_BY_KIND.get(kind, frozenset())
     refused = sorted({c.type for c in spec.checks} - allowed)
     if refused:
         return f"checagem {', '.join(refused)} não vale para {kind}"
-    if kind == "workflow" and spec.context:
-        return "workflow roda uma entrada por vez: caso sem turnos anteriores"
+    if kind == "workflow" and spec.context and not history_runs:
+        # sem histórico, os turnos anteriores não chegariam às etapas (ADR-0038)
+        return "turnos anteriores em workflow exigem o histórico ligado no workflow"
+    steps = [c.step for c in spec.checks if isinstance(c, TextCheck) and c.step]
+    if steps and kind != "workflow":
+        return "checagem de texto numa etapa só vale para workflow"
+    if steps and step_names is not None:
+        missing = sorted(set(steps) - step_names)
+        if missing:
+            return f"etapas que não existem no workflow: {', '.join(missing)}"
     return None
 
 

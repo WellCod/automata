@@ -621,3 +621,46 @@ def test_gate_barra_workflow_com_suite_vermelha(client: TestClient) -> None:
     assert client.get(f"/api/v1/configs/{wf}/eval-runs/{run['id']}").json()["failed"] == 1
     resp = client.post(f"/api/v1/configs/{wf}/publish")
     assert resp.status_code == 409 and "suíte verde" in resp.json()["detail"]
+
+
+def test_checagem_numa_etapa_e_turnos_anteriores_com_historico(client: TestClient) -> None:
+    """ADR-0038: a regra olha a saída da etapa; contexto só com o histórico ligado."""
+    wf, agents = _workflow(client, "historico", "reembolso")
+    case_url = f"/api/v1/configs/{wf}/eval-cases"
+
+    def case(name: str, checks: list[dict[str, Any]], **extra: Any) -> Any:
+        return client.post(
+            case_url, json={"name": name, "input": "Quero reembolso", "checks": checks, **extra}
+        )
+
+    na_triagem = [{"type": "text", "kind": "contains", "value": "30 dias", "step": "triagem"}]
+    assert case("etapa", na_triagem).status_code == 201
+    nao_rodou = [{"type": "text", "kind": "contains", "value": "x", "step": "revisao"}]
+    assert case("revisao sem reembolso", nao_rodou, input="Oi").status_code == 201
+    inexistente = [{"type": "text", "kind": "contains", "value": "x", "step": "fantasma"}]
+    assert "fantasma" in case("fantasma", inexistente).json()["detail"]
+    assert case("contexto", na_triagem, context=["oi"]).status_code == 422
+
+    # com o histórico ligado, o caso aceita turnos anteriores e roda no workflow
+    steps = [
+        {"type": "step", "name": "triagem", "agent_id": agents[0]},
+        {"type": "step", "name": "revisao", "agent_id": agents[1]},
+    ]
+    body = {"name": "historico", "description": "Use para historico"}
+    client.put(
+        f"/api/v1/configs/{wf}/draft",
+        json={**body, "payload": {"workflow": {"steps": steps, "history_runs": 2}}},
+    ).raise_for_status()
+    assert case("contexto", na_triagem, context=["oi", "meu pedido é 42"]).status_code == 201
+    client.post(f"/api/v1/configs/{wf}/publish").raise_for_status()
+
+    run_id = _start(client, wf).json()["id"]
+    run = client.get(f"/api/v1/configs/{wf}/eval-runs/{run_id}").json()
+    assert run["status"] == "completed", run
+    by_name = {r["case_name"]: r for r in run["results"]}
+    assert by_name["etapa"]["status"] == "passed", by_name["etapa"]
+    assert by_name["contexto"]["status"] == "passed", by_name["contexto"]
+    failed = by_name["revisao sem reembolso"]
+    # a revisão rodou no workflow sem condição, mas a regra pede "x"
+    assert failed["status"] == "failed"
+    assert failed["checks"][0]["rules"][0]["step"] == "revisao"

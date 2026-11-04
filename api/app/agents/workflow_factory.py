@@ -102,6 +102,14 @@ class ResolvedWorkflow:
     steps: list[WorkflowNode]
     # resolução por etapa: a mesma config em duas etapas ganha instâncias separadas
     executors: dict[str, ResolvedStep]
+    history_runs: int = 0
+
+
+def history_kwargs(resolved: ResolvedWorkflow) -> dict[str, Any]:
+    """Histórico do workflow nas etapas (ADR-0038); desligado, o padrão do Agno."""
+    if not resolved.history_runs:
+        return {}
+    return {"add_workflow_history_to_steps": True, "num_history_runs": resolved.history_runs}
 
 
 def load_workflow(config_id: UUID, version_id: UUID | None) -> ResolvedWorkflow:
@@ -119,7 +127,9 @@ def load_workflow(config_id: UUID, version_id: UUID | None) -> ResolvedWorkflow:
             )
         elif node.team_id is not None:
             executors[node.name] = ResolvedStep(node, team=load_team(node.team_id, node.version_id))
-    return ResolvedWorkflow(resolved.name, resolved.description, workflow.steps, executors)
+    return ResolvedWorkflow(
+        resolved.name, resolved.description, workflow.steps, executors, workflow.history_runs
+    )
 
 
 def _find(outputs: dict[str, StepOutput] | None, name: str) -> StepOutput | None:
@@ -300,6 +310,7 @@ def make_workflow_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> Workflow
             steps=build_nodes(resolved.steps, resolved),
             # sem isso as etapas rodam com o user_id da instância (None) e viram anônimas
             user_id=ctx.user_id,
+            **history_kwargs(resolved),
         )
         workflow.automata_config_id = config_id
         return workflow

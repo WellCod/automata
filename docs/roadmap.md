@@ -1394,7 +1394,7 @@ Decisão em [ADR-0038](adr/0038-workflow-e-suite.md). O workflow ganha um rotead
 
 - [x] `docs(adr)`: ADR-0038 e esta seção
 - [x] `feat(api)`: roteador por regras e entrada por etapa no workflow
-- [ ] `feat(api)`: histórico no workflow, turnos anteriores no caso e checagem de texto numa etapa
+- [x] `feat(api)`: histórico no workflow, turnos anteriores no caso e checagem de texto numa etapa
 - [ ] `feat(api)`: sugestões de casos em lote a partir das conversas
 - [ ] `feat(web)`: roteador, entrada e histórico no editor de workflow, etapa na checagem e casos em lote
 - [ ] `test(api)`: evals do roteador, da entrada por etapa e dos casos em lote

@@ -18,6 +18,32 @@ from agno.workflow import StepOutput
 from app.agents.tracking import TrackedWorkflow
 
 
+def _deepest(output: StepOutput) -> str:
+    if output.steps:
+        return _deepest(output.steps[-1])
+    return "" if output.content is None else str(output.content)
+
+
+def step_contents(output: WorkflowRunOutput, known: set[str]) -> dict[str, str]:
+    """Saída de cada etapa que rodou, pelo nome, para a checagem de texto numa etapa."""
+    contents: dict[str, str] = {}
+
+    def walk(items: Iterable[Any]) -> None:
+        for item in items:
+            if isinstance(item, list):
+                walk(item)
+                continue
+            if not isinstance(item, StepOutput):
+                continue
+            if item.step_name in known:
+                # numa etapa que roda mais de uma vez (laço), vale a última volta
+                contents[item.step_name] = _deepest(item)
+            walk(item.steps or [])
+
+    walk(output.step_results or [])
+    return contents
+
+
 def steps_run(output: WorkflowRunOutput, known: set[str]) -> list[str]:
     """Etapas que rodaram, na ordem, sem os contêineres (paralelo, condição, laço)."""
     names: list[str] = []
@@ -70,5 +96,8 @@ class WorkflowUnderTest:
             session_id=session_id,
             content=output.content,
             status=output.status or RunStatus.completed,
-            metadata={"steps": steps_run(output, self._known)},
+            metadata={
+                "steps": steps_run(output, self._known),
+                "step_contents": step_contents(output, self._known),
+            },
         )

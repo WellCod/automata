@@ -193,6 +193,8 @@ class WorkflowSettings(BaseModel):
     """Seção de workflow do payload. Só existe em config de kind=workflow."""
 
     steps: list[WorkflowNode] = Field(min_length=1)
+    # últimos runs do workflow na mesma sessão levados às etapas (ADR-0038); 0 desliga
+    history_runs: int = Field(default=0, ge=0, le=5)
 
     @model_validator(mode="after")
     def estrutura_valida(self) -> "WorkflowSettings":

@@ -118,7 +118,7 @@ def test_crud_de_casos(client: TestClient) -> None:
     assert client.put(f"{base}/{case_id}", json=_case()).status_code == 409
     updated = client.put(f"{base}/{case_id}", json=_case("tom cordial", input="Oi"))
     assert updated.status_code == 200 and updated.json()["input"] == "Oi"
-    assert updated.json()["checks"] == [{"type": "text", "kind": "contains", "value": "prazo"}]
+    assert updated.json()["checks"] == [{**TEXT, "step": None}]
 
     assert client.delete(f"{base}/{case_id}").status_code == 204
     assert client.delete(f"{base}/{case_id}").status_code == 404
