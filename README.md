@@ -386,7 +386,8 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0029](docs/adr/0029-chunking-por-base-e-compressao.md) | Chunking por base com prévia e reprocessamento, e compressão do resultado de tool |
 | [0030](docs/adr/0030-guardrails-por-modelo.md) | Classificador por modelo na entrada e exame do resultado de tool e dos documentos |
 | [0031](docs/adr/0031-controle-de-custo-no-run.md) | Teto de custo por run e orçamento mensal por usuário e por token de integração |
-| [0032](docs/adr/0032-direitos-do-titular.md) | Direitos do titular: consulta, exportação e exclusão por usuário, e máscara com padrões próprios (proposto, Fase 35) |
+| [0032](docs/adr/0032-direitos-do-titular.md) | Direitos do titular: consulta, exportação e exclusão por usuário, e máscara com padrões próprios |
+| [0033](docs/adr/0033-reranker-e-filtros-na-recuperacao.md) | Reranker por cross-encoder e filtros escolhidos pelo modelo na recuperação (proposto, Fase 36) |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 

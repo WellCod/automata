@@ -1283,3 +1283,40 @@ Decisão em [ADR-0032](adr/0032-direitos-do-titular.md). O owner consulta o que 
 - Depois da exclusão de A, nenhuma tabela do Agno tem linha com o `user_id` dele, e o custo e as métricas do agente ficam iguais.
 - Um agente com o padrão "matrícula, `MAT-`, 8 dígitos" mascara `MAT-12345678` na entrada e na memória.
 - O pedido de exclusão aparece no histórico sem o id em claro.
+
+## Plano das Fases 36 a 42
+
+Pedido em 2026-11-04: o backlog inteiro dos ADRs até o 0032, incluindo o que tinha ficado para depois. Uma fase por tema, cada uma com o próprio ADR.
+
+| Fase | Tema | Itens do backlog |
+|---|---|---|
+| 36 | Recuperação | reranker por cross-encoder (Cohere, Bedrock), metadados por documento e filtros escolhidos pelo modelo (ADR-0017, Fase 13) |
+| 37 | Guardrails da instância | padrão mínimo de guardrails para todos os agentes e classificador na saída (ADR-0013, ADR-0030) |
+| 38 | Memória e conversa em time | memória do usuário no time, compactação no líder e modelo próprio para o resumo (ADR-0019, ADR-0025) |
+| 39 | Titular, segunda parte | pedido feito pelo próprio titular por token de integração e prazo legal com alerta (ADR-0032) |
+| 40 | Operação | painel da fila, conciliação com a API de uso do provedor, e-mail e run com erro como avisos, retry de agente idempotente (ADR-0020, ADR-0021, ADR-0018) |
+| 41 | Workflow e suíte | checagem de texto em etapa do meio, caso de workflow com turnos anteriores, roteador e entrada por etapa, casos em lote a partir das conversas (ADR-0014, ADR-0016, ADR-0022) |
+| 42 | Conectores e ingestão | Google Drive e GCS, filtro por padrão de nome, webhook da origem e worker de ingestão separado (ADR-0024, Fase 13) |
+
+Itens que não entram, com o motivo no ADR de cada fase:
+- revisão humana dentro de condição e de ramo paralelo, que o Agno 3.1.8 não pausa (ADR-0023);
+- exclusão em backups, que fica fora da aplicação (ADR-0032);
+- fila em banco próprio, já resolvida pela fila durável do Agno no Postgres (ADR-0020).
+
+## Fase 36 — Recuperação com reranker e filtros
+
+Decisão em [ADR-0033](adr/0033-reranker-e-filtros-na-recuperacao.md). A base pode ordenar os candidatos por relevância com um cross-encoder (Cohere direto ou pelo Bedrock) antes do MMR ou da recência. Cada documento ganha campos próprios, como produto ou ano, e o modelo pode filtrar a busca por eles quando a conversa já diz o que procura.
+
+- [x] `docs(adr)`: ADR-0033, esta seção e o plano das Fases 36 a 42, ADR-0032 aceito
+- [ ] `feat(api)`: cross-encoder por base com cohere e bedrock, custo por busca no agente
+- [ ] `feat(api)`: metadados por documento nos trechos e filtros escolhidos pelo modelo na tool da base
+- [ ] `feat(web)`: cross-encoder e filtros na estratégia da base, campos do documento e filtros na busca de teste
+- [ ] `test(api)`: evals do cross-encoder e dos filtros
+
+**Critério de aceite da fase:**
+
+- Com o cross-encoder ligado, o trecho que responde à pergunta com outras palavras sobe acima do que só repete as palavras dela.
+- Uma falha do provedor devolve a busca sem reordenar, e o consumo do agente mostra o custo das buscas que funcionaram.
+- Numa base com manuais de dois produtos, o agente que sabe o produto do cliente busca com `{"produto": ...}` e só recebe trechos desse produto.
+- Filtro com valor inexistente cai na busca sem filtro, com aviso no resultado da tool.
+

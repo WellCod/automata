@@ -1,6 +1,6 @@
 # ADR-0032 — Direitos do titular: consulta, exportação e exclusão por usuário, e máscara com padrões próprios
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-11-04
 
 ## Contexto
