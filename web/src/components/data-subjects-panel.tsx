@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import client from "@/lib/api/client";
@@ -84,7 +84,13 @@ export function InventoryView({ inventory }: { inventory: SubjectInventory }) {
   );
 }
 
-export function SubjectActions({ userId, onDone }: { userId: string; onDone: () => void }) {
+export function SubjectActions({
+  userId,
+  onErase,
+}: {
+  userId: string;
+  onErase: (requestId: string) => void;
+}) {
   const id = useId();
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
@@ -111,13 +117,14 @@ export function SubjectActions({ userId, onDone }: { userId: string; onDone: () 
         body: { confirm: typed },
       });
       if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao pedir a exclusão"));
+      return res.data.id;
     },
-    onSuccess: () => {
+    onSuccess: (requestId) => {
       toast.success("Exclusão pedida.");
       setConfirming(false);
       setTyped("");
       void queryClient.invalidateQueries({ queryKey: REQUESTS });
-      onDone();
+      onErase(requestId);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -260,6 +267,15 @@ export function DataSubjectsPanel() {
     },
   });
   const requests = useDataSubjectRequests();
+  // a exclusão roda em background: a contagem só muda quando o pedido termina
+  const [erasing, setErasing] = useState<string | null>(null);
+  const finished = requests.data?.find(
+    (r) => r.id === erasing && (r.status === "done" || r.status === "failed"),
+  );
+  const { refetch } = inventory;
+  useEffect(() => {
+    if (finished) void refetch();
+  }, [finished, refetch]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -302,7 +318,7 @@ export function DataSubjectsPanel() {
           )}
           {inventory.data && <InventoryView inventory={inventory.data} />}
           {inventory.data && inventory.data.total > 0 && (
-            <SubjectActions userId={userId} onDone={() => void inventory.refetch()} />
+            <SubjectActions userId={userId} onErase={setErasing} />
           )}
         </section>
       )}
