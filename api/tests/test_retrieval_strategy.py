@@ -246,3 +246,115 @@ def test_busca_de_teste_compara_com_e_sem_estrategia(client: TestClient) -> None
     assert without == {"politica de troca", "politica de troca (copia)"}
     assert "politica de garantia" in with_
     assert body["with_strategy"]["hyde_tokens"] == 0
+
+
+# --- cross-encoder (ADR-0033) ---
+
+CROSS_DOCS = [
+    ("uso do produto", "Dicas de uso: lave à mão e guarde em local seco depois de usar."),
+    (
+        "devolucao",
+        "Produtos utilizados não são aceitos para devolução, salvo defeito de fabricação.",
+    ),
+]
+CROSS = {"cross_encoder": {"provider": "cohere"}}
+
+
+def _agent() -> Any:
+    from app.models.config import AgentConfig
+
+    agent_id = uuid4()
+    with Session(get_engine()) as session:
+        session.add(
+            AgentConfig(id=agent_id, name=f"ce {agent_id.hex[:6]}", description="x", kind="agent")
+        )
+        session.commit()
+    return agent_id
+
+
+def _events(agent_id: Any) -> list[Any]:
+    from app.models.usage import UsageEvent
+
+    with Session(get_engine()) as session:
+        return list(session.query(UsageEvent).filter(UsageEvent.agent_config_id == agent_id))
+
+
+def test_cross_encoder_ordena_por_relevancia_e_cobra_por_busca(
+    db_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from agno.knowledge.reranker.cohere import CohereReranker
+
+    import app.agents.models_map as models_map
+    from app.knowledge.search import search
+    from app.side_usage import Caller
+
+    seen: list[int] = []
+
+    def relevance(self: Any, query: str, documents: list[Any]) -> list[Any]:
+        seen.append(len(documents))
+        return sorted(documents, key=lambda d: "não são aceitos" not in d.content)
+
+    question = "posso devolver depois de usar?"
+    base = _base(CROSS_DOCS, CROSS)
+    assert _names(base, question, 1) == ["uso do produto"]  # modo demo: sem cross-encoder
+
+    monkeypatch.setattr(models_map, "demo_replay", lambda: False)
+    monkeypatch.setattr(CohereReranker, "_rerank", relevance)
+    outcome = search(base, question, 1)
+    assert [h.content_name for h in outcome.hits] == ["devolucao"]
+    assert outcome.rerank_cost == pytest.approx(0.002)
+    # o lote de candidatos é maior que o K: o cross-encoder resgata o trecho de baixo
+    assert seen[-1] == 2
+
+    agent_id = _agent()
+    search(base, question, 1, caller=Caller(agent_id, "alice", "run-1"))
+    [event] = _events(agent_id)
+    assert (event.model_id, event.total_tokens, event.run_id) == ("cohere:rerank-v3.5", 0, "run-1")
+    assert float(event.cost) == pytest.approx(0.002)
+
+
+def test_cross_encoder_com_falha_busca_sem_ele_e_nao_cobra(
+    db_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from agno.knowledge.reranker.cohere import CohereReranker
+
+    import app.agents.models_map as models_map
+    from app.knowledge.search import search
+    from app.side_usage import Caller
+
+    def broken(self: Any, query: str, documents: list[Any]) -> list[Any]:
+        raise RuntimeError("401 invalid api token")
+
+    base = _base(CROSS_DOCS, CROSS)
+    monkeypatch.setattr(models_map, "demo_replay", lambda: False)
+    monkeypatch.setattr(CohereReranker, "_rerank", broken)
+    agent_id = _agent()
+    outcome = search(base, "posso devolver depois de usar?", 1, caller=Caller(agent_id, "a"))
+    assert [h.content_name for h in outcome.hits] == ["uso do produto"]
+    assert outcome.rerank_cost is None
+    assert _events(agent_id) == []
+
+
+def test_cross_encoder_so_com_provedor_configurado(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("COHERE_API_KEY", raising=False)
+    monkeypatch.delenv("AWS_REGION", raising=False)
+    body = {"name": "base ce", "slug": "base_ce", "retrieval": CROSS}
+    assert client.post("/api/v1/knowledge-bases", json=body).status_code == 422
+    listed = {p["provider"]: p for p in client.get("/api/v1/knowledge-bases/cross-encoders").json()}
+    assert listed["cohere"]["configured"] is False
+    assert listed["bedrock"]["price_per_search"]["amazon.rerank-v1:0"] == pytest.approx(0.001)
+
+    monkeypatch.setenv("COHERE_API_KEY", "x")
+    created = client.post("/api/v1/knowledge-bases", json=body)
+    assert created.status_code == 201, created.text
+    assert created.json()["retrieval"]["cross_encoder"] == {
+        "provider": "cohere",
+        "model": "rerank-v3.5",
+    }
+    wrong = {"cross_encoder": {"provider": "cohere", "model": "amazon.rerank-v1:0"}}
+    bad = client.post(
+        "/api/v1/knowledge-bases", json={**body, "slug": "base_ce2", "retrieval": wrong}
+    )
+    assert bad.status_code == 422

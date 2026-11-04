@@ -9,6 +9,30 @@ from app.knowledge.embedders import EmbedderName
 _SLUG = r"^[a-z][a-z0-9_]{1,30}$"
 
 
+CrossEncoderProvider = Literal["cohere", "bedrock"]
+# modelos por provedor, o primeiro é o padrão (ADR-0033)
+CROSS_ENCODER_MODELS: dict[str, tuple[str, ...]] = {
+    "cohere": ("rerank-v3.5", "rerank-multilingual-v3.0"),
+    "bedrock": ("cohere.rerank-v3-5:0", "amazon.rerank-v1:0"),
+}
+
+
+class CrossEncoderSettings(BaseModel):
+    """Reranker que lê a pergunta e o trecho juntos (ADR-0033); o texto sai para o provedor."""
+
+    provider: CrossEncoderProvider
+    model: str = ""
+
+    @model_validator(mode="after")
+    def modelo_do_provedor(self) -> "CrossEncoderSettings":
+        models = CROSS_ENCODER_MODELS[self.provider]
+        if not self.model:
+            self.model = models[0]
+        elif self.model not in models:
+            raise ValueError(f"modelo de rerank inválido para {self.provider}: {self.model}")
+        return self
+
+
 class RetrievalSettings(BaseModel):
     """Estratégia de busca da base (ADR-0017): vale para todos os agentes que a usam."""
 
@@ -25,6 +49,8 @@ class RetrievalSettings(BaseModel):
     hyde: bool = False
     # sempre explícito: sem modelo, o HyDE do Agno cairia num modelo da OpenAI
     hyde_model: str | None = Field(default=None, max_length=64)
+    # roda antes do MMR ou da recência, sobre o mesmo lote de candidatos
+    cross_encoder: CrossEncoderSettings | None = None
 
     @model_validator(mode="after")
     def hyde_com_modelo(self) -> "RetrievalSettings":
@@ -191,6 +217,17 @@ class SearchResult(BaseModel):
     searched: str
     # tokens do HyDE nesta busca; na busca de teste não são atribuídos a agente nenhum
     hyde_tokens: int
+    # custo do cross-encoder nesta busca (ADR-0033); None sem ele ou quando falhou
+    rerank_cost: float | None = None
+
+
+class CrossEncoderInfo(BaseModel):
+    provider: CrossEncoderProvider
+    models: list[str]
+    # COHERE_API_KEY, ou AWS_REGION com credenciais da AWS
+    configured: bool
+    # dólares por busca de cada modelo
+    price_per_search: dict[str, float]
 
 
 class SearchComparison(BaseModel):
