@@ -16,7 +16,7 @@ import { ReviewHistory } from "@/components/review-history";
 import { RunTrace } from "@/components/run-trace";
 import { Button } from "@/components/ui/button";
 import client from "@/lib/api/client";
-import { blockLabel, screenedText } from "@/lib/guardrail-labels";
+import { blockLabel, screenedText, stopLabel } from "@/lib/guardrail-labels";
 import type { components } from "@/lib/api/schema.d.ts";
 
 type AgentRunResponse = components["schemas"]["AgentRunResponse"];
@@ -108,6 +108,11 @@ function RunItem({
           </span>
           {run.status === "blocked" && (
             <span className="text-[11px] text-amber-400">{blockLabel(run.blocked_by)}</span>
+          )}
+          {run.stop_reason && (
+            <span className="text-[11px] text-amber-600 dark:text-amber-400">
+              {stopLabel(run.stop_reason)}
+            </span>
           )}
           <span className="text-muted-foreground text-[11px]">{run.user_id}</span>
         </div>

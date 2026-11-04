@@ -33,3 +33,12 @@ export function screenedText(items: { tool: string }[]): string {
   const n = items.length;
   return `${n} resultado${n === 1 ? "" : "s"} de tool retirado${n === 1 ? "" : "s"} por instrução embutida: ${tools}`;
 }
+
+// run encerrado antes do fim sem ser erro (ADR-0031)
+export const STOP_LABELS: Record<string, string> = {
+  run_cost_limit: "Parado pelo teto de custo",
+};
+
+export function stopLabel(reason: string): string {
+  return STOP_LABELS[reason] ?? reason;
+}

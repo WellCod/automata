@@ -93,6 +93,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/caller-budgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Budgets */
+        get: operations["list_budgets_api_v1_caller_budgets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/caller-budgets/{subject}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Budget */
+        put: operations["put_budget_api_v1_caller_budgets__subject__put"];
+        post?: never;
+        /** Delete Budget */
+        delete: operations["delete_budget_api_v1_caller_budgets__subject__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/configs": {
         parameters: {
             query?: never;
@@ -1456,6 +1491,8 @@ export interface components {
              * @default []
              */
             screened_tools: components["schemas"]["ScreenedTool"][];
+            /** Stop Reason */
+            stop_reason?: string | null;
             /** Steps */
             steps?: number | null;
             /** Total Tokens */
@@ -1475,7 +1512,7 @@ export interface components {
             /** Url */
             url: string;
             /** Events */
-            events: ("budget.warning" | "budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered")[];
+            events: ("budget.warning" | "budget.exceeded" | "caller_budget.warning" | "caller_budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered")[];
         };
         /** AlertDestinationIssued */
         AlertDestinationIssued: {
@@ -1489,7 +1526,7 @@ export interface components {
             /** Host */
             host: string;
             /** Events */
-            events: ("budget.warning" | "budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered")[];
+            events: ("budget.warning" | "budget.exceeded" | "caller_budget.warning" | "caller_budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered")[];
             /** Created By */
             created_by: string;
             /** Last Status */
@@ -1516,7 +1553,7 @@ export interface components {
             /** Host */
             host: string;
             /** Events */
-            events: ("budget.warning" | "budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered")[];
+            events: ("budget.warning" | "budget.exceeded" | "caller_budget.warning" | "caller_budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered")[];
             /** Created By */
             created_by: string;
             /** Last Status */
@@ -1534,7 +1571,7 @@ export interface components {
             /** Name */
             name: string;
             /** Events */
-            events: ("budget.warning" | "budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered")[];
+            events: ("budget.warning" | "budget.exceeded" | "caller_budget.warning" | "caller_budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered")[];
         };
         /** AlertTestResult */
         AlertTestResult: {
@@ -1621,6 +1658,47 @@ export interface components {
             percent: number | null;
             /** Level */
             level: ("ok" | "warning" | "exceeded") | null;
+        };
+        /** CallerBudgetInput */
+        CallerBudgetInput: {
+            /** Monthly Usd */
+            monthly_usd: number;
+            /**
+             * Warn Percent
+             * @default 80
+             */
+            warn_percent: number;
+            /**
+             * Hard Stop
+             * @default false
+             */
+            hard_stop: boolean;
+        };
+        /** CallerBudgetResponse */
+        CallerBudgetResponse: {
+            /** Subject */
+            subject: string;
+            /** Label */
+            label: string;
+            /** Kind */
+            kind: string;
+            /** Monthly Usd */
+            monthly_usd: number;
+            /** Warn Percent */
+            warn_percent: number;
+            /** Hard Stop */
+            hard_stop: boolean;
+            /** Spent Usd */
+            spent_usd: number;
+            /** Percent */
+            percent: number;
+            /** Level */
+            level: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** CapabilityFlags */
         CapabilityFlags: {
@@ -3101,6 +3179,8 @@ export interface components {
             /** Fallback Models */
             fallback_models?: string[];
             compress_tool_results?: components["schemas"]["ToolCompression"] | null;
+            /** Max Cost Usd */
+            max_cost_usd?: number | null;
         };
         /** RunTrace */
         RunTrace: {
@@ -3775,6 +3855,90 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["BudgetResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_budgets_api_v1_caller_budgets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CallerBudgetResponse"][];
+                };
+            };
+        };
+    };
+    put_budget_api_v1_caller_budgets__subject__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                subject: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CallerBudgetInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CallerBudgetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_budget_api_v1_caller_budgets__subject__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                subject: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

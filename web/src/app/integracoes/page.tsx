@@ -7,6 +7,7 @@ import client from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
 import { mcpSnippet } from "@/lib/mcp-snippet";
 import type { components } from "@/lib/api/schema.d.ts";
+import { CallerBudgetEditor } from "@/components/caller-budget";
 import { Button } from "@/components/ui/button";
 
 type Integration = components["schemas"]["IntegrationResponse"];
@@ -301,6 +302,9 @@ function IntegrationRow({ item, names }: { item: Integration; names: Record<stri
           emitido por {item.created_by} em {formatDate(item.created_at)} · expira em{" "}
           {formatDate(item.expires_at)}
         </span>
+        {status === "ativo" && (
+          <CallerBudgetEditor subject={`integration:${item.id}`} label={item.name} />
+        )}
       </div>
       {status === "ativo" &&
         (confirm ? (

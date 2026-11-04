@@ -6,6 +6,9 @@ export type AlertEvent = components["schemas"]["AlertDestinationResponse"]["even
 export const EVENT_LABELS: Record<AlertEvent, string> = {
   "budget.warning": "Orçamento perto do limite",
   "budget.exceeded": "Orçamento estourado",
+  // orçamento de usuário ou token de integração (ADR-0031)
+  "caller_budget.warning": "Orçamento de quem chama perto do limite",
+  "caller_budget.exceeded": "Orçamento de quem chama estourado",
   "errors.spike": "Pico de erro",
   "suite.regressed": "Suíte regrediu",
   "suite.failing": "Suíte falhando",
