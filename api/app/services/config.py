@@ -35,6 +35,11 @@ def guardrail_errors(guardrails: GuardrailSettings) -> list[str]:
             get_capabilities(classifier.model_id)
         except ValueError as exc:
             errors.append(f"modelo do classificador: {exc}")
+    if guardrails.output.classifier is not None:
+        try:
+            get_capabilities(guardrails.output.classifier.model_id)
+        except ValueError as exc:
+            errors.append(f"modelo do classificador da saída: {exc}")
     return errors
 
 

@@ -9,17 +9,24 @@ mensagem do assistente que vai para a sessão) antes de levantar. No stream o
 texto já foi entregue enquanto era gerado: ali o hook só marca o run.
 """
 
+import asyncio
 import json
+import logging
 from collections.abc import Callable
 from typing import Any
+from uuid import UUID
 
 from agno.exceptions import CheckTrigger, OutputCheckError
 
 from app.guardrails.input import Block, BlockLog, normalize
 from app.guardrails.pii import find_pii
-from app.schemas.config import GuardrailSettings
+from app.schemas.config import GuardrailSettings, OutputClassifierRule
+from app.side_usage import Caller, record_side_usage
 
 RULE_OUTPUT = "output_not_allowed"
+RULE_OUTPUT_CLASSIFIER = "output_classifier"
+
+logger = logging.getLogger(__name__)
 
 
 def _violation(text: str, settings: GuardrailSettings) -> dict[str, Any] | None:
@@ -37,40 +44,128 @@ def _violation(text: str, settings: GuardrailSettings) -> dict[str, Any] | None:
     return None
 
 
+def _content(run_output: Any) -> str | None:
+    content = getattr(run_output, "content", None)
+    # com saída estruturada a resposta é objeto (ADR-0027): o dado pessoal está nos valores
+    if isinstance(content, dict | list):
+        content = json.dumps(content, ensure_ascii=False)
+    if not isinstance(content, str) or not content:
+        return None
+    return content
+
+
+def _replace(run_output: Any, message: str, hit: Callable[[str], bool]) -> None:
+    """Troca a resposta e a mensagem do assistente que vai para a sessão, antes de levantar:
+    o Agno só troca o conteúdo pelo texto da exceção quando ele está vazio."""
+    run_output.content = message
+    for msg in getattr(run_output, "messages", None) or []:
+        role = getattr(msg, "role", None)
+        if role == "assistant" and isinstance(msg.content, str) and hit(msg.content):
+            msg.content = message
+
+
+def _raise(log: BlockLog | None, rule: str, message: str, detail: dict[str, Any]) -> None:
+    if log is not None:
+        log.blocks.append(Block(rule, message, detail))
+    raise OutputCheckError(
+        message,
+        check_trigger=CheckTrigger.OUTPUT_NOT_ALLOWED,
+        additional_data={"rule": rule, **detail},
+    )
+
+
 def output_guardrail(
-    settings: GuardrailSettings, log: BlockLog | None = None
-) -> Callable[..., None] | None:
+    settings: GuardrailSettings, log: BlockLog | None = None, config_id: UUID | None = None
+) -> Callable[..., Any] | None:
     rule = settings.output
-    if not (rule.pii or rule.blocked_terms):
+    classifier = rule.classifier
+    if classifier is not None:
+        from app.guardrails.classifier import classifier_enabled
+
+        # o replay da demo não tem resposta gravada para o classificador
+        if not classifier_enabled():
+            classifier = None
+    if not (rule.pii or rule.blocked_terms or classifier):
         return None
     message = settings.blocked_message
 
-    # o Agno passa só os argumentos que a função declara, pelo nome
-    def check_output(run_output: Any) -> None:
-        content = getattr(run_output, "content", None)
-        # com saída estruturada a resposta é objeto (ADR-0027): o dado pessoal está nos valores
-        if isinstance(content, dict | list):
-            content = json.dumps(content, ensure_ascii=False)
-        if not isinstance(content, str) or not content:
+    def check_rules(run_output: Any) -> None:
+        content = _content(run_output)
+        if content is None:
             return
         detail = _violation(content, settings)
         if detail is None:
             return
-        run_output.content = message
-        for msg in getattr(run_output, "messages", None) or []:
-            role = getattr(msg, "role", None)
-            if (
-                role == "assistant"
-                and isinstance(msg.content, str)
-                and _violation(msg.content, settings)
-            ):
-                msg.content = message
-        if log is not None:
-            log.blocks.append(Block(RULE_OUTPUT, message, detail))
-        raise OutputCheckError(
-            message,
-            check_trigger=CheckTrigger.OUTPUT_NOT_ALLOWED,
-            additional_data={"rule": RULE_OUTPUT, **detail},
-        )
+        _replace(run_output, message, lambda text: _violation(text, settings) is not None)
+        _raise(log, RULE_OUTPUT, message, detail)
 
-    return check_output
+    if classifier is None:
+        # o Agno passa só os argumentos que a função declara, pelo nome
+        def check_output(run_output: Any) -> None:
+            check_rules(run_output)
+
+        return check_output
+
+    judge = OutputClassifier(classifier, config_id)
+
+    # assíncrono: o arun do Agno espera; o run() síncrono pularia, e o app não o usa
+    async def check_output_classified(run_output: Any, run_context: Any = None) -> None:
+        check_rules(run_output)
+        content = _content(run_output)
+        if content is None or not content.strip():
+            return
+        detail = await judge.verdict(content, run_context)
+        if detail is None:
+            return
+        _replace(run_output, message, lambda text: text == content)
+        _raise(log, RULE_OUTPUT_CLASSIFIER, message, detail)
+
+    return check_output_classified
+
+
+class OutputClassifier:
+    """Classificador da resposta (ADR-0034), com as regras de falha do de entrada."""
+
+    def __init__(self, rule: OutputClassifierRule, config_id: UUID | None) -> None:
+        self.rule = rule
+        self.config_id = config_id
+
+    def _record(self, usage: Any, run_context: Any) -> None:
+        if self.config_id is None:
+            return
+        caller = Caller(
+            self.config_id,
+            getattr(run_context, "user_id", None) or "anonymous",
+            getattr(run_context, "run_id", None),
+        )
+        try:
+            record_side_usage(caller, self.rule.model_id, usage)
+        except Exception as exc:
+            logger.warning("consumo do classificador não gravado", extra={"error": str(exc)})
+
+    async def verdict(self, text: str, run_context: Any = None) -> dict[str, Any] | None:
+        """Detalhe do bloqueio, ou None para deixar a resposta passar."""
+        from app.agents.models_map import resolve_model
+        from app.evals.judge import metered
+        from app.guardrails.classifier import ClassifierBadOutput, ClassifierUnavailable, aclassify
+
+        usage = None
+        try:
+            model, usage = metered(resolve_model(self.rule.model_id))
+            result = await aclassify(model, self.rule, text)
+        except ClassifierBadOutput as exc:
+            return {"category": "invalid_output", "reason": str(exc)[:300]}
+        except (ClassifierUnavailable, ValueError) as exc:
+            logger.warning(
+                "classificador da saída indisponível",
+                extra={"config_id": str(self.config_id), "error": str(exc)[:300]},
+            )
+            if self.rule.on_failure == "block":
+                return {"category": "unavailable", "reason": str(exc)[:300]}
+            return None
+        finally:
+            if usage is not None:
+                await asyncio.to_thread(self._record, usage, run_context)
+        if result.block:
+            return {"category": result.category, "reason": result.reason}
+        return None
