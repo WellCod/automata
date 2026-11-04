@@ -62,6 +62,12 @@ Arquivos:
   - Para 64 pares de piso e agente e as mensagens do eval de guardrails, o efetivo barra tudo o que cada lado barraria sozinho e mascara tudo o que cada lado mascararia.
   - Sem piso, ou com piso vazio, o agente fica igual.
   - Na noturna, com `ANTHROPIC_API_KEY`, o classificador da saída julga seis respostas, entre vazamentos do prompt e recusas legítimas, e aceita um erro.
+- `tests/test_evals_memoria_time.py`: memória em time e resumo com modelo próprio (ADR-0035).
+  - Dono da memória em cada combinação de `agent_id` e `team_id`.
+  - O time lê pelo `team_id` e nunca pelo `agent_id`, e o contrário vale para o agente.
+  - Time sem usuário fica sem memória.
+  - A máscara usa os padrões próprios do time, e não os de outro dono.
+  - O modelo do resumo herda o retry da versão.
 - `.github/workflows/evals-nightly.yml` — workflow agendado
 
 ## Metering
