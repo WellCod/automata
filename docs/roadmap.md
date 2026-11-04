@@ -1325,7 +1325,7 @@ Decisão em [ADR-0033](adr/0033-reranker-e-filtros-na-recuperacao.md). A base po
 Decisão em [ADR-0034](adr/0034-guardrails-da-instancia-e-classificador-na-saida.md). O owner define um piso de guardrails que todo agente e time herda. O agente só pode endurecer o piso. A saída ganha um classificador por modelo, com as checagens de ofensa, assunto e vazamento das instruções internas.
 
 - [x] `docs(adr)`: ADR-0034 e esta seção
-- [ ] `feat(api)`: piso de guardrails da instância herdado por todo agente e líder de time
+- [x] `feat(api)`: piso de guardrails da instância herdado por todo agente e líder de time
 - [ ] `feat(api)`: classificador na saída, com falha aberta ou fechada e custo no agente
 - [ ] `feat(web)`: página de guardrails da instância, herança no editor e classificador na saída
 - [ ] `test(api)`: evals do piso da instância e do classificador na saída

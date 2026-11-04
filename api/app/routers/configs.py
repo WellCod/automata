@@ -2,10 +2,13 @@ import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
 
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.evals.gate import draft_verdict
+from app.guardrails.instance import effective
+from app.guardrails.instance import floor as instance_floor
 from app.models.config import AgentConfig, AgentConfigVersion
 from app.repositories.config import ConfigRepository
 from app.repositories.knowledge_base import KnowledgeBaseRepository
@@ -21,6 +24,7 @@ from app.schemas.config import (
     ConfigPayloadStatus,
     CreateConfigInput,
     DraftInput,
+    GuardrailSettings,
     RollbackInput,
 )
 from app.services.config import ConfigService
@@ -119,6 +123,31 @@ def get_config(config_id: UUID, session: SessionDep) -> AgentConfigDetail:
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     return _to_detail(config, payload)
+
+
+class EffectiveGuardrails(BaseModel):
+    """Guardrails da versão, o piso da instância e o que vale no run (ADR-0034)."""
+
+    own: GuardrailSettings
+    floor: GuardrailSettings | None
+    effective: GuardrailSettings
+
+
+@router.get("/{config_id}/guardrails/effective", response_model=EffectiveGuardrails)
+def get_effective_guardrails(
+    config_id: UUID, session: SessionDep, draft: bool = Query(default=False)
+) -> EffectiveGuardrails:
+    repo = ConfigRepository(session)
+    config = repo.get_config(config_id)
+    if config is None:
+        raise HTTPException(status_code=404, detail="Config não encontrada")
+    version_id = config.draft_version_id if draft else config.current_version_id
+    version = repo.get_version(version_id) if version_id else None
+    if version is None:
+        raise HTTPException(status_code=404, detail="Versão não encontrada")
+    own = ConfigPayload.model_validate(version.payload).guardrails
+    base = instance_floor()
+    return EffectiveGuardrails(own=own, floor=base, effective=effective(base, own))
 
 
 @router.get("/{config_id}/teams", response_model=list[AgentConfigResponse])

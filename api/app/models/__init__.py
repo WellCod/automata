@@ -4,6 +4,7 @@ from app.models.config import AgentConfig, AgentConfigVersion, Base
 from app.models.data_subject import DataSubjectRequest
 from app.models.embedding_usage import EmbeddingUsage
 from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSchedule
+from app.models.instance_guardrails import InstanceGuardrails
 from app.models.integration import IntegrationToken
 from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_connector import KnowledgeConnector
@@ -23,6 +24,7 @@ __all__ = [
     "AgentRun",
     "Base",
     "DataSubjectRequest",
+    "InstanceGuardrails",
     "EmbeddingUsage",
     "EvalCase",
     "EvalResult",

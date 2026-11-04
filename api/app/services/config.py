@@ -8,8 +8,34 @@ from app.models.config import AgentConfig, AgentConfigVersion
 from app.repositories.config import ConfigRepository
 from app.repositories.knowledge_base import KnowledgeBaseRepository
 from app.repositories.mcp_server import McpServerRepository
-from app.schemas.config import ConfigKind, ConfigPayload, ConfigPayloadStatus, RunControls
+from app.schemas.config import (
+    ConfigKind,
+    ConfigPayload,
+    ConfigPayloadStatus,
+    GuardrailSettings,
+    RunControls,
+)
 from app.schemas.workflow import step_nodes
+
+
+def guardrail_errors(guardrails: GuardrailSettings) -> list[str]:
+    """Regras de escrita dos guardrails, do agente e do piso da instância (ADR-0034)."""
+    # sem a chave, a moderação falharia a cada mensagem em produção
+    errors: list[str] = []
+    if guardrails.moderation and not (moderation_available() or demo_replay()):
+        errors.append("moderação exige OPENAI_API_KEY na API")
+    classifier = guardrails.classifier
+    screening = guardrails.tool_results
+    if screening is not None and screening.classifier and classifier is None:
+        errors.append("o exame de tool pelo classificador exige o classificador configurado")
+    if screening is not None and not (screening.terms or screening.classifier):
+        errors.append("exame de tool sem termos nem classificador não examina nada")
+    if classifier is not None:
+        try:
+            get_capabilities(classifier.model_id)
+        except ValueError as exc:
+            errors.append(f"modelo do classificador: {exc}")
+    return errors
 
 
 class ConfigService:
@@ -294,22 +320,7 @@ class ConfigService:
         return errors
 
     def _guardrail_errors(self, payload: ConfigPayload) -> list[str]:
-        # sem a chave, a moderação falharia a cada mensagem em produção
-        errors: list[str] = []
-        if payload.guardrails.moderation and not (moderation_available() or demo_replay()):
-            errors.append("moderação exige OPENAI_API_KEY na API")
-        classifier = payload.guardrails.classifier
-        screening = payload.guardrails.tool_results
-        if screening is not None and screening.classifier and classifier is None:
-            errors.append("o exame de tool pelo classificador exige o classificador configurado")
-        if screening is not None and not (screening.terms or screening.classifier):
-            errors.append("exame de tool sem termos nem classificador não examina nada")
-        if classifier is not None:
-            try:
-                get_capabilities(classifier.model_id)
-            except ValueError as exc:
-                errors.append(f"modelo do classificador: {exc}")
-        return errors
+        return guardrail_errors(payload.guardrails)
 
     def _knowledge_errors(self, payload: ConfigPayload) -> list[str]:
         if not payload.knowledge:
