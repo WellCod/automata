@@ -68,6 +68,7 @@ describe("integrações", () => {
         agent_ids: ["a1"],
         team_ids: [],
         eval_ids: [],
+        data_subjects: false,
         expires_in_days: 30,
       },
     });

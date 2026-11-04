@@ -13,6 +13,9 @@ export const EVENT_LABELS: Record<AlertEvent, string> = {
   "suite.regressed": "Suíte regrediu",
   "suite.failing": "Suíte falhando",
   "suite.recovered": "Suíte voltou a passar",
+  // pedidos do titular (ADR-0036)
+  "data_subject.failed": "Pedido de titular falhou",
+  "data_subject.due": "Pedido de titular perto do prazo",
 };
 
 export const ALERT_EVENTS = Object.keys(EVENT_LABELS) as AlertEvent[];

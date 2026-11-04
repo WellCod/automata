@@ -6,6 +6,7 @@ import {
   Bell,
   Brain,
   BookOpen,
+  FileLock,
   KeyRound,
   LayoutGrid,
   LockKeyhole,
@@ -127,6 +128,14 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
           {me?.email ?? "v0.1"}
         </span>
         <div className="flex items-center gap-1">
+          <Link
+            href="/meus-dados"
+            aria-label="Meus dados"
+            title="Meus dados"
+            className="text-muted-foreground hover:border-border hover:text-foreground focus-visible:ring-ring/50 flex h-6 w-6 items-center justify-center rounded border border-transparent transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <FileLock className="h-3.5 w-3.5" />
+          </Link>
           <Link
             href="/minhas-memorias"
             aria-label="Minhas memórias"

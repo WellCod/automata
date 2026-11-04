@@ -353,6 +353,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Inventory */
+        get: operations["my_inventory_api_v1_me_data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/data/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** My Export */
+        post: operations["my_export_api_v1_me_data_export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/data/erase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** My Erase */
+        post: operations["my_erase_api_v1_me_data_erase_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/data/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Requests */
+        get: operations["my_requests_api_v1_me_data_requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/data/requests/{request_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Download */
+        get: operations["my_download_api_v1_me_data_requests__request_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/instance-guardrails": {
         parameters: {
             query?: never;
@@ -1689,7 +1774,7 @@ export interface components {
             /** Url */
             url: string;
             /** Events */
-            events: ("budget.warning" | "budget.exceeded" | "caller_budget.warning" | "caller_budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered")[];
+            events: ("budget.warning" | "budget.exceeded" | "caller_budget.warning" | "caller_budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered" | "data_subject.failed" | "data_subject.due")[];
         };
         /** AlertDestinationIssued */
         AlertDestinationIssued: {
@@ -1703,7 +1788,7 @@ export interface components {
             /** Host */
             host: string;
             /** Events */
-            events: ("budget.warning" | "budget.exceeded" | "caller_budget.warning" | "caller_budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered")[];
+            events: ("budget.warning" | "budget.exceeded" | "caller_budget.warning" | "caller_budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered" | "data_subject.failed" | "data_subject.due")[];
             /** Created By */
             created_by: string;
             /** Last Status */
@@ -1730,7 +1815,7 @@ export interface components {
             /** Host */
             host: string;
             /** Events */
-            events: ("budget.warning" | "budget.exceeded" | "caller_budget.warning" | "caller_budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered")[];
+            events: ("budget.warning" | "budget.exceeded" | "caller_budget.warning" | "caller_budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered" | "data_subject.failed" | "data_subject.due")[];
             /** Created By */
             created_by: string;
             /** Last Status */
@@ -1748,7 +1833,7 @@ export interface components {
             /** Name */
             name: string;
             /** Events */
-            events: ("budget.warning" | "budget.exceeded" | "caller_budget.warning" | "caller_budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered")[];
+            events: ("budget.warning" | "budget.exceeded" | "caller_budget.warning" | "caller_budget.exceeded" | "errors.spike" | "suite.regressed" | "suite.failing" | "suite.recovered" | "data_subject.failed" | "data_subject.due")[];
         };
         /** AlertTestResult */
         AlertTestResult: {
@@ -2276,6 +2361,10 @@ export interface components {
             status: string;
             /** Requested By */
             requested_by: string;
+            /** Source */
+            source: string;
+            /** Due At */
+            due_at?: string | null;
             /** Counts */
             counts: {
                 [key: string]: unknown;
@@ -2817,6 +2906,11 @@ export interface components {
             /** Eval Ids */
             eval_ids?: string[];
             /**
+             * Data Subjects
+             * @default false
+             */
+            data_subjects: boolean;
+            /**
              * Expires In Days
              * @default 30
              */
@@ -2837,6 +2931,11 @@ export interface components {
             team_ids: string[];
             /** Eval Ids */
             eval_ids: string[];
+            /**
+             * Data Subjects
+             * @default false
+             */
+            data_subjects: boolean;
             /** Created By */
             created_by: string;
             /**
@@ -2869,6 +2968,11 @@ export interface components {
             team_ids: string[];
             /** Eval Ids */
             eval_ids: string[];
+            /**
+             * Data Subjects
+             * @default false
+             */
+            data_subjects: boolean;
             /** Created By */
             created_by: string;
             /**
@@ -3239,6 +3343,11 @@ export interface components {
             input_schema?: {
                 [key: string]: unknown;
             };
+        };
+        /** MeEraseInput */
+        MeEraseInput: {
+            /** Confirm */
+            confirm: string;
         };
         /** MeResponse */
         MeResponse: {
@@ -4725,6 +4834,131 @@ export interface operations {
         };
     };
     download_api_v1_data_subject_requests__request_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "application/gzip": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_inventory_api_v1_me_data_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectInventory"];
+                };
+            };
+        };
+    };
+    my_export_api_v1_me_data_export_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequestResponse"];
+                };
+            };
+        };
+    };
+    my_erase_api_v1_me_data_erase_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MeEraseInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_requests_api_v1_me_data_requests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequestResponse"][];
+                };
+            };
+        };
+    };
+    my_download_api_v1_me_data_requests__request_id__download_get: {
         parameters: {
             query?: never;
             header?: never;

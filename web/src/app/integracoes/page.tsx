@@ -106,6 +106,7 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
   const [agentIds, setAgentIds] = useState<string[]>([]);
   const [teamIds, setTeamIds] = useState<string[]>([]);
   const [evalIds, setEvalIds] = useState<string[]>([]);
+  const [dataSubjects, setDataSubjects] = useState(false);
   const { data: testableAgents } = useTestable("agent");
   const { data: testableTeams } = useTestable("team");
   const testable = [...(testableAgents ?? []), ...(testableTeams ?? [])];
@@ -118,6 +119,7 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
           agent_ids: agentIds,
           team_ids: teamIds,
           eval_ids: evalIds,
+          data_subjects: dataSubjects,
           expires_in_days: days,
         },
       });
@@ -129,6 +131,7 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
       setAgentIds([]);
       setTeamIds([]);
       setEvalIds([]);
+      setDataSubjects(false);
       void queryClient.invalidateQueries({ queryKey: ["integrations"] });
       onIssued(issued);
     },
@@ -138,7 +141,8 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
     set(on ? [...list, value] : list.filter((v) => v !== value));
   }
 
-  const nothingSelected = agentIds.length === 0 && teamIds.length === 0 && evalIds.length === 0;
+  const nothingSelected =
+    agentIds.length === 0 && teamIds.length === 0 && evalIds.length === 0 && !dataSubjects;
 
   return (
     <form
@@ -234,6 +238,28 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
         ))}
       </fieldset>
 
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className="text-foreground mb-1 text-[13px] font-medium">
+          Pedidos de titular (LGPD)
+        </legend>
+        <label className="flex items-center gap-2 text-[13px]">
+          <input
+            type="checkbox"
+            checked={dataSubjects}
+            onChange={(e) => setDataSubjects(e.target.checked)}
+          />
+          <span className="text-foreground">
+            Consultar, exportar e apagar os dados de titulares pelo sistema da empresa
+          </span>
+        </label>
+        {dataSubjects && (
+          <p className="text-[11px] text-amber-600 dark:text-amber-400">
+            O token passa a pedir os dados de qualquer titular da instância, pelo id que o sistema
+            enviar. Ele só vê e baixa os pedidos que fez.
+          </p>
+        )}
+      </fieldset>
+
       {issue.isError && (
         <p className="text-destructive text-[13px]" role="alert">
           {issue.error.message}
@@ -296,6 +322,11 @@ function IntegrationRow({ item, names }: { item: Integration; names: Record<stri
         {suites.length > 0 && (
           <span className="text-muted-foreground text-[13px]">
             Roda a suíte de: {suites.join(", ")}
+          </span>
+        )}
+        {item.data_subjects && (
+          <span className="text-[13px] text-amber-600 dark:text-amber-400">
+            Pede dados de titulares
           </span>
         )}
         <span className="text-muted-foreground text-[11px]">
