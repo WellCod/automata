@@ -1,6 +1,6 @@
 # ADR-0031 — Teto de custo por run e orçamento por quem chama
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-11-04
 
 ## Contexto
