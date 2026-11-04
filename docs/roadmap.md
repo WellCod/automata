@@ -1320,3 +1320,20 @@ Decisão em [ADR-0033](adr/0033-reranker-e-filtros-na-recuperacao.md). A base po
 - Numa base com manuais de dois produtos, o agente que sabe o produto do cliente busca com `{"produto": ...}` e só recebe trechos desse produto.
 - Filtro com valor inexistente cai na busca sem filtro, com aviso no resultado da tool.
 
+## Fase 37 — Guardrails da instância e classificador na saída
+
+Decisão em [ADR-0034](adr/0034-guardrails-da-instancia-e-classificador-na-saida.md). O owner define um piso de guardrails que todo agente e time herda. O agente só pode endurecer o piso. A saída ganha um classificador por modelo, com as checagens de ofensa, assunto e vazamento das instruções internas.
+
+- [x] `docs(adr)`: ADR-0034 e esta seção
+- [ ] `feat(api)`: piso de guardrails da instância herdado por todo agente e líder de time
+- [ ] `feat(api)`: classificador na saída, com falha aberta ou fechada e custo no agente
+- [ ] `feat(web)`: página de guardrails da instância, herança no editor e classificador na saída
+- [ ] `test(api)`: evals do piso da instância e do classificador na saída
+
+**Critério de aceite da fase:**
+
+- Com o piso em "mascarar CPF", um agente com os guardrails desligados mascara o CPF já no próximo run, sem ser publicado de novo.
+- Um agente que bloqueia não volta a mascarar por causa do piso, e um que só mascara passa a bloquear quando o piso bloqueia.
+- Uma resposta que repete o prompt de sistema é trocada pela mensagem de bloqueio no não-stream, e o run fica `blocked` com a categoria `prompt_leak`.
+- Classificador de saída fora do ar com `on_failure: allow` deixa a resposta passar e registra a falha.
+
