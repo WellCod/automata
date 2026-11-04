@@ -33,3 +33,9 @@ class DataSubjectRequest(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # prazo legal (ADR-0036) e quando cada aviso saiu: um de cada por pedido
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_alerted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    due_alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

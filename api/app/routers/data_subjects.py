@@ -18,7 +18,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.authz import Scope
-from app.data_subjects import inventory, purge_expired, run_erase, run_export, subject_hash
+from app.data_subjects import (
+    due_date,
+    inventory,
+    purge_expired,
+    run_erase,
+    run_export,
+    subject_hash,
+)
 from app.db import SessionDep
 from app.models.data_subject import DataSubjectRequest
 from app.models.user import User
@@ -73,6 +80,8 @@ class DataSubjectRequestResponse(BaseModel):
     requested_by: str
     # panel (owner), integration (token) ou self (o próprio usuário do painel)
     source: str
+    # prazo legal (ADR-0036)
+    due_at: datetime | None = None
     counts: dict[str, Any] | None
     error: str | None
     expires_at: datetime | None
@@ -103,6 +112,7 @@ def _response(
         status=r.status,
         requested_by=(emails or {}).get(r.requested_by, r.requested_by),
         source=r.source,
+        due_at=r.due_at,
         counts=r.counts,
         error=r.error,
         expires_at=r.expires_at,
@@ -129,6 +139,7 @@ def create_export(
         status="pending",
         requested_by=actor,
         source=source,
+        due_at=due_date(),
     )
     session.add(row)
     session.commit()
@@ -147,6 +158,7 @@ def create_erase(
         status="pending",
         requested_by=actor,
         source=source,
+        due_at=due_date(),
     )
     session.add(row)
     # exportação do mesmo titular também perde o arquivo e o id em claro
