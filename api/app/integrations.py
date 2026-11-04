@@ -32,7 +32,10 @@ MAX_DAYS = 90
 
 
 def integration_scopes(
-    agent_ids: list[UUID], team_ids: list[UUID], eval_ids: list[UUID] | None = None
+    agent_ids: list[UUID],
+    team_ids: list[UUID],
+    eval_ids: list[UUID] | None = None,
+    data_subjects: bool = False,
 ) -> list[str]:
     """Ler e executar só os recursos liberados; nada de sessões de outros nem config.
 
@@ -45,6 +48,9 @@ def integration_scopes(
         scopes += [f"teams:{team_id}:read", f"teams:{team_id}:run"]
     for config_id in eval_ids or []:
         scopes += [f"evals:{config_id}:read", f"evals:{config_id}:run"]
+    if data_subjects:
+        # pedido do titular pelo sistema da empresa (ADR-0036)
+        scopes.append("data_subjects:request")
     return scopes
 
 
