@@ -13,7 +13,7 @@ from functools import lru_cache
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Table, func, inspect, select
+from sqlalchemy import Table, delete, func, inspect, select, update
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.schema import MetaData
@@ -199,3 +199,106 @@ def purge_expired(session: Session, now: datetime | None = None) -> int:
     if expired:
         session.commit()
     return len(expired)
+
+
+def pseudonym(user_id: str) -> str:
+    """O id que fica no consumo e nos runs depois da exclusão: conta, mas não identifica."""
+    return f"apagado:{subject_hash(user_id)[:16]}"
+
+
+def _affected(result: Any) -> int:
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
+def _delete(conn: Connection, table: Table | None, column: str, values: list[Any]) -> int:
+    if table is None or column not in table.c or not values:
+        return 0
+    return int(conn.execute(table.delete().where(table.c[column].in_(values))).rowcount or 0)
+
+
+def erase(user_id: str) -> dict[str, int]:
+    """Apaga o titular numa transação; devolve quantas linhas saíram ou mudaram de cada lugar.
+
+    A conversa sai na ordem do `delete_session` do Agno (transcrições, runs e sessão),
+    com as compactações junto. No consumo e nos runs registrados, o id vira pseudônimo.
+    """
+    from app.models.caller_budget import CallerBudget
+    from app.models.eval import EvalCase
+
+    counts: dict[str, int] = {}
+    engine = get_engine()
+    with engine.begin() as conn:
+        sessions = agno_table(conn, "sessions")
+        session_ids: list[Any] = []
+        if sessions is not None:
+            session_ids = list(
+                conn.scalars(select(sessions.c.session_id).where(sessions.c.user_id == user_id))
+            )
+        counts["transcripts"] = _delete(
+            conn, agno_table(conn, "transcripts"), "session_id", session_ids
+        )
+        counts["compactions"] = _delete(
+            conn, agno_table(conn, "compactions"), "session_id", session_ids
+        )
+        counts["runs"] = _delete(conn, agno_table(conn, "runs"), "session_id", session_ids)
+        traces = agno_table(conn, "traces")
+        trace_ids: list[Any] = []
+        if traces is not None:
+            trace_ids = list(
+                conn.scalars(select(traces.c.trace_id).where(traces.c.user_id == user_id))
+            )
+        counts["spans"] = _delete(conn, agno_table(conn, "spans"), "trace_id", trace_ids)
+        for key in AGNO_BY_USER:
+            # runs fora de sessão do titular também saem
+            removed = _delete(conn, agno_table(conn, key), "user_id", [user_id])
+            counts[key] = counts.get(key, 0) + removed
+    alias = pseudonym(user_id)
+    with Session(engine) as session:
+        run_ids = [
+            r
+            for r in session.scalars(select(AgentRun.run_id).where(AgentRun.user_id == user_id))
+            if r
+        ]
+        counts["agent_runs"] = _affected(
+            session.execute(
+                update(AgentRun)
+                .where(AgentRun.user_id == user_id)
+                .values(user_id=alias, review_log=None, screened_tools=None, block_detail=None)
+            )
+        )
+        counts["usage_events"] = _affected(
+            session.execute(
+                update(UsageEvent).where(UsageEvent.user_id == user_id).values(user_id=alias)
+            )
+        )
+        counts["eval_cases_unlinked"] = (
+            _affected(
+                session.execute(
+                    update(EvalCase)
+                    .where(EvalCase.source_run_id.in_(run_ids))
+                    .values(source_run_id=None)
+                )
+            )
+            if run_ids
+            else 0
+        )
+        counts["caller_budget"] = _affected(
+            session.execute(delete(CallerBudget).where(CallerBudget.subject == user_id))
+        )
+        session.commit()
+    return counts
+
+
+def run_erase(request_id: UUID, user_id: str) -> None:
+    """Background: o id em claro só existe nesta chamada, nunca no pedido gravado."""
+    _finish(request_id, status="running")
+    try:
+        counts = erase(user_id)
+        from app import caller_budget
+
+        caller_budget.forget(user_id)
+        _finish(request_id, status="done", counts=counts)
+        logger.info("titular apagado", extra={"request_id": str(request_id)})
+    except Exception as exc:
+        logger.warning("exclusão do titular falhou", extra={"request_id": str(request_id)})
+        _finish(request_id, status="failed", error=str(exc)[:500])
