@@ -34,6 +34,8 @@ class AgentRunResponse(BaseModel):
     error: str | None
     blocked_by: str | None = None
     screened_tools: list[ScreenedTool] = []
+    # run encerrado antes do fim sem ser erro, ex.: run_cost_limit (ADR-0031)
+    stop_reason: str | None = None
     # só em run de workflow: etapas que rodaram e consumo somado delas
     steps: int | None = None
     total_tokens: int | None = None
@@ -123,6 +125,7 @@ def list_runs(
                 error=r.error,
                 blocked_by=r.blocked_by,
                 screened_tools=[ScreenedTool.model_validate(s) for s in r.screened_tools or []],
+                stop_reason=r.stop_reason,
                 steps=consumo.get(r.run_id or "", (None, None, None))[0],
                 total_tokens=consumo.get(r.run_id or "", (None, None, None))[1],
                 cost=consumo.get(r.run_id or "", (None, None, None))[2],

@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.agents.memory import memory_kwargs
 from app.agents.models_map import demo_replay, resolve_model
+from app.agents.run_cost import CostCap
 from app.agents.tracking import TrackedAgent, TrackedTeam
 from app.budget import BudgetGuardrail, hard_limit
 from app.db import get_engine
@@ -201,9 +202,15 @@ def fallback_for(payload: ConfigPayload) -> FallbackConfig | None:
 
 
 def tool_hooks_for(config_id: UUID, payload: ConfigPayload, blocks: BlockLog) -> list[Any] | None:
-    """Exame do resultado de tool (ADR-0030); as retiradas vão para o registro do run."""
+    """Teto de custo (ADR-0031) por fora, depois o exame do resultado (ADR-0030): a tool
+    que passaria do teto nem roda. As paradas e retiradas vão para o registro do run."""
+    hooks: list[Any] = []
+    if payload.run.max_cost_usd is not None and payload.model_id is not None:
+        hooks += CostCap(payload.run.max_cost_usd, payload.model_id, blocks).hooks()
     screen = tool_screen(payload.guardrails, blocks, config_id)
-    return screen.hooks() if screen is not None else None
+    if screen is not None:
+        hooks += screen.hooks()
+    return hooks or None
 
 
 def compression_for(payload: ConfigPayload) -> CompressionManager | None:

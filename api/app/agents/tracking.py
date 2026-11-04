@@ -21,8 +21,9 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from agno.agent import Agent
-from agno.run.agent import RunErrorEvent, RunOutput
+from agno.run.agent import RunContentEvent, RunErrorEvent, RunOutput
 from agno.run.base import RunStatus
+from agno.run.team import RunContentEvent as TeamRunContentEvent
 from agno.run.team import RunErrorEvent as TeamRunErrorEvent
 from agno.run.team import TeamRunOutput
 from agno.run.workflow import WorkflowErrorEvent, WorkflowRunOutput
@@ -31,6 +32,7 @@ from agno.tools.mcp import MCPTools
 from agno.workflow import Workflow
 from sqlalchemy.orm import Session
 
+from app.agents.run_cost import COST_LIMIT_MESSAGE, STOP_RUN_COST
 from app.db import get_engine
 from app.guardrails.input import BlockLog
 from app.mcp.client import McpUnavailable, connect_strict
@@ -90,6 +92,7 @@ class RunRecord:
     eval_run_id: UUID | None = None
     pending_steps: list[dict[str, Any]] | None = None
     screened_tools: list[dict[str, Any]] | None = None
+    stop_reason: str | None = None
 
 
 # run do workflow em andamento; etapas (inclusive ramos paralelos, que copiam o contexto)
@@ -125,6 +128,7 @@ def persist(record: RunRecord) -> None:
             eval_run_id=record.eval_run_id,
             pending_steps=record.pending_steps,
             screened_tools=record.screened_tools,
+            stop_reason=record.stop_reason,
         )
         if record.total_tokens:
             UsageRepository(session).record_event(
@@ -257,6 +261,9 @@ class RunTracking:
             raise
         finally:
             await _close_all(members)
+        if isinstance(output, _OUTPUT_TYPES) and self._stopped_by_cost() and not output.content:
+            # o Agno não chama o modelo depois do StopAgentRun: a resposta viria vazia
+            output.content = COST_LIMIT_MESSAGE
         if isinstance(output, _OUTPUT_TYPES):
             record = self._record(kwargs, start, output, output.run_id, None, None)
             await self._save(record)
@@ -304,10 +311,19 @@ class RunTracking:
                 )
             except Exception:
                 logger.warning("run sem saída persistida", extra={"run_id": run_id})
+        if self._stopped_by_cost() and run_id:
+            yield self._notice_event(run_id, session_id, COST_LIMIT_MESSAGE)
         status = _status_of(output, last_event)
         record = self._record(kwargs, start, output, run_id, status, None)
         await self._save(record)
         self._fail_step(record)
+
+    def _stopped_by_cost(self) -> bool:
+        blocks = self.automata_blocks
+        return blocks is not None and blocks.stop_reason == STOP_RUN_COST
+
+    def _notice_event(self, run_id: str, session_id: str | None, message: str) -> Any:
+        raise NotImplementedError
 
     def _fail_step(self, record: RunRecord) -> None:
         # No Agno, etapa cujo agente falha segue e passa o erro como entrada da próxima
@@ -359,6 +375,9 @@ class RunTracking:
             screened_tools=list(self.automata_blocks.screened)
             if self.automata_blocks is not None and self.automata_blocks.screened
             else None,
+            stop_reason=self.automata_blocks.stop_reason
+            if self.automata_blocks is not None
+            else None,
         )
 
     @staticmethod
@@ -397,6 +416,11 @@ class TrackedAgent(RunTracking, Agent):
             status=RunStatus.error,
         )
 
+    def _notice_event(self, run_id: str, session_id: str | None, message: str) -> Any:
+        return RunContentEvent(
+            run_id=run_id, agent_id=self.id or "", session_id=session_id, content=message
+        )
+
     def _error_event(self, failed: AnyOutput, message: str) -> Any:
         return RunErrorEvent(
             run_id=failed.run_id,
@@ -431,6 +455,11 @@ class TrackedTeam(RunTracking, Team):
             user_id=kwargs.get("user_id"),
             content=message,
             status=RunStatus.error,
+        )
+
+    def _notice_event(self, run_id: str, session_id: str | None, message: str) -> Any:
+        return TeamRunContentEvent(
+            run_id=run_id, team_id=self.id or "", session_id=session_id, content=message
         )
 
     def _error_event(self, failed: AnyOutput, message: str) -> Any:
