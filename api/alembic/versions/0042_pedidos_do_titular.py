@@ -37,7 +37,9 @@ def upgrade() -> None:
         ),
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
     )
-    op.create_index("ix_data_subject_request_subject_hash", "data_subject_request", ["subject_hash"])
+    op.create_index(
+        "ix_data_subject_request_subject_hash", "data_subject_request", ["subject_hash"]
+    )
     # a consulta e a exclusão procuram o titular nos runs registrados
     op.create_index("ix_agent_run_user_id", "agent_run", ["user_id"])
 
