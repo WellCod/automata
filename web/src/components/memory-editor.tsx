@@ -18,10 +18,14 @@ const RETENTION = [30, 90, 180, 365];
 export function MemoryEditor({
   value,
   onChange,
+  team = false,
 }: {
   value: Memory;
   onChange: (v: Memory) => void;
+  /** no time, quem guarda e lê é o líder; os agentes não veem (ADR-0035) */
+  team?: boolean;
 }) {
+  const who = team ? "time" : "agente";
   return (
     <fieldset className="border-border flex flex-col gap-2 rounded border px-4 pt-3 pb-4">
       <legend className="text-foreground px-1 text-[13px] font-medium">Memória do usuário</legend>
@@ -34,9 +38,9 @@ export function MemoryEditor({
         Lembrar do usuário entre conversas
       </label>
       <p className="text-muted-foreground text-[12px]">
-        No fim de cada conversa, o modelo do agente guarda fatos que o usuário contou. Só este
-        agente lê o que guardou, e só para o mesmo usuário. Documento, cartão e e-mail saem
-        mascarados, e conversa sem usuário identificado não gera memória.
+        No fim de cada conversa, o modelo do {team ? "líder" : "agente"} guarda fatos que o usuário
+        contou. Só este {who} lê o que guardou, e só para o mesmo usuário. Documento, cartão e
+        e-mail saem mascarados, e conversa sem usuário identificado não gera memória.
       </p>
       {value.enabled && (
         <div className="flex flex-col gap-2">
