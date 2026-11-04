@@ -82,6 +82,7 @@ describe("controle do run", () => {
       provider_retries: 2,
       fallback_models: ["gpt-4o"],
       compress_tool_results: null,
+      max_cost_usd: null,
     });
     // a segunda reserva só aparece depois da primeira, sem repetir a escolhida
     const second = screen.getByLabelText("Modelo reserva 2");

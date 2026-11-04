@@ -100,6 +100,10 @@ function diffPayload(a: ConfigPayload, b: ConfigPayload): string[] {
   const compA = compressionText(runA.compress_tool_results);
   const compB = compressionText(runB.compress_tool_results);
   if (compA !== compB) diffs.push(`compressão de tool: ${compA} → ${compB}`);
+  if ((runA.max_cost_usd ?? null) !== (runB.max_cost_usd ?? null))
+    diffs.push(
+      `teto de custo por resposta: ${runA.max_cost_usd ?? "sem"} → ${runB.max_cost_usd ?? "sem"}`,
+    );
   const schemaA = a.output_schema ? JSON.stringify(a.output_schema) : null;
   const schemaB = b.output_schema ? JSON.stringify(b.output_schema) : null;
   if (schemaA !== schemaB)

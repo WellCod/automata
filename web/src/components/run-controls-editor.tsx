@@ -19,6 +19,7 @@ export const DEFAULT_RUN: RunControls = {
   provider_retries: 0,
   fallback_models: [],
   compress_tool_results: null,
+  max_cost_usd: null,
 };
 
 export function withRunDefaults(value: Partial<RunControls> | undefined): RunControls {
@@ -66,6 +67,7 @@ export function RunControlsEditor({
   });
   const fallbacks = value.fallback_models ?? [];
   const limited = value.tool_call_limit != null;
+  const capped = value.max_cost_usd != null;
   const compression = value.compress_tool_results ?? null;
 
   function setCompression(patch: Partial<ToolCompression>) {
@@ -109,6 +111,37 @@ export function RunControlsEditor({
         <p className="text-muted-foreground text-[12px]">
           Corta o laço de um modelo que chama a mesma tool sem parar. Passado o limite, a tool não
           roda e o modelo responde com o que já tem.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-foreground flex flex-wrap items-center gap-2 text-[13px]">
+          <input
+            type="checkbox"
+            checked={capped}
+            onChange={(e) => onChange({ ...value, max_cost_usd: e.target.checked ? 0.5 : null })}
+          />
+          Limitar o custo de cada resposta
+          {capped && (
+            <>
+              <span>US$</span>
+              <input
+                type="number"
+                aria-label="Teto de custo por resposta em dólar"
+                min={0.01}
+                max={100}
+                step={0.01}
+                value={value.max_cost_usd ?? 0.5}
+                onChange={(e) => onChange({ ...value, max_cost_usd: Number(e.target.value) })}
+                className={`${inputCls} w-20`}
+              />
+            </>
+          )}
+        </label>
+        <p className="text-muted-foreground text-[12px]">
+          Conferido antes de cada tool, somando as chamadas ao modelo da resposta. Passou do teto, a
+          resposta é encerrada com um aviso, sem erro. Classificador, busca da base e membros de
+          time ficam de fora do teto e entram no orçamento do mês.
         </p>
       </div>
 

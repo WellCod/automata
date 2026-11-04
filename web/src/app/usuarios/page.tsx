@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { CallerBudgetEditor } from "@/components/caller-budget";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -248,6 +249,9 @@ function UserRow({ user, isSelf }: { user: UserAccount; isSelf: boolean }) {
         </Badge>
       </td>
       <td className="px-4 py-2.5">
+        <CallerBudgetEditor subject={user.id} label={user.email} />
+      </td>
+      <td className="px-4 py-2.5">
         <div className="flex flex-wrap justify-end gap-2">
           {mode === "remove" ? (
             <>
@@ -320,6 +324,7 @@ export default function UsersPage() {
                   <th className="text-muted-foreground px-4 py-2 font-medium">Usuário</th>
                   <th className="text-muted-foreground px-4 py-2 font-medium">Papel</th>
                   <th className="text-muted-foreground px-4 py-2 font-medium">Situação</th>
+                  <th className="text-muted-foreground px-4 py-2 font-medium">Orçamento do mês</th>
                   <th className="px-4 py-2">
                     <span className="sr-only">Ações</span>
                   </th>
