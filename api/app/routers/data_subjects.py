@@ -1,5 +1,6 @@
 """Direitos do titular (ADR-0032), só para o owner."""
 
+import contextlib
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -8,11 +9,13 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.authz import Scope, require_scopes
 from app.data_subjects import inventory, purge_expired, run_export, subject_hash
 from app.db import SessionDep
 from app.models.data_subject import DataSubjectRequest
+from app.models.user import User
 
 router = APIRouter(
     prefix="/api/v1",
@@ -42,14 +45,28 @@ class DataSubjectRequestResponse(BaseModel):
     finished_at: datetime | None
 
 
-def _response(r: DataSubjectRequest) -> DataSubjectRequestResponse:
+def _emails(session: Session, ids: set[str]) -> dict[str, str]:
+    """Quem pediu fica gravado pelo id do usuário; a resposta mostra o e-mail."""
+    uuids = []
+    for value in ids:
+        with contextlib.suppress(TypeError, ValueError):
+            uuids.append(UUID(value))
+    if not uuids:
+        return {}
+    rows = session.execute(select(User.id, User.email).where(User.id.in_(uuids)))
+    return {str(user_id): email for user_id, email in rows}
+
+
+def _response(
+    r: DataSubjectRequest, emails: dict[str, str] | None = None
+) -> DataSubjectRequestResponse:
     return DataSubjectRequestResponse(
         id=r.id,
         kind=r.kind,
         subject=r.subject,
         subject_hash=r.subject_hash,
         status=r.status,
-        requested_by=r.requested_by,
+        requested_by=(emails or {}).get(r.requested_by, r.requested_by),
         counts=r.counts,
         error=r.error,
         expires_at=r.expires_at,
@@ -96,7 +113,8 @@ def list_requests(session: SessionDep) -> list[DataSubjectRequestResponse]:
     rows = session.scalars(
         select(DataSubjectRequest).order_by(DataSubjectRequest.created_at.desc()).limit(100)
     ).all()
-    return [_response(r) for r in rows]
+    emails = _emails(session, {r.requested_by for r in rows})
+    return [_response(r, emails) for r in rows]
 
 
 @router.get(
