@@ -163,6 +163,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/configs/{config_id}/guardrails/effective": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Effective Guardrails */
+        get: operations["get_effective_guardrails_api_v1_configs__config_id__guardrails_effective_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/configs/{config_id}/teams": {
         parameters: {
             query?: never;
@@ -329,6 +346,24 @@ export interface paths {
         /** Download */
         get: operations["download_api_v1_data_subject_requests__request_id__download_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instance-guardrails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Floor */
+        get: operations["get_floor_api_v1_instance_guardrails_get"];
+        /** Put Floor */
+        put: operations["put_floor_api_v1_instance_guardrails_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1760,7 +1795,7 @@ export interface components {
              */
             type: "blocked";
             /** Rule */
-            rule?: ("pii_detected" | "prompt_injection" | "off_topic" | "input_too_long" | "moderation" | "classifier" | "output_not_allowed") | null;
+            rule?: ("pii_detected" | "prompt_injection" | "off_topic" | "input_too_long" | "moderation" | "classifier" | "output_not_allowed" | "output_classifier") | null;
         };
         /** Body_upload_file_api_v1_knowledge_bases__base_id__contents_file_post */
         Body_upload_file_api_v1_knowledge_bases__base_id__contents_file_post: {
@@ -2263,6 +2298,15 @@ export interface components {
             description: string;
             payload: components["schemas"]["ConfigPayload"];
         };
+        /**
+         * EffectiveGuardrails
+         * @description Guardrails da versão, o piso da instância e o que vale no run (ADR-0034).
+         */
+        EffectiveGuardrails: {
+            own: components["schemas"]["GuardrailSettings"];
+            floor: components["schemas"]["GuardrailSettings"] | null;
+            effective: components["schemas"]["GuardrailSettings"];
+        };
         /** EmbedderInfo */
         EmbedderInfo: {
             /**
@@ -2719,6 +2763,18 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** InstanceGuardrailsInput */
+        InstanceGuardrailsInput: {
+            settings: components["schemas"]["GuardrailSettings"] | null;
+        };
+        /** InstanceGuardrailsResponse */
+        InstanceGuardrailsResponse: {
+            settings: components["schemas"]["GuardrailSettings"] | null;
+            /** Updated By */
+            updated_by?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
         };
         /** InstructionSections */
         InstructionSections: {
@@ -3226,6 +3282,27 @@ export interface components {
             retention_days: number;
         };
         /**
+         * OutputClassifierRule
+         * @description Classificador por modelo na resposta (ADR-0034): uma chamada por resposta.
+         */
+        OutputClassifierRule: {
+            /** Model Id */
+            model_id: string;
+            /** Checks */
+            checks: ("toxicity" | "off_topic" | "prompt_leak")[];
+            /**
+             * Scope
+             * @default
+             */
+            scope: string;
+            /**
+             * On Failure
+             * @default allow
+             * @enum {string}
+             */
+            on_failure: "allow" | "block";
+        };
+        /**
          * OutputRule
          * @description Validação da resposta. No stream o texto já saiu quando ela roda (ADR-0013).
          */
@@ -3239,6 +3316,7 @@ export interface components {
             pii_types?: ("cpf" | "cnpj" | "cartao" | "email" | "telefone")[];
             /** Blocked Terms */
             blocked_terms?: string[];
+            classifier?: components["schemas"]["OutputClassifierRule"] | null;
         };
         /** ParallelNode */
         ParallelNode: {
@@ -4331,6 +4409,39 @@ export interface operations {
             };
         };
     };
+    get_effective_guardrails_api_v1_configs__config_id__guardrails_effective_get: {
+        parameters: {
+            query?: {
+                draft?: boolean;
+            };
+            header?: never;
+            path: {
+                config_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EffectiveGuardrails"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_teams_using_api_v1_configs__config_id__teams_get: {
         parameters: {
             query?: never;
@@ -4630,6 +4741,59 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                     "application/gzip": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_floor_api_v1_instance_guardrails_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstanceGuardrailsResponse"];
+                };
+            };
+        };
+    };
+    put_floor_api_v1_instance_guardrails_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstanceGuardrailsInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstanceGuardrailsResponse"];
                 };
             };
             /** @description Validation Error */

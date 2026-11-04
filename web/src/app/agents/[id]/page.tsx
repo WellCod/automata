@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useGuardrailFloor } from "@/lib/api/guardrail-floor";
 import { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -183,6 +184,7 @@ function TeamsUsingAgent({ agentId }: { agentId: string }) {
 
 export default function AgentEditPage() {
   const { id } = useParams<{ id: string }>();
+  const { data: floor } = useGuardrailFloor(id);
   const [tab, setTab] = useState<PageTab>("config");
   // run escolhido em "Virar caso de teste": a aba Testes abre o caso preenchido
   const [caseFromRun, setCaseFromRun] = useState<string | null>(null);
@@ -464,7 +466,7 @@ export default function AgentEditPage() {
                 name="guardrails"
                 control={form.control}
                 render={({ field }) => (
-                  <GuardrailsEditor value={field.value} onChange={field.onChange} />
+                  <GuardrailsEditor value={field.value} onChange={field.onChange} floor={floor} />
                 )}
               />
 
