@@ -192,14 +192,14 @@ export function RequestsTable({ requests }: { requests: DataSubjectRequest[] }) 
   if (requests.length === 0)
     return <p className="text-muted-foreground text-[13px]">Nenhum pedido ainda.</p>;
   return (
-    <div className="overflow-x-auto">
+    <div className="max-w-full min-w-0 overflow-x-auto">
       <table className="w-full text-left text-[13px]">
         <thead className="text-muted-foreground text-[12px]">
           <tr>
             <th className="py-1.5 pr-3 font-normal">Pedido</th>
             <th className="py-1.5 pr-3 font-normal">Titular</th>
             <th className="py-1.5 pr-3 font-normal">Situação</th>
-            <th className="py-1.5 pr-3 font-normal">Quem pediu</th>
+            <th className="hidden py-1.5 pr-3 font-normal sm:table-cell">Quem pediu</th>
             <th className="py-1.5 pr-3 font-normal">Quando</th>
             <th className="py-1.5 font-normal">
               <span className="sr-only">Arquivo</span>
@@ -225,12 +225,13 @@ export function RequestsTable({ requests }: { requests: DataSubjectRequest[] }) 
                 {r.status === "done" && r.counts && (
                   <span className="text-muted-foreground">
                     {" "}
-                    · {requestTotal(r).toLocaleString("pt-BR")} linhas
+                    · {requestTotal(r).toLocaleString("pt-BR")}{" "}
+                    {requestTotal(r) === 1 ? "linha" : "linhas"}
                   </span>
                 )}
                 {r.error && <span className="text-destructive block text-[12px]">{r.error}</span>}
               </td>
-              <td className="py-1.5 pr-3">{r.requested_by}</td>
+              <td className="hidden py-1.5 pr-3 break-all sm:table-cell">{r.requested_by}</td>
               <td className="py-1.5 pr-3">{when(r.created_at)}</td>
               <td className="py-1.5">
                 {r.kind === "export" && r.status === "done" && (
@@ -323,7 +324,7 @@ export function DataSubjectsPanel() {
         </section>
       )}
 
-      <section aria-labelledby={`${id}-requests`} className="flex flex-col gap-2">
+      <section aria-labelledby={`${id}-requests`} className="flex min-w-0 flex-col gap-2">
         <h2 id={`${id}-requests`} className="text-foreground text-sm font-medium">
           Pedidos
         </h2>
