@@ -40,11 +40,16 @@ def _masked(text: str | None, custom: tuple[CustomPattern, ...] = ()) -> str | N
     return mask(text, find_pii(text, custom=custom))
 
 
+def owner_of(memory: UserMemory) -> str | None:
+    """Config dona da memória (ADR-0035): o agente grava com agent_id, o time com team_id."""
+    return memory.agent_id or memory.team_id
+
+
 class MaskingDb(PostgresDb):
     """PostgresDb que mascara PII de toda memória antes de gravar."""
 
     def upsert_user_memory(self, memory: UserMemory, *args: Any, **kwargs: Any) -> Any:
-        custom = _custom_by_agent.get(memory.agent_id or "", ())
+        custom = _custom_by_agent.get(owner_of(memory) or "", ())
         memory.memory = _masked(memory.memory, custom) or ""
         memory.input = _masked(memory.input, custom)
         return super().upsert_user_memory(memory, *args, **kwargs)
@@ -61,16 +66,20 @@ def memory_db() -> MaskingDb:
 
 
 class AgentMemoryManager(MemoryManager):
-    """Lê só as memórias que este agente guardou para o usuário."""
+    """Lê só as memórias que este agente, ou este time, guardou para o usuário."""
 
-    def __init__(self, agent_id: str, **kwargs: Any) -> None:
+    def __init__(self, agent_id: str, *, team: bool = False, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.agent_id = agent_id
+        self.team = team
 
     def _read(self, user_id: str | None) -> dict[str, list[UserMemory]] | None:
         if self.db is None:
             return None
-        rows = self.db.get_user_memories(user_id=user_id, agent_id=self.agent_id)
+        if self.team:
+            rows = self.db.get_user_memories(user_id=user_id, team_id=self.agent_id)
+        else:
+            rows = self.db.get_user_memories(user_id=user_id, agent_id=self.agent_id)
         memories: dict[str, list[UserMemory]] = {}
         # PostgresDb é síncrono e devolve UserMemory com deserialize padrão
         for memory in rows if isinstance(rows, list) else []:
@@ -92,6 +101,8 @@ def memory_kwargs(
     settings: MemorySettings,
     user_id: str | None,
     custom: tuple[CustomPattern, ...] = (),
+    *,
+    team: bool = False,
 ) -> dict[str, Any]:
     """Argumentos do Agent para a memória; vazio quando ela não vale neste run.
 
@@ -106,7 +117,10 @@ def memory_kwargs(
         instructions = f"{settings.instructions.strip()}\n\n{CAPTURE_RULES}"
     return {
         "memory_manager": AgentMemoryManager(
-            agent_id=agent_id, db=memory_db(), memory_capture_instructions=instructions
+            agent_id=agent_id,
+            team=team,
+            db=memory_db(),
+            memory_capture_instructions=instructions,
         ),
         "update_memory_on_run": True,
         "add_memories_to_context": True,
