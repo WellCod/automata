@@ -10,6 +10,7 @@ from app.agents.capabilities import get_capabilities
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.knowledge.embedders import EMBEDDERS, is_configured
+from app.knowledge.filters import field_values
 from app.knowledge.ingest import IngestError, read_documents
 from app.knowledge.reprocess import plan_reprocess, reprocess
 from app.knowledge.rerank import CROSS_ENCODER_PRICES, cross_encoder_available
@@ -112,6 +113,13 @@ def list_embedders() -> list[EmbedderInfo]:
         )
         for spec in EMBEDDERS.values()
     ]
+
+
+@router.get("/{base_id}/fields", response_model=dict[str, list[str]])
+def get_field_values(base_id: UUID, session: SessionDep) -> dict[str, list[str]]:
+    """Campos e valores dos documentos prontos da base: o que o modelo vê na tool."""
+    _get_or_404(KnowledgeBaseRepository(session), base_id)
+    return field_values(base_id)
 
 
 @router.get("/cross-encoders", response_model=list[CrossEncoderInfo])
@@ -241,7 +249,7 @@ def search(
     _limit_search(request)
     base = _get_or_404(KnowledgeBaseRepository(session), base_id)
     try:
-        hits = search_base(base, body.query, body.max_results)
+        hits = search_base(base, body.query, body.max_results, filters=body.filters)
     except Exception as exc:
         # embedder sem chave ou fora do ar: o detalhe do provedor fica só no log
         logger.warning("busca falhou", extra={"base_id": str(base_id), "error": str(exc)})
@@ -255,6 +263,7 @@ def _result(outcome: SearchOutcome) -> SearchResult:
         searched=outcome.searched,
         hyde_tokens=outcome.hyde_tokens,
         rerank_cost=outcome.rerank_cost,
+        filters_dropped=outcome.filters_dropped,
     )
 
 
@@ -266,8 +275,10 @@ def compare_search(
     _limit_search(request)
     base = _get_or_404(KnowledgeBaseRepository(session), base_id)
     try:
-        with_strategy = run_search(base, body.query, body.max_results)
-        without_strategy = run_search(base, body.query, body.max_results, plain=True)
+        with_strategy = run_search(base, body.query, body.max_results, filters=body.filters)
+        without_strategy = run_search(
+            base, body.query, body.max_results, plain=True, filters=body.filters
+        )
     except Exception as exc:
         logger.warning("busca falhou", extra={"base_id": str(base_id), "error": str(exc)})
         raise HTTPException(status_code=502, detail=_SEARCH_FAILED) from exc

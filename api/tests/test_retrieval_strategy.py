@@ -358,3 +358,97 @@ def test_cross_encoder_so_com_provedor_configurado(
         "/api/v1/knowledge-bases", json={**body, "slug": "base_ce2", "retrieval": wrong}
     )
     assert bad.status_code == 422
+
+
+# --- campos do documento e filtros (ADR-0033) ---
+
+MANUAIS = [
+    ("manual plano a", "Para cancelar o plano, ligue para a central e informe o protocolo.", "a"),
+    ("manual plano b", "Para cancelar o plano, acesse o app e confirme pelo e-mail.", "b"),
+]
+
+
+def _base_com_campos(retrieval: dict[str, Any]) -> KnowledgeBase:
+    base = _base([], retrieval)
+    for name, text, plano in MANUAIS:
+        with Session(get_engine()) as session:
+            content = KnowledgeContent(
+                base_id=base.id,
+                name=name,
+                source_type="text",
+                source=name,
+                extension="txt",
+                status="processing",
+                created_by="teste",
+                fields={"plano": plano},
+            )
+            session.add(content)
+            session.commit()
+            content_id = content.id
+        ingest(content_id, text.encode())
+    return base
+
+
+def test_filtro_traz_so_os_trechos_do_campo(db_url: str) -> None:
+    from app.knowledge.filters import field_values
+    from app.knowledge.search import search
+
+    base = _base_com_campos({"agentic_filters": True})
+    assert field_values(base.id) == {"plano": ["a", "b"]}
+    names = [h.content_name for h in search(base, "como cancelar", 5, filters={"plano": "b"}).hits]
+    assert names == ["manual plano b"]
+    sem = search(base, "como cancelar", 5, filters={"plano": "c"})
+    assert sem.filters_dropped is True
+    assert {h.content_name for h in sem.hits} == {"manual plano a", "manual plano b"}
+
+
+def test_tool_mostra_campos_e_avisa_filtro_inexistente(db_url: str) -> None:
+    import asyncio
+    import json
+
+    from agno.run import RunContext
+
+    from app.knowledge.tools import knowledge_tool
+
+    base = _base_com_campos({"agentic_filters": True})
+    fn = knowledge_tool(base, 5)
+    assert 'plano: "a", "b"' in (fn.description or "")
+    ctx = RunContext(run_id="r", session_id="s")
+    entry = fn.entrypoint
+    assert entry is not None
+    ok = json.loads(
+        asyncio.run(entry(pergunta="como cancelar", run_context=ctx, filtros={"plano": "a"}))
+    )
+    assert ok["filtros"] == {"plano": "a"}
+    assert [t["documento"] for t in ok["trechos"]] == ["manual plano a"]
+    bad = json.loads(
+        asyncio.run(entry(pergunta="como cancelar", run_context=ctx, filtros={"produto": "x"}))
+    )
+    assert "produto=x" in bad["aviso"] and len(bad["trechos"]) == 2
+
+    plain = knowledge_tool(_base_com_campos({}), 5)
+    assert "filtros" not in (plain.description or "")
+
+
+def test_editar_campos_atualiza_os_trechos_sem_embedar(client: TestClient) -> None:
+    from app.knowledge.search import search
+
+    base = _base_com_campos({})
+    with Session(get_engine()) as session:
+        content = (
+            session.query(KnowledgeContent)
+            .filter(KnowledgeContent.base_id == base.id, KnowledgeContent.name == "manual plano a")
+            .one()
+        )
+        content_id = content.id
+    url = f"/api/v1/knowledge-bases/{base.id}/contents/{content_id}/fields"
+    assert client.put(url, json={"fields": {"Plano": "a"}}).status_code == 422
+    resp = client.put(url, json={"fields": {"plano": "premium", "ano": "2026"}})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["fields"] == {"plano": "premium", "ano": "2026"}
+    hits = search(base, "como cancelar", 5, filters={"plano": "premium"}).hits
+    assert [h.content_name for h in hits] == ["manual plano a"]
+    assert client.get(f"/api/v1/knowledge-bases/{base.id}/fields").json() == {
+        "ano": ["2026"],
+        "plano": ["b", "premium"],
+    }

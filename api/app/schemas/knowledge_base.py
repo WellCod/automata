@@ -1,8 +1,9 @@
+import re
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, HttpUrl, model_validator
+from pydantic import AfterValidator, BaseModel, Field, HttpUrl, model_validator
 
 from app.knowledge.embedders import EmbedderName
 
@@ -51,6 +52,8 @@ class RetrievalSettings(BaseModel):
     hyde_model: str | None = Field(default=None, max_length=64)
     # roda antes do MMR ou da recência, sobre o mesmo lote de candidatos
     cross_encoder: CrossEncoderSettings | None = None
+    # a tool da base ganha o argumento filtros, com os campos e valores dos documentos
+    agentic_filters: bool = False
 
     @model_validator(mode="after")
     def hyde_com_modelo(self) -> "RetrievalSettings":
@@ -135,11 +138,40 @@ class EmbedderInfo(BaseModel):
     default: bool
 
 
+MAX_FIELDS = 10
+_FIELD_NAME = re.compile(r"^[a-z0-9_]{1,40}$")
+
+
+def check_fields(value: dict[str, str] | None) -> dict[str, str] | None:
+    """Campos do documento (ADR-0033): nome em minúsculas e valor em texto curto."""
+    if value is None:
+        return None
+    if len(value) > MAX_FIELDS:
+        raise ValueError(f"no máximo {MAX_FIELDS} campos por documento")
+    cleaned: dict[str, str] = {}
+    for name, raw in value.items():
+        if not _FIELD_NAME.match(name):
+            raise ValueError(f"campo inválido: {name!r} (minúsculas, dígitos e _, até 40)")
+        text = str(raw).strip()
+        if not 1 <= len(text) <= 100:
+            raise ValueError(f"o valor de {name} precisa ter de 1 a 100 caracteres")
+        cleaned[name] = text
+    return cleaned or None
+
+
+DocumentFields = Annotated[dict[str, str] | None, AfterValidator(check_fields)]
+
+
+class ContentFieldsInput(BaseModel):
+    fields: DocumentFields = None
+
+
 class UrlContentInput(BaseModel):
     url: HttpUrl
     name: str | None = Field(default=None, max_length=255)
     # baixa de novo nesse intervalo e reindexa se mudou (ADR-0024); vazio = nunca
     refresh_every_hours: int | None = Field(default=None, ge=1, le=168)
+    fields: DocumentFields = None
 
 
 class ContentScheduleInput(BaseModel):
@@ -149,6 +181,7 @@ class ContentScheduleInput(BaseModel):
 class TextContentInput(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     text: str = Field(min_length=1)
+    fields: DocumentFields = None
 
 
 class KnowledgeContentResponse(BaseModel):
@@ -172,6 +205,7 @@ class KnowledgeContentResponse(BaseModel):
     external_path: str | None = None
     refresh_every_hours: int | None = None
     next_refresh_at: datetime | None = None
+    fields: dict[str, str] | None = None
 
 
 class ChunkPreviewInput(BaseModel):
@@ -209,6 +243,8 @@ class ReprocessResult(BaseModel):
 class SearchInput(BaseModel):
     query: str = Field(min_length=1, max_length=1000)
     max_results: int = Field(default=5, ge=1, le=20)
+    # os mesmos filtros que o modelo passa à tool da base (ADR-0033)
+    filters: DocumentFields = None
 
 
 class SearchResult(BaseModel):
@@ -219,6 +255,8 @@ class SearchResult(BaseModel):
     hyde_tokens: int
     # custo do cross-encoder nesta busca (ADR-0033); None sem ele ou quando falhou
     rerank_cost: float | None = None
+    # o filtro não achou trecho e a busca saiu sem ele
+    filters_dropped: bool = False
 
 
 class CrossEncoderInfo(BaseModel):
