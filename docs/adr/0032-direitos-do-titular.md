@@ -32,9 +32,8 @@ Verificado no Agno 3.1.8 instalado:
 
 **Exclusão.** `POST /api/v1/data-subjects/{user_id}/erase` exige que o corpo repita o `user_id`, para não apagar por engano. Em background, a exclusão:
 
-- apaga as sessões pelo Agno, o que leva junto os runs e as transcrições;
-- apaga as memórias pelo Agno;
-- apaga por SQL, com o `user_id`, as aprovações, os resultados de tool, os traces (com os spans deles), os jobs da fila e os runs de suíte do Agno;
+- apaga por SQL, numa transação, as sessões com os runs, as transcrições e as compactações delas, na ordem que o `delete_session` do Agno usa. O Agno não tem exclusão por usuário para todas as tabelas, e uma transação só evita deixar o titular pela metade;
+- apaga, com o `user_id`, as memórias, as aprovações, os resultados de tool, os traces (com os spans deles), os jobs da fila, os runs de suíte, os aprendizados e as métricas do Agno;
 - troca o `user_id` em `agent_run` e `usage_event` por `apagado:` mais os primeiros 16 caracteres do sha256 dele, e limpa `review_log`, `screened_tools` e `block_detail`. Contagem, latência e custo continuam batendo nas métricas e no orçamento;
 - tira a ligação (`source_run_id`) dos casos de teste criados de conversas dele (ADR-0016). O texto do caso já foi mascarado na criação;
 - remove o orçamento por quem chama (ADR-0031) daquele `user_id`.

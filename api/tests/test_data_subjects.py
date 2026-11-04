@@ -126,3 +126,55 @@ def test_arquivo_vencido_sai_com_o_id_em_claro(client: TestClient) -> None:
     assert client.get(f"/api/v1/data-subject-requests/{request_id}/download").status_code == 409
     missing = "00000000-0000-0000-0000-000000000000"
     assert client.get(f"/api/v1/data-subject-requests/{missing}/download").status_code == 404
+
+
+# --- exclusão ---
+
+
+def _agent_id(client: TestClient) -> str:
+    [config] = [
+        c for c in client.get("/api/v1/configs").json()["items"] if c["name"] == "atendimento"
+    ]
+    return str(config["id"])
+
+
+def test_confirmacao_errada_nao_apaga(client: TestClient) -> None:
+    resp = client.post(f"/api/v1/data-subjects/{ANA}/erase", json={"confirm": "ana"})
+    assert resp.status_code == 422
+    assert client.get(f"/api/v1/data-subjects/{ANA}").json()["total"] > 0
+
+
+def test_exclusao_apaga_o_titular_e_mantem_metricas_e_outro(client: TestClient) -> None:
+    from sqlalchemy import func, select
+
+    from app.data_subjects import pseudonym, subject_hash
+    from app.db import get_engine
+    from app.models.run import AgentRun
+    from app.models.usage import UsageEvent
+
+    agent_id = _agent_id(client)
+    before = client.get(f"/api/v1/configs/{agent_id}/metrics").json()
+    bia_before = client.get(f"/api/v1/data-subjects/{BIA}").json()["counts"]
+
+    resp = client.post(f"/api/v1/data-subjects/{ANA}/erase", json={"confirm": ANA})
+    assert resp.status_code == 202, resp.text
+    request_id = resp.json()["id"]
+    assert resp.json()["subject"] is None
+
+    assert client.get(f"/api/v1/data-subjects/{ANA}").json()["total"] == 0
+    assert client.get(f"/api/v1/data-subjects/{BIA}").json()["counts"] == bia_before
+    after = client.get(f"/api/v1/configs/{agent_id}/metrics").json()
+    assert after["total_runs"] == before["total_runs"]
+
+    with Session(get_engine()) as session:
+        alias = pseudonym(ANA)
+        assert session.scalar(select(func.count()).where(AgentRun.user_id == alias)) == 1
+        kept = session.scalar(select(func.count()).where(UsageEvent.user_id == alias))
+        assert kept is not None and kept >= 0
+
+    rows = client.get("/api/v1/data-subject-requests").json()
+    [row] = [r for r in rows if r["id"] == request_id]
+    assert (row["kind"], row["status"], row["subject"]) == ("erase", "done", None)
+    assert row["subject_hash"] == subject_hash(ANA)
+    assert row["counts"]["sessions"] == 1 and row["counts"]["memories"] == 1
+    assert ANA not in json.dumps(rows)

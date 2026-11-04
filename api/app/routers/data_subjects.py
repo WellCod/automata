@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.authz import Scope, require_scopes
-from app.data_subjects import inventory, purge_expired, run_export, subject_hash
+from app.data_subjects import inventory, purge_expired, run_erase, run_export, subject_hash
 from app.db import SessionDep
 from app.models.data_subject import DataSubjectRequest
 from app.models.user import User
@@ -104,6 +104,51 @@ def export_subject(
     session.commit()
     session.refresh(row)
     background.add_task(run_export, row.id)
+    return _response(row)
+
+
+class EraseInput(BaseModel):
+    # o id repetido no corpo: apagar um titular não tem volta
+    confirm: str
+
+
+@router.post(
+    "/data-subjects/{user_id}/erase",
+    response_model=DataSubjectRequestResponse,
+    status_code=202,
+)
+def erase_subject(
+    user_id: str,
+    body: EraseInput,
+    session: SessionDep,
+    request: Request,
+    background: BackgroundTasks,
+) -> DataSubjectRequestResponse:
+    if body.confirm != user_id:
+        raise HTTPException(status_code=422, detail="Repita o id do titular para confirmar")
+    row = DataSubjectRequest(
+        kind="erase",
+        subject=None,
+        subject_hash=subject_hash(user_id),
+        status="pending",
+        requested_by=_actor(request),
+    )
+    session.add(row)
+    # exportação pendente do mesmo titular também perde o arquivo e o id em claro
+    for pending in session.scalars(
+        select(DataSubjectRequest).where(
+            DataSubjectRequest.kind == "export",
+            DataSubjectRequest.subject_hash == row.subject_hash,
+        )
+    ):
+        pending.result = None
+        pending.subject = None
+        pending.expires_at = None
+        if pending.status == "done":
+            pending.status = "expired"
+    session.commit()
+    session.refresh(row)
+    background.add_task(run_erase, row.id, user_id)
     return _response(row)
 
 
