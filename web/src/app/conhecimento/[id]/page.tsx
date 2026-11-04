@@ -488,7 +488,9 @@ function TestSearch({ base }: { base: KnowledgeBase }) {
       return res.data!;
     },
   });
-  const active = compare ? comparison : search;
+  // com filtro, a comparação devolve se o filtro caiu; a busca simples só traz os trechos
+  const viaCompare = compare || filtersBody !== null;
+  const active = viaCompare ? comparison : search;
 
   return (
     <div className="flex flex-col gap-4">
@@ -536,7 +538,10 @@ function TestSearch({ base }: { base: KnowledgeBase }) {
           {active.error.message}
         </p>
       )}
-      {!compare && search.data && <HitList hits={search.data} />}
+      {!viaCompare && search.data && <HitList hits={search.data} />}
+      {viaCompare && !compare && comparison.data && (
+        <ResultColumn title="Resultado" result={comparison.data.with_strategy} />
+      )}
       {compare && comparison.data && (
         <div className="grid gap-4 md:grid-cols-2">
           <ResultColumn title="Com a estratégia da base" result={comparison.data.with_strategy} />

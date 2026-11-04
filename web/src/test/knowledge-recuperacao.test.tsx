@@ -197,4 +197,34 @@ describe("cross-encoder e filtros", () => {
     ];
     expect(opts.body).toEqual({ query: "cancelar", max_results: 5, filters: { plano: "c" } });
   });
+
+  it("filtro sem comparação também avisa quando o filtro cai", async () => {
+    const hit = {
+      content_id: "c1",
+      content_name: "manual plano a",
+      source: null,
+      text: "t",
+      score: 0.4,
+    };
+    vi.mocked(client.POST).mockResolvedValue({
+      data: {
+        with_strategy: { hits: [hit], searched: "cancelar", hyde_tokens: 0, filters_dropped: true },
+        without_strategy: { hits: [hit], searched: "cancelar", hyde_tokens: 0 },
+        retrieval,
+      },
+      error: undefined,
+    } as never);
+    const user = userEvent.setup();
+    render(<KnowledgeBasePage />, { wrapper });
+    await user.click(await screen.findByRole("tab", { name: /busca de teste/i }));
+    expect(screen.getByRole("checkbox", { name: /comparar/i })).not.toBeChecked();
+    await user.type(screen.getByLabelText("Pergunta"), "cancelar");
+    await user.type(screen.getByPlaceholderText("produto=plano a, ano=2026"), "plano=c");
+    await user.click(screen.getByRole("button", { name: /^buscar$/i }));
+    const col = await screen.findByRole("region", { name: "Resultado" });
+    expect(within(col).getByText(/a busca saiu sem ele/)).toBeInTheDocument();
+    expect(vi.mocked(client.POST).mock.calls.at(-1)![0]).toBe(
+      "/api/v1/knowledge-bases/{base_id}/search/compare",
+    );
+  });
 });
