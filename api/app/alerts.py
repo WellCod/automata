@@ -189,8 +189,16 @@ def poll_once(now: datetime | None = None) -> None:
     from app.caller_budget import check_caller_budgets
     from app.data_subjects import check_requests
     from app.job_queue import check_jobs
+    from app.reconciliation import check_divergence
 
-    checks = (check_budgets, check_caller_budgets, check_errors, check_requests, check_jobs)
+    checks = (
+        check_budgets,
+        check_caller_budgets,
+        check_errors,
+        check_requests,
+        check_jobs,
+        check_divergence,
+    )
     for check in checks:
         try:
             with Session(get_engine()) as session:

@@ -208,3 +208,37 @@ def get_timeseries(
     runs = RunRepository(session).daily(since=since, until=until, config_id=agent_id)
     usage = UsageRepository(session).daily(since=since, until=until, agent_config_id=agent_id)
     return build_series(since.date(), last, runs, usage)
+
+
+class ReconciliationRow(BaseModel):
+    provider: str
+    day: date
+    reported_usd: float
+    estimated_usd: float
+    diff_usd: float
+    diff_percent: float | None
+    # o dia corrente ainda recebe custo do provedor
+    closed: bool
+    fetched_at: datetime
+
+
+class Reconciliation(BaseModel):
+    # provedores com chave admin no ambiente (ANTHROPIC_ADMIN_KEY, OPENAI_ADMIN_KEY)
+    providers: list[str]
+    alert_percent: float
+    rows: list[ReconciliationRow]
+
+
+@router.get("/reconciliation", response_model=Reconciliation)
+def get_reconciliation(
+    session: SessionDep, days: int = Query(default=30, ge=1, le=90)
+) -> Reconciliation:
+    """Custo informado pelo provedor e estimado pelo Automata, por dia (ADR-0037)."""
+    from app import reconciliation
+
+    today = datetime.now(UTC).date()
+    return Reconciliation(
+        providers=sorted(reconciliation.configured()),
+        alert_percent=reconciliation.alert_percent(),
+        rows=[ReconciliationRow(**r) for r in reconciliation.report(session, days, today)],
+    )
