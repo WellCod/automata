@@ -73,6 +73,10 @@ Arquivos:
   - A opção só entra no token quando é pedida.
   - Origem pelo ator.
   - Prazo lido do ambiente.
+- `tests/test_evals_operacao.py`: fila, conciliação e e-mail (ADR-0037).
+  - Matriz de decisão do retry, de 0 a 2 repetições por tentativa. Falha de mais de 24 h não é retomada no deploy.
+  - Centavos da Anthropic e dólares da OpenAI.
+  - O status do e-mail nunca traz a mensagem do servidor, e sem SMTP recusa sem tentar.
 - `.github/workflows/evals-nightly.yml` — workflow agendado
 
 ## Metering
