@@ -264,7 +264,12 @@ def agent_from(
         tool_hooks=tool_hooks_for(config_id, payload, blocks),
         compression_manager=compression_for(payload),
         output_schema=payload.output_schema,
-        **memory_kwargs(str(config_id), payload.memory, memory_user if tracked else None),
+        **memory_kwargs(
+            str(config_id),
+            payload.memory,
+            memory_user if tracked else None,
+            payload.guardrails.pii.custom_patterns(),
+        ),
     )
     if isinstance(agent, TrackedAgent):
         agent.automata_config_id = config_id

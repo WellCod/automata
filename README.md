@@ -124,7 +124,7 @@ Na revisão humana do workflow, quem aprova pode **editar a saída** da etapa, c
 
 Regras de entrada e saída versionadas junto com o agente. O bloqueio acontece antes da chamada ao modelo, então não gasta token.
 
-- **Dados pessoais:** CPF e CNPJ com dígito verificador e cartão com Luhn, para que número de pedido não seja confundido com documento. Também e-mail e telefone. Cada tipo pode ser mascarado ou bloqueado.
+- **Dados pessoais:** CPF e CNPJ com dígito verificador e cartão com Luhn, para que número de pedido não seja confundido com documento. Também e-mail e telefone. Cada tipo pode ser mascarado ou bloqueado. Até 10 padrões próprios por agente cobrem matrícula, contrato ou protocolo. Cada padrão tem prefixo e faixa de dígitos, sem regex livre, e vale na entrada, na memória e na resposta.
 - **Injeção de prompt:** detectada em português e inglês, sem diferenciar acento.
 - **Outras regras:** tópicos proibidos, tamanho máximo e moderação opcional da OpenAI.
 - **Direitos do titular:** o owner consulta tudo o que a instância guarda de uma pessoa, pelo id dela, e exporta num arquivo que fica 7 dias disponível para download. A exclusão apaga a conversa, a memória, as aprovações e os traces da pessoa, e troca o id dela por um pseudônimo no consumo e nos runs, para as métricas e o custo continuarem batendo ([ADR-0032](docs/adr/0032-direitos-do-titular.md)).

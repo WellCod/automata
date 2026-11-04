@@ -17,7 +17,7 @@ from agno.guardrails.base import BaseGuardrail
 from agno.run.agent import RunInput
 from agno.run.team import TeamRunInput
 
-from app.guardrails.pii import PII_SCAN_MAX_CHARS, PiiType, find_pii, mask
+from app.guardrails.pii import PII_SCAN_MAX_CHARS, CustomPattern, PiiType, find_pii, mask
 from app.schemas.config import GuardrailSettings
 
 AnyInput = RunInput | TeamRunInput
@@ -140,10 +140,12 @@ class PiiGuardrail(_Guardrail):
         types: list[PiiType],
         block: bool,
         log: BlockLog | None = None,
+        custom: tuple[CustomPattern, ...] = (),
     ) -> None:
         super().__init__(blocked_message, log)
         self.types = types
         self.block = block
+        self.custom = custom
 
     def _check(self, run_input: AnyInput) -> None:
         if not isinstance(run_input.input_content, str):
@@ -158,7 +160,7 @@ class PiiGuardrail(_Guardrail):
                 size=size,
                 limit=PII_SCAN_MAX_CHARS,
             )
-        matches = find_pii(run_input.input_content, self.types)
+        matches = find_pii(run_input.input_content, self.types, self.custom)
         if not matches:
             return
         run_input.input_content = mask(run_input.input_content, matches)
@@ -251,8 +253,16 @@ def input_guardrails(
     classificador e a moderação por último, porque saem da API."""
     msg = settings.blocked_message
     hooks: list[BaseGuardrail] = []
-    if settings.pii.mode != "off" and settings.pii.types:
-        hooks.append(PiiGuardrail(msg, list(settings.pii.types), settings.pii.mode == "block", log))
+    if settings.pii.mode != "off" and (settings.pii.types or settings.pii.custom):
+        hooks.append(
+            PiiGuardrail(
+                msg,
+                list(settings.pii.types),
+                settings.pii.mode == "block",
+                log,
+                settings.pii.custom_patterns(),
+            )
+        )
     if settings.max_input_chars is not None:
         hooks.append(LengthGuardrail(msg, settings.max_input_chars, log))
     if settings.prompt_injection:

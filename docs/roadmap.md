@@ -1273,7 +1273,7 @@ Decisão em [ADR-0032](adr/0032-direitos-do-titular.md). O owner consulta o que 
 - [x] `docs(adr)`: ADR-0032 e esta seção
 - [x] `feat(api)`: consulta e exportação dos dados de um titular, com o arquivo guardado por 7 dias
 - [x] `feat(api)`: exclusão dos dados de um titular, com o id trocado por hash no consumo e nos runs
-- [ ] `feat(api)`: padrões próprios na máscara de dados pessoais do agente
+- [x] `feat(api)`: padrões próprios na máscara de dados pessoais do agente
 - [ ] `feat(web)`: página Titulares e padrões próprios nos guardrails
 - [ ] `test(api)`: evals de isolamento da exportação e da exclusão e da máscara própria
 

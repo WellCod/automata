@@ -25,7 +25,8 @@ RULE_OUTPUT = "output_not_allowed"
 def _violation(text: str, settings: GuardrailSettings) -> dict[str, Any] | None:
     rule = settings.output
     if rule.pii:
-        matches = find_pii(text, rule.pii_types)
+        # os padrões próprios do agente valem também na saída (ADR-0032)
+        matches = find_pii(text, rule.pii_types, settings.pii.custom_patterns())
         if matches:
             return {"types": sorted({m.type for m in matches})}
     if rule.blocked_terms:
