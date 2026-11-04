@@ -14,6 +14,7 @@ from app.routers.evals import settings_router as eval_settings_router
 from app.routers.evals import status_router as eval_status_router
 from app.routers.instance_guardrails import router as instance_guardrails_router
 from app.routers.integrations import router as integrations_router
+from app.routers.job_queue import router as job_queue_router
 from app.routers.key_rotation import router as key_rotation_router
 from app.routers.knowledge_bases import router as knowledge_bases_router
 from app.routers.knowledge_connectors import router as knowledge_connectors_router
@@ -41,6 +42,7 @@ PROTECTED_ROUTERS: list[APIRouter] = [
     data_subjects_router,
     my_data_router,
     instance_guardrails_router,
+    job_queue_router,
     evals_router,
     eval_runs_router,
     eval_schedule_router,

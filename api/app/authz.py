@@ -45,6 +45,8 @@ class Scope:
     DATA_SUBJECTS_REQUEST = "data_subjects:request"
     # piso de guardrails da instância (ADR-0034): só owner
     GUARDRAILS_ADMIN = "guardrails:admin"
+    # fila durável dos runs em background (ADR-0037): só owner
+    QUEUE_ADMIN = "queue:admin"
 
 
 def require_resource_scope(resource: str, action: str) -> Callable[[Request], None]:

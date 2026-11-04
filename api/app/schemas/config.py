@@ -267,6 +267,9 @@ class RunControls(BaseModel):
     compress_tool_results: ToolCompression | None = None
     # teto de custo das chamadas ao modelo do run, conferido antes de cada tool (ADR-0031)
     max_cost_usd: float | None = Field(default=None, ge=0.01, le=100)
+    # run em background que falhou roda de novo sozinho (ADR-0037); ligar declara que
+    # repetir o run inteiro é seguro, inclusive as tools com efeito
+    background_retries: int = Field(default=0, ge=0, le=2)
 
     @model_validator(mode="after")
     def reservas_unicas(self) -> "RunControls":

@@ -16,6 +16,8 @@ AlertEvent = Literal[
     # pedidos do titular (ADR-0036)
     "data_subject.failed",
     "data_subject.due",
+    # run em background que falhou de vez (ADR-0037)
+    "job.failed",
 ]
 
 

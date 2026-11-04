@@ -188,8 +188,10 @@ def poll_once(now: datetime | None = None) -> None:
     moment = now or datetime.now(UTC)
     from app.caller_budget import check_caller_budgets
     from app.data_subjects import check_requests
+    from app.job_queue import check_jobs
 
-    for check in (check_budgets, check_caller_budgets, check_errors, check_requests):
+    checks = (check_budgets, check_caller_budgets, check_errors, check_requests, check_jobs)
+    for check in checks:
         try:
             with Session(get_engine()) as session:
                 check(session, moment)
