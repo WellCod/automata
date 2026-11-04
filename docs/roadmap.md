@@ -1378,7 +1378,7 @@ Decisão em [ADR-0037](adr/0037-operacao-fila-conciliacao-e-avisos.md). O owner 
 - [x] `feat(api)`: painel da fila e retry automático do agente marcado como idempotente
 - [x] `feat(api)`: conciliação do custo estimado com o relatório da Anthropic e da OpenAI
 - [x] `feat(api)`: aviso por e-mail nos destinos da instância
-- [ ] `feat(web)`: página da fila, conciliação no analytics, retry no controle do run e destino por e-mail
+- [x] `feat(web)`: página da fila, conciliação no analytics, retry no controle do run e destino por e-mail
 - [ ] `test(api)`: evals da fila, da conciliação e do aviso por e-mail
 
 **Critério de aceite da fase:**

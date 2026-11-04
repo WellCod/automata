@@ -20,6 +20,7 @@ export const DEFAULT_RUN: RunControls = {
   fallback_models: [],
   compress_tool_results: null,
   max_cost_usd: null,
+  background_retries: 0,
 };
 
 export function withRunDefaults(value: Partial<RunControls> | undefined): RunControls {
@@ -112,6 +113,32 @@ export function RunControlsEditor({
           Corta o laço de um modelo que chama a mesma tool sem parar. Passado o limite, a tool não
           roda e o modelo responde com o que já tem.
         </p>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-foreground flex flex-wrap items-center gap-2 text-[13px]">
+          Repetir sozinho o run em background que falhar
+          <select
+            aria-label="Repetições do run em background"
+            value={value.background_retries ?? 0}
+            onChange={(e) => onChange({ ...value, background_retries: Number(e.target.value) })}
+            className={`${inputCls} w-auto`}
+          >
+            <option value={0}>Não</option>
+            <option value={1}>1 vez</option>
+            <option value={2}>2 vezes</option>
+          </select>
+        </label>
+        {(value.background_retries ?? 0) > 0 ? (
+          <p className="text-[12px] text-amber-600 dark:text-amber-400">
+            Repete o run inteiro, inclusive as tools. Ligue só se repetir for seguro: consulta sim,
+            pagamento ou envio de mensagem não.
+          </p>
+        ) : (
+          <p className="text-muted-foreground text-[12px]">
+            Sem repetição, o run que falha em background fica na fila como falha e gera aviso.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-1">

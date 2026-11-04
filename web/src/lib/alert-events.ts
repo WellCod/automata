@@ -16,6 +16,9 @@ export const EVENT_LABELS: Record<AlertEvent, string> = {
   // pedidos do titular (ADR-0036)
   "data_subject.failed": "Pedido de titular falhou",
   "data_subject.due": "Pedido de titular perto do prazo",
+  // operação (ADR-0037)
+  "job.failed": "Run em background falhou",
+  "cost.divergence": "Custo diferente do informado pelo provedor",
 };
 
 export const ALERT_EVENTS = Object.keys(EVENT_LABELS) as AlertEvent[];

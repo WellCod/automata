@@ -121,6 +121,7 @@ describe("página de alertas", () => {
     expect(vi.mocked(client.POST).mock.calls[0][1]).toEqual({
       body: {
         name: "#financeiro",
+        kind: "webhook",
         url: "https://hooks.slack.com/x",
         events: ["budget.warning", "budget.exceeded", "errors.spike"],
       },
