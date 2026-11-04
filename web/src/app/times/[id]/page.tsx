@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, ArrowLeft, FlaskConical, History, ListChecks, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useGuardrailFloor } from "@/lib/api/guardrail-floor";
 import { useEffect, useId, useMemo, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -122,6 +123,7 @@ const inputCls =
 
 export default function TeamEditPage() {
   const { id } = useParams<{ id: string }>();
+  const { data: floor } = useGuardrailFloor(id);
   const fieldId = useId();
   const queryClient = useQueryClient();
   const [activePanel, setActivePanel] = useState<PanelId>("teste");
@@ -427,7 +429,7 @@ export default function TeamEditPage() {
               name="guardrails"
               control={form.control}
               render={({ field }) => (
-                <GuardrailsEditor value={field.value} onChange={field.onChange} />
+                <GuardrailsEditor value={field.value} onChange={field.onChange} floor={floor} />
               )}
             />
 

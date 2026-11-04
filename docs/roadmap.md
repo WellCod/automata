@@ -1327,7 +1327,7 @@ Decisão em [ADR-0034](adr/0034-guardrails-da-instancia-e-classificador-na-saida
 - [x] `docs(adr)`: ADR-0034 e esta seção
 - [x] `feat(api)`: piso de guardrails da instância herdado por todo agente e líder de time
 - [x] `feat(api)`: classificador na saída, com falha aberta ou fechada e custo no agente
-- [ ] `feat(web)`: página de guardrails da instância, herança no editor e classificador na saída
+- [x] `feat(web)`: página de guardrails da instância, herança no editor e classificador na saída
 - [ ] `test(api)`: evals do piso da instância e do classificador na saída
 
 **Critério de aceite da fase:**

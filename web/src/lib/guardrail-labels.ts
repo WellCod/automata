@@ -7,6 +7,8 @@ export const BLOCK_LABELS: Record<string, string> = {
   moderation: "Moderação",
   classifier: "Classificador",
   output_not_allowed: "Resposta barrada",
+  // classificador por modelo na resposta (ADR-0034)
+  output_classifier: "Classificador da resposta",
   // orçamento do mês estourado com bloqueio ligado (ADR-0021)
   budget_exceeded: "Orçamento do mês",
 };
