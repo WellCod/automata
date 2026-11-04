@@ -5,6 +5,7 @@ from app.routers.approvals import router as approvals_router
 from app.routers.budget import router as budget_router
 from app.routers.caller_budgets import router as caller_budgets_router
 from app.routers.configs import router as configs_router
+from app.routers.data_subjects import router as data_subjects_router
 from app.routers.evals import router as evals_router
 from app.routers.evals import runs_router as eval_runs_router
 from app.routers.evals import schedule_router as eval_schedule_router
@@ -35,6 +36,7 @@ PROTECTED_ROUTERS: list[APIRouter] = [
     budget_router,
     caller_budgets_router,
     configs_router,
+    data_subjects_router,
     evals_router,
     eval_runs_router,
     eval_schedule_router,

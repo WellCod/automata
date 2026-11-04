@@ -1,6 +1,7 @@
 from app.models.alert import AlertDestination, AlertSent
 from app.models.caller_budget import CallerBudget
 from app.models.config import AgentConfig, AgentConfigVersion, Base
+from app.models.data_subject import DataSubjectRequest
 from app.models.embedding_usage import EmbeddingUsage
 from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSchedule
 from app.models.integration import IntegrationToken
@@ -21,6 +22,7 @@ __all__ = [
     "AgentConfigVersion",
     "AgentRun",
     "Base",
+    "DataSubjectRequest",
     "EmbeddingUsage",
     "EvalCase",
     "EvalResult",
