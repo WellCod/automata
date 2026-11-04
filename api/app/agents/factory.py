@@ -328,7 +328,7 @@ def make_team_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> TeamFactory:
     async def build(ctx: RequestContext) -> Team:
         version_id = ctx.input.version_id if isinstance(ctx.input, FactoryInput) else None
         resolved = await asyncio.to_thread(load_team, config_id, version_id)
-        return team_from(config_id, resolved)
+        return team_from(config_id, resolved, memory_user=ctx.user_id)
 
     return TeamFactory(
         id=str(config_id),
@@ -338,7 +338,10 @@ def make_team_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> TeamFactory:
     )
 
 
-def team_from(config_id: UUID, resolved: ResolvedTeam) -> TrackedTeam:
+def team_from(
+    config_id: UUID, resolved: ResolvedTeam, *, memory_user: str | None = None
+) -> TrackedTeam:
+    """`memory_user` liga a memória do usuário no time (ADR-0035), gravada com o team_id."""
     leader = resolved.leader
     settings = leader.payload.team
     assert settings is not None
@@ -363,6 +366,13 @@ def team_from(config_id: UUID, resolved: ResolvedTeam) -> TrackedTeam:
         output_schema=leader.payload.output_schema,
         add_history_to_context=True,
         num_history_runs=HISTORY_RUNS,
+        **memory_kwargs(
+            str(config_id),
+            leader.payload.memory,
+            memory_user,
+            leader.payload.guardrails.pii.custom_patterns(),
+            team=True,
+        ),
     )
     team.automata_config_id = config_id
     team.automata_blocks = blocks

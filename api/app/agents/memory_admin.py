@@ -25,9 +25,15 @@ PURGE_EVERY_S = 3600.0
 _last_purge: float | None = None
 
 
-def memories(agent_id: str | None = None, user_id: str | None = None) -> list[UserMemory]:
+def memories(
+    agent_id: str | None = None, user_id: str | None = None, *, team_id: str | None = None
+) -> list[UserMemory]:
     rows = memory_db().get_user_memories(
-        agent_id=agent_id, user_id=user_id, sort_by="updated_at", sort_order="desc"
+        agent_id=agent_id,
+        team_id=team_id,
+        user_id=user_id,
+        sort_by="updated_at",
+        sort_order="desc",
     )
     return [m for m in rows if isinstance(m, UserMemory)] if isinstance(rows, list) else []
 
@@ -37,20 +43,27 @@ def delete(memory_ids: list[str], user_id: str | None = None) -> None:
         memory_db().delete_user_memories(memory_ids=memory_ids, user_id=user_id)
 
 
-def retention_by_agent(session: Session) -> dict[str, int]:
-    """Prazo da versão vigente de cada agente; sem seção, o padrão."""
+def of_config(config_id: str, kind: str, user_id: str | None = None) -> list[UserMemory]:
+    """Memórias de um agente (agent_id) ou de um time (team_id), ADR-0035."""
+    if kind == "team":
+        return memories(user_id=user_id, team_id=config_id)
+    return memories(agent_id=config_id, user_id=user_id)
+
+
+def retention_by_agent(session: Session) -> dict[str, tuple[str, int]]:
+    """Tipo e prazo da versão vigente de cada agente e time; sem seção, o padrão."""
     rows = session.execute(
-        select(AgentConfig.id, AgentConfigVersion.payload)
+        select(AgentConfig.id, AgentConfig.kind, AgentConfigVersion.payload)
         .join(AgentConfigVersion, AgentConfigVersion.id == AgentConfig.current_version_id)
-        .where(AgentConfig.kind == "agent")
+        .where(AgentConfig.kind.in_(["agent", "team"]))
     ).all()
-    out: dict[str, int] = {}
-    for config_id, payload in rows:
+    out: dict[str, tuple[str, int]] = {}
+    for config_id, kind, payload in rows:
         try:
             settings = ConfigPayload.model_validate(payload).memory
         except ValueError:
             settings = MemorySettings()
-        out[str(config_id)] = settings.retention_days
+        out[str(config_id)] = (str(kind), settings.retention_days)
     return out
 
 
@@ -66,8 +79,8 @@ def purge_expired(now: datetime | None = None) -> int:
     with Session(get_engine()) as session:
         retention = retention_by_agent(session)
     removed = 0
-    for agent_id, days in retention.items():
-        ids = expired(memories(agent_id=agent_id), days, now)
+    for config_id, (kind, days) in retention.items():
+        ids = expired(of_config(config_id, kind), days, now)
         delete(ids)
         removed += len(ids)
     if removed:

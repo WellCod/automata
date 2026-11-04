@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 
 from app.agents import memory_admin
+from app.agents.memory import owner_of
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.repositories.config import ConfigRepository
@@ -42,17 +43,20 @@ def _item(m: UserMemory, names: dict[str, str] | None = None) -> MemoryItem:
     return MemoryItem(
         memory_id=m.memory_id or "",
         user_id=m.user_id,
-        agent_id=m.agent_id,
-        agent_name=(names or {}).get(m.agent_id or ""),
+        # dono da memória: o agente, ou o time (ADR-0035)
+        agent_id=owner_of(m),
+        agent_name=(names or {}).get(owner_of(m) or ""),
         memory=m.memory,
         topics=list(m.topics or []),
         updated_at=_when(m.updated_at or m.created_at),
     )
 
 
-def _agent_or_404(session: SessionDep, config_id: UUID) -> None:
-    if ConfigRepository(session).get_config(config_id) is None:
+def _agent_or_404(session: SessionDep, config_id: UUID) -> str:
+    config = ConfigRepository(session).get_config(config_id)
+    if config is None:
         raise HTTPException(status_code=404, detail="Config não encontrada")
+    return str(config.kind)
 
 
 @router.get("", response_model=list[MemoryItem])
@@ -61,14 +65,14 @@ def list_agent_memories(
     session: SessionDep,
     user_id: str | None = Query(default=None, max_length=255),  # noqa: B008
 ) -> list[MemoryItem]:
-    _agent_or_404(session, config_id)
-    return [_item(m) for m in memory_admin.memories(agent_id=str(config_id), user_id=user_id)]
+    kind = _agent_or_404(session, config_id)
+    return [_item(m) for m in memory_admin.of_config(str(config_id), kind, user_id)]
 
 
 @router.delete("/{memory_id}", status_code=204)
 def delete_agent_memory(config_id: UUID, memory_id: str, session: SessionDep) -> Response:
-    _agent_or_404(session, config_id)
-    found = [m for m in memory_admin.memories(agent_id=str(config_id)) if m.memory_id == memory_id]
+    kind = _agent_or_404(session, config_id)
+    found = [m for m in memory_admin.of_config(str(config_id), kind) if m.memory_id == memory_id]
     if not found:
         raise HTTPException(status_code=404, detail="Memória não encontrada")
     memory_admin.delete([memory_id])
@@ -82,8 +86,8 @@ def forget_user(
     user_id: str = Query(min_length=1, max_length=255),  # noqa: B008
 ) -> Response:
     """Pedido de exclusão: tudo o que este agente guardou sobre o usuário."""
-    _agent_or_404(session, config_id)
-    rows = memory_admin.memories(agent_id=str(config_id), user_id=user_id)
+    kind = _agent_or_404(session, config_id)
+    rows = memory_admin.of_config(str(config_id), kind, user_id)
     memory_admin.delete([m.memory_id for m in rows if m.memory_id], user_id=user_id)
     return Response(status_code=204)
 
@@ -98,7 +102,8 @@ def _me(request: Request) -> str:
 @me_router.get("", response_model=list[MemoryItem])
 def list_my_memories(request: Request, session: SessionDep) -> list[MemoryItem]:
     rows = memory_admin.memories(user_id=_me(request))
-    names = memory_admin.agent_name_map(session, {m.agent_id for m in rows if m.agent_id})
+    owners = {owner for m in rows if (owner := owner_of(m))}
+    names = memory_admin.agent_name_map(session, owners)
     return [_item(m, names) for m in rows]
 
 

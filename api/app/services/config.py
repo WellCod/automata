@@ -189,9 +189,9 @@ class ConfigService:
         if config.kind == ConfigKind.workflow and payload.run != RunControls():
             # quem chama modelo e tool são os agentes e times das etapas, cada um com o seu
             errors.append("workflow não tem controle de run próprio")
-        if payload.memory.enabled and config.kind != ConfigKind.agent:
-            # memória do líder e dos membros se misturariam (ADR-0025)
-            errors.append("só agente guarda memória do usuário")
+        if payload.memory.enabled and config.kind == ConfigKind.workflow:
+            # a memória é de quem conversa: agente ou líder do time (ADR-0035)
+            errors.append("workflow não guarda memória do usuário; ligue nos agentes das etapas")
         if errors:
             raise ValueError("; ".join(errors))
 

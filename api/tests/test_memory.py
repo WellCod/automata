@@ -131,10 +131,59 @@ def test_dado_pessoal_sai_mascarado_da_memoria(client: TestClient) -> None:
     assert saved.input is not None and "529.982.247-25" not in saved.input
 
 
-def test_memoria_so_em_agente(client: TestClient) -> None:
-    resp, _ = _agent(client, "time com memória", {"enabled": True}, kind="team")
+def test_memoria_no_time_fica_separada_da_do_agente(client: TestClient) -> None:
+    """ADR-0035: o time grava e lê pelo team_id; o agente do mesmo usuário não vê."""
+    from app.agents.memory import memory_db
+
+    membro = _published(client, "membro do time", {})
+    body = {"name": "time com memoria", "description": "x"}
+    team = str(client.post("/api/v1/configs", json={**body, "kind": "team"}).json()["id"])
+    payload = {
+        "model_id": "claude-haiku-4-5",
+        "memory": {"enabled": True},
+        "team": {"mode": "coordinate", "members": [{"agent_id": membro}]},
+    }
+    client.put(
+        f"/api/v1/configs/{team}/draft", json={**body, "payload": payload}
+    ).raise_for_status()
+    client.post(f"/api/v1/configs/{team}/publish").raise_for_status()
+    memory_db().upsert_user_memory(
+        UserMemory(memory_id=str(uuid4()), user_id="cliente-9", team_id=team, memory=FACT)
+    )
+
+    resp = client.post(
+        f"/teams/{team}/runs",
+        data={"message": "que tamanho eu visto?", "stream": "false", "user_id": "cliente-9"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["content"] == "lembro do tamanho"
+    agente = _published(client, "agente do mesmo cliente", {"enabled": True})
+    assert _ask(client, agente, "cliente-9") == "não lembro"
+
+    [item] = client.get(f"/api/v1/configs/{team}/memories").json()
+    assert item["agent_id"] == team and item["memory"] == FACT
+    assert client.get(f"/api/v1/configs/{agente}/memories").json() == []
+
+
+def test_retencao_vale_para_o_time(client: TestClient) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy.orm import Session
+
+    from app.agents import memory_admin
+    from app.db import get_engine
+
+    with Session(get_engine()) as session:
+        kinds = {kind for kind, _ in memory_admin.retention_by_agent(session).values()}
+    assert "team" in kinds
+    future = datetime.now(UTC) + timedelta(days=400)
+    assert memory_admin.purge_expired(future) >= 1
+
+
+def test_memoria_recusada_so_no_workflow(client: TestClient) -> None:
+    resp, _ = _agent(client, "fluxo com memória", {"enabled": True}, kind="workflow")
     assert resp.status_code in (400, 422)
-    assert "só agente guarda memória do usuário" in resp.text
+    assert "workflow não guarda memória do usuário" in resp.text
     resp, _ = _agent(client, "retenção longa", {"enabled": True, "retention_days": 400})
     assert resp.status_code == 422
 
