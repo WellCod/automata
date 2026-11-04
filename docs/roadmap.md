@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 34
+# Roadmap — Fases 4 a 35
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -1265,3 +1265,21 @@ Decisão em [ADR-0031](adr/0031-controle-de-custo-no-run.md). Um teto de custo p
 - Um token de integração com o orçamento estourado e bloqueio ligado recebe a mensagem de orçamento, e outro token segue no mesmo agente.
 - Um usuário do painel com 80% do orçamento gera um aviso só no mês.
 - O run parado pelo teto não entra na taxa de erro.
+
+## Fase 35 — Direitos do titular
+
+Decisão em [ADR-0032](adr/0032-direitos-do-titular.md). O owner consulta o que a instância guarda de uma pessoa, exporta tudo num arquivo e apaga. A conversa, a memória, as aprovações e os traces saem. No consumo e nos runs registrados, o id vira um hash, para métricas e custo continuarem batendo. A máscara de dados pessoais ganha padrões próprios de cada empresa, como matrícula e número de contrato.
+
+- [x] `docs(adr)`: ADR-0032 e esta seção
+- [ ] `feat(api)`: consulta e exportação dos dados de um titular, com o arquivo guardado por 7 dias
+- [ ] `feat(api)`: exclusão dos dados de um titular, com o id trocado por hash no consumo e nos runs
+- [ ] `feat(api)`: padrões próprios na máscara de dados pessoais do agente
+- [ ] `feat(web)`: página Titulares e padrões próprios nos guardrails
+- [ ] `test(api)`: evals de isolamento da exportação e da exclusão e da máscara própria
+
+**Critério de aceite da fase:**
+
+- A exportação do titular A traz as conversas e as memórias dele e nada do titular B.
+- Depois da exclusão de A, nenhuma tabela do Agno tem linha com o `user_id` dele, e o custo e as métricas do agente ficam iguais.
+- Um agente com o padrão "matrícula, `MAT-`, 8 dígitos" mascara `MAT-12345678` na entrada e na memória.
+- O pedido de exclusão aparece no histórico sem o id em claro.
