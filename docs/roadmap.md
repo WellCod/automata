@@ -1388,3 +1388,22 @@ Decisão em [ADR-0037](adr/0037-operacao-fila-conciliacao-e-avisos.md). O owner 
 - Com a chave admin da Anthropic, o Analytics mostra o custo informado e o estimado do dia, lado a lado.
 - Um destino de e-mail recebe o aviso de orçamento pelo SMTP configurado.
 
+## Fase 41 — Workflow e suíte
+
+Decisão em [ADR-0038](adr/0038-workflow-e-suite.md). O workflow ganha um roteador com vários caminhos, a escolha do que cada etapa recebe e o histórico da conversa. A suíte confere a saída de uma etapa do meio, aceita turnos anteriores em caso de workflow e sugere casos em lote a partir das conversas.
+
+- [x] `docs(adr)`: ADR-0038 e esta seção
+- [ ] `feat(api)`: roteador por regras e entrada por etapa no workflow
+- [ ] `feat(api)`: histórico no workflow, turnos anteriores no caso e checagem de texto numa etapa
+- [ ] `feat(api)`: sugestões de casos em lote a partir das conversas
+- [ ] `feat(web)`: roteador, entrada e histórico no editor de workflow, etapa na checagem e casos em lote
+- [ ] `test(api)`: evals do roteador, da entrada por etapa e dos casos em lote
+
+**Critério de aceite da fase:**
+
+- Uma triagem com roteador manda "quero trocar" para a etapa de troca e uma mensagem sem caminho para o padrão.
+- Uma etapa de revisão com `input: original` recebe a pergunta do cliente, e não o rascunho.
+- Um caso de workflow com histórico e um turno anterior responde usando o que foi dito antes.
+- A checagem com `step: triagem` falha quando a triagem classifica errado, mesmo com a saída final certa.
+- As sugestões em lote não trazem conversa que já virou caso.
+
