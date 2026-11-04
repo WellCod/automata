@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-ConnectorKind = Literal["github", "s3", "sharepoint"]
+ConnectorKind = Literal["github", "s3", "sharepoint", "gdrive", "gcs"]
 
 _Path = Annotated[str, Field(default="", max_length=512)]
 
@@ -35,10 +35,24 @@ class SharePointSettings(BaseModel):
     client_id: str = Field(min_length=1, max_length=100)
 
 
+class GDriveSettings(BaseModel):
+    """Pasta do Google Drive (ADR-0039); compartilhe só ela com a conta de serviço."""
+
+    folder_id: str = Field(min_length=10, max_length=100, pattern=r"^[A-Za-z0-9_\-]+$")
+    shared_drive: bool = False
+
+
+class GCSSettings(BaseModel):
+    bucket: str = Field(min_length=3, max_length=222, pattern=r"^[a-z0-9][a-z0-9._\-]+$")
+    prefix: _Path = ""
+
+
 SETTINGS_BY_KIND: dict[str, type[BaseModel]] = {
     "github": GitHubSettings,
     "s3": S3Settings,
     "sharepoint": SharePointSettings,
+    "gdrive": GDriveSettings,
+    "gcs": GCSSettings,
 }
 
 # campos do segredo por tipo; GitHub sem token lê repositório público e S3 sem chave
@@ -47,8 +61,17 @@ SECRET_FIELDS: dict[str, tuple[str, ...]] = {
     "github": ("token",),
     "s3": ("access_key_id", "secret_access_key"),
     "sharepoint": ("client_secret",),
+    # o JSON inteiro da chave da conta de serviço (ADR-0039)
+    "gdrive": ("service_account_json",),
+    "gcs": ("service_account_json",),
 }
-SECRET_REQUIRED: dict[str, bool] = {"github": False, "s3": False, "sharepoint": True}
+SECRET_REQUIRED: dict[str, bool] = {
+    "github": False,
+    "s3": False,
+    "sharepoint": True,
+    "gdrive": True,
+    "gcs": True,
+}
 
 
 class ConnectorInput(BaseModel):
@@ -56,7 +79,7 @@ class ConnectorInput(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     settings: dict[str, Any]
     # None mantém o segredo salvo; {} apaga
-    secret: dict[str, Annotated[str, Field(max_length=4000)]] | None = None
+    secret: dict[str, Annotated[str, Field(max_length=8000)]] | None = None
     # vazio = só manual
     sync_every_hours: int | None = Field(default=None, ge=1, le=168)
 
