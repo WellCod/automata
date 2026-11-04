@@ -1370,3 +1370,21 @@ Decisão em [ADR-0036](adr/0036-pedido-do-titular-e-prazo.md). O sistema da empr
 - Um pedido que falha gera um aviso `data_subject.failed` uma vez só.
 - Um pedido parado a 2 dias do prazo gera `data_subject.due`.
 
+## Fase 40 — Operação
+
+Decisão em [ADR-0037](adr/0037-operacao-fila-conciliacao-e-avisos.md). O owner vê a fila de runs em background e repete um job que falhou. O agente marcado como idempotente repete sozinho. O custo estimado é conferido todo dia com o relatório da Anthropic e da OpenAI. Os avisos também saem por e-mail.
+
+- [x] `docs(adr)`: ADR-0037 e esta seção
+- [ ] `feat(api)`: painel da fila e retry automático do agente marcado como idempotente
+- [ ] `feat(api)`: conciliação do custo estimado com o relatório da Anthropic e da OpenAI
+- [ ] `feat(api)`: aviso por e-mail nos destinos da instância
+- [ ] `feat(web)`: página da fila, conciliação no analytics, retry no controle do run e destino por e-mail
+- [ ] `test(api)`: evals da fila, da conciliação e do aviso por e-mail
+
+**Critério de aceite da fase:**
+
+- Um job que falhou aparece na fila com o nome do agente e volta a rodar pelo botão de repetir.
+- Um agente com `background_retries: 1` que falha em background roda de novo uma vez sozinho. Sem a opção, falha uma vez e gera `job.failed`.
+- Com a chave admin da Anthropic, o Analytics mostra o custo informado e o estimado do dia, lado a lado.
+- Um destino de e-mail recebe o aviso de orçamento pelo SMTP configurado.
+
