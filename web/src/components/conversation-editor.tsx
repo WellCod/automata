@@ -1,5 +1,7 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
 
 export type Conversation = components["schemas"]["ConversationSettings"];
@@ -10,6 +12,7 @@ export const DEFAULT_CONVERSATION: Conversation = {
   keep_recent_runs: 3,
   summary_instructions: null,
   search_history: true,
+  summary_model: null,
 };
 
 export function withConversationDefaults(value: Partial<Conversation> | undefined): Conversation {
@@ -24,6 +27,18 @@ function pages(tokens: number): string {
   return `~${Math.round((tokens * 4) / 3000)} páginas de texto`;
 }
 
+function useModelIds() {
+  return useQuery({
+    queryKey: ["models:capabilities"],
+    queryFn: async () => {
+      const res = await client.GET("/api/v1/models/capabilities");
+      if (res.error) throw new Error("Falha ao carregar modelos");
+      return res.data as Record<string, unknown>;
+    },
+    select: (models) => Object.keys(models),
+  });
+}
+
 export function ConversationEditor({
   value,
   onChange,
@@ -31,6 +46,7 @@ export function ConversationEditor({
   value: Conversation;
   onChange: (v: Conversation) => void;
 }) {
+  const { data: models = [] } = useModelIds();
   return (
     <fieldset className="border-border flex flex-col gap-2 rounded border px-4 pt-3 pb-4">
       <legend className="px-1 text-[13px] font-medium">Conversa longa</legend>
@@ -44,8 +60,8 @@ export function ConversationEditor({
       </label>
       <p className="text-muted-foreground text-[12px]">
         Sem isto, o agente leva os últimos 5 turnos inteiros e esquece o começo da conversa. Com
-        isto, o que passar do limite vira um resumo feito pelo próprio modelo do agente, cobrado no
-        consumo dele.
+        isto, o que passar do limite vira um resumo, feito pelo modelo do agente ou por um mais
+        barato escolhido abaixo, cobrado no consumo dele.
       </p>
       {value.compaction && (
         <div className="flex flex-col gap-2">
@@ -86,6 +102,22 @@ export function ConversationEditor({
             onChange={(e) => onChange({ ...value, summary_instructions: e.target.value || null })}
             className={inputCls}
           />
+          <label className="text-muted-foreground flex items-center gap-2 text-[12px]">
+            Modelo do resumo
+            <select
+              aria-label="Modelo do resumo"
+              value={value.summary_model ?? ""}
+              onChange={(e) => onChange({ ...value, summary_model: e.target.value || null })}
+              className={inputCls}
+            >
+              <option value="">O mesmo do agente</option>
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="text-muted-foreground flex items-center gap-2 text-[12px]">
             <input
               type="checkbox"

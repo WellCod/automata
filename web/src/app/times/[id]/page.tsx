@@ -2,7 +2,15 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, ArrowLeft, FlaskConical, History, ListChecks, TrendingUp } from "lucide-react";
+import {
+  Brain,
+  Activity,
+  ArrowLeft,
+  FlaskConical,
+  History,
+  ListChecks,
+  TrendingUp,
+} from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useGuardrailFloor } from "@/lib/api/guardrail-floor";
@@ -16,6 +24,13 @@ import {
   withDefaults,
 } from "@/components/guardrails-editor";
 import { EvalSuitePanel } from "@/components/eval-suite-panel";
+import { MemoriesPanel } from "@/components/memories-panel";
+import {
+  DEFAULT_MEMORY,
+  type Memory,
+  MemoryEditor,
+  withMemoryDefaults,
+} from "@/components/memory-editor";
 import { KnowledgeSelector } from "@/components/knowledge-selector";
 import { McpToolsSelector } from "@/components/mcp-tools-selector";
 import { MetricsPanel } from "@/components/metrics-panel";
@@ -88,6 +103,8 @@ const schema = z.object({
   guardrails: z.custom<Guardrails>(),
   // limite de tools, retry e reserva do líder (ADR-0027), validados pela API
   run: z.custom<RunControls>(),
+  // memória do usuário no time (ADR-0035), validada pela API
+  memory: z.custom<Memory>(),
   team: z.object({
     mode: z.enum(["coordinate", "route", "broadcast", "tasks"]),
     members: z
@@ -114,6 +131,7 @@ const PANEL_TABS = [
   { id: "runs" as const, label: "Execuções", icon: Activity },
   { id: "metricas" as const, label: "Métricas", icon: TrendingUp },
   { id: "suite" as const, label: "Suíte", icon: ListChecks },
+  { id: "memoria" as const, label: "Memórias", icon: Brain },
 ];
 type PanelId = (typeof PANEL_TABS)[number]["id"];
 
@@ -157,6 +175,7 @@ export default function TeamEditPage() {
       knowledge: [],
       guardrails: DEFAULT_GUARDRAILS,
       run: DEFAULT_RUN,
+      memory: DEFAULT_MEMORY,
       team: {
         mode: "coordinate",
         members: [],
@@ -195,6 +214,7 @@ export default function TeamEditPage() {
       })),
       guardrails: withDefaults(p?.guardrails),
       run: withRunDefaults(p?.run),
+      memory: withMemoryDefaults(p?.memory),
       team: {
         mode: p?.team?.mode ?? "coordinate",
         members: (p?.team?.members ?? []).map((m) => ({
@@ -224,6 +244,7 @@ export default function TeamEditPage() {
             guardrails: values.guardrails,
             metadata: data?.payload?.metadata ?? {},
             run: values.run,
+            memory: values.memory,
             // schema do líder só pela API por enquanto: repassa o da versão (ADR-0027)
             output_schema: data?.payload?.output_schema,
             team: values.team,
@@ -434,6 +455,14 @@ export default function TeamEditPage() {
             />
 
             <Controller
+              name="memory"
+              control={form.control}
+              render={({ field }) => (
+                <MemoryEditor value={field.value} onChange={field.onChange} team />
+              )}
+            />
+
+            <Controller
               name="run"
               control={form.control}
               render={({ field }) => (
@@ -491,6 +520,7 @@ export default function TeamEditPage() {
               />
             )}
             {activePanel === "metricas" && <MetricsPanel agentId={id} />}
+            {activePanel === "memoria" && <MemoriesPanel agentId={id} />}
             {activePanel === "suite" && (
               <EvalSuitePanel
                 configId={id}

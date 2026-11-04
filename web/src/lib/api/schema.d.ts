@@ -2159,6 +2159,8 @@ export interface components {
              * @default true
              */
             search_history: boolean;
+            /** Summary Model */
+            summary_model?: string | null;
         };
         /** CreateConfigInput */
         CreateConfigInput: {
