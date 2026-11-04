@@ -1359,7 +1359,7 @@ Decisão em [ADR-0036](adr/0036-pedido-do-titular-e-prazo.md). O sistema da empr
 
 - [x] `docs(adr)`: ADR-0036 e esta seção
 - [x] `feat(api)`: pedido do titular por token de integração e pelo próprio usuário do painel
-- [ ] `feat(api)`: prazo legal dos pedidos com aviso de falha e de vencimento
+- [x] `feat(api)`: prazo legal dos pedidos com aviso de falha e de vencimento
 - [ ] `feat(web)`: prazo e origem nos pedidos, opção no token e meus dados
 - [ ] `test(api)`: evals do pedido por token, do próprio usuário e do prazo
 

@@ -302,3 +302,79 @@ def run_erase(request_id: UUID, user_id: str) -> None:
     except Exception as exc:
         logger.warning("exclusão do titular falhou", extra={"request_id": str(request_id)})
         _finish(request_id, status="failed", error=str(exc)[:500])
+
+
+DATA_SUBJECT_FAILED = "data_subject.failed"
+DATA_SUBJECT_DUE = "data_subject.due"
+# o aviso de vencimento sai com essa folga antes do prazo
+DUE_NOTICE = timedelta(days=2)
+
+
+def due_date(now: datetime | None = None) -> datetime:
+    return (now or datetime.now(UTC)) + timedelta(days=get_settings().data_subject_deadline_days)
+
+
+def _claim(session: Session, request_id: UUID, column: str, now: datetime) -> bool:
+    """Marca o aviso no próprio pedido; False quando ele já saiu (aqui ou em outra réplica)."""
+    field = getattr(DataSubjectRequest, column)
+    updated = session.execute(
+        update(DataSubjectRequest)
+        .where(DataSubjectRequest.id == request_id, field.is_(None))
+        .values({column: now})
+    )
+    session.commit()
+    return _affected(updated) > 0
+
+
+def check_requests(session: Session, now: datetime) -> list[tuple[UUID, str]]:
+    """Rodada do poller de avisos (ADR-0036): pedido que falhou e pedido perto do prazo."""
+    from app.alerts import broadcast, destinations_for
+
+    sent: list[tuple[UUID, str]] = []
+    if destinations_for(session, DATA_SUBJECT_FAILED):
+        failed = session.scalars(
+            select(DataSubjectRequest).where(
+                DataSubjectRequest.status == "failed",
+                DataSubjectRequest.failed_alerted_at.is_(None),
+            )
+        ).all()
+        for row in failed:
+            if not _claim(session, row.id, "failed_alerted_at", now):
+                continue
+            # a exclusão não guarda o id: o aviso pede para refazer o pedido
+            again = "Refaça o pedido com o id do titular." if row.kind == "erase" else ""
+            broadcast(
+                session,
+                DATA_SUBJECT_FAILED,
+                {"request_id": str(row.id), "kind": row.kind, "source": row.source},
+                f"Pedido de {_KIND[row.kind]} do titular {row.subject_hash[:12]} falhou. {again}",
+            )
+            sent.append((row.id, DATA_SUBJECT_FAILED))
+    if destinations_for(session, DATA_SUBJECT_DUE):
+        late = session.scalars(
+            select(DataSubjectRequest).where(
+                DataSubjectRequest.status.in_(["pending", "running"]),
+                DataSubjectRequest.due_at.is_not(None),
+                DataSubjectRequest.due_at <= now + DUE_NOTICE,
+                DataSubjectRequest.due_alerted_at.is_(None),
+            )
+        ).all()
+        for row in late:
+            if row.due_at is None or not _claim(session, row.id, "due_alerted_at", now):
+                continue
+            broadcast(
+                session,
+                DATA_SUBJECT_DUE,
+                {
+                    "request_id": str(row.id),
+                    "kind": row.kind,
+                    "due_at": row.due_at.isoformat(),
+                },
+                f"Pedido de {_KIND[row.kind]} do titular {row.subject_hash[:12]} segue sem "
+                f"resposta; o prazo é {row.due_at:%d/%m/%Y}.",
+            )
+            sent.append((row.id, DATA_SUBJECT_DUE))
+    return sent
+
+
+_KIND = {"export": "exportação", "erase": "exclusão"}

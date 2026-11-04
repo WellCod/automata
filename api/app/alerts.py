@@ -187,8 +187,9 @@ def poll_once(now: datetime | None = None) -> None:
     """Uma rodada do poller: orçamento e pico de erro. Nunca levanta."""
     moment = now or datetime.now(UTC)
     from app.caller_budget import check_caller_budgets
+    from app.data_subjects import check_requests
 
-    for check in (check_budgets, check_caller_budgets, check_errors):
+    for check in (check_budgets, check_caller_budgets, check_errors, check_requests):
         try:
             with Session(get_engine()) as session:
                 check(session, moment)

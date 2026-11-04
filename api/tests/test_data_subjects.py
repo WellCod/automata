@@ -178,3 +178,62 @@ def test_exclusao_apaga_o_titular_e_mantem_metricas_e_outro(client: TestClient) 
     assert row["subject_hash"] == subject_hash(ANA)
     assert row["counts"]["sessions"] == 1 and row["counts"]["memories"] == 1
     assert ANA not in json.dumps(rows)
+
+
+# --- prazo e avisos (ADR-0036) ---
+
+
+def test_pedido_tem_prazo_de_15_dias(client: TestClient) -> None:
+    row = client.post("/api/v1/data-subjects/carla@cliente.com/export").json()
+    created = datetime.fromisoformat(row["created_at"])
+    due = datetime.fromisoformat(row["due_at"])
+    assert timedelta(days=14, hours=23) < due - created < timedelta(days=15, hours=1)
+
+
+def test_aviso_de_falha_e_de_vencimento_sai_uma_vez(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.alerts as alerts
+    from app.data_subjects import DATA_SUBJECT_DUE, DATA_SUBJECT_FAILED, check_requests
+    from app.db import get_engine
+    from app.models.data_subject import DataSubjectRequest
+
+    sent: list[tuple[str, str]] = []
+    monkeypatch.setattr(alerts, "destinations_for", lambda session, event: [object()])
+    monkeypatch.setattr(
+        alerts, "broadcast", lambda session, event, data, text: sent.append((event, text)) or 1
+    )
+    now = datetime.now(UTC)
+    with Session(get_engine()) as session:
+        failed = DataSubjectRequest(
+            kind="erase",
+            subject_hash="f" * 64,
+            status="failed",
+            requested_by="owner",
+            due_at=now + timedelta(days=10),
+        )
+        stuck = DataSubjectRequest(
+            kind="export",
+            subject_hash="e" * 64,
+            status="pending",
+            requested_by="owner",
+            due_at=now + timedelta(days=1),
+        )
+        fresh = DataSubjectRequest(
+            kind="export",
+            subject_hash="d" * 64,
+            status="pending",
+            requested_by="owner",
+            due_at=now + timedelta(days=10),
+        )
+        session.add_all([failed, stuck, fresh])
+        session.commit()
+        ids = {failed.id: DATA_SUBJECT_FAILED, stuck.id: DATA_SUBJECT_DUE}
+        first = check_requests(session, now)
+        second = check_requests(session, now)
+    assert sorted(first, key=str) == sorted(ids.items(), key=str)
+    assert second == []
+    [failed_text] = [t for e, t in sent if e == DATA_SUBJECT_FAILED]
+    # a exclusão não guarda o id: o aviso pede para refazer
+    assert "ffffffffffff" in failed_text and "Refaça o pedido" in failed_text
+    assert all("@" not in text for _, text in sent)

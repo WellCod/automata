@@ -13,6 +13,9 @@ AlertEvent = Literal[
     "suite.regressed",
     "suite.failing",
     "suite.recovered",
+    # pedidos do titular (ADR-0036)
+    "data_subject.failed",
+    "data_subject.due",
 ]
 
 

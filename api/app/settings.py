@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     mcp_allowed_hosts: str = ""
     # URL pública da API, usada para montar o endereço do /mcp nas integrações
     public_base_url: str | None = None
+    # prazo da resposta ao titular (LGPD, art. 19, II); o aviso sai 2 dias antes (ADR-0036)
+    data_subject_deadline_days: int = 15
     # Spans de agente, time, modelo e tool gravados no banco (árvore de execução)
     tracing_enabled: bool = True
     # Laço que roda as suítes agendadas (ADR-0016); no modo demo fica desligado de qualquer jeito
