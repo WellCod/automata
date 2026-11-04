@@ -135,6 +135,10 @@ def test_estrategias_semanticas_com_voyage(db_url: str, monkeypatch: pytest.Monk
     # HyDE precisa de um modelo de verdade: entra só com a chave do provedor
     if os.environ.get("ANTHROPIC_API_KEY"):
         strategies["hyde"] = {"hyde": True, "hyde_model": "claude-haiku-4-5"}
+    # cross-encoder (ADR-0033) só com a chave do Cohere; o texto sai para o provedor
+    if os.environ.get("COHERE_API_KEY"):
+        strategies["cohere"] = {"cross_encoder": {"provider": "cohere"}}
+        strategies["cohere_mmr"] = {"cross_encoder": {"provider": "cohere"}, "reranker": "mmr"}
     tolerance = 1 / len(demo_content.QUESTIONS)
     results = {}
     for name, retrieval in strategies.items():

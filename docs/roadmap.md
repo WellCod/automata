@@ -1311,7 +1311,7 @@ Decisão em [ADR-0033](adr/0033-reranker-e-filtros-na-recuperacao.md). A base po
 - [x] `feat(api)`: cross-encoder por base com cohere e bedrock, custo por busca no agente
 - [x] `feat(api)`: metadados por documento nos trechos e filtros escolhidos pelo modelo na tool da base
 - [x] `feat(web)`: cross-encoder e filtros na estratégia da base, campos do documento e filtros na busca de teste
-- [ ] `test(api)`: evals do cross-encoder e dos filtros
+- [x] `test(api)`: evals do cross-encoder e dos filtros
 
 **Critério de aceite da fase:**
 
