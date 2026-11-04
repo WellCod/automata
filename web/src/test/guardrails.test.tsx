@@ -46,7 +46,7 @@ describe("GuardrailsEditor", () => {
     }
     expect(tipos).toBeInTheDocument();
     expect(onValue).toHaveBeenLastCalledWith(
-      expect.objectContaining({ pii: { mode: "block", types: ["cpf"] } }),
+      expect.objectContaining({ pii: { mode: "block", types: ["cpf"], custom: [] } }),
     );
   });
 

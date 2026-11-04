@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
+import { Button } from "@/components/ui/button";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
 
@@ -18,6 +19,8 @@ export const PII_LABELS: Record<PiiType, string> = {
 const PII_TYPES = Object.keys(PII_LABELS) as PiiType[];
 
 type PiiRule = NonNullable<Guardrails["pii"]>;
+export type CustomPiiPattern = components["schemas"]["CustomPiiPattern"];
+export const MAX_CUSTOM_PATTERNS = 10;
 export type ClassifierRule = components["schemas"]["ClassifierRule"];
 type ClassifierCheck = ClassifierRule["checks"][number];
 
@@ -44,6 +47,7 @@ export function guardrailProblems(g: Guardrails): string[] {
     if (c.checks.includes("off_topic") && !c.scope?.trim())
       problems.push("Descreva o que o agente atende para a checagem de assunto.");
   }
+  problems.push(...customPatternProblems(g.pii?.custom ?? []));
   const t = g.tool_results;
   if (t?.classifier && !c)
     problems.push("O exame de tool pelo classificador exige o classificador.");
@@ -51,8 +55,30 @@ export function guardrailProblems(g: Guardrails): string[] {
     problems.push("O exame de tool precisa de termos ou classificador.");
   return problems;
 }
+// mesmas regras de CustomPiiPattern na API (ADR-0032)
+export function customPatternProblems(patterns: CustomPiiPattern[]): string[] {
+  const problems: string[] = [];
+  const labels = new Set<string>();
+  patterns.forEach((p, i) => {
+    const n = i + 1;
+    const label = p.label.trim();
+    if (!label || !/^[\p{L}\p{N}_ ]{1,30}$/u.test(label))
+      problems.push(`Padrão ${n}: o rótulo precisa de 1 a 30 letras, dígitos ou espaços.`);
+    else if (labels.has(label.toLowerCase())) problems.push(`Padrão ${n}: rótulo repetido.`);
+    labels.add(label.toLowerCase());
+    if (!/^[A-Za-z0-9-]{0,10}$/.test(p.prefix ?? ""))
+      problems.push(`Padrão ${n}: o prefixo aceita até 10 letras, dígitos ou hífen.`);
+    const inRange = (d: number) => Number.isInteger(d) && d >= 4 && d <= 20;
+    if (!inRange(p.min_digits) || !inRange(p.max_digits))
+      problems.push(`Padrão ${n}: os dígitos vão de 4 a 20.`);
+    else if (p.min_digits > p.max_digits)
+      problems.push(`Padrão ${n}: o mínimo de dígitos passa do máximo.`);
+  });
+  return problems;
+}
+
 type OutputRule = NonNullable<Guardrails["output"]>;
-const DEFAULT_PII: PiiRule = { mode: "off", types: PII_TYPES };
+const DEFAULT_PII: PiiRule = { mode: "off", types: PII_TYPES, custom: [] };
 const DEFAULT_OUTPUT: OutputRule = { pii: false, pii_types: PII_TYPES, blocked_terms: [] };
 
 export const DEFAULT_GUARDRAILS: Guardrails = {
@@ -241,6 +267,103 @@ function ClassifierFields({
   );
 }
 
+function CustomPatterns({
+  value,
+  onChange,
+}: {
+  value: CustomPiiPattern[];
+  onChange: (v: CustomPiiPattern[]) => void;
+}) {
+  const id = useId();
+  const update = (i: number, patch: Partial<CustomPiiPattern>) =>
+    onChange(value.map((p, j) => (j === i ? { ...p, ...patch } : p)));
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-foreground text-[13px]">Padrões próprios</span>
+      <span className={hintCls}>
+        Matrícula, contrato ou protocolo da empresa, pelo prefixo e pela quantidade de dígitos
+        (pontos, hífens e espaços entre eles são aceitos). Valem na entrada quando a verificação
+        está ligada, na memória do usuário e na resposta. Sem prefixo, qualquer número com essa
+        quantidade de dígitos é mascarado.
+      </span>
+      {value.map((p, i) => (
+        <div
+          key={i}
+          role="group"
+          aria-label={`Padrão ${i + 1}`}
+          className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_8rem_5rem_5rem_auto]"
+        >
+          <label className="flex flex-col gap-1 text-[11px]">
+            <span className="text-muted-foreground">Rótulo</span>
+            <input
+              id={`${id}-label-${i}`}
+              className={inputCls}
+              value={p.label}
+              maxLength={30}
+              placeholder="matrícula"
+              onChange={(e) => update(i, { label: e.target.value })}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-[11px]">
+            <span className="text-muted-foreground">Prefixo</span>
+            <input
+              className={inputCls}
+              value={p.prefix ?? ""}
+              maxLength={10}
+              placeholder="MAT"
+              onChange={(e) => update(i, { prefix: e.target.value })}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-[11px]">
+            <span className="text-muted-foreground">Mín. dígitos</span>
+            <input
+              type="number"
+              min={4}
+              max={20}
+              className={inputCls}
+              value={p.min_digits}
+              onChange={(e) => update(i, { min_digits: Number(e.target.value) })}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-[11px]">
+            <span className="text-muted-foreground">Máx. dígitos</span>
+            <input
+              type="number"
+              min={4}
+              max={20}
+              className={inputCls}
+              value={p.max_digits}
+              onChange={(e) => update(i, { max_digits: Number(e.target.value) })}
+            />
+          </label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label={`Remover o padrão ${i + 1}`}
+            onClick={() => onChange(value.filter((_, j) => j !== i))}
+          >
+            Remover
+          </Button>
+        </div>
+      ))}
+      {value.length < MAX_CUSTOM_PATTERNS && (
+        <Button
+          type="button"
+          variant="muted"
+          size="sm"
+          className="self-start"
+          onClick={() =>
+            onChange([...value, { label: "", prefix: "", min_digits: 6, max_digits: 10 }])
+          }
+        >
+          Adicionar padrão
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function GuardrailsEditor({
   value,
   onChange,
@@ -289,6 +412,11 @@ export function GuardrailsEditor({
           Mascarar troca o dado por “[CPF removido]” antes do modelo e da gravação.
         </span>
       </div>
+
+      <CustomPatterns
+        value={pii.custom ?? []}
+        onChange={(custom) => set({ pii: { ...pii, custom } })}
+      />
 
       <label className="text-foreground flex items-center gap-2 text-[13px]">
         <input

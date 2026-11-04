@@ -13,6 +13,7 @@ import {
   Plug,
   ShieldCheck,
   UserCog,
+  UserSearch,
   Users,
   Workflow,
   X,
@@ -34,6 +35,7 @@ const navItems = [
   { href: "/integracoes", label: "Integrações", icon: KeyRound, exact: true },
   { href: "/alertas", label: "Alertas", icon: Bell, exact: true, ownerOnly: true },
   { href: "/usuarios", label: "Usuários", icon: UserCog, exact: true, ownerOnly: true },
+  { href: "/titulares", label: "Titulares", icon: UserSearch, exact: true, ownerOnly: true },
   { href: "/chaves", label: "Chaves", icon: LockKeyhole, exact: true, ownerOnly: true },
 ];
 

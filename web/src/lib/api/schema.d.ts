@@ -251,6 +251,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/data-subjects/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Subject */
+        get: operations["get_subject_api_v1_data_subjects__user_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/data-subjects/{user_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export Subject */
+        post: operations["export_subject_api_v1_data_subjects__user_id__export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/data-subjects/{user_id}/erase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Erase Subject */
+        post: operations["erase_subject_api_v1_data_subjects__user_id__erase_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/data-subject-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Requests */
+        get: operations["list_requests_api_v1_data_subject_requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/data-subject-requests/{request_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download */
+        get: operations["download_api_v1_data_subject_requests__request_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/configs/{config_id}/eval-cases": {
         parameters: {
             query?: never;
@@ -1997,6 +2082,25 @@ export interface components {
             /** @default viewer */
             role: components["schemas"]["UserRole"];
         };
+        /**
+         * CustomPiiPattern
+         * @description Dado pessoal da empresa (matrícula, contrato, protocolo) pelo formato (ADR-0032).
+         *
+         *     Sem regex livre: prefixo literal e a faixa de dígitos, montados em regex pelo código.
+         */
+        CustomPiiPattern: {
+            /** Label */
+            label: string;
+            /**
+             * Prefix
+             * @default
+             */
+            prefix: string;
+            /** Min Digits */
+            min_digits: number;
+            /** Max Digits */
+            max_digits: number;
+        };
         /** DailyMetricsPoint */
         DailyMetricsPoint: {
             /**
@@ -2022,6 +2126,39 @@ export interface components {
             /** Total Cost */
             total_cost: number | null;
         };
+        /** DataSubjectRequestResponse */
+        DataSubjectRequestResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Subject */
+            subject: string | null;
+            /** Subject Hash */
+            subject_hash: string;
+            /** Status */
+            status: string;
+            /** Requested By */
+            requested_by: string;
+            /** Counts */
+            counts: {
+                [key: string]: unknown;
+            } | null;
+            /** Error */
+            error: string | null;
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Finished At */
+            finished_at: string | null;
+        };
         /** DraftInput */
         DraftInput: {
             /** Name */
@@ -2045,6 +2182,11 @@ export interface components {
             configured: boolean;
             /** Default */
             default: boolean;
+        };
+        /** EraseInput */
+        EraseInput: {
+            /** Confirm */
+            confirm: string;
         };
         /** EvalCaseInput */
         EvalCaseInput: {
@@ -3058,6 +3200,8 @@ export interface components {
             mode: "off" | "mask" | "block";
             /** Types */
             types?: ("cpf" | "cnpj" | "cartao" | "email" | "telefone")[];
+            /** Custom */
+            custom?: components["schemas"]["CustomPiiPattern"][];
         };
         /** ReprocessResult */
         ReprocessResult: {
@@ -3354,6 +3498,17 @@ export interface components {
              * @default false
              */
             exclusive: boolean;
+        };
+        /** SubjectInventory */
+        SubjectInventory: {
+            /** User Id */
+            user_id: string;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Total */
+            total: number;
         };
         /** TeamMember */
         TeamMember: {
@@ -4201,6 +4356,155 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentConfigVersionSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_subject_api_v1_data_subjects__user_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectInventory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_subject_api_v1_data_subjects__user_id__export_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    erase_subject_api_v1_data_subjects__user_id__erase_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EraseInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_requests_api_v1_data_subject_requests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataSubjectRequestResponse"][];
+                };
+            };
+        };
+    };
+    download_api_v1_data_subject_requests__request_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "application/gzip": unknown;
                 };
             };
             /** @description Validation Error */
