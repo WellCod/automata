@@ -388,6 +388,7 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0031](docs/adr/0031-controle-de-custo-no-run.md) | Teto de custo por run e orçamento mensal por usuário e por token de integração |
 | [0032](docs/adr/0032-direitos-do-titular.md) | Direitos do titular: consulta, exportação e exclusão por usuário, e máscara com padrões próprios |
 | [0033](docs/adr/0033-reranker-e-filtros-na-recuperacao.md) | Reranker por cross-encoder e filtros escolhidos pelo modelo na recuperação (proposto, Fase 36) |
+| [0034](docs/adr/0034-guardrails-da-instancia-e-classificador-na-saida.md) | Piso de guardrails da instância e classificador na saída (proposto, Fase 37) |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 
