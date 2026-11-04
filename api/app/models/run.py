@@ -41,6 +41,8 @@ class AgentRun(Base):
     review_log: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
     # resultados de tool retirados por instrução embutida (ADR-0030)
     screened_tools: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
+    # run encerrado antes do fim sem ser erro, ex.: run_cost_limit (ADR-0031)
+    stop_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
     # status=blocked: regra de guardrail que barrou (ADR-0013) e o detalhe dela
     # (tipos de dado, termo configurado); nunca o valor que o usuário mandou
     blocked_by: Mapped[str | None] = mapped_column(String(32), nullable=True)

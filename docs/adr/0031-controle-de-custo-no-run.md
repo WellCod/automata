@@ -22,7 +22,9 @@ Verificado no Agno 3.1.8 instalado:
 
 - soma os tokens das mensagens do assistente no `run_context.messages`;
 - precifica pela tabela do modelo do agente (`pricing`, ADR-0021);
-- ao passar do teto, não roda a tool e levanta `StopAgentRun` com um aviso ao modelo, que responde com o que já tem.
+- ao passar do teto, não roda a tool e levanta `StopAgentRun`.
+
+O Agno não chama o modelo de novo depois do `StopAgentRun`, e a resposta do run sairia vazia. O tracking põe no lugar uma mensagem fixa: a conversa chegou ao limite de custo por resposta. No stream, ela sai como evento de conteúdo no fim.
 
 O run termina como sucesso, com `agent_run.stop_reason = "run_cost_limit"` (migration 0040), e não conta na taxa de erro. Vale no agente e no líder do time.
 

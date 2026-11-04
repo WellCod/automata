@@ -87,6 +87,8 @@ class BlockLog:
     blocks: list[Block] = field(default_factory=list)
     # resultados de tool retirados (ADR-0030): o run segue, mas o motivo fica gravado
     screened: list[dict[str, Any]] = field(default_factory=list)
+    # run encerrado antes do fim por uma regra que não é erro (ADR-0031)
+    stop_reason: str | None = None
 
     @property
     def last(self) -> Block | None:

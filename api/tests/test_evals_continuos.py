@@ -6,7 +6,7 @@ cada minuto ou um CI passar com caso não avaliado.
 """
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -49,11 +49,13 @@ def test_validacao_do_agendamento(case: CronCase) -> None:
 
 
 def test_proximo_horario_respeita_o_fuso() -> None:
-    # 8h em São Paulo (UTC-3, sem horário de verão) é 11h UTC
-    after = datetime(2026, 11, 3, 12, 0, tzinfo=UTC)
-    assert next_run("0 8 * * *", "America/Sao_Paulo", after) == datetime(
-        2026, 11, 4, 11, 0, tzinfo=UTC
+    # 8h em São Paulo (UTC-3, sem horário de verão) é 11h UTC. Data no futuro: o Agno
+    # nunca devolve horário no passado, então uma data fixa vira bomba-relógio
+    after = (datetime.now(UTC) + timedelta(days=2)).replace(
+        hour=12, minute=0, second=0, microsecond=0
     )
+    expected = (after + timedelta(days=1)).replace(hour=11)
+    assert next_run("0 8 * * *", "America/Sao_Paulo", after) == expected
 
 
 def _request(scopes: list[str], config_id: str, enforce: bool = True) -> SimpleNamespace:

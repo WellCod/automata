@@ -194,6 +194,8 @@ class RunControls(BaseModel):
     fallback_models: list[str] = Field(default_factory=list, max_length=2)
     # vazio = resultado de tool inteiro no contexto, como antes
     compress_tool_results: ToolCompression | None = None
+    # teto de custo das chamadas ao modelo do run, conferido antes de cada tool (ADR-0031)
+    max_cost_usd: float | None = Field(default=None, ge=0.01, le=100)
 
     @model_validator(mode="after")
     def reservas_unicas(self) -> "RunControls":
