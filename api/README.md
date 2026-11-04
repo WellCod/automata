@@ -58,6 +58,10 @@ Arquivos:
   - Sem banco: todo modelo oferecido tem preço, a matriz de filtro aceito e ignorado (valor exato, campo inexistente), aspas no valor não quebram a descrição da tool, campos fora da regra são recusados, o lote de candidatos cresce com o cross-encoder e falha do provedor levanta para a busca seguir sem ele.
   - Com Postgres: três manuais de planos parecidos. O filtro nunca traz o manual de outro plano, dois campos combinam, e um filtro errado cai na busca sem filtro em vez de "nada encontrado".
   - A noturna de estratégias compara também o cross-encoder do Cohere (sozinho e com MMR) quando há `COHERE_API_KEY`.
+- `tests/test_evals_guardrails_da_instancia.py`: piso da instância e classificador na saída (ADR-0034).
+  - Para 64 pares de piso e agente e as mensagens do eval de guardrails, o efetivo barra tudo o que cada lado barraria sozinho e mascara tudo o que cada lado mascararia.
+  - Sem piso, ou com piso vazio, o agente fica igual.
+  - Na noturna, com `ANTHROPIC_API_KEY`, o classificador da saída julga seis respostas, entre vazamentos do prompt e recusas legítimas, e aceita um erro.
 - `.github/workflows/evals-nightly.yml` — workflow agendado
 
 ## Metering
