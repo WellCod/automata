@@ -17,7 +17,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app import budget
+from app import budget, mailer
 from app.db import get_engine
 from app.evals import webhook
 from app.models.alert import AlertDestination, AlertSent
@@ -52,13 +52,19 @@ def broadcast(session: Session, event: str, data: dict[str, Any], text: str) -> 
     delivered = 0
     body = webhook.body_for(event, data, text)
     for dest in destinations_for(session, event):
-        try:
-            status = webhook.deliver(webhook.unseal(dest.webhook_encrypted), event, body)
-        except SecretsKeyMissing as exc:
-            status = f"recusado: {exc}"
+        if dest.kind == "email":
+            # o mesmo texto do webhook; nada de dado de conversa (ADR-0037)
+            status = mailer.send(list(dest.email_to or []), f"[Automata] {event}", text)
+            ok = status == mailer.SENT
+        else:
+            try:
+                status = webhook.deliver(webhook.unseal(dest.webhook_encrypted or ""), event, body)
+            except SecretsKeyMissing as exc:
+                status = f"recusado: {exc}"
+            ok = status.startswith("HTTP 2")
         dest.last_status = status
         dest.last_at = datetime.now(UTC)
-        delivered += status.startswith("HTTP 2")
+        delivered += ok
     session.commit()
     return delivered
 
