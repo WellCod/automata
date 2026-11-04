@@ -28,6 +28,8 @@ from app.budget import BudgetGuardrail, hard_limit
 from app.caller_budget import CallerBudgetGuardrail
 from app.db import get_engine
 from app.guardrails.input import BlockLog, input_guardrails
+from app.guardrails.instance import effective
+from app.guardrails.instance import floor as instance_floor
 from app.guardrails.output import output_guardrail
 from app.guardrails.tool_results import tool_screen
 from app.knowledge.tools import knowledge_instructions, knowledge_tool
@@ -78,6 +80,8 @@ def load_version(config_id: UUID, version_id: UUID | None) -> ResolvedVersion:
             raise FactoryValidationError(f"Versão {vid} não pertence a este agente")
 
         payload = ConfigPayload.model_validate(version.payload)
+        # piso da instância (ADR-0034): vale no próximo run, sem publicar de novo
+        payload.guardrails = effective(instance_floor(), payload.guardrails)
         bases = _bases_for(session, payload)
         return ResolvedVersion(
             name=config.name,

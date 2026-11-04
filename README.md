@@ -131,6 +131,7 @@ Regras de entrada e saída versionadas junto com o agente. O bloqueio acontece a
 - **Classificador por modelo:** um modelo escolhido julga a mensagem antes do run e pega a injeção que a lista de termos não pega, a toxicidade e o pedido fora do que o agente atende, descrito em texto. Se o classificador cair, o agente segue ou bloqueia, conforme configurado, e o custo da checagem entra no agente ([ADR-0030](docs/adr/0030-guardrails-por-modelo.md)).
 - **Conteúdo de terceiros:** o resultado das tools, inclusive MCP e busca da base, é examinado antes de voltar ao modelo. Uma página ou um documento com instrução embutida para o assistente chega como aviso, e o run segue com a retirada registrada. Na ingestão, o documento que tem trechos com instrução embutida fica marcado na base, para quem cuida dela ver de onde a injeção vem. No painel, o classificador e o exame de tool ficam na seção de guardrails do agente e do time, o documento suspeito aparece marcado na lista da base e o run mostra quais resultados foram retirados.
 - **Na resposta:** dado pessoal ou termo proibido troca a resposta antes de ela sair.
+- **Piso da instância:** o owner define o mínimo que todo agente e time segue, como mascarar CPF ou barrar injeção. O agente só pode endurecer, e o piso vale no próximo run, sem publicar de novo ([ADR-0034](docs/adr/0034-guardrails-da-instancia-e-classificador-na-saida.md)).
 
 Execuções barradas aparecem como **bloqueadas**, com a regra, separadas de falha no analytics.
 
