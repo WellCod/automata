@@ -25,6 +25,7 @@ from app.agents.models_map import demo_replay, resolve_model
 from app.agents.run_cost import CostCap
 from app.agents.tracking import TrackedAgent, TrackedTeam
 from app.budget import BudgetGuardrail, hard_limit
+from app.caller_budget import CallerBudgetGuardrail
 from app.db import get_engine
 from app.guardrails.input import BlockLog, input_guardrails
 from app.guardrails.output import output_guardrail
@@ -169,6 +170,9 @@ def pre_hooks_for(
     hooks: list[BaseGuardrail] = []
     if budget and resolved.budget_limit_usd is not None:
         hooks.append(BudgetGuardrail(config_id, resolved.budget_limit_usd, blocks))
+    if budget:
+        # orçamento de quem chama (ADR-0031): sem linha para o usuário, só uma consulta em cache
+        hooks.append(CallerBudgetGuardrail(blocks))
     hooks.extend(input_guardrails(resolved.payload.guardrails, blocks, config_id))
     return hooks or None
 
