@@ -1,12 +1,24 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Bot, GitBranch, Plus, Repeat, Split, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Bot,
+  GitBranch,
+  Plus,
+  Repeat,
+  Signpost,
+  Split,
+  Trash2,
+} from "lucide-react";
 import client from "@/lib/api/client";
 import {
   MAX_BRANCHES,
   type LoopNode,
+  type RouterNode,
   MAX_DEPTH,
+  MAX_ROUTES,
   type NodeType,
   RULE_KINDS,
   type StepNode,
@@ -31,6 +43,17 @@ const TYPE_META: Record<NodeType, { label: string; icon: typeof Bot; hint: strin
   parallel: { label: "Paralelo", icon: Split, hint: "Ramos rodam ao mesmo tempo" },
   condition: { label: "Condição", icon: GitBranch, hint: "Escolhe o caminho por uma regra" },
   loop: { label: "Repetição", icon: Repeat, hint: "Repete até a regra ou o limite" },
+  router: {
+    label: "Roteador",
+    icon: Signpost,
+    hint: "Vários caminhos: roda o primeiro cuja regra casa",
+  },
+};
+
+const INPUT_LABELS: Record<NonNullable<StepNode["input"]>, string> = {
+  previous: "Recebe a resposta da etapa anterior",
+  original: "Recebe a mensagem do usuário",
+  template: "Recebe um texto montado",
 };
 
 type Executor = { key: string; name: string; kind: "agent" | "team" };
@@ -187,8 +210,157 @@ function StepFields({
           className={`${inputCls} w-14`}
         />
       </label>
+      <select
+        aria-label={`Entrada de ${node.name}`}
+        value={node.input ?? "previous"}
+        onChange={(e) => {
+          const input = e.target.value as NonNullable<StepNode["input"]>;
+          onChange({
+            ...node,
+            input,
+            template: input === "template" ? (node.template ?? "{entrada}") : null,
+          });
+        }}
+        className={`${inputCls} max-w-full min-w-0`}
+      >
+        {Object.entries(INPUT_LABELS).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+      {node.input === "template" && (
+        <label className="text-muted-foreground flex w-full flex-col gap-1 text-[11px]">
+          {
+            "Texto de entrada: {entrada} é a mensagem do usuário, {anterior} a resposta anterior e {etapa:Nome} a resposta de uma etapa"
+          }
+          <textarea
+            aria-label={`Texto de entrada de ${node.name}`}
+            rows={2}
+            maxLength={2000}
+            value={node.template ?? ""}
+            onChange={(e) => onChange({ ...node, template: e.target.value })}
+            className={`${inputCls} w-full resize-y`}
+          />
+        </label>
+      )}
       {(ctx.reviewable || node.review) && (
         <ReviewFields node={node} onChange={onChange} reviewable={ctx.reviewable} />
+      )}
+    </div>
+  );
+}
+
+function RouterFields({
+  node,
+  onChange,
+  ctx,
+}: {
+  node: RouterNode;
+  onChange: (n: RouterNode) => void;
+  ctx: Ctx;
+}) {
+  const inner = { ...ctx, reviewable: false };
+  const setRoute = (i: number, route: RouterNode["routes"][number]) =>
+    onChange({ ...node, routes: replaceAt(node.routes, i, route) });
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-muted-foreground text-[11px]">
+        Roda o primeiro caminho cuja regra casa; sem nenhum, o padrão.
+      </span>
+      <ol className="flex flex-col gap-2">
+        {node.routes.map((route, i) => (
+          <li
+            key={i}
+            aria-label={`Caminho ${route.step.name}`}
+            className="border-border ml-2 flex flex-col gap-1.5 border-l pl-3"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-foreground text-[12px] font-medium">Se</span>
+              <RuleFields
+                rule={route.rule}
+                onChange={(rule) => setRoute(i, { ...route, rule })}
+                label={route.step.name}
+                withSource
+              />
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                disabled={node.routes.length <= 2}
+                onClick={() => onChange({ ...node, routes: removeAt(node.routes, i) })}
+              >
+                Remover caminho
+              </Button>
+            </div>
+            <input
+              aria-label={`Nome do caminho ${route.step.name}`}
+              value={route.step.name}
+              maxLength={60}
+              onChange={(e) =>
+                setRoute(i, { ...route, step: { ...route.step, name: e.target.value } })
+              }
+              className={`${inputCls} w-full sm:w-64`}
+            />
+            <StepFields
+              node={route.step}
+              onChange={(step) => setRoute(i, { ...route, step })}
+              ctx={inner}
+            />
+          </li>
+        ))}
+      </ol>
+      {node.routes.length < MAX_ROUTES && (
+        <Button
+          type="button"
+          size="xs"
+          variant="muted"
+          className="self-start"
+          onClick={() => {
+            const step = newNode("step", ctx.taken) as StepNode;
+            onChange({
+              ...node,
+              routes: [
+                ...node.routes,
+                { rule: { kind: "contains", source: "input", value: "" }, step },
+              ],
+            });
+          }}
+        >
+          <Plus aria-hidden />
+          Caminho
+        </Button>
+      )}
+      <label className="text-foreground flex items-center gap-1.5 text-[12px]">
+        <input
+          type="checkbox"
+          checked={node.default != null}
+          onChange={(e) =>
+            onChange({
+              ...node,
+              default: e.target.checked ? (newNode("step", ctx.taken) as StepNode) : null,
+            })
+          }
+        />
+        Caminho padrão quando nenhuma regra casar
+      </label>
+      {node.default && (
+        <div className="border-border ml-2 flex flex-col gap-1.5 border-l pl-3">
+          <input
+            aria-label={`Nome do caminho padrão de ${node.name}`}
+            value={node.default.name}
+            maxLength={60}
+            onChange={(e) =>
+              onChange({ ...node, default: { ...node.default!, name: e.target.value } })
+            }
+            className={`${inputCls} w-full sm:w-64`}
+          />
+          <StepFields
+            node={node.default}
+            onChange={(step) => onChange({ ...node, default: step })}
+            ctx={inner}
+          />
+        </div>
       )}
     </div>
   );
@@ -469,6 +641,8 @@ function NodeCard({
 
       {node.type === "step" && <StepFields node={node} onChange={onChange} ctx={ctx} />}
 
+      {node.type === "router" && <RouterFields node={node} onChange={onChange} ctx={ctx} />}
+
       {node.type === "parallel" && (
         <NodeList
           nodes={node.branches}
@@ -651,8 +825,8 @@ export function WorkflowEditor({ value, onChange }: Props) {
     <fieldset className="border-border flex flex-col gap-3 rounded border px-4 pt-3 pb-4">
       <legend className="text-foreground px-1 text-[13px] font-medium">Etapas</legend>
       <p className="text-muted-foreground text-[11px]">
-        Rodam de cima para baixo. Cada etapa recebe a resposta da anterior; os ramos de um paralelo
-        recebem a mesma entrada. Só agentes e times publicados aparecem na lista.
+        Rodam de cima para baixo. Por padrão, cada etapa recebe a resposta da anterior, e os ramos
+        de um paralelo recebem a mesma entrada. Só agentes e times publicados aparecem na lista.
       </p>
       {isError && (
         <p className="text-destructive text-[12px]" role="alert">

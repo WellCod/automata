@@ -38,15 +38,30 @@ function CheckFields({
   check,
   onChange,
   index,
+  kind,
 }: {
   check: EvalCheck;
   onChange: (c: EvalCheck) => void;
   index: number;
+  kind: SuiteKind;
 }) {
   if (check.type === "text") {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-muted-foreground text-[12px]">A resposta</span>
+        {kind === "workflow" ? (
+          // ADR-0038: vazio olha a resposta final; com nome, a saída daquela etapa
+          <input
+            aria-label={`Etapa da checagem ${index + 1}`}
+            value={check.step ?? ""}
+            maxLength={60}
+            placeholder="resposta final"
+            title="Nome de uma etapa para olhar a saída dela; vazio olha a resposta final"
+            onChange={(e) => onChange({ ...check, step: e.target.value.trim() || null })}
+            className={`${inputCls} w-36`}
+          />
+        ) : (
+          <span className="text-muted-foreground text-[12px]">A resposta</span>
+        )}
         <select
           aria-label={`Regra da checagem ${index + 1}`}
           value={check.kind}
@@ -202,7 +217,7 @@ function CheckFields({
 
 interface Props {
   initial?: EvalCaseInput;
-  // workflow troca tools e bloqueio por etapas e não tem turnos anteriores
+  // workflow troca tools e bloqueio por etapas; turnos anteriores só com histórico ligado
   kind?: SuiteKind;
   // vindo de uma conversa real: avisos (dados mascarados, contexto cortado) e critério sugerido
   notes?: string[];
@@ -269,13 +284,14 @@ export function EvalCaseForm({
           ))}
         </ul>
       )}
-      {kind !== "workflow" && (
+      {
         <fieldset className="flex flex-col gap-1.5">
           <legend className="text-foreground mb-1 text-[12px] font-medium">
             Conversa antes da mensagem (opcional)
           </legend>
           <p className="text-muted-foreground text-[11px]">
             Rodam na mesma sessão antes da mensagem de entrada; só a resposta a ela é checada.
+            {kind === "workflow" && " No workflow, exige o histórico ligado na configuração."}
           </p>
           {context.map((message, i) => (
             <div key={i} className="flex items-start gap-1.5">
@@ -312,7 +328,7 @@ export function EvalCaseForm({
             </div>
           )}
         </fieldset>
-      )}
+      }
       <div className="flex flex-col gap-1">
         <label htmlFor={`${id}-input`} className="text-foreground text-[12px] font-medium">
           Mensagem de entrada
@@ -355,7 +371,7 @@ export function EvalCaseForm({
                   <Trash2 aria-hidden />
                 </Button>
               </div>
-              <CheckFields check={check} index={i} onChange={(c) => setCheck(i, c)} />
+              <CheckFields check={check} index={i} kind={kind} onChange={(c) => setCheck(i, c)} />
             </li>
           ))}
         </ol>

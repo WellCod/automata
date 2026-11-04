@@ -5,7 +5,9 @@ export type StepNode = Schemas["StepNode"];
 export type ParallelNode = Schemas["ParallelNode"];
 export type ConditionNode = Schemas["ConditionNode"];
 export type LoopNode = Schemas["LoopNode"];
-export type WorkflowNode = StepNode | ParallelNode | ConditionNode | LoopNode;
+export type RouterNode = Schemas["RouterNode"];
+export type RouterRoute = Schemas["RouterRoute"];
+export type WorkflowNode = StepNode | ParallelNode | ConditionNode | LoopNode | RouterNode;
 export type WorkflowRule = Schemas["WorkflowRule"];
 export type StepReview = Schemas["StepReview"];
 export type NodeType = WorkflowNode["type"];
@@ -14,6 +16,12 @@ export type NodeType = WorkflowNode["type"];
 export const MAX_STEPS = 30;
 export const MAX_DEPTH = 3;
 export const MAX_BRANCHES = 5;
+export const MAX_ROUTES = 5;
+
+// {etapa:Nome} no texto de entrada (ADR-0038); mesma regra de STEP_REF na API
+export function templateRefs(template: string | null | undefined): string[] {
+  return [...(template ?? "").matchAll(/\{etapa:([^{}]{1,60})\}/g)].map((m) => m[1].trim());
+}
 
 export const RULE_KINDS: { value: WorkflowRule["kind"]; label: string; needsValue: boolean }[] = [
   { value: "contains", label: "contém", needsValue: true },
@@ -32,6 +40,8 @@ export function children(node: WorkflowNode): WorkflowNode[] {
   if (node.type === "parallel") return node.branches;
   if (node.type === "condition") return [...node.steps, ...(node.else_steps ?? [])];
   if (node.type === "loop") return node.steps;
+  if (node.type === "router")
+    return [...node.routes.map((r) => r.step), ...(node.default ? [node.default] : [])];
   return [];
 }
 
@@ -48,6 +58,7 @@ const BASE_NAME: Record<NodeType, string> = {
   parallel: "paralelo",
   condition: "condição",
   loop: "repetição",
+  router: "roteador",
 };
 
 export function uniqueName(base: string, taken: Set<string>): string {
@@ -65,6 +76,7 @@ export function newNode(type: NodeType, taken: Set<string>): WorkflowNode {
     name: n,
     on_error: "stop",
     max_retries: 0,
+    input: "previous",
   });
   if (type === "step") return step(name);
   if (type === "parallel") {
@@ -80,6 +92,19 @@ export function newNode(type: NodeType, taken: Set<string>): WorkflowNode {
       rule: { kind: "contains", source: "input", value: "" },
       steps: [step(inner)],
       else_steps: [],
+    };
+  }
+  if (type === "router") {
+    const first = uniqueName("caminho", new Set([...taken, name]));
+    const second = uniqueName("caminho", new Set([...taken, name, first]));
+    return {
+      type,
+      name,
+      routes: [
+        { rule: { kind: "contains", source: "input", value: "" }, step: step(first) },
+        { rule: { kind: "contains", source: "input", value: "" }, step: step(second) },
+      ],
+      default: null,
     };
   }
   const inner = uniqueName("etapa", new Set([...taken, name]));
@@ -144,6 +169,16 @@ export function structureErrors(nodes: WorkflowNode[]): string[] {
     const rule = n.type === "condition" ? n.rule : n.type === "loop" ? n.until : null;
     if (rule && ruleNeedsValue(rule.kind) && !rule.value?.trim())
       errors.push(`Preencha o texto da regra de "${n.name}".`);
+    if (n.type === "router")
+      for (const r of n.routes)
+        if (ruleNeedsValue(r.rule.kind) && !r.rule.value?.trim())
+          errors.push(`Preencha o texto da regra do caminho "${r.step.name}".`);
+    if (n.type === "step" && n.input === "template") {
+      if (!n.template?.trim()) errors.push(`Escreva o texto de entrada de "${n.name}".`);
+      for (const ref of templateRefs(n.template))
+        if (!all.some((other) => other.name === ref))
+          errors.push(`O texto de "${n.name}" cita a etapa "${ref}", que não existe.`);
+    }
   }
   if (countSteps(nodes) > MAX_STEPS) errors.push(`No máximo ${MAX_STEPS} etapas.`);
   for (const name of reviewsInsideContainers(nodes))
