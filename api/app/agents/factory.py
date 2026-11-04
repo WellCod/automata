@@ -146,7 +146,7 @@ def build_instructions(
     return "\n\n".join(s for s in sections if s) or None
 
 
-def _post_hooks(hook: Callable[..., None] | None) -> list[Any] | None:
+def _post_hooks(hook: Callable[..., Any] | None) -> list[Any] | None:
     return [hook] if hook is not None else None
 
 
@@ -258,7 +258,7 @@ def agent_from(
         tools=[*resolved.mcp_tools, *resolved.knowledge_tools],
         # membro de time não tem orçamento próprio: o consumo dele conta no time
         pre_hooks=pre_hooks_for(config_id, resolved, blocks, budget=tracked),
-        post_hooks=_post_hooks(output_guardrail(payload.guardrails, blocks)),
+        post_hooks=_post_hooks(output_guardrail(payload.guardrails, blocks, config_id)),
         # o histórico sai do banco da sessão, que o AgentFactory injeta no agente
         add_history_to_context=True,
         num_history_runs=HISTORY_RUNS,
@@ -352,7 +352,7 @@ def team_from(config_id: UUID, resolved: ResolvedTeam) -> TrackedTeam:
         instructions=build_instructions(leader.payload, leader.bases),
         tools=[*leader.mcp_tools, *leader.knowledge_tools],
         pre_hooks=pre_hooks_for(config_id, leader, blocks, budget=True),
-        post_hooks=_post_hooks(output_guardrail(leader.payload.guardrails, blocks)),
+        post_hooks=_post_hooks(output_guardrail(leader.payload.guardrails, blocks, config_id)),
         members=[agent_from(mid, m, tracked=False) for mid, m in resolved.members],
         mode=TeamMode(settings.mode),
         max_iterations=settings.max_iterations,

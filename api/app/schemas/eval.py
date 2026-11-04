@@ -77,6 +77,7 @@ BlockRule = Literal[
     "moderation",
     "classifier",
     "output_not_allowed",
+    "output_classifier",
 ]
 
 

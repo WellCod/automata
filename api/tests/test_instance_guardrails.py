@@ -190,3 +190,28 @@ def test_piso_validado_como_o_agente(client: TestClient, monkeypatch: pytest.Mon
     assert bad.status_code == 422
     model = {"settings": {"classifier": {"model_id": "inventado", "checks": ["injection"]}}}
     assert client.put("/api/v1/instance-guardrails", json=model).status_code == 422
+
+
+def test_classificador_da_saida_no_run_de_verdade(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """O post hook assíncrono roda no arun do AgentOS e marca o run como bloqueado."""
+    import app.agents.models_map as models_map
+    from tests.fake_models import FixedReplyModel
+
+    verdict = '{"verdict": "block", "category": "prompt_leak", "reason": "vaza"}'
+    monkeypatch.setattr(models_map, "demo_replay", lambda: False)
+    monkeypatch.setattr(
+        models_map,
+        "resolve_model",
+        lambda model_id, *a, **k: FixedReplyModel(id=model_id, reply=verdict, tokens=5),
+    )
+    classifier = {"model_id": "claude-haiku-4-5", "checks": ["prompt_leak"]}
+    agent_id = _agent(
+        client, {"output": {"classifier": classifier}, "blocked_message": "Não posso."}
+    )
+    resp = client.post(f"/agents/{agent_id}/runs", data={"message": "oi", "stream": "false"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["content"] == "Não posso."
+    [run] = client.get(f"/api/v1/configs/{agent_id}/runs").json()["items"]
+    assert (run["status"], run["blocked_by"]) == ("blocked", "output_classifier")

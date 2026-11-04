@@ -114,6 +114,8 @@ class OutputRule(BaseModel):
     pii: bool = False
     pii_types: list[PiiType] = Field(default_factory=lambda: list(PII_TYPES))
     blocked_terms: list[str] = Field(default_factory=list, max_length=50)
+    # depois dos termos e dos dados pessoais; no stream, só marca o run (ADR-0034)
+    classifier: "OutputClassifierRule | None" = None
 
     @field_validator("blocked_terms")
     @classmethod
@@ -147,6 +149,30 @@ class ClassifierRule(BaseModel):
         if "off_topic" in self.checks and not self.scope.strip():
             raise ValueError("o classificador de assunto precisa do escopo do agente")
         return self
+
+
+OutputClassifierCheck = Literal["toxicity", "off_topic", "prompt_leak"]
+
+
+class OutputClassifierRule(BaseModel):
+    """Classificador por modelo na resposta (ADR-0034): uma chamada por resposta."""
+
+    model_id: str = Field(min_length=1, max_length=64)
+    checks: list[OutputClassifierCheck] = Field(min_length=1, max_length=3)
+    scope: str = Field(default="", max_length=500)
+    on_failure: Literal["allow", "block"] = "allow"
+
+    @model_validator(mode="after")
+    def escopo_com_off_topic(self) -> "OutputClassifierRule":
+        if len(self.checks) != len(set(self.checks)):
+            raise ValueError("checagem repetida no classificador da saída")
+        if "off_topic" in self.checks and not self.scope.strip():
+            raise ValueError("o classificador de assunto precisa do escopo do agente")
+        return self
+
+
+# OutputRule vem antes e cita o classificador da saída pelo nome
+OutputRule.model_rebuild()
 
 
 class ToolResultScreening(BaseModel):

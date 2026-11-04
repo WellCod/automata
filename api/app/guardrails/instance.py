@@ -14,6 +14,7 @@ from app.models.instance_guardrails import InstanceGuardrails
 from app.schemas.config import (
     ClassifierRule,
     GuardrailSettings,
+    OutputClassifierRule,
     OutputRule,
     PiiRule,
     ToolResultScreening,
@@ -54,9 +55,9 @@ def _pii(base: PiiRule, own: PiiRule) -> PiiRule:
     return own.model_copy(update={"mode": mode, "types": types, "custom": custom})
 
 
-def merge_classifier(
-    base: ClassifierRule | None, own: ClassifierRule | None
-) -> ClassifierRule | None:
+def merge_classifier[R: (ClassifierRule, OutputClassifierRule)](
+    base: R | None, own: R | None
+) -> R | None:
     """Com os dois: modelo e escopo do agente, união das checagens, falha bloqueia se um pedir."""
     if base is None or own is None:
         return own if base is None else base
@@ -85,6 +86,7 @@ def _output(base: OutputRule, own: OutputRule) -> OutputRule:
             "pii": base.pii or own.pii,
             "pii_types": _union(*(r.pii_types for r in (base, own) if r.pii)),
             "blocked_terms": _union(base.blocked_terms, own.blocked_terms),
+            "classifier": merge_classifier(base.classifier, own.classifier),
         }
     )
 
