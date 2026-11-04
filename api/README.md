@@ -301,6 +301,10 @@ Fase 13 ([ADR-0012](../docs/adr/0012-bases-de-conhecimento.md)). Ingestão, busc
     - `gcs` tem `bucket` e `prefix`. A versão é o `generation`.
     - Segredo obrigatório: `service_account_json`, até 8000 caracteres.
     - Login: o JWT RS256 é assinado com a chave do JSON e trocado sempre em `oauth2.googleapis.com/token`, nunca no `token_uri` do JSON. Escopo só de leitura (`drive.readonly`, `devstorage.read_only`), sem a biblioteca do Google.
+  - Filtro por nome (ADR-0039, `app/knowledge/path_filter.py`): `include` e `exclude` na configuração de todo conector, até 10 globs de até 200 caracteres cada e no máximo 3 `**`.
+    - Sintaxe: `**/` é qualquer quantidade de pastas, `*` não atravessa pasta e `?` é um caractere. Comparado com o caminho relativo, sem diferenciar maiúsculas.
+    - Sem `include` entra tudo, e `exclude` vence.
+    - O que sai do filtro some como se não estivesse na origem: não conta como pulado e sai da base na sincronização. O teste de conexão já mostra a amostra filtrada.
   - O download é nosso (`app/knowledge/sources.py`): REST do GitHub (árvore do branch e conteúdo bruto), Microsoft Graph com client credentials pelo `httpx` e `boto3` no S3. Os loaders remotos do Agno gravam pelo `Knowledge` dele, sem `content_id` por trecho e sem medir o embedder.
   - `POST .../{id}/test` lista a origem sem baixar e diz quantos arquivos entrariam. `POST .../{id}/sync` responde 202 e roda em background (409 se já estiver rodando).
   - A sincronização (`app/knowledge/connector_sync.py`) compara pela versão remota (sha do Git, ETag do S3, eTag do Graph) guardada em `knowledge_content.external_version`: arquivo novo entra, versão mudada perde os trechos e é reindexada, arquivo que sumiu sai com os trechos, versão igual não baixa. Só extensões que a ingestão lê, até 500 arquivos e `KNOWLEDGE_MAX_UPLOAD_MB` por arquivo; o resto conta como `skipped` no `last_summary`.

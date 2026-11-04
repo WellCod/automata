@@ -1413,7 +1413,7 @@ Decisão em [ADR-0039](adr/0039-conectores-e-worker-de-ingestao.md). As bases ga
 
 - [x] `docs(adr)`: ADR-0039 e esta seção
 - [x] `feat(api)`: conectores do Google Drive e do Cloud Storage com conta de serviço
-- [ ] `feat(api)`: filtro de arquivos por padrão de nome nos conectores
+- [x] `feat(api)`: filtro de arquivos por padrão de nome nos conectores
 - [ ] `feat(api)`: sincronização disparada por webhook da origem com assinatura
 - [ ] `feat(api)`: worker de ingestão separado com fila no banco
 - [ ] `feat(web)`: Drive, Cloud Storage, filtros e webhook nos conectores

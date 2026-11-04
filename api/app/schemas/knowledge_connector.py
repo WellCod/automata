@@ -4,14 +4,33 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 ConnectorKind = Literal["github", "s3", "sharepoint", "gdrive", "gcs"]
 
 _Path = Annotated[str, Field(default="", max_length=512)]
 
 
-class GitHubSettings(BaseModel):
+class PathFilters(BaseModel):
+    """Glob sobre o caminho relativo (ADR-0039): sem include entra tudo, exclude vence."""
+
+    include: list[str] = Field(default_factory=list, max_length=10)
+    exclude: list[str] = Field(default_factory=list, max_length=10)
+
+    @field_validator("include", "exclude")
+    @classmethod
+    def padroes_validos(cls, value: list[str]) -> list[str]:
+        from app.knowledge.path_filter import pattern_problem
+
+        cleaned = [p.strip() for p in value if p.strip()]
+        for pattern in cleaned:
+            problem = pattern_problem(pattern)
+            if problem:
+                raise ValueError(f"{problem}: {pattern!r}")
+        return cleaned
+
+
+class GitHubSettings(PathFilters):
     repo: str = Field(pattern=r"^[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+$", max_length=200)
     branch: str = Field(default="main", min_length=1, max_length=200)
     path: _Path = ""
@@ -19,7 +38,7 @@ class GitHubSettings(BaseModel):
     api_url: str = Field(default="https://api.github.com", max_length=500)
 
 
-class S3Settings(BaseModel):
+class S3Settings(PathFilters):
     bucket: str = Field(min_length=3, max_length=63)
     region: str | None = Field(default=None, max_length=40)
     prefix: _Path = ""
@@ -27,7 +46,7 @@ class S3Settings(BaseModel):
     endpoint_url: str | None = Field(default=None, max_length=500)
 
 
-class SharePointSettings(BaseModel):
+class SharePointSettings(PathFilters):
     hostname: str = Field(min_length=3, max_length=255, pattern=r"^[A-Za-z0-9.\-]+$")
     site_path: str = Field(min_length=1, max_length=255)
     folder_path: _Path = ""
@@ -35,14 +54,14 @@ class SharePointSettings(BaseModel):
     client_id: str = Field(min_length=1, max_length=100)
 
 
-class GDriveSettings(BaseModel):
+class GDriveSettings(PathFilters):
     """Pasta do Google Drive (ADR-0039); compartilhe só ela com a conta de serviço."""
 
     folder_id: str = Field(min_length=10, max_length=100, pattern=r"^[A-Za-z0-9_\-]+$")
     shared_drive: bool = False
 
 
-class GCSSettings(BaseModel):
+class GCSSettings(PathFilters):
     bucket: str = Field(min_length=3, max_length=222, pattern=r"^[a-z0-9][a-z0-9._\-]+$")
     prefix: _Path = ""
 

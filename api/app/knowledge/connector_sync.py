@@ -9,6 +9,7 @@ fica no próprio conector.
 import logging
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select, update
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_engine
 from app.knowledge.ingest import ingest, remove_chunks
+from app.knowledge.path_filter import allowed
 from app.knowledge.sources import SUPPORTED, RemoteFile, Source, SourceError, source_for
 from app.mcp.egress import EgressDenied
 from app.models.knowledge_base import KnowledgeBase
@@ -51,8 +53,17 @@ def source_of(connector: KnowledgeConnector) -> Source:
     return source_for(connector.kind, connector.settings, secret_of(connector))
 
 
-def selectable(files: list[RemoteFile], max_bytes: int) -> tuple[list[RemoteFile], int]:
-    """Arquivos que entram e quantos ficaram de fora."""
+def selectable(
+    files: list[RemoteFile], max_bytes: int, settings: dict[str, Any] | None = None
+) -> tuple[list[RemoteFile], int]:
+    """Arquivos que entram e quantos ficaram de fora.
+
+    O que sai do filtro por nome (ADR-0039) some como se não estivesse na origem: não
+    conta como pulado e, se já estava na base, sai na sincronização.
+    """
+    include = list((settings or {}).get("include") or [])
+    exclude = list((settings or {}).get("exclude") or [])
+    files = [f for f in files if allowed(f.path, include, exclude)]
     chosen = [f for f in files if f.extension in SUPPORTED and 0 < f.size <= max_bytes]
     skipped = len(files) - len(chosen)
     if len(chosen) > MAX_FILES:
@@ -172,7 +183,7 @@ def sync(connector_id: UUID) -> SyncSummary:
         listed = source.list_files()
         summary.truncated = source.truncated
         max_bytes = get_settings().knowledge_max_upload_mb * 1024 * 1024
-        files, summary.skipped = selectable(listed, max_bytes)
+        files, summary.skipped = selectable(listed, max_bytes, connector.settings)
         todo = plan(known, files)
         summary.unchanged = todo.unchanged
         for file, existing in todo.fetch:
