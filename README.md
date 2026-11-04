@@ -392,6 +392,7 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0034](docs/adr/0034-guardrails-da-instancia-e-classificador-na-saida.md) | Piso de guardrails da instância e classificador na saída (proposto, Fase 37) |
 | [0035](docs/adr/0035-memoria-e-conversa-em-time.md) | Memória do usuário no time e modelo próprio para o resumo da compactação (proposto, Fase 38) |
 | [0036](docs/adr/0036-pedido-do-titular-e-prazo.md) | Pedido do titular por integração e pelo próprio usuário, com prazo e aviso (proposto, Fase 39) |
+| [0037](docs/adr/0037-operacao-fila-conciliacao-e-avisos.md) | Painel da fila, retry por agente idempotente, conciliação de custo e aviso por e-mail (proposto, Fase 40) |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 
