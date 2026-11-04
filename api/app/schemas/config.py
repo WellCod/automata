@@ -230,6 +230,8 @@ class ConversationSettings(BaseModel):
     summary_instructions: str | None = Field(default=None, max_length=500)
     # tool de busca no histórico compactado, para o detalhe que o resumo deixou de fora
     search_history: bool = True
+    # modelo da matriz que escreve o resumo (ADR-0035); vazio usa o do agente
+    summary_model: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class MemorySettings(BaseModel):

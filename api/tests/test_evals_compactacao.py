@@ -15,7 +15,7 @@ from app.schemas.config import ConfigPayload, ConversationSettings
 def test_versao_sem_a_secao_fica_sem_compactacao() -> None:
     payload = ConfigPayload.model_validate({"schema_version": 2, "model_id": "claude-haiku-4-5"})
     assert payload.conversation.compaction is False
-    assert compaction_for(payload.conversation) is None
+    assert compaction_for(payload) is None
 
 
 def test_ligada_passa_limite_turnos_e_instrucoes_ao_agno() -> None:
@@ -26,7 +26,7 @@ def test_ligada_passa_limite_turnos_e_instrucoes_ao_agno() -> None:
         summary_instructions="mantenha números de pedido",
         search_history=False,
     )
-    compaction = compaction_for(settings)
+    compaction = compaction_for(ConfigPayload(model_id="claude-haiku-4-5", conversation=settings))
     assert compaction is not None
     assert compaction.compact_at_tokens == 8_000
     assert compaction.uncompacted_runs == 2

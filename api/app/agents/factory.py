@@ -39,7 +39,7 @@ from app.models.knowledge_base import KnowledgeBase
 from app.repositories.config import ConfigRepository
 from app.repositories.knowledge_base import KnowledgeBaseRepository
 from app.repositories.mcp_server import McpServerRepository
-from app.schemas.config import ConfigPayload, ConversationSettings
+from app.schemas.config import ConfigPayload
 from app.secrets import SecretsKeyMissing
 
 
@@ -155,11 +155,17 @@ def _post_hooks(hook: Callable[..., Any] | None) -> list[Any] | None:
 HISTORY_RUNS = 5
 
 
-def compaction_for(settings: ConversationSettings) -> Compaction | None:
-    """Resumo pelo modelo do próprio agente; o consumo entra nos totais do run (ADR-0019)."""
+def compaction_for(payload: ConfigPayload) -> Compaction | None:
+    """Resumo pelo modelo do agente ou pelo `summary_model` (ADR-0035). O consumo entra em
+    `RunMetrics.details["compaction_model"]` com o id de quem resumiu, e o custo do run
+    precifica por esse id."""
+    settings = payload.conversation
     if not settings.compaction:
         return None
+    summary = settings.summary_model
     return Compaction(
+        # sem extended thinking: o resumo é texto, e o retry da versão vale para ele também
+        model=model_for(summary, payload, plain=True) if summary and not demo_replay() else None,
         compact_at_tokens=settings.compact_at_tokens,
         uncompacted_runs=settings.keep_recent_runs,
         instructions=settings.summary_instructions,
@@ -263,7 +269,7 @@ def agent_from(
         add_history_to_context=True,
         num_history_runs=HISTORY_RUNS,
         # com compactação, a janela vai até o limite e o num_history_runs deixa de valer
-        compaction=compaction_for(payload.conversation),
+        compaction=compaction_for(payload),
         tool_call_limit=payload.run.tool_call_limit,
         tool_hooks=tool_hooks_for(config_id, payload, blocks),
         compression_manager=compression_for(payload),
