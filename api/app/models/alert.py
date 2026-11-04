@@ -15,8 +15,11 @@ class AlertDestination(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    webhook_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    # webhook ou email (ADR-0037); o e-mail não tem URL nem segredo
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="webhook")
+    webhook_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     webhook_host: Mapped[str] = mapped_column(String(255), nullable=False)
+    email_to: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     events: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
     last_status: Mapped[str | None] = mapped_column(String(255), nullable=True)
