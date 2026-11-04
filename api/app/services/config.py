@@ -225,15 +225,21 @@ class ConfigService:
 
     @staticmethod
     def _compression_errors(payload: ConfigPayload) -> list[str]:
-        """Modelo da compressão só da matriz (ADR-0029); ele recebe só texto."""
+        """Modelos da compressão (ADR-0029) e do resumo (ADR-0035) só da matriz; recebem texto."""
+        errors: list[str] = []
         settings = payload.run.compress_tool_results
-        if settings is None or settings.model_id is None:
-            return []
-        try:
-            get_capabilities(settings.model_id)
-        except ValueError as exc:
-            return [f"modelo da compressão: {exc}"]
-        return []
+        if settings is not None and settings.model_id is not None:
+            try:
+                get_capabilities(settings.model_id)
+            except ValueError as exc:
+                errors.append(f"modelo da compressão: {exc}")
+        summary = payload.conversation.summary_model
+        if summary is not None:
+            try:
+                get_capabilities(summary)
+            except ValueError as exc:
+                errors.append(f"modelo do resumo da conversa: {exc}")
+        return errors
 
     def _model_errors(self, config: AgentConfig, payload: ConfigPayload) -> list[str]:
         if config.kind == ConfigKind.workflow:

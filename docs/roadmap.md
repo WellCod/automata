@@ -1343,7 +1343,7 @@ Decisão em [ADR-0035](adr/0035-memoria-e-conversa-em-time.md). O time passa a l
 
 - [x] `docs(adr)`: ADR-0035 e esta seção
 - [x] `feat(api)`: memória do usuário no time, separada por dono e mascarada como a do agente
-- [ ] `feat(api)`: modelo próprio para o resumo da compactação
+- [x] `feat(api)`: modelo próprio para o resumo da compactação
 - [ ] `feat(web)`: memória na configuração do time e modelo do resumo na compactação
 - [ ] `test(api)`: evals da memória em time e do resumo com modelo próprio
 
