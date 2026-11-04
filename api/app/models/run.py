@@ -17,6 +17,8 @@ class AgentRun(Base):
         Index("ix_agent_run_run_id", "run_id"),
         Index("ix_agent_run_status", "status"),
         Index("ix_agent_run_blocked_by", "blocked_by"),
+        # consulta e exclusão por titular (ADR-0032)
+        Index("ix_agent_run_user_id", "user_id"),
         Index("ix_agent_run_parent_run_id", "parent_run_id"),
         Index("ix_agent_run_eval_run_id", "eval_run_id"),
     )

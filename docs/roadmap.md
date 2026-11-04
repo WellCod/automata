@@ -1271,7 +1271,7 @@ Decisão em [ADR-0031](adr/0031-controle-de-custo-no-run.md). Um teto de custo p
 Decisão em [ADR-0032](adr/0032-direitos-do-titular.md). O owner consulta o que a instância guarda de uma pessoa, exporta tudo num arquivo e apaga. A conversa, a memória, as aprovações e os traces saem. No consumo e nos runs registrados, o id vira um hash, para métricas e custo continuarem batendo. A máscara de dados pessoais ganha padrões próprios de cada empresa, como matrícula e número de contrato.
 
 - [x] `docs(adr)`: ADR-0032 e esta seção
-- [ ] `feat(api)`: consulta e exportação dos dados de um titular, com o arquivo guardado por 7 dias
+- [x] `feat(api)`: consulta e exportação dos dados de um titular, com o arquivo guardado por 7 dias
 - [ ] `feat(api)`: exclusão dos dados de um titular, com o id trocado por hash no consumo e nos runs
 - [ ] `feat(api)`: padrões próprios na máscara de dados pessoais do agente
 - [ ] `feat(web)`: página Titulares e padrões próprios nos guardrails
