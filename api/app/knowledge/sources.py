@@ -290,4 +290,11 @@ def source_for(kind: str, settings: dict[str, Any], secret: dict[str, str]) -> S
         return S3Source(S3Settings.model_validate(settings), secret)
     if kind == "sharepoint":
         return SharePointSource(SharePointSettings.model_validate(settings), secret)
+    if kind in ("gdrive", "gcs"):
+        from app.knowledge.google_sources import GCSSource, GDriveSource
+        from app.schemas.knowledge_connector import GCSSettings, GDriveSettings
+
+        if kind == "gdrive":
+            return GDriveSource(GDriveSettings.model_validate(settings), secret)
+        return GCSSource(GCSSettings.model_validate(settings), secret)
     raise SourceError(f"tipo de conector desconhecido: {kind}")
