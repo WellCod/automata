@@ -64,6 +64,8 @@ services:
       SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
       KNOWLEDGE_DEFAULT_EMBEDDER: ${KNOWLEDGE_DEFAULT_EMBEDDER:-voyage}
       KNOWLEDGE_MAX_UPLOAD_MB: ${KNOWLEDGE_MAX_UPLOAD_MB:-20}
+      # true: a API só enfileira a ingestão e o ingest-worker processa (ADR-0039)
+      INGEST_WORKER: ${INGEST_WORKER:-false}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
       interval: 30s
@@ -80,6 +82,20 @@ services:
         limits:
           cpus: "0.5"
           memory: 512M  # embedder e leitores de documento do RAG (ADR-0012)
+
+  # worker de ingestão separado (ADR-0039): sobe com --profile worker e INGEST_WORKER=true
+  ingest-worker:
+    extends:
+      service: api
+    profiles: [worker]
+    # a API já migrou no boot dela; o worker não roda o entrypoint
+    entrypoint: ["python", "-m", "app.knowledge.worker"]
+    command: []
+    healthcheck:
+      disable: true
+    depends_on:
+      api:
+        condition: service_healthy
 
   web:
     build:

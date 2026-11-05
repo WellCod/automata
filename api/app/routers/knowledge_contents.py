@@ -14,16 +14,16 @@ from fastapi import (
     Request,
     UploadFile,
 )
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.authz import Scope, require_scopes
-from app.db import SessionDep, get_engine
-from app.knowledge.fetch import FetchFailed, fetch_url
+from app.db import SessionDep
 from app.knowledge.filters import forget_field_values, set_chunk_fields
-from app.knowledge.ingest import CONTENT_TYPES, ingest, remove_chunks
+from app.knowledge.ingest import remove_chunks
+from app.knowledge.jobs import queued_contents, submit, worker_enabled
 from app.knowledge.reprocess import save_original
-from app.knowledge.schedule import next_at, refresh_url
+from app.knowledge.schedule import next_at
 from app.mcp.egress import EgressDenied, check_url
 from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_content import KnowledgeContent
@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 _WRITE = [Depends(require_scopes(Scope.KNOWLEDGE_WRITE))]
 
 
-def to_response(c: KnowledgeContent) -> KnowledgeContentResponse:
+def to_response(c: KnowledgeContent, *, queued: bool = False) -> KnowledgeContentResponse:
     return KnowledgeContentResponse(
         id=c.id,
         base_id=c.base_id,
@@ -67,6 +67,7 @@ def to_response(c: KnowledgeContent) -> KnowledgeContentResponse:
         refresh_every_hours=c.refresh_every_hours,
         next_refresh_at=c.next_refresh_at,
         fields=c.fields,
+        queued=queued,
     )
 
 
@@ -103,33 +104,6 @@ def _register(session: Session, content: KnowledgeContent) -> KnowledgeContent:
     return content
 
 
-def _ingest_url(content_id: UUID, url: str) -> None:
-    """Baixa na thread de background: a resposta do POST não espera o site."""
-    try:
-        fetched = fetch_url(url, _max_bytes())
-        extension = CONTENT_TYPES.get(fetched.content_type)
-        if extension is None:
-            raise FetchFailed(f"tipo de conteúdo não suportado: {fetched.content_type or '?'}")
-    except (FetchFailed, EgressDenied, OSError) as exc:
-        with Session(get_engine()) as session:
-            session.execute(
-                update(KnowledgeContent)
-                .where(KnowledgeContent.id == content_id)
-                .values(status="failed", status_message=str(exc)[:500])
-            )
-            session.commit()
-        logger.warning("download falhou", extra={"content_id": str(content_id), "error": str(exc)})
-        return
-    with Session(get_engine()) as session:
-        session.execute(
-            update(KnowledgeContent)
-            .where(KnowledgeContent.id == content_id)
-            .values(extension=extension, size_bytes=len(fetched.data))
-        )
-        session.commit()
-    ingest(content_id, fetched.data)
-
-
 @router.get("", response_model=list[KnowledgeContentResponse])
 def list_contents(base_id: UUID, session: SessionDep) -> list[KnowledgeContentResponse]:
     _base_or_404(session, base_id)
@@ -137,13 +111,15 @@ def list_contents(base_id: UUID, session: SessionDep) -> list[KnowledgeContentRe
         select(KnowledgeContent)
         .where(KnowledgeContent.base_id == base_id)
         .order_by(KnowledgeContent.created_at.desc())
-    )
-    return [to_response(c) for c in rows]
+    ).all()
+    waiting = queued_contents(session, [c.id for c in rows])
+    return [to_response(c, queued=c.id in waiting) for c in rows]
 
 
 @router.get("/{content_id}", response_model=KnowledgeContentResponse)
 def get_content(base_id: UUID, content_id: UUID, session: SessionDep) -> KnowledgeContentResponse:
-    return to_response(_content_or_404(session, base_id, content_id))
+    content = _content_or_404(session, base_id, content_id)
+    return to_response(content, queued=bool(queued_contents(session, [content.id])))
 
 
 @router.post("/file", response_model=KnowledgeContentResponse, status_code=202, dependencies=_WRITE)
@@ -187,8 +163,8 @@ def upload_file(
     )
     save_original(session, content.id, data)
     session.commit()
-    background.add_task(ingest, content.id, data)
-    return to_response(content)
+    submit(background, "ingest", content.id)
+    return to_response(content, queued=worker_enabled())
 
 
 @router.post("/url", response_model=KnowledgeContentResponse, status_code=202, dependencies=_WRITE)
@@ -220,8 +196,8 @@ def add_url(
             fields=body.fields,
         ),
     )
-    background.add_task(_ingest_url, content.id, url)
-    return to_response(content)
+    submit(background, "url", content.id)
+    return to_response(content, queued=worker_enabled())
 
 
 @router.post("/text", response_model=KnowledgeContentResponse, status_code=202, dependencies=_WRITE)
@@ -252,8 +228,8 @@ def add_text(
     )
     save_original(session, content.id, data)
     session.commit()
-    background.add_task(ingest, content.id, data)
-    return to_response(content)
+    submit(background, "ingest", content.id)
+    return to_response(content, queued=worker_enabled())
 
 
 @router.put("/{content_id}/fields", response_model=KnowledgeContentResponse, dependencies=_WRITE)
@@ -303,8 +279,8 @@ def refresh_content(
         raise HTTPException(status_code=422, detail="Só conteúdo de URL é baixado de novo")
     if content.status == "processing":
         raise HTTPException(status_code=409, detail="Conteúdo em processamento")
-    background.add_task(refresh_url, content.id)
-    return to_response(content)
+    submit(background, "refresh", content.id)
+    return to_response(content, queued=worker_enabled())
 
 
 @router.delete("/{content_id}", status_code=204, dependencies=_WRITE)

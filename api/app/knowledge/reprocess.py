@@ -105,7 +105,7 @@ def _replace(base: KnowledgeBase, content_id: UUID, data: bytes, extension: str 
     ingest(content_id, data, replace=True)
 
 
-def _original(content_id: UUID) -> bytes | None:
+def original_of(content_id: UUID) -> bytes | None:
     # um por vez: a base inteira de originais não cabe na memória da API
     with Session(get_engine()) as session:
         return session.scalar(
@@ -138,7 +138,7 @@ def reprocess(content_ids: list[UUID]) -> None:
                 _replace(base, content.id, fetched.data, extension)
             elif content.source_type == "connector" and content.connector_id is not None:
                 by_connector[content.connector_id].append(content)
-            elif (original := _original(content.id)) is not None:
+            elif (original := original_of(content.id)) is not None:
                 _replace(base, content.id, original, None)
             else:
                 _fail(content.id, "sem o original: envie o arquivo de novo")

@@ -132,6 +132,9 @@ def _fail_stale_evals() -> None:
 
 
 def _fail_stale_ingestions() -> None:
+    # com o worker separado (ADR-0039), o conteúdo parado está na fila: o worker cuida
+    if get_settings().ingest_worker:
+        return
     # banco fora do ar no boot não pode impedir a API de subir (o /health acusa)
     try:
         failed = fail_stale()

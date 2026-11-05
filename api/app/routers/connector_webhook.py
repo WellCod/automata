@@ -15,7 +15,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.db import get_engine
-from app.knowledge.connector_sync import sync
+from app.knowledge.jobs import submit
 from app.models.knowledge_connector import KnowledgeConnector
 from app.secrets import SecretsKeyMissing, decrypt_json
 
@@ -75,5 +75,5 @@ async def receive(
         "sincronização pelo webhook da origem",
         extra={"connector_id": str(connector_id), "at": datetime.now(UTC).isoformat()},
     )
-    background.add_task(sync, connector_id)
+    submit(background, "sync", connector_id)
     return {"status": "queued"}

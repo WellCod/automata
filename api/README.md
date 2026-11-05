@@ -349,7 +349,13 @@ Fase 13 ([ADR-0012](../docs/adr/0012-bases-de-conhecimento.md)). Ingestão, busc
 - Postgres com a extensão `vector`: os compose e o testcontainers usam `pgvector/pgvector:pg17` (mesmo Postgres 17, volume existente continua válido). O `PgVector` do Agno roda `CREATE EXTENSION IF NOT EXISTS vector` ao criar a tabela da base, então o usuário do banco precisa poder criar extensão; em Postgres gerenciado (Railway, RDS), habilite `vector` antes.
 - Embedder por base, escolhido na criação: `voyage` (padrão, `voyage-3.5`, 1024 dimensões, lê `VOYAGE_API_KEY`) ou `openai` (lê `OPENAI_API_KEY`). A Voyage dá 200M tokens grátis por conta e cobra depois.
 - Leitores instalados: PDF (`pypdf`), DOCX (`python-docx`), Markdown, texto, CSV (`aiofiles`), JSON e páginas web (`beautifulsoup4`).
-- Settings: `KNOWLEDGE_DEFAULT_EMBEDDER`, `VOYAGE_API_KEY`, `KNOWLEDGE_MAX_UPLOAD_MB` (20), `KNOWLEDGE_ALLOWED_EXTENSIONS` (`pdf,docx,md,txt,csv,json`).
+- Settings: `KNOWLEDGE_DEFAULT_EMBEDDER`, `VOYAGE_API_KEY`, `KNOWLEDGE_MAX_UPLOAD_MB` (20), `KNOWLEDGE_ALLOWED_EXTENSIONS` (`pdf,docx,md,txt,csv,json`), `INGEST_WORKER` (false).
+- **Worker de ingestão** (ADR-0039, migration 0050, `app/knowledge/jobs.py` e `app/knowledge/worker.py`):
+  - Com `INGEST_WORKER=true` a API não processa: grava um job em `ingest_job` e o `python -m app.knowledge.worker` executa. Sem a variável, tudo segue em `BackgroundTasks`.
+  - Tipos: `ingest` (arquivo e texto, lidos do original guardado), `url`, `refresh` (reindexação de URL), `sync` (conector, também pelo webhook e pelo agendamento) e `reprocess` (um job por base, com a lista de conteúdos no `payload`).
+  - O worker reivindica com `FOR UPDATE SKIP LOCKED`, então várias réplicas dividem a fila. Job em `running` há mais de 30 minutos volta para a fila uma vez; na segunda, falha junto com o conteúdo ou o conector. Job terminado sai depois de 7 dias.
+  - O conteúdo esperando o worker vem com `queued: true`. Com o worker ligado, a API não marca no boot como falha o conteúdo parado em `processing`: ele está na fila.
+  - No compose, o serviço `ingest-worker` fica no perfil `worker` e reaproveita a configuração da `api`: `docker compose --profile worker up -d ingest-worker`. O `/health` da API não sabe do worker.
 - O SDK da Voyage e os leitores somam ~85 MB de memória quando importados; o limite da API nos compose passou de 256M para 512M.
 
 - Busca de teste e comparação: 30 por minuto por usuário, porque cada uma paga embedding (e HyDE, na comparação). Falha do embedder volta como mensagem genérica; o detalhe do provedor fica só no log.

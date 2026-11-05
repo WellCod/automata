@@ -12,7 +12,8 @@ from app.db import SessionDep
 from app.knowledge.embedders import EMBEDDERS, is_configured
 from app.knowledge.filters import field_values
 from app.knowledge.ingest import IngestError, read_documents
-from app.knowledge.reprocess import plan_reprocess, reprocess
+from app.knowledge.jobs import submit
+from app.knowledge.reprocess import plan_reprocess
 from app.knowledge.rerank import CROSS_ENCODER_PRICES, cross_encoder_available
 from app.knowledge.search import SearchOutcome, search_base
 from app.knowledge.search import search as run_search
@@ -362,7 +363,7 @@ def reprocess_base(
     plan = plan_reprocess(session, base_id)
     session.commit()
     if plan.queued:
-        background.add_task(reprocess, plan.queued)
+        submit(background, "reprocess", base_id, {"content_ids": [str(i) for i in plan.queued]})
     logger.info(
         "base reprocessada",
         extra={"base_id": str(base_id), "queued": len(plan.queued), "skipped": plan.skipped},

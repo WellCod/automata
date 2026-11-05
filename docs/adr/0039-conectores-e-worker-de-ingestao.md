@@ -39,7 +39,7 @@ O segredo dos dois é o JSON da conta de serviço, cifrado como os outros segred
 
 A chamada válida agenda uma sincronização. O conteúdo do evento não é lido: a sincronização lista a origem de novo. Um conector sem segredo de webhook responde 404.
 
-**Worker de ingestão.** Com `INGEST_WORKER=true`, a API não processa mais. Ela grava um job em `ingest_job` (migration 0049), com tipo, alvo, situação, tentativas e erro, e o processo `python -m app.knowledge.worker` executa. Os tipos são os cinco caminhos de hoje:
+**Worker de ingestão.** Com `INGEST_WORKER=true`, a API não processa mais. Ela grava um job em `ingest_job` (migration 0050), com tipo, alvo, situação, tentativas e erro, e o processo `python -m app.knowledge.worker` executa. Os tipos são os cinco caminhos de hoje:
 
 - arquivo e texto, lidos do original guardado (ADR-0029);
 - URL;
