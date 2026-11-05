@@ -26,6 +26,8 @@ class KnowledgeConnector(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     settings: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     secret_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # segredo do webhook da origem (ADR-0039), cifrado como os outros
+    webhook_secret_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     # idle | running | ok | failed
     last_status: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="idle", default="idle"

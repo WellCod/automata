@@ -195,5 +195,6 @@ def test_toda_coluna_cifrada_entra_no_comando_de_recifrar() -> None:
         for column in table.columns
         if column.name.endswith("_encrypted")
     }
-    covered = {(table, column.key) for table, column in ENCRYPTED.items()}
+    # a chave do dicionário é o rótulo; a tabela vem da coluna
+    covered = {(column.class_.__tablename__, column.key) for column in ENCRYPTED.values()}
     assert encrypted == covered, "coluna cifrada nova precisa entrar em ENCRYPTED"

@@ -30,6 +30,7 @@ ENCRYPTED: dict[str, InstrumentedAttribute[Any]] = {
     "eval_schedule": EvalSchedule.webhook_encrypted,
     "alert_destination": AlertDestination.webhook_encrypted,
     "knowledge_connector": KnowledgeConnector.secret_encrypted,
+    "knowledge_connector_webhook": KnowledgeConnector.webhook_secret_encrypted,
 }
 
 

@@ -1,5 +1,6 @@
 """Conectores de uma base (ADR-0024): cadastro, teste e sincronização em background."""
 
+import secrets
 from typing import Any
 from uuid import UUID
 
@@ -25,6 +26,7 @@ from app.schemas.knowledge_connector import (
     ConnectorInput,
     ConnectorResponse,
     ConnectorTestResult,
+    ConnectorWebhook,
 )
 from app.secrets import SecretsKeyMissing, encrypt_json
 from app.settings import get_settings
@@ -67,6 +69,7 @@ def _response(session: Session, c: KnowledgeConnector) -> ConnectorResponse:
         name=c.name,
         settings=c.settings,
         has_secret=c.secret_encrypted is not None,
+        has_webhook=c.webhook_secret_encrypted is not None,
         last_status=c.last_status,
         last_message=c.last_message,
         last_summary=c.last_summary,
@@ -198,6 +201,29 @@ def test_connector(base_id: UUID, connector_id: UUID, session: SessionDep) -> Co
     return ConnectorTestResult(
         ok=True, files=len(files), sample=[f.path for f in files[:5]], error=None
     )
+
+
+@router.post("/{connector_id}/webhook", response_model=ConnectorWebhook, dependencies=_OWNER)
+def create_webhook(base_id: UUID, connector_id: UUID, session: SessionDep) -> ConnectorWebhook:
+    """Gera o segredo do webhook da origem; trocar invalida o anterior (ADR-0039)."""
+    connector = _connector_or_404(session, base_id, connector_id)
+    secret = secrets.token_urlsafe(32)
+    try:
+        connector.webhook_secret_encrypted = encrypt_json({"secret": secret})
+    except SecretsKeyMissing as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    session.commit()
+    path = f"/api/v1/knowledge-connectors/{connector.id}/webhook"
+    base = (get_settings().public_base_url or "").rstrip("/")
+    return ConnectorWebhook(secret=secret, url=f"{base}{path}" if base else "", path=path)
+
+
+@router.delete("/{connector_id}/webhook", status_code=204, dependencies=_OWNER)
+def delete_webhook(base_id: UUID, connector_id: UUID, session: SessionDep) -> Response:
+    connector = _connector_or_404(session, base_id, connector_id)
+    connector.webhook_secret_encrypted = None
+    session.commit()
+    return Response(status_code=204)
 
 
 @router.post(

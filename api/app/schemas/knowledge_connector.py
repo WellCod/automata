@@ -111,6 +111,8 @@ class ConnectorResponse(BaseModel):
     settings: dict[str, Any]
     # nunca o segredo: só se há um salvo
     has_secret: bool
+    # webhook da origem configurado (ADR-0039)
+    has_webhook: bool = False
     last_status: str
     last_message: str | None
     last_summary: dict[str, Any] | None
@@ -120,6 +122,14 @@ class ConnectorResponse(BaseModel):
     content_count: int
     created_by: str
     created_at: datetime
+
+
+class ConnectorWebhook(BaseModel):
+    # mostrado uma vez: o painel não guarda nem mostra de novo
+    secret: str
+    # vazio sem PUBLIC_BASE_URL: o painel monta pela própria URL
+    url: str
+    path: str
 
 
 class ConnectorTestResult(BaseModel):
