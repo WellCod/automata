@@ -12,6 +12,7 @@ export const SECRET_TABLES: Record<string, string> = {
   eval_schedule: "Webhooks da suíte",
   alert_destination: "Destinos de alerta",
   knowledge_connector: "Conectores de conhecimento",
+  knowledge_connector_webhook: "Webhook dos conectores",
 };
 
 export function useKeyRotation() {

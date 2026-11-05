@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { KnowledgeConnectors } from "@/components/knowledge-connectors";
-import { origin, summaryText } from "@/lib/api/connectors";
+import { filterText, origin, summaryText } from "@/lib/api/connectors";
 
 vi.mock("@/lib/api/client", () => ({
   default: { GET: vi.fn(), POST: vi.fn(), PUT: vi.fn(), DELETE: vi.fn() },
@@ -111,5 +111,66 @@ describe("conectores da base", () => {
     expect(vi.mocked(client.POST).mock.calls[0][0]).toBe(
       "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/sync",
     );
+  });
+
+  it("Drive com filtros e drive compartilhado vai com a conta de serviço", async () => {
+    mockGet("owner");
+    const user = userEvent.setup();
+    render(<KnowledgeConnectors baseId="b1" />, { wrapper });
+    await user.click(await screen.findByRole("button", { name: "Novo conector" }));
+    const form = screen.getByRole("form", { name: "Novo conector" });
+    await user.selectOptions(within(form).getByLabelText("Origem"), "gdrive");
+    await user.type(within(form).getByLabelText("Nome do conector"), "Políticas");
+    await user.type(within(form).getByLabelText("ID da pasta"), "1AbCdEfGhIjKlMn");
+    await user.click(within(form).getByLabelText("Pasta num drive compartilhado"));
+    await user.type(
+      within(form).getByLabelText("Só os arquivos (um padrão por linha)"),
+      "politicas/**/*.md{enter}  {enter}*.txt",
+    );
+    await user.type(within(form).getByLabelText("JSON da conta de serviço"), "sa");
+    await user.click(within(form).getByRole("button", { name: "Salvar conector" }));
+
+    await waitFor(() => expect(client.POST).toHaveBeenCalled());
+    const body = (vi.mocked(client.POST).mock.calls[0][1] as { body: Record<string, unknown> })
+      .body;
+    expect(body.kind).toBe("gdrive");
+    expect(body.settings).toEqual({
+      folder_id: "1AbCdEfGhIjKlMn",
+      include: ["politicas/**/*.md", "*.txt"],
+      shared_drive: true,
+    });
+    expect(body.secret).toEqual({ service_account_json: "sa" });
+  });
+
+  it("owner gera o webhook e vê o segredo uma vez", async () => {
+    mockGet("owner");
+    vi.mocked(client.POST).mockResolvedValue({
+      data: {
+        secret: "segredo-gerado",
+        url: "",
+        path: "/api/v1/knowledge-connectors/c1/webhook",
+      },
+      error: undefined,
+    } as never);
+    const user = userEvent.setup();
+    render(<KnowledgeConnectors baseId="b1" />, { wrapper });
+    const row = await screen.findByRole("listitem", { name: "Conector Documentação" });
+    await user.click(within(row).getByRole("button", { name: "Webhook" }));
+    const shown = await within(row).findByRole("status", { name: "Webhook gerado" });
+    expect(shown).toHaveTextContent("segredo-gerado");
+    expect(shown).toHaveTextContent("/api/v1/knowledge-connectors/c1/webhook");
+    expect(vi.mocked(client.POST).mock.calls[0][0]).toBe(
+      "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/webhook",
+    );
+    await user.click(within(shown).getByRole("button", { name: "Fechar" }));
+    expect(within(row).queryByText("segredo-gerado")).toBeNull();
+  });
+
+  it("resume o filtro e as origens do Google", () => {
+    expect(filterText({ settings: { include: ["a/*.md"], exclude: ["b/**"] } })).toBe(
+      "só a/*.md · fora b/**",
+    );
+    expect(origin({ kind: "gcs", settings: { bucket: "b", prefix: "p" } })).toBe("b/p");
+    expect(origin({ kind: "gdrive", settings: { folder_id: "X1" } })).toBe("pasta X1");
   });
 });

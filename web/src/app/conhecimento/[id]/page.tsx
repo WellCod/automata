@@ -47,6 +47,10 @@ function formatSize(bytes: number): string {
 }
 
 function StatusBadge({ content }: { content: KnowledgeContent }) {
+  if (content.status === "processing" && content.queued) {
+    // esperando o worker de ingestão separado (ADR-0039)
+    return <span className="text-muted-foreground text-[11px]">na fila…</span>;
+  }
   if (content.status === "processing") {
     return <span className="text-[11px] text-amber-600 dark:text-amber-400">processando…</span>;
   }
