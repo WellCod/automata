@@ -664,3 +664,33 @@ def test_checagem_numa_etapa_e_turnos_anteriores_com_historico(client: TestClien
     # a revisão rodou no workflow sem condição, mas a regra pede "x"
     assert failed["status"] == "failed"
     assert failed["checks"][0]["rules"][0]["step"] == "revisao"
+
+
+def test_sugestoes_em_lote_pulam_o_que_ja_virou_caso(client: TestClient) -> None:
+    """ADR-0038: conversas recentes viram sugestões; a que já é caso fica de fora."""
+    agent = _agent(client, "lote de casos")
+
+    def say(message: str, session: str) -> str:
+        resp = client.post(
+            f"/agents/{agent}/runs",
+            data={"message": message, "stream": "false", "session_id": session},
+        )
+        assert resp.status_code == 200, resp.text
+        return str(resp.json()["run_id"])
+
+    first = say("quero trocar o tênis", "s1")
+    second = say("meu e-mail é ana@exemplo.com", "s2")
+    third = say("qual o prazo de entrega?", "s3")
+    url = f"/api/v1/configs/{agent}/eval-cases/suggestions"
+
+    found = client.get(url, params={"limit": 5}).json()
+    assert [s["source_run_id"] for s in found] == [third, second, first]
+    assert found[1]["input"] == "meu e-mail é [e-mail removido]"
+
+    client.post(
+        f"/api/v1/configs/{agent}/eval-cases",
+        json={k: found[0][k] for k in ("name", "input", "context", "checks", "source_run_id")},
+    ).raise_for_status()
+    again = client.get(url, params={"limit": 2}).json()
+    assert [s["source_run_id"] for s in again] == [second, first]
+    assert client.get(url, params={"limit": 21}).status_code == 422
