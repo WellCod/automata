@@ -193,7 +193,8 @@ def test_connector(base_id: UUID, connector_id: UUID, session: SessionDep) -> Co
         listed = source_of(connector).list_files()
     except (SourceError, EgressDenied, SecretsKeyMissing) as exc:
         return ConnectorTestResult(ok=False, files=0, sample=[], error=str(exc))
-    files, _ = selectable(listed, get_settings().knowledge_max_upload_mb * 1024 * 1024)
+    max_bytes = get_settings().knowledge_max_upload_mb * 1024 * 1024
+    files, _ = selectable(listed, max_bytes, connector.settings)
     return ConnectorTestResult(
         ok=True, files=len(files), sample=[f.path for f in files[:5]], error=None
     )
