@@ -1407,3 +1407,22 @@ Decisão em [ADR-0038](adr/0038-workflow-e-suite.md). O workflow ganha um rotead
 - A checagem com `step: triagem` falha quando a triagem classifica errado, mesmo com a saída final certa.
 - As sugestões em lote não trazem conversa que já virou caso.
 
+## Fase 42 — Conectores e ingestão
+
+Decisão em [ADR-0039](adr/0039-conectores-e-worker-de-ingestao.md). As bases ganham conectores do Google Drive e do Cloud Storage, o filtro de arquivos por padrão de nome e a sincronização disparada pela própria origem. A ingestão pode sair do processo da API para um worker com fila no banco.
+
+- [x] `docs(adr)`: ADR-0039 e esta seção
+- [ ] `feat(api)`: conectores do Google Drive e do Cloud Storage com conta de serviço
+- [ ] `feat(api)`: filtro de arquivos por padrão de nome nos conectores
+- [ ] `feat(api)`: sincronização disparada por webhook da origem com assinatura
+- [ ] `feat(api)`: worker de ingestão separado com fila no banco
+- [ ] `feat(web)`: Drive, Cloud Storage, filtros e webhook nos conectores
+- [ ] `test(api)`: evals dos conectores novos, do filtro, do webhook e do worker
+
+**Critério de aceite da fase:**
+
+- Uma pasta do Drive com um Google Docs e um PDF vira dois documentos na base, e editar o Docs reindexa só ele.
+- Um conector com `include: ["politicas/**/*.md"]` não indexa o `CHANGELOG.md`, e mudar o filtro tira da base o que saiu dele.
+- Um push no GitHub com o webhook configurado sincroniza a base em segundos. Uma assinatura errada recebe 401.
+- Com `INGEST_WORKER=true`, o upload fica na fila até o worker processar, e dois workers não processam o mesmo job.
+

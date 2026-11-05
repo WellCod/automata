@@ -394,6 +394,7 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0036](docs/adr/0036-pedido-do-titular-e-prazo.md) | Pedido do titular por integração e pelo próprio usuário, com prazo e aviso (proposto, Fase 39) |
 | [0037](docs/adr/0037-operacao-fila-conciliacao-e-avisos.md) | Painel da fila, retry por agente idempotente, conciliação de custo e aviso por e-mail (proposto, Fase 40) |
 | [0038](docs/adr/0038-workflow-e-suite.md) | Roteador, entrada por etapa, histórico no workflow e casos de suíte a partir das conversas (proposto, Fase 41) |
+| [0039](docs/adr/0039-conectores-e-worker-de-ingestao.md) | Google Drive e Cloud Storage, filtro por nome, webhook da origem e worker de ingestão (proposto, Fase 42) |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 
