@@ -2,6 +2,7 @@
 
 from dataclasses import asdict
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
@@ -17,11 +18,12 @@ from app.evals.scheduler import next_run, validate
 from app.evals.service import EvalRunRefused, check_judge, create_run
 from app.evals.suggest import suggest
 from app.mcp.egress import EgressDenied
-from app.models.config import AgentConfig
+from app.models.config import AgentConfig, AgentConfigVersion
 from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSchedule
 from app.models.run import AgentRun
 from app.repositories.config import ConfigRepository
 from app.repositories.eval import EvalCaseRepository, EvalRunRepository, EvalScheduleRepository
+from app.schemas.config import ConfigPayload
 from app.schemas.eval import (
     MAX_CASES,
     CaseComparison,
@@ -45,6 +47,7 @@ from app.schemas.eval import (
     WebhookTestResult,
     kind_problem,
 )
+from app.schemas.workflow import walk
 from app.secrets import SecretsKeyMissing
 
 router = APIRouter(
@@ -72,9 +75,25 @@ def _config_or_404(session: SessionDep, config_id: UUID) -> AgentConfig:
     return config
 
 
-def _fits(config: AgentConfig, body: EvalCaseInput) -> None:
+def _workflow_shape(session: Any, config: AgentConfig) -> tuple[int, set[str] | None]:
+    """Histórico e etapas do rascunho, ou da versão vigente, do workflow (ADR-0038)."""
+    if config.kind != "workflow":
+        return 0, None
+    version_id = config.draft_version_id or config.current_version_id
+    version = session.get(AgentConfigVersion, version_id) if version_id else None
+    if version is None:
+        return 0, None
+    workflow = ConfigPayload.model_validate(version.payload).workflow
+    if workflow is None:
+        return 0, None
+    names = {n.name for n, _ in walk(workflow.steps)}
+    return workflow.history_runs, names
+
+
+def _fits(config: AgentConfig, body: EvalCaseInput, session: Any = None) -> None:
     # tools e bloqueio são de cada etapa do workflow; etapas só existem nele (ADR-0022)
-    problem = kind_problem(config.kind, body)
+    history, names = _workflow_shape(session, config) if session is not None else (0, None)
+    problem = kind_problem(config.kind, body, history, names)
     if problem is not None:
         raise HTTPException(status_code=422, detail=problem)
 
@@ -155,7 +174,7 @@ def suggest_case(
 def create_case(
     config_id: UUID, body: EvalCaseInput, request: Request, session: SessionDep
 ) -> EvalCaseResponse:
-    _fits(_config_or_404(session, config_id), body)
+    _fits(_config_or_404(session, config_id), body, session)
     repo = EvalCaseRepository(session)
     if repo.count(config_id) >= MAX_CASES:
         raise HTTPException(status_code=422, detail=f"No máximo {MAX_CASES} casos por suíte")
@@ -182,7 +201,7 @@ def create_case(
 def update_case(
     config_id: UUID, case_id: UUID, body: EvalCaseInput, request: Request, session: SessionDep
 ) -> EvalCaseResponse:
-    _fits(_config_or_404(session, config_id), body)
+    _fits(_config_or_404(session, config_id), body, session)
     repo = EvalCaseRepository(session)
     case = _case_or_404(repo, config_id, case_id)
     if repo.name_taken(config_id, body.name, exclude=case_id):

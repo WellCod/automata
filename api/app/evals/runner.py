@@ -23,7 +23,12 @@ from app.agents import models_map
 from app.agents.factory import agent_from, load_team, load_version, team_from
 from app.agents.output_schema import aschema_verdict
 from app.agents.tracking import EvalContext, TrackedWorkflow, current_eval_run
-from app.agents.workflow_factory import build_nodes, load_workflow, rule_matches
+from app.agents.workflow_factory import (
+    build_nodes,
+    history_kwargs,
+    load_workflow,
+    rule_matches,
+)
 from app.budget import RULE_BUDGET
 from app.db import get_db, get_engine
 from app.evals.judge import JudgeUsage, metered
@@ -79,17 +84,34 @@ class TextScorer:
         # o JSON Schema da versão testada, quando o caso tem a checagem `schema`
         self._schema = schema
 
-    def verdicts(self, content: str) -> list[dict[str, Any]]:
-        return [
-            {"kind": c.kind, "value": c.value, "passed": rule_matches(c.rule(), content)}
-            for c in self._checks
-        ]
+    def verdicts(
+        self, content: str, step_contents: dict[str, str] | None = None
+    ) -> list[dict[str, Any]]:
+        """Com `step`, a regra olha a saída daquela etapa; etapa que não rodou falha (ADR-0038)."""
+        out = []
+        for c in self._checks:
+            verdict: dict[str, Any] = {"kind": c.kind, "value": c.value}
+            if c.step:
+                verdict["step"] = c.step
+                text = (step_contents or {}).get(c.step)
+                verdict["passed"] = text is not None and rule_matches(c.rule(), text)
+            else:
+                verdict["passed"] = rule_matches(c.rule(), content)
+            out.append(verdict)
+        return out
 
     async def ascore(self, run: Any, expected: Any = None) -> Score:
-        verdicts = self.verdicts(_text(getattr(run, "content", None)))
+        metadata = getattr(run, "metadata", None) or {}
+        verdicts = self.verdicts(
+            _text(getattr(run, "content", None)), metadata.get("step_contents")
+        )
         ok = sum(1 for v in verdicts if v["passed"])
         total = len(verdicts)
-        failed = [f"{v['kind']} {v['value']!r}".strip() for v in verdicts if not v["passed"]]
+        failed = [
+            (f"{v['step']}: " if v.get("step") else "") + f"{v['kind']} {v['value']!r}".strip()
+            for v in verdicts
+            if not v["passed"]
+        ]
         detail: dict[str, Any] = {"checks": verdicts}
         if self._steps is not None:
             ran = list((getattr(run, "metadata", None) or {}).get("steps", []))
@@ -170,6 +192,7 @@ def _runner_for(config_id: UUID, kind: str, version_id: UUID, actor: str) -> tup
             description=resolved.description,
             steps=build_nodes(resolved.steps, resolved),
             user_id=actor,
+            **history_kwargs(resolved),
         )
         workflow.automata_config_id = config_id
         return "agent", WorkflowUnderTest(workflow, set(resolved.executors))
@@ -241,13 +264,15 @@ def _context_args(runner: Any, context: list[str], actor: str) -> dict[str, Any]
     """
     if not context:
         return {}
-    runner.db = get_db()
+    # o adaptador do workflow é um gerador: os turnos anteriores rodam no workflow (ADR-0038)
+    target = runner.workflow if isinstance(runner, WorkflowUnderTest) else runner
+    target.db = get_db()
     session_id = f"eval-{uuid4().hex}"
 
     async def setup() -> None:
         for message in context:
             await asyncio.wait_for(
-                runner.arun(message, session_id=session_id, user_id=actor, stream=False),
+                target.arun(message, session_id=session_id, user_id=actor, stream=False),
                 CONTEXT_TIMEOUT_S,
             )
         # bloqueio num turno anterior não é o do turno avaliado
