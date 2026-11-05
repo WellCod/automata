@@ -189,19 +189,19 @@ export default function WorkflowEditPage() {
 
             <div className="flex flex-col gap-1">
               <label className="text-foreground flex flex-wrap items-center gap-2 text-[13px]">
-                Levar às etapas as últimas
+                Histórico da conversa nas etapas
                 <select
                   aria-label="Conversas anteriores levadas às etapas"
                   {...form.register("history_runs", { valueAsNumber: true })}
-                  className={`${inputCls} w-auto`}
+                  // o inputCls desta página é w-full: aqui o select fica do tamanho da opção
+                  className={inputCls.replace("w-full", "w-auto")}
                 >
                   {[0, 1, 2, 3, 4, 5].map((n) => (
                     <option key={n} value={n}>
-                      {n === 0 ? "nenhuma" : n}
+                      {n === 0 ? "Sem histórico" : n === 1 ? "Última troca" : `Últimas ${n} trocas`}
                     </option>
                   ))}
                 </select>
-                mensagens da conversa
               </label>
               <p className="text-muted-foreground text-[11px]">
                 Com histórico, as etapas lembram o que foi dito antes na mesma sessão, e a suíte
