@@ -1,6 +1,6 @@
 # ADR-0034 — Piso de guardrails da instância e classificador na saída
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-11-04
 
 ## Contexto

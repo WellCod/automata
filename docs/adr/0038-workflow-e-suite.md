@@ -1,6 +1,6 @@
 # ADR-0038 — Roteador, entrada por etapa, histórico no workflow e casos de suíte a partir das conversas
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-11-04
 
 ## Contexto

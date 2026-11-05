@@ -1,6 +1,6 @@
 # ADR-0033 — Reranker por cross-encoder e filtros escolhidos pelo modelo na recuperação
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-11-04
 
 ## Contexto

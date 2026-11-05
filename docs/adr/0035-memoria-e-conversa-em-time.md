@@ -1,6 +1,6 @@
 # ADR-0035 — Memória do usuário no time e modelo próprio para o resumo da compactação
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-11-04
 
 ## Contexto
