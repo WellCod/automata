@@ -3,7 +3,7 @@
 Passo a passo da [ADR-0026](adr/0026-rotacao-de-chaves.md). São duas chaves independentes, e cada uma tem a sua troca:
 
 - **Par JWT** (`JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY`): assina e verifica sessões do painel e tokens de integração.
-- **Chave dos segredos** (`MCP_SECRETS_KEY`): cifra os headers dos servidores MCP, os webhooks da suíte, os destinos de alerta e as credenciais dos conectores.
+- **Chave dos segredos** (`MCP_SECRETS_KEY`): cifra os headers dos servidores MCP, os webhooks da suíte, os destinos de alerta, as credenciais dos conectores e o segredo do webhook deles.
 
 A página **Chaves** do painel (só para o owner) acompanha a troca. Ela mostra o que ainda depende da chave velha e avisa quando as variáveis `*_PREVIOUS_*` podem sair.
 
@@ -94,7 +94,7 @@ Reinicie a API. Tudo o que for gravado daqui em diante já sai com a nova, e o q
 docker compose exec api python -m app.rotate_secrets
 ```
 
-No Railway, use `railway run python -m app.rotate_secrets`. O comando recifra as quatro tabelas numa transação só e informa quantos registros mudaram em cada uma. Pode rodar de novo sem efeito.
+No Railway, use `railway run python -m app.rotate_secrets`. O comando recifra os cinco campos cifrados numa transação só e informa quantos registros mudaram em cada um. Pode rodar de novo sem efeito.
 
 Se algum segredo não abrir com nenhuma das duas chaves, o comando para sem gravar nada e informa a tabela e o id. Isso acontece quando a chave original já tinha se perdido. Recadastre esse segredo no painel e rode o comando de novo.
 

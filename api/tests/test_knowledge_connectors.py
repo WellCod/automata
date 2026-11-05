@@ -538,3 +538,65 @@ def test_conector_sincroniza_no_intervalo(
     done = client.get(f"/api/v1/knowledge-bases/{base_id}/connectors").json()[0]
     assert done["last_status"] == "ok" and done["last_summary"]["added"] == 1
     assert schedule.claim_due()[0] == []
+
+
+def test_webhook_da_origem_sincroniza_com_assinatura(
+    client: TestClient, base_id: str, github: FakeGitHub
+) -> None:
+    """ADR-0039: rota pública, só com o HMAC do corpo; inclui o filtro por nome."""
+    import hashlib
+    import hmac
+
+    github.files = {
+        "docs/politicas/troca.md": "# Troca\n\nO prazo de troca é de 30 dias.",
+        "docs/CHANGELOG.md": "mudanças",
+    }
+    base = f"/api/v1/knowledge-bases/{base_id}/connectors"
+    connector = client.post(
+        base,
+        json={
+            "kind": "github",
+            "name": "Políticas",
+            "settings": {
+                "repo": "acme/docs",
+                "path": "docs",
+                "api_url": github.url,
+                "include": ["politicas/**/*.md"],
+            },
+        },
+    ).json()
+    hook = f"/api/v1/knowledge-connectors/{connector['id']}/webhook"
+    body = b'{"ref": "refs/heads/main"}'
+    assert client.post(hook, content=body).status_code == 404  # sem webhook configurado
+
+    issued = client.post(f"{base}/{connector['id']}/webhook").json()
+    assert issued["path"] == hook and len(issued["secret"]) > 30
+    assert client.get(base).json()[0]["has_webhook"] is True
+    assert issued["secret"] not in json.dumps(client.get(base).json())
+
+    def sign(secret: str) -> str:
+        return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+    assert (
+        client.post(hook, content=body, headers={"X-Hub-Signature-256": "sha256=00"}).status_code
+        == 401
+    )
+    assert client.post(hook, content=body).status_code == 401
+    ok = client.post(hook, content=body, headers={"X-Hub-Signature-256": sign(issued["secret"])})
+    assert ok.status_code == 202, ok.text
+    contents = client.get(f"/api/v1/knowledge-bases/{base_id}/contents").json()
+    # o filtro deixou o CHANGELOG de fora
+    assert [c["external_path"] for c in contents] == ["politicas/troca.md"]
+    # uma sincronização por minuto
+    again = client.post(
+        hook, content=body, headers={"X-Automata-Signature": sign(issued["secret"])}
+    )
+    assert again.status_code == 429
+
+    assert client.delete(f"{base}/{connector['id']}/webhook").status_code == 204
+    assert (
+        client.post(
+            hook, content=body, headers={"X-Hub-Signature-256": sign(issued["secret"])}
+        ).status_code
+        == 404
+    )
