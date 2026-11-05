@@ -26,6 +26,7 @@ from app.db import get_engine
 from app.evals.notify import notify_after
 from app.evals.runner import execute
 from app.evals.service import EvalRunRefused, create_run
+from app.knowledge import jobs as knowledge_jobs
 from app.knowledge import schedule as knowledge_schedule
 from app.knowledge.connector_sync import sync
 from app.models.eval import EvalSchedule
@@ -103,6 +104,15 @@ async def _run_and_notify(run_id: UUID) -> None:
     await asyncio.to_thread(notify_after, run_id)
 
 
+def _enqueue_due(connectors: list[UUID], urls: list[UUID]) -> None:
+    with Session(get_engine()) as session:
+        for cid in connectors:
+            knowledge_jobs.enqueue(session, "sync", cid)
+        for uid in urls:
+            knowledge_jobs.enqueue(session, "refresh", uid)
+        session.commit()
+
+
 async def _in_thread(fn: Callable[[UUID], object], item: UUID) -> None:
     # cada um grava o próprio resultado; aqui só não deixa a exceção sumir no loop
     try:
@@ -129,6 +139,10 @@ async def run_forever(poll_seconds: int = POLL_SECONDS) -> None:
         # conectores e URLs com reindexação vencida (ADR-0024)
         try:
             connectors, urls = await asyncio.to_thread(knowledge_schedule.claim_due)
+            if knowledge_jobs.worker_enabled():
+                # com o worker separado (ADR-0039) a API só enfileira
+                await asyncio.to_thread(_enqueue_due, connectors, urls)
+                connectors, urls = [], []
             jobs = [_in_thread(sync, cid) for cid in connectors]
             jobs += [_in_thread(knowledge_schedule.refresh_url, uid) for uid in urls]
             for job in jobs:

@@ -11,8 +11,9 @@ from sqlalchemy.orm import Session
 
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
-from app.knowledge.connector_sync import selectable, source_of, sync
+from app.knowledge.connector_sync import selectable, source_of
 from app.knowledge.ingest import remove_chunks
+from app.knowledge.jobs import submit
 from app.knowledge.schedule import next_at
 from app.knowledge.sources import SourceError
 from app.mcp.egress import EgressDenied, check_url
@@ -239,5 +240,5 @@ def sync_connector(
     connector.last_message = None
     session.commit()
     session.refresh(connector)
-    background.add_task(sync, connector.id)
+    submit(background, "sync", connector.id)
     return _response(session, connector)

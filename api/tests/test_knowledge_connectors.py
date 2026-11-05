@@ -600,3 +600,92 @@ def test_webhook_da_origem_sincroniza_com_assinatura(
         ).status_code
         == 404
     )
+
+
+@pytest.fixture
+def worker_on(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    monkeypatch.setenv("INGEST_WORKER", "true")
+    get_settings.cache_clear()
+    yield
+    monkeypatch.delenv("INGEST_WORKER")
+    get_settings.cache_clear()
+
+
+def test_worker_de_ingestao_processa_a_fila(
+    client: TestClient, base_id: str, github: FakeGitHub, worker_on: None
+) -> None:
+    """ADR-0039: com INGEST_WORKER a API só enfileira; o worker executa os cinco caminhos."""
+    from app.db import get_engine
+    from app.knowledge.worker import run_once
+    from app.models.ingest_job import IngestJob
+
+    contents = f"/api/v1/knowledge-bases/{base_id}/contents"
+    sent = client.post(
+        contents + "/text", json={"name": "Troca", "text": "Prazo de troca: 30 dias."}
+    )
+    assert sent.status_code == 202, sent.text
+    assert sent.json()["queued"] is True
+    listed = client.get(contents).json()
+    assert listed[0]["status"] == "processing" and listed[0]["queued"] is True
+    assert _chunks(base_id) == 0  # nada processado no processo da API
+
+    github.files = {"docs/frete.md": "Frete grátis acima de R$ 200."}
+    connector = client.post(
+        f"/api/v1/knowledge-bases/{base_id}/connectors",
+        json={
+            "kind": "github",
+            "name": "Docs",
+            "settings": {"repo": "acme/docs", "path": "docs", "api_url": github.url},
+        },
+    ).json()
+    synced = client.post(f"/api/v1/knowledge-bases/{base_id}/connectors/{connector['id']}/sync")
+    assert synced.status_code == 202
+    assert len(client.get(contents).json()) == 1  # a sincronização também esperou
+
+    with Session(get_engine()) as session:
+        kinds = session.scalars(select(IngestJob.kind).order_by(IngestJob.created_at)).all()
+    assert kinds[-2:] == ["ingest", "sync"]
+
+    while run_once():
+        pass
+    listed = client.get(contents).json()
+    assert {c["status"] for c in listed} == {"completed"}
+    assert {c["queued"] for c in listed} == {False}
+    assert {c["name"] for c in listed} >= {"Troca", "frete"}
+
+    # reprocessamento entra como um job só, com a lista de conteúdos
+    assert client.post(f"/api/v1/knowledge-bases/{base_id}/reprocess").status_code == 202
+    with Session(get_engine()) as session:
+        job = session.scalars(select(IngestJob).where(IngestJob.status == "queued")).one()
+    assert job.kind == "reprocess" and len(job.payload["content_ids"]) == 2
+    assert run_once() and not run_once()
+    assert {c["status"] for c in client.get(contents).json()} == {"completed"}
+
+
+def test_job_travado_volta_uma_vez_e_depois_falha(
+    client: TestClient, base_id: str, worker_on: None
+) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from app.db import get_engine
+    from app.knowledge.worker import claim, recover_stale
+    from app.models.ingest_job import IngestJob
+
+    contents = f"/api/v1/knowledge-bases/{base_id}/contents"
+    content_id = client.post(contents + "/text", json={"name": "Travado", "text": "texto"}).json()[
+        "id"
+    ]
+    later = datetime.now(UTC) + timedelta(minutes=31)
+
+    first = claim()
+    assert first is not None and str(first.target_id) == content_id
+    # worker caiu no meio: volta para a fila
+    assert recover_stale(later) == (1, 0)
+    second = claim()
+    assert second is not None and second.id == first.id
+    assert recover_stale(later) == (0, 1)
+    with Session(get_engine()) as session:
+        job = session.get(IngestJob, first.id)
+        assert job is not None and job.status == "failed" and job.attempts == 2
+    content = client.get(f"{contents}/{content_id}").json()
+    assert content["status"] == "failed" and "worker" in content["status_message"]

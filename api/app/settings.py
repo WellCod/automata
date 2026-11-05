@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     # "development" liga /docs, /redoc e /openapi.json; qualquer outro valor os desliga
     app_env: str = "production"
     redis_url: str | None = None
+    # ingestão no worker separado (ADR-0039): a API só grava o job em ingest_job
+    ingest_worker: bool = False
     # IPs ou CIDRs de proxies cujo X-Forwarded-For é confiável (separados por vírgula).
     # Vazio: o header é ignorado e vale o IP da conexão.
     trusted_proxies: str = ""

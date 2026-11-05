@@ -206,6 +206,8 @@ class KnowledgeContentResponse(BaseModel):
     refresh_every_hours: int | None = None
     next_refresh_at: datetime | None = None
     fields: dict[str, str] | None = None
+    # esperando o worker de ingestão (ADR-0039); sempre falso sem INGEST_WORKER
+    queued: bool = False
 
 
 class ChunkPreviewInput(BaseModel):
