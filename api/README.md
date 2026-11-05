@@ -77,6 +77,11 @@ Arquivos:
   - Matriz de decisão do retry, de 0 a 2 repetições por tentativa. Falha de mais de 24 h não é retomada no deploy.
   - Centavos da Anthropic e dólares da OpenAI.
   - O status do e-mail nunca traz a mensagem do servidor, e sem SMTP recusa sem tentar.
+- `tests/test_evals_workflow_e_suite.py`: roteador, entrada por etapa e suíte por etapa (ADR-0038).
+  - Roteador: regra sobre a mensagem e sobre a saída anterior, a ordem decidindo o empate, o padrão e o caso sem padrão.
+  - Entrada da etapa: a anterior é a saída mais funda, não a frase-resumo do paralelo. `{etapa:Nome}` acha etapa dentro de contêiner, e etapa inexistente fica vazia.
+  - Checagem numa etapa: etapa que não rodou falha.
+  - Regras do caso: contexto exige histórico, etapa só em workflow, etapa inexistente.
 - `.github/workflows/evals-nightly.yml` — workflow agendado
 
 ## Metering
