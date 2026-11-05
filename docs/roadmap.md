@@ -1417,7 +1417,7 @@ Decisão em [ADR-0039](adr/0039-conectores-e-worker-de-ingestao.md). As bases ga
 - [x] `feat(api)`: sincronização disparada por webhook da origem com assinatura
 - [x] `feat(api)`: worker de ingestão separado com fila no banco
 - [x] `feat(web)`: Drive, Cloud Storage, filtros e webhook nos conectores
-- [ ] `test(api)`: evals dos conectores novos, do filtro, do webhook e do worker
+- [x] `test(api)`: evals dos conectores novos, do filtro, do webhook e do worker
 
 **Critério de aceite da fase:**
 

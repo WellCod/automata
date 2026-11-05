@@ -17,6 +17,7 @@ from app.knowledge.sources import (
     MAX_DEPTH,
     SUPPORTED,
     TIMEOUT_S,
+    UNKNOWN_SIZE,
     RemoteFile,
     SourceError,
     _inside,
@@ -140,13 +141,16 @@ class GDriveSource:
                     # o nativo não tem md5: a versão é a data da última edição
                     path = f"{path}.{EXPORTS[mime][1]}"
                     version = str(item.get("modifiedTime") or "")
+                    # o Drive não devolve `size` do nativo
+                    size = UNKNOWN_SIZE
                 else:
                     version = str(item.get("md5Checksum") or item.get("modifiedTime") or "")
+                    size = int(item.get("size") or 0)
                 files.append(
                     RemoteFile(
                         path=path,
                         version=version,
-                        size=int(item.get("size") or 0),
+                        size=size,
                         ref=f"{item['id']}|{mime}",
                     )
                 )
