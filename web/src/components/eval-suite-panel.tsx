@@ -1,11 +1,13 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, CircleSlash, Loader2, Pencil, Plus, Trash2, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { EvalCaseForm } from "@/components/eval-case-form";
 import { EvalScheduleSection } from "@/components/eval-schedule-section";
 import client from "@/lib/api/client";
+import { apiErrorMessage } from "@/lib/api/errors";
+import type { components } from "@/lib/api/schema.d.ts";
 import {
   useEvalCases,
   useEvalComparison,
@@ -287,6 +289,101 @@ function SuggestedCase({
   );
 }
 
+type Suggestion = components["schemas"]["EvalCaseSuggestion"];
+
+/** Sugestões em lote das conversas recentes (ADR-0038); cada uma é revisada antes de salvar. */
+function BatchSuggestions({
+  configId,
+  saving,
+  error,
+  onSave,
+  onClose,
+}: {
+  configId: string;
+  saving: boolean;
+  error?: string | null;
+  onSave: (body: EvalCaseInput, done: () => void) => void;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const key = ["eval-suggestions", configId];
+  const [open, setOpen] = useState<string | null>(null);
+  const {
+    data = [],
+    isPending,
+    error: loadError,
+  } = useQuery({
+    queryKey: key,
+    queryFn: async (): Promise<Suggestion[]> => {
+      const res = await client.GET("/api/v1/configs/{config_id}/eval-cases/suggestions", {
+        params: { path: { config_id: configId }, query: { limit: 10 } },
+      });
+      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao sugerir casos"));
+      return res.data;
+    },
+  });
+  return (
+    <section
+      aria-label="Sugestões das conversas"
+      className="border-border flex flex-col gap-2 rounded border border-dashed p-3"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-foreground text-[12px] font-medium">Sugestões das conversas</span>
+        <Button size="xs" variant="muted" onClick={onClose}>
+          Fechar
+        </Button>
+      </div>
+      <p className="text-muted-foreground text-[11px]">
+        Das conversas recentes que ainda não viraram caso, com os dados pessoais mascarados. Nada é
+        salvo até você revisar.
+      </p>
+      {isPending && <p className="text-muted-foreground text-[12px]">Buscando conversas…</p>}
+      {loadError && <p className="text-destructive text-[12px]">{loadError.message}</p>}
+      {!isPending && !loadError && data.length === 0 && (
+        <p className="text-muted-foreground text-[12px]">Nenhuma conversa nova para virar caso.</p>
+      )}
+      <ul className="flex flex-col gap-2">
+        {data.map((item) =>
+          open === item.source_run_id ? (
+            <li key={item.source_run_id}>
+              <EvalCaseForm
+                initial={{
+                  name: item.name,
+                  input: item.input,
+                  context: item.context,
+                  checks: item.checks,
+                  source_run_id: item.source_run_id,
+                }}
+                notes={item.notes}
+                judgeSuggestion={item.judge_criteria}
+                saving={saving}
+                error={error}
+                onCancel={() => setOpen(null)}
+                onSave={(body) =>
+                  onSave(body, () => {
+                    setOpen(null);
+                    void queryClient.invalidateQueries({ queryKey: key });
+                  })
+                }
+              />
+            </li>
+          ) : (
+            <li
+              key={item.source_run_id}
+              className="border-border flex items-center justify-between gap-2 border-t pt-2"
+            >
+              <span className="text-foreground min-w-0 truncate text-[12px]">{item.input}</span>
+              <Button size="xs" variant="accent" onClick={() => setOpen(item.source_run_id)}>
+                Revisar
+              </Button>
+            </li>
+          ),
+        )}
+      </ul>
+    </section>
+  );
+}
+
 export function EvalSuitePanel({
   configId,
   kind = "agent",
@@ -302,6 +399,7 @@ export function EvalSuitePanel({
   const { saveCase, deleteCase, startRun, updateSettings } = useEvalMutations(configId);
 
   const [editing, setEditing] = useState<string | "new" | null>(null);
+  const [batch, setBatch] = useState(false);
   const [chosenTarget, setTarget] = useState<string | null>(null);
   const [judge, setJudge] = useState<string>("");
   const [selected, setSelected] = useState<string | null>(null);
@@ -364,16 +462,32 @@ export function EvalSuitePanel({
             Casos de teste <span className="text-muted-foreground">({cases.length})</span>
           </h3>
           {editing === null && (
-            <Button size="sm" variant="accent" onClick={() => setEditing("new")}>
-              <Plus aria-hidden />
-              Novo caso
-            </Button>
+            <div className="flex gap-2">
+              {kind !== "workflow" && !batch && (
+                <Button size="sm" variant="muted" onClick={() => setBatch(true)}>
+                  Sugerir das conversas
+                </Button>
+              )}
+              <Button size="sm" variant="accent" onClick={() => setEditing("new")}>
+                <Plus aria-hidden />
+                Novo caso
+              </Button>
+            </div>
           )}
         </div>
         <p className="text-muted-foreground text-[12px]">
           Cada caso é uma mensagem e o que precisa ser verdade na resposta. Os casos não fazem parte
           da versão: editar o rascunho não muda o teste.
         </p>
+        {batch && (
+          <BatchSuggestions
+            configId={configId}
+            saving={saveCase.isPending}
+            error={saveCase.error?.message}
+            onClose={() => setBatch(false)}
+            onSave={(body, done) => saveCase.mutate({ body }, { onSuccess: done })}
+          />
+        )}
         {fromRun && (
           <SuggestedCase
             configId={configId}

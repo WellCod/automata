@@ -50,7 +50,13 @@ describe("estrutura do workflow", () => {
   });
 
   it("acusa o que a API recusaria", () => {
-    const step: WorkflowNode = { type: "step", name: "a", on_error: "stop", max_retries: 0 };
+    const step: WorkflowNode = {
+      type: "step",
+      name: "a",
+      on_error: "stop",
+      max_retries: 0,
+      input: "previous",
+    };
     expect(structureErrors([])).toContain("Adicione ao menos uma etapa.");
     expect(structureErrors([step])).toContain('Escolha o agente ou time de "a".');
     const ok = { ...step, agent_id: "x" };

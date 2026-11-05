@@ -65,12 +65,12 @@ describe("checagens", () => {
 });
 
 describe("EvalCaseForm", () => {
-  it("caso de workflow confere as etapas e não tem conversa anterior", async () => {
+  it("caso de workflow confere as etapas e avisa que conversa anterior exige histórico", async () => {
     const onSave = vi.fn();
     const user = userEvent.setup();
     render(<EvalCaseForm kind="workflow" saving={false} onSave={onSave} onCancel={() => {}} />);
 
-    expect(screen.queryByText("Conversa antes da mensagem (opcional)")).toBeNull();
+    expect(screen.getByText(/exige o histórico ligado na configuração/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Tools chamadas" })).toBeNull();
     await user.type(screen.getByLabelText("Nome do caso"), "reembolso revisa");
     await user.type(screen.getByLabelText("Mensagem de entrada"), "Quero reembolso");

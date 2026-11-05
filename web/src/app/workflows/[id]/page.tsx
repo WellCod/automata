@@ -25,6 +25,8 @@ const schema = z.object({
   description: z.string().min(1, "Descrição obrigatória"),
   // estrutura conferida por structureErrors e de novo pela API
   steps: z.custom<WorkflowNode[]>(),
+  // últimos runs levados às etapas (ADR-0038); 0 desliga
+  history_runs: z.number().int().min(0).max(5),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -59,7 +61,7 @@ export default function WorkflowEditPage() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", description: "", steps: [] },
+    defaultValues: { name: "", description: "", steps: [], history_runs: 0 },
   });
   const { reset } = form;
   const isDirty = form.formState.isDirty;
@@ -71,6 +73,7 @@ export default function WorkflowEditPage() {
       name: data.name,
       description: data.description,
       steps: data.payload?.workflow?.steps ?? [],
+      history_runs: data.payload?.workflow?.history_runs ?? 0,
     });
   }, [data, reset]);
 
@@ -87,7 +90,7 @@ export default function WorkflowEditPage() {
             schema_version: 2,
             model_id: null,
             metadata: data?.payload?.metadata ?? {},
-            workflow: { steps: values.steps },
+            workflow: { steps: values.steps, history_runs: values.history_runs },
           },
         },
       });
@@ -183,6 +186,28 @@ export default function WorkflowEditPage() {
                 <WorkflowEditor value={field.value} onChange={field.onChange} />
               )}
             />
+
+            <div className="flex flex-col gap-1">
+              <label className="text-foreground flex flex-wrap items-center gap-2 text-[13px]">
+                Levar às etapas as últimas
+                <select
+                  aria-label="Conversas anteriores levadas às etapas"
+                  {...form.register("history_runs", { valueAsNumber: true })}
+                  className={`${inputCls} w-auto`}
+                >
+                  {[0, 1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>
+                      {n === 0 ? "nenhuma" : n}
+                    </option>
+                  ))}
+                </select>
+                mensagens da conversa
+              </label>
+              <p className="text-muted-foreground text-[11px]">
+                Com histórico, as etapas lembram o que foi dito antes na mesma sessão, e a suíte
+                aceita casos com turnos anteriores. Aumenta o contexto e o custo de cada run.
+              </p>
+            </div>
           </form>
         </div>
 
