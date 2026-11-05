@@ -197,9 +197,10 @@ export default function AlertsPage() {
           <Bell className="h-4 w-4" /> Alertas
         </h1>
         <p className="text-muted-foreground text-[13px]">
-          Webhooks da instância que recebem avisos de todos os agentes, times e workflows: orçamento
-          do mês, pico de erro e mudanças de estado das suítes agendadas. Cola direto em webhook de
-          entrada do Slack, Teams ou Discord.
+          Destinos da instância que recebem avisos de todos os agentes, times e workflows:
+          orçamento, pico de erro, suítes agendadas, pedidos de titular, runs em background e
+          conciliação de custo. O webhook cola direto no de entrada do Slack, Teams ou Discord; o
+          e-mail sai pelo SMTP configurado na API.
         </p>
       </div>
 
