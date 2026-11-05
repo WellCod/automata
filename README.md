@@ -3,7 +3,7 @@
 [![CI](https://github.com/WellCod/automata/actions/workflows/ci.yml/badge.svg)](https://github.com/WellCod/automata/actions/workflows/ci.yml)
 [![Publish](https://github.com/WellCod/automata/actions/workflows/publish.yml/badge.svg)](https://github.com/WellCod/automata/actions/workflows/publish.yml)
 
-Plataforma para operar agentes de IA em produção. Com ela, quem não programa cria, versiona, testa e publica agentes, times multi-agente e workflows. Também liga bases de conhecimento (RAG) que acompanham o GitHub, o S3, o SharePoint, o Google Drive e o Cloud Storage, ferramentas via MCP, guardrails e memória do usuário entre conversas. Roda suítes de teste por agente, time e workflow antes de publicar e de forma agendada, pausa o workflow para aprovação humana onde for preciso e acompanha execução, latência e custo de cada um, com orçamento mensal e aviso no canal do time.
+Plataforma para operar agentes de IA em produção. Com ela, quem não programa cria, versiona, testa e publica agentes, times multi-agente e workflows. Também liga bases de conhecimento (RAG) que acompanham o GitHub, o S3, o SharePoint, o Google Drive e o Cloud Storage, ferramentas via MCP, guardrails com piso da instância e memória do usuário entre conversas. Roda suítes de teste por agente, time e workflow antes de publicar e de forma agendada, pausa o workflow para aprovação humana onde for preciso e acompanha execução, latência e custo de cada um, com orçamento mensal, conciliação com a fatura do provedor e aviso no canal do time ou por e-mail.
 
 O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é a camada de produto em volta: configuração versionada em banco próprio, validação antes de publicar, rastreamento de cada execução, segurança e painel.
 
@@ -13,8 +13,8 @@ O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é
 |---|---|
 | **Backend** | Python 3.12 · FastAPI · Agno 3.1.8 · PostgreSQL 17 + pgvector · Redis · Alembic |
 | **Frontend** | Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · TanStack Query |
-| **Qualidade** | mypy strict · ruff · ~630 testes pytest (testcontainers) · 158 testes Vitest · Playwright · evals |
-| **Decisões** | 25 ADRs com contexto, alternativas descartadas e gatilho de reversão |
+| **Qualidade** | mypy strict · ruff · ~1.160 testes pytest (testcontainers) · 233 testes Vitest · Playwright · evals |
+| **Decisões** | 39 ADRs com contexto, alternativas descartadas e gatilho de reversão |
 
 ---
 
@@ -87,6 +87,9 @@ Quando o processo é conhecido e precisa ser repetível e auditável, um líder 
 - **Paralelo:** de 2 a 5 ramos recebem a mesma entrada ao mesmo tempo.
 - **Condição:** regra sobre a mensagem do usuário ou a resposta anterior (contém, não contém, começa com, vazia), com então e senão.
 - **Repetição:** limite de voltas e regra de parada ("até a revisão dizer *aprovado*").
+- **Roteador:** de 2 a 5 caminhos, cada um com a sua regra. Roda o primeiro que casa ou um caminho padrão, e o resto nem chama o modelo.
+
+Cada etapa escolhe o que recebe: a resposta da anterior, a mensagem original do usuário ou um texto montado com as saídas de etapas nomeadas (`{etapa:triagem}`), conferido na escrita. Com o **histórico** ligado, as etapas lembram as últimas trocas da mesma sessão ([ADR-0038](docs/adr/0038-workflow-e-suite.md)).
 
 O modo teste lê o stream do AgentOS e mostra cada etapa ao vivo: quem respondeu, o que respondeu, se a condição deu verdadeira, em que volta está a repetição e onde falhou. As execuções mostram o consumo somado de todas as etapas.
 
@@ -147,19 +150,21 @@ Com o **gate** ligado, publicar exige a suíte verde no rascunho atual. Editar o
 
 A suíte também roda sem ninguém clicar. Um **agendamento** por agente roda a suíte na versão vigente e pega o que muda por fora do prompt: modelo do provedor, base reindexada, servidor MCP. A lista de agentes e times mostra o estado da suíte, e a execução agendada que perde um caso que passava aparece como regressão. O agendamento pode ter um **webhook**, que avisa o canal do time quando a suíte regride, passa a falhar ou volta a passar. Ele só dispara na mudança de estado, com assinatura HMAC e um texto pronto para Slack, Teams ou Discord. Um **token de integração** pode rodar e ler a suíte de agentes escolhidos, para o CI de quem consome o agente decidir pelo `verdict`.
 
-Caso novo não precisa nascer do zero. No histórico de execuções, **Virar caso de teste** abre o formulário preenchido com a mensagem, os turnos anteriores como contexto e as tools que o run chamou. Dados pessoais chegam mascarados, e o editor revisa antes de salvar.
+Caso novo não precisa nascer do zero. No histórico de execuções, **Virar caso de teste** abre o formulário preenchido com a mensagem, os turnos anteriores como contexto e as tools que o run chamou. A aba da suíte também sugere **casos em lote** a partir das conversas recentes. Dados pessoais chegam mascarados, e o editor revisa antes de salvar. No workflow, uma checagem de texto pode olhar a saída de uma etapa do meio, e o caso pode ter turnos anteriores.
 
 ### Ferramentas via MCP e confirmação humana
 
 Catálogo de servidores MCP externos, com credenciais cifradas e teste de conexão que descobre as tools. Em cada agente, escolhe-se quais tools ele usa e quais **pedem confirmação**. Uma tool sensível pausa a execução até alguém aprovar ou rejeitar, no modo teste ou na página Aprovações, vendo nome e argumentos da ação.
 
-O caminho inverso também existe: os próprios agentes e times ficam expostos via **MCP server mode** para Claude Desktop, Cursor e outros sistemas, com tokens de integração limitados aos agentes escolhidos e revogáveis na hora. Por REST, um sistema pode pedir o run em **background**: o pedido entra numa fila durável no Postgres e sobrevive a deploy e a crash.
+O caminho inverso também existe: os próprios agentes e times ficam expostos via **MCP server mode** para Claude Desktop, Cursor e outros sistemas, com tokens de integração limitados aos agentes escolhidos e revogáveis na hora. Por REST, um sistema pode pedir o run em **background**: o pedido entra numa fila durável no Postgres e sobrevive a deploy e a crash. A página **Fila** mostra ao owner o que está esperando, rodando e falhou, e devolve à fila o job que falhou.
 
 ### Analytics e rastreamento
 
 Conversas, taxa de falha, bloqueios, latência p50 e p95, tokens e custo, com gráficos diários e uso por agente. Cada execução abre como **árvore**, com time, agentes, chamadas de modelo e tools, e mostra duração, entrada, saída e erro de cada nó.
 
-O custo sai da tabela de preços de cada modelo quando o provedor só informa tokens, que é o caso da Anthropic e da OpenAI. Cada agente pode ter um **orçamento mensal**, com aviso num percentual e, se ligado, bloqueio dos runs seguintes quando estoura, sem chamar o modelo. Os **destinos de aviso** da instância recebem orçamento perto do limite ou estourado, pico de erro e mudança de estado das suítes agendadas, assinados com HMAC e prontos para Slack, Teams ou Discord.
+O custo sai da tabela de preços de cada modelo quando o provedor só informa tokens, que é o caso da Anthropic e da OpenAI. Cada agente pode ter um **orçamento mensal**, com aviso num percentual e, se ligado, bloqueio dos runs seguintes quando estoura, sem chamar o modelo. Os **destinos de aviso** da instância recebem orçamento perto do limite ou estourado, pico de erro, mudança de estado das suítes agendadas, pedido de titular falho ou perto do prazo, run em background que falhou e diferença de custo. O destino é um webhook assinado com HMAC, pronto para Slack, Teams ou Discord, ou e-mail pelo SMTP da instância.
+
+Com a chave admin da Anthropic ou da OpenAI, a **conciliação** lê de hora em hora o custo que o provedor cobrou por dia e mostra no analytics ao lado do estimado, avisando quando a diferença passa do limite.
 
 <p align="center"><img src="docs/img/orcamento.png" alt="Orçamento do mês no desempenho de um agente" width="600"></p>
 
@@ -188,14 +193,15 @@ flowchart LR
         OS["AgentOS (Agno)<br/>/agents /teams /workflows<br/>/mcp (server mode)"]
         F["Factories por request<br/>agente · time · workflow"]
         T["RunTracking<br/>agent_run · usage_event"]
-        W["Workers<br/>fila de background ·<br/>suítes agendadas"]
+        W["Workers<br/>fila de background ·<br/>suítes agendadas ·<br/>conectores e conciliação"]
     end
     PG[("PostgreSQL 17<br/>config versionada, runs,<br/>metering, pgvector")]
     RD[("Redis<br/>rate limit · cancelamento<br/>entre réplicas")]
     LLM["Provedores<br/>Anthropic · OpenAI"]
     MCP["Servidores MCP<br/>externos"]
     EMB["Embeddings<br/>Voyage · OpenAI"]
-    HOOK["Webhooks<br/>Slack · Teams · Discord"]
+    HOOK["Avisos<br/>webhook · e-mail"]
+    IW["Worker de ingestão<br/>(opcional)"]
 
     UI --> BFF --> R & OS
     OS --> F --> T --> PG
@@ -206,9 +212,10 @@ flowchart LR
     W --> PG
     W --> RD
     W --> HOOK
+    IW --> PG & EMB
 ```
 
-O painel nunca fala direto com a API: todo acesso passa por Route Handlers server-side, e o token fica num cookie httpOnly. A API tem dois lados. As rotas próprias, em `/api/v1`, gerenciam configuração, execuções, métricas, bases, servidores MCP e usuários. As rotas do AgentOS executam agentes, times e workflows; o Automata não as modifica, só registra nelas o que foi publicado. Dois laços rodam dentro da API, sem serviço à parte: o worker da fila de background, do próprio Agno, e o poller das suítes agendadas, que avisa por webhook quando o estado muda.
+O painel nunca fala direto com a API: todo acesso passa por Route Handlers server-side, e o token fica num cookie httpOnly. A API tem dois lados. As rotas próprias, em `/api/v1`, gerenciam configuração, execuções, métricas, bases, servidores MCP e usuários. As rotas do AgentOS executam agentes, times e workflows; o Automata não as modifica, só registra nelas o que foi publicado. Dois laços rodam dentro da API, sem serviço à parte: o worker da fila de background, do próprio Agno, e o poller das suítes agendadas, que também sincroniza conectores, lê a conciliação e dispara os avisos. A ingestão pode sair da API para um worker separado com fila no banco ([ADR-0039](docs/adr/0039-conectores-e-worker-de-ingestao.md)).
 
 ---
 
@@ -236,7 +243,7 @@ rascunho ──publicar──▶ v3 (publicada, imutável) ◀── current_ver
 Um run pedido com `background=true` vira uma linha na fila durável do Agno, no Postgres da instância ([ADR-0020](docs/adr/0020-fila-duravel.md)). Um worker por réplica reivindica a linha e roda o agente pelo mesmo factory dos runs síncronos.
 
 - **Sobrevive a deploy.** Run aceito termina ou falha com motivo. Nunca fica `PENDING` para sempre.
-- **Uma tentativa só.** O agente pode ter chamado uma tool com efeito antes de cair. Rodar de novo sozinho repetiria o efeito, então quem integra decide se reenvia.
+- **Uma tentativa por padrão.** O agente pode ter chamado uma tool com efeito antes de cair, e rodar de novo sozinho repetiria o efeito. Só o agente marcado como idempotente no controle do run volta sozinho para a fila, até 2 vezes; os outros voltam pelo clique na página Fila ([ADR-0037](docs/adr/0037-operacao-fila-conciliacao-e-avisos.md)).
 - **15 minutos por execução** e 429 acima de mil pendentes.
 - **Redis opcional.** Com `REDIS_URL`, cancelar e acompanhar o stream funcionam de qualquer réplica.
 
@@ -310,7 +317,7 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 | **Revogação** | Logout revoga o `jti`. Mudar papel, desativar ou trocar senha corta na hora as sessões da pessoa. |
 | **Papéis e scopes** | `owner`, `editor`, `viewer`. Toda rota, própria ou do AgentOS, exige scope. |
 | **Rate limit** | Login limitado por e-mail e IP, por e-mail e por IP no Redis, sem deixar ninguém travar a conta de outro. `X-Forwarded-For` só vale vindo de proxy listado em `TRUSTED_PROXIES`, e o painel só repassa o IP do cabeçalho de `CLIENT_IP_HEADER`. Busca de teste na base limitada por usuário. |
-| **Superfície** | Login com e-mail inexistente também roda argon2, para a latência não revelar contas. `/docs` e `/openapi.json` só em desenvolvimento. |
+| **Superfície** | Login com e-mail inexistente também roda argon2, para a latência não revelar contas. `/docs` e `/openapi.json` só em desenvolvimento. Fora do login e do health, a única rota pública é o webhook da origem dos conectores, que só sincroniza com a assinatura HMAC do corpo e no máximo uma vez por minuto. |
 | **Headers** | HSTS, CSP com `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`. |
 | **Saída** | Servidores MCP, webhooks, destinos de aviso e conectores de conhecimento passam pelo mesmo filtro: só https, sem host que resolva para IP interno, conferido no cadastro e a cada chamada, sem seguir redirect. URLs e segredos ficam cifrados com Fernet. A telemetria do Agno fica desligada. |
 | **Integrações** | Token de consumidor com escopo por recurso: roda só os agentes liberados e, se marcado, a suíte de testes deles, sem acesso a configuração. |
@@ -323,9 +330,9 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 
 | Camada | Ferramenta | Cobertura |
 |---|---|---|
-| API | pytest + testcontainers | ~630 testes contra Postgres com pgvector real, sem mock de banco. Gate de cobertura de 70%. |
+| API | pytest + testcontainers | ~1.160 testes contra Postgres com pgvector real, sem mock de banco. Gate de cobertura de 70%. |
 | Tipos | mypy strict + plugin pydantic · ruff | Rodam em todo PR. |
-| Web | Vitest + Testing Library | 158 testes de componente e de lógica, inclusive o redutor de eventos do workflow, a suíte de testes e a revisão humana. |
+| Web | Vitest + Testing Library | 233 testes de componente e de lógica, inclusive o redutor de eventos do workflow, a suíte de testes e a revisão humana. |
 | E2E | Playwright | Login → editar agente → publicar → rollback. |
 | Contrato | openapi-typescript | Os tipos do painel são gerados do OpenAPI da API, nunca escritos à mão. |
 
@@ -343,6 +350,12 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 | Corte e compressão | O manual com três seções vira três trechos com o título, o nível de título decide onde abre trecho, a seção grande é cortada com o título em cada pedaço e a base antiga mantém a recursiva com 10%. Com o Agent de verdade, o resultado de 20 mil caracteres chega ao modelo resumido e o resumo entra no custo do run. | Todo PR |
 | Guardrails por modelo | Injeções indiretas em português e inglês ("nota para a IA", "envie os dados do cliente", comentário HTML) são pegas no resultado de tool e na varredura, e o conteúdo legítimo passa. O classificador bloqueia a injeção com a categoria, deixa seguir quando cai em falha aberta e bloqueia em falha fechada. Com o Agent de verdade, o resultado suspeito chega ao modelo como aviso e o run termina. | Todo PR |
 | Controle de custo | Com o Agent de verdade e uma tool em laço, o teto de US$ 0,05 encerra o run passando no máximo uma chamada, o teto corta na chamada certa e o run abaixo do teto termina normal. O orçamento por quem chama barra só quem estourou com bloqueio ligado, mede sem bloquear e ignora run sem usuário. | Todo PR |
+| Reranker e filtros | O lote de candidatos cresce com o cross-encoder, e a falha do provedor deixa a busca seguir sem ele. O filtro fica só com campo e valor que existem, nunca traz o manual de outro plano e, errado, não vira "nada encontrado". | Todo PR |
+| Guardrails da instância | O efetivo nunca afrouxa o piso nem o agente, o piso vazio não muda nada e o classificador da saída pega o vazamento das instruções. | Todo PR |
+| Memória em time e titular | O time lê a memória pelo `team_id`, nunca pelo `agent_id`, só com usuário e com a máscara dele. O resumo com modelo próprio herda o retry da versão. O pedido do titular segue a matriz de acesso por token, e o prazo vem do ambiente (15 dias por padrão). | Todo PR |
+| Operação | O retry automático só vale para o agente idempotente, e falha antiga não volta no deploy. A conciliação lê centavos da Anthropic e dólares da OpenAI. O estado do e-mail nunca traz a mensagem do servidor, e sem SMTP o destino é recusado sem tentar. | Todo PR |
+| Workflow e suíte | O roteador escolhe pela regra e pela ordem, e sem caminho padrão nada roda. A entrada da etapa monta o texto com as saídas certas, e a checagem olha a etapa pedida ou a resposta final. | Todo PR |
+| Conectores e ingestão | Pasta do Drive com Docs e PDF vira dois documentos e editar o Docs reindexa só ele, o filtro tira da base o que saiu dele, a assinatura do webhook recusa corpo trocado e quatro workers não pegam o mesmo job. | Todo PR |
 | Recuperação | O documento certo volta entre os 3 primeiros trechos. A versão literal roda em todo PR com cada estratégia de busca (simples, MMR, recência), e nenhuma pode errar. A semântica, com Voyage, roda à noite, aceita recall@3 de 80% e compara as estratégias (HyDE incluso, com chave de modelo) com a busca simples. | PR e noturna |
 | Confiabilidade | Tool calls com LLM real. | Noturna |
 
@@ -375,7 +388,7 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0017](docs/adr/0017-estrategia-de-recuperacao.md) | Estratégia de recuperação por base: reranker do Agno (MMR, recência) e HyDE com modelo medido |
 | [0018](docs/adr/0018-avisos-de-regressao.md) | Avisos de regressão por webhook assinado nas mudanças de estado da suíte agendada |
 | [0019](docs/adr/0019-compactacao-de-conversa.md) | Compactação de conversa por agente no payload versionado, limite de 16 mil tokens |
-| [0020](docs/adr/0020-fila-duravel.md) | Fila durável para runs em background, uma tentativa e 15 min por execução |
+| [0020](docs/adr/0020-fila-duravel.md) | Fila durável para runs em background, 15 min por execução e uma tentativa salvo agente idempotente |
 | [0021](docs/adr/0021-orcamento-e-alertas.md) | Custo estimado pela tabela de preços, orçamento mensal com bloqueio e destinos de aviso |
 | [0022](docs/adr/0022-suite-de-workflow-e-bloqueio.md) | Suíte de testes para workflows e caso que espera bloqueio de guardrail |
 | [0023](docs/adr/0023-revisao-humana-no-workflow.md) | Revisão humana numa etapa do workflow, antes de rodar ou depois da saída |
@@ -388,13 +401,13 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0030](docs/adr/0030-guardrails-por-modelo.md) | Classificador por modelo na entrada e exame do resultado de tool e dos documentos |
 | [0031](docs/adr/0031-controle-de-custo-no-run.md) | Teto de custo por run e orçamento mensal por usuário e por token de integração |
 | [0032](docs/adr/0032-direitos-do-titular.md) | Direitos do titular: consulta, exportação e exclusão por usuário, e máscara com padrões próprios |
-| [0033](docs/adr/0033-reranker-e-filtros-na-recuperacao.md) | Reranker por cross-encoder e filtros escolhidos pelo modelo na recuperação (proposto, Fase 36) |
-| [0034](docs/adr/0034-guardrails-da-instancia-e-classificador-na-saida.md) | Piso de guardrails da instância e classificador na saída (proposto, Fase 37) |
-| [0035](docs/adr/0035-memoria-e-conversa-em-time.md) | Memória do usuário no time e modelo próprio para o resumo da compactação (proposto, Fase 38) |
-| [0036](docs/adr/0036-pedido-do-titular-e-prazo.md) | Pedido do titular por integração e pelo próprio usuário, com prazo e aviso (proposto, Fase 39) |
-| [0037](docs/adr/0037-operacao-fila-conciliacao-e-avisos.md) | Painel da fila, retry por agente idempotente, conciliação de custo e aviso por e-mail (proposto, Fase 40) |
-| [0038](docs/adr/0038-workflow-e-suite.md) | Roteador, entrada por etapa, histórico no workflow e casos de suíte a partir das conversas (proposto, Fase 41) |
-| [0039](docs/adr/0039-conectores-e-worker-de-ingestao.md) | Google Drive e Cloud Storage, filtro por nome, webhook da origem e worker de ingestão (proposto, Fase 42) |
+| [0033](docs/adr/0033-reranker-e-filtros-na-recuperacao.md) | Reranker por cross-encoder e filtros escolhidos pelo modelo na recuperação |
+| [0034](docs/adr/0034-guardrails-da-instancia-e-classificador-na-saida.md) | Piso de guardrails da instância e classificador na saída |
+| [0035](docs/adr/0035-memoria-e-conversa-em-time.md) | Memória do usuário no time e modelo próprio para o resumo da compactação |
+| [0036](docs/adr/0036-pedido-do-titular-e-prazo.md) | Pedido do titular por integração e pelo próprio usuário, com prazo e aviso |
+| [0037](docs/adr/0037-operacao-fila-conciliacao-e-avisos.md) | Painel da fila, retry por agente idempotente, conciliação de custo e aviso por e-mail |
+| [0038](docs/adr/0038-workflow-e-suite.md) | Roteador, entrada por etapa, histórico no workflow e casos de suíte a partir das conversas |
+| [0039](docs/adr/0039-conectores-e-worker-de-ingestao.md) | Google Drive e Cloud Storage, filtro por nome, webhook da origem e worker de ingestão |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 
@@ -459,11 +472,11 @@ api/
     agents/       factories, rastreamento, workflows, modelos, memória do usuário, replay
     evals/        runner da suíte (agente, time e workflow), juiz, gate, agendamento, avisos e sugestão de caso
     guardrails/   regras de entrada e saída
-    knowledge/    embedders, ingestão, conectores, reindexação agendada, busca com reranker e HyDE, tools
+    knowledge/    embedders, ingestão e worker, conectores e filtro, reindexação, busca com reranker, HyDE e filtros, tools
     mcp/          cliente MCP, proteção de saída (SSRF)
     routers/      rotas próprias /api/v1
     services/     regras de negócio e validação na escrita
-  alembic/        34 migrations
+  alembic/        50 migrations
   fixtures/       respostas gravadas do modo replay
   tests/          pytest, integração e evals
 web/
@@ -472,7 +485,7 @@ web/
   src/lib/        client gerado do OpenAPI, SSE, progresso do workflow
   e2e/            Playwright
 docs/
-  adr/            25 Architecture Decision Records
+  adr/            39 Architecture Decision Records
   roadmap.md      fases, auditorias e critérios de aceite
 DESIGN.md         sistema visual do painel
 DEMO.md           demo local sem chave de LLM

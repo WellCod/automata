@@ -1,6 +1,6 @@
 # ADR-0039 — Google Drive e Cloud Storage, filtro por nome, webhook da origem e worker de ingestão
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-11-04
 
 ## Contexto

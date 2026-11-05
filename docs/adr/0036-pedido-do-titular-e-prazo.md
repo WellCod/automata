@@ -1,6 +1,6 @@
 # ADR-0036 — Pedido do titular por integração e pelo próprio usuário, com prazo e aviso
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-11-04
 
 ## Contexto

@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 35
+# Roadmap — Fases 4 a 42
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
