@@ -1021,6 +1021,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Webhook
+         * @description Gera o segredo do webhook da origem; trocar invalida o anterior (ADR-0039).
+         */
+        post: operations["create_webhook_api_v1_knowledge_bases__base_id__connectors__connector_id__webhook_post"];
+        /** Delete Webhook */
+        delete: operations["delete_webhook_api_v1_knowledge_bases__base_id__connectors__connector_id__webhook_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/sync": {
         parameters: {
             query?: never;
@@ -2260,7 +2281,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "github" | "s3" | "sharepoint";
+            kind: "github" | "s3" | "sharepoint" | "gdrive" | "gcs";
             /** Name */
             name: string;
             /** Settings */
@@ -2290,7 +2311,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "github" | "s3" | "sharepoint";
+            kind: "github" | "s3" | "sharepoint" | "gdrive" | "gcs";
             /** Name */
             name: string;
             /** Settings */
@@ -2299,6 +2320,11 @@ export interface components {
             };
             /** Has Secret */
             has_secret: boolean;
+            /**
+             * Has Webhook
+             * @default false
+             */
+            has_webhook: boolean;
             /** Last Status */
             last_status: string;
             /** Last Message */
@@ -2333,6 +2359,15 @@ export interface components {
             sample: string[];
             /** Error */
             error: string | null;
+        };
+        /** ConnectorWebhook */
+        ConnectorWebhook: {
+            /** Secret */
+            secret: string;
+            /** Url */
+            url: string;
+            /** Path */
+            path: string;
         };
         /** ContentFieldsInput */
         ContentFieldsInput: {
@@ -3335,6 +3370,11 @@ export interface components {
             fields?: {
                 [key: string]: string;
             } | null;
+            /**
+             * Queued
+             * @default false
+             */
+            queued: boolean;
         };
         /** LintWarning */
         LintWarning: {
@@ -6577,6 +6617,68 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ConnectorTestResult"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_webhook_api_v1_knowledge_bases__base_id__connectors__connector_id__webhook_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_id: string;
+                connector_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectorWebhook"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_webhook_api_v1_knowledge_bases__base_id__connectors__connector_id__webhook_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                base_id: string;
+                connector_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

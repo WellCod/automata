@@ -20,7 +20,13 @@ const quiet: KeyRotationStatus = {
   secrets: {
     configured: true,
     previous_configured: false,
-    pending: { mcp_server: 0, eval_schedule: 0, alert_destination: 0, knowledge_connector: 0 },
+    pending: {
+      mcp_server: 0,
+      eval_schedule: 0,
+      alert_destination: 0,
+      knowledge_connector: 0,
+      knowledge_connector_webhook: 0,
+    },
   },
   done: true,
 };

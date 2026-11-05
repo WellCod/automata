@@ -11,8 +11,12 @@ import {
   type Connector,
   type ConnectorKind,
   type ConnectorTest,
+  type ConnectorWebhook,
+  filterText,
   KIND_LABEL,
   origin,
+  parsePatterns,
+  patternsOf,
   SECRET_FIELDS,
   SETTINGS_FIELDS,
   summaryText,
@@ -48,11 +52,17 @@ function ConnectorForm({
   const queryClient = useQueryClient();
   const [kind, setKind] = useState<ConnectorKind>(initial?.kind ?? "github");
   const [name, setName] = useState(initial?.name ?? "");
+  const initialSettings = (initial?.settings ?? {}) as Record<string, unknown>;
   const [settings, setSettings] = useState<Record<string, string>>(
     Object.fromEntries(
-      Object.entries(initial?.settings ?? {}).map(([k, v]) => [k, v == null ? "" : String(v)]),
+      Object.entries(initialSettings)
+        .filter(([, v]) => !Array.isArray(v) && typeof v !== "boolean")
+        .map(([k, v]) => [k, v == null ? "" : String(v)]),
     ),
   );
+  const [include, setInclude] = useState(patternsOf(initialSettings.include).join("\n"));
+  const [exclude, setExclude] = useState(patternsOf(initialSettings.exclude).join("\n"));
+  const [sharedDrive, setSharedDrive] = useState(initialSettings.shared_drive === true);
   const [secret, setSecret] = useState<Record<string, string>>({});
   const [hours, setHours] = useState(
     initial?.sync_every_hours ? String(initial.sync_every_hours) : "",
@@ -61,11 +71,20 @@ function ConnectorForm({
   const save = useMutation({
     mutationFn: async () => {
       // campo vazio não vai: a API aplica o padrão (branch main, AWS, pasta raiz)
-      const cleaned = Object.fromEntries(
+      const cleaned: Record<string, unknown> = Object.fromEntries(
         SETTINGS_FIELDS[kind]
           .map((f) => [f.key, settings[f.key]?.trim() ?? ""])
           .filter(([, v]) => v !== ""),
       );
+      // a configuração é trocada inteira: padrão ausente é lista vazia
+      for (const [key, text] of [
+        ["include", include],
+        ["exclude", exclude],
+      ] as const) {
+        const patterns = parsePatterns(text);
+        if (patterns.length) cleaned[key] = patterns;
+      }
+      if (kind === "gdrive") cleaned.shared_drive = sharedDrive;
       const typed = Object.values(secret).some((v) => v.trim());
       const body = {
         kind,
@@ -110,6 +129,7 @@ function ConnectorForm({
             setKind(e.target.value as ConnectorKind);
             setSettings({});
             setSecret({});
+            setSharedDrive(false);
           }}
           className={`${inputCls} w-auto`}
         >
@@ -156,6 +176,36 @@ function ConnectorForm({
             />
           </label>
         ))}
+        {kind === "gdrive" && (
+          <label className="text-muted-foreground flex items-center gap-2 self-end text-[12px]">
+            <input
+              type="checkbox"
+              checked={sharedDrive}
+              onChange={(e) => setSharedDrive(e.target.checked)}
+            />
+            Pasta num drive compartilhado
+          </label>
+        )}
+        <label className="text-muted-foreground flex flex-col gap-1 text-[12px]">
+          Só os arquivos (um padrão por linha)
+          <textarea
+            rows={2}
+            value={include}
+            placeholder={"politicas/**/*.md\nvazio = todos"}
+            onChange={(e) => setInclude(e.target.value)}
+            className={`${inputCls} font-mono`}
+          />
+        </label>
+        <label className="text-muted-foreground flex flex-col gap-1 text-[12px]">
+          Deixar de fora (um padrão por linha)
+          <textarea
+            rows={2}
+            value={exclude}
+            placeholder={"**/rascunhos/**\nCHANGELOG.md"}
+            onChange={(e) => setExclude(e.target.value)}
+            className={`${inputCls} font-mono`}
+          />
+        </label>
         <label className="text-muted-foreground flex flex-col gap-1 text-[12px]">
           Sincronizar a cada (horas)
           <input
@@ -172,6 +222,10 @@ function ConnectorForm({
       <p className="text-muted-foreground text-[11px]">
         Use uma credencial só de leitura, restrita ao repositório, bucket ou pasta: a base recebe
         tudo o que ela lê dentro do caminho. O segredo fica cifrado e não é mostrado de novo.
+        {(kind === "gdrive" || kind === "gcs") &&
+          " A conta de serviço vê tudo o que foi compartilhado com ela: compartilhe só a pasta ou o bucket desta base."}{" "}
+        Nos padrões, <code>*</code> não atravessa pasta, <code>**/</code> é qualquer quantidade de
+        pastas e o que fica de fora sai da base na próxima sincronização.
       </p>
       {save.isError && (
         <p className="text-destructive text-[12px]" role="alert">
@@ -203,6 +257,7 @@ function ConnectorRow({
   const [editing, setEditing] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [tested, setTested] = useState<ConnectorTest | null>(null);
+  const [hook, setHook] = useState<ConnectorWebhook | null>(null);
   const path = { params: { path: { base_id: baseId, connector_id: connector.id } } };
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ["knowledge-bases", baseId, "connectors"] });
@@ -246,6 +301,37 @@ function ConnectorRow({
     onError: (e) => toast.error(e.message),
   });
 
+  const createHook = useMutation({
+    mutationFn: async () => {
+      const res = await client.POST(
+        "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/webhook",
+        path,
+      );
+      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao gerar o webhook"));
+      return res.data!;
+    },
+    onSuccess: (data) => {
+      setHook(data);
+      refresh();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const removeHook = useMutation({
+    mutationFn: async () => {
+      const res = await client.DELETE(
+        "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/webhook",
+        path,
+      );
+      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao desligar o webhook"));
+    },
+    onSuccess: () => {
+      setHook(null);
+      toast.success("Webhook desligado");
+      refresh();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   if (editing) {
     return (
       <li>
@@ -265,6 +351,7 @@ function ConnectorRow({
           <span className="text-foreground truncate text-[13px] font-medium">{connector.name}</span>
           <Badge tone="neutral">{KIND_LABEL[connector.kind]}</Badge>
           <Badge tone={status.tone}>{status.label}</Badge>
+          {connector.has_webhook && <Badge tone="neutral">webhook</Badge>}
         </div>
         <div className="flex flex-wrap gap-1.5">
           <Button size="xs" variant="muted" disabled={test.isPending} onClick={() => test.mutate()}>
@@ -278,6 +365,26 @@ function ConnectorRow({
           >
             Sincronizar
           </Button>
+          {canManage && (
+            <Button
+              size="xs"
+              variant="muted"
+              disabled={createHook.isPending}
+              onClick={() => createHook.mutate()}
+            >
+              {connector.has_webhook ? "Trocar segredo" : "Webhook"}
+            </Button>
+          )}
+          {canManage && connector.has_webhook && (
+            <Button
+              size="xs"
+              variant="subtleDestructive"
+              disabled={removeHook.isPending}
+              onClick={() => removeHook.mutate()}
+            >
+              Desligar webhook
+            </Button>
+          )}
           {canManage && (
             <Button size="xs" variant="muted" onClick={() => setEditing(true)}>
               Editar
@@ -306,6 +413,39 @@ function ConnectorRow({
           ? ` · a cada ${connector.sync_every_hours} h, próxima ${when(connector.next_sync_at)}`
           : " · só manual"}
       </p>
+      {filterText(connector) && (
+        <p className="text-muted-foreground truncate text-[11px]">
+          Filtro: <code>{filterText(connector)}</code>
+        </p>
+      )}
+      {hook && (
+        <div
+          role="status"
+          aria-label="Webhook gerado"
+          className="border-border bg-muted/40 flex flex-col gap-1 rounded border p-2 text-[11px]"
+        >
+          <p className="text-foreground">
+            Copie agora: o segredo não é mostrado de novo. Gerar outro invalida este.
+          </p>
+          <p>
+            URL: <code className="break-all">{hook.url || hook.path}</code>
+            {!hook.url && " (na URL pública da API; configure PUBLIC_BASE_URL para ver completa)"}
+          </p>
+          <p>
+            Segredo: <code className="break-all">{hook.secret}</code>
+          </p>
+          <p className="text-muted-foreground">
+            No GitHub: Settings → Webhooks, content type <code>application/json</code>, evento push.
+            Outra origem assina o corpo com HMAC-SHA256 em <code>X-Automata-Signature</code> (
+            <code>sha256=…</code>). Uma sincronização por minuto.
+          </p>
+          <div>
+            <Button size="xs" variant="muted" onClick={() => setHook(null)}>
+              Fechar
+            </Button>
+          </div>
+        </div>
+      )}
       {connector.last_sync_at && (
         <p className="text-muted-foreground text-[11px]">
           Última: {when(connector.last_sync_at)} · {summaryText(connector.last_summary)}
@@ -339,9 +479,9 @@ export function KnowledgeConnectors({ baseId }: { baseId: string }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-muted-foreground text-[13px]">
-        Conecte um repositório do GitHub, um bucket S3 ou uma pasta do SharePoint. A sincronização
-        compara pela versão de cada arquivo: novo entra, alterado é reindexado, removido sai da
-        base.
+        Conecte um repositório do GitHub, um bucket S3 ou do Cloud Storage, uma pasta do SharePoint
+        ou do Google Drive. A sincronização compara pela versão de cada arquivo: novo entra,
+        alterado é reindexado, removido sai da base.
       </p>
       {canManage && !creating && (
         <div>

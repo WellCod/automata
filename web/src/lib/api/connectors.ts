@@ -9,11 +9,14 @@ export type Connector = components["schemas"]["ConnectorResponse"];
 export type ConnectorInput = components["schemas"]["ConnectorInput"];
 export type ConnectorKind = ConnectorInput["kind"];
 export type ConnectorTest = components["schemas"]["ConnectorTestResult"];
+export type ConnectorWebhook = components["schemas"]["ConnectorWebhook"];
 
 export const KIND_LABEL: Record<ConnectorKind, string> = {
   github: "GitHub",
   s3: "S3",
   sharepoint: "SharePoint",
+  gdrive: "Google Drive",
+  gcs: "Cloud Storage",
 };
 
 interface FieldSpec {
@@ -44,6 +47,18 @@ export const SETTINGS_FIELDS: Record<ConnectorKind, FieldSpec[]> = {
     { key: "tenant_id", label: "Tenant ID", required: true },
     { key: "client_id", label: "Client ID", required: true },
   ],
+  gdrive: [
+    {
+      key: "folder_id",
+      label: "ID da pasta",
+      placeholder: "o trecho depois de /folders/ na URL",
+      required: true,
+    },
+  ],
+  gcs: [
+    { key: "bucket", label: "Bucket", placeholder: "empresa-documentos", required: true },
+    { key: "prefix", label: "Prefixo", placeholder: "contratos/ (vazio = bucket todo)" },
+  ],
 };
 
 export const SECRET_FIELDS: Record<ConnectorKind, FieldSpec[]> = {
@@ -53,12 +68,37 @@ export const SECRET_FIELDS: Record<ConnectorKind, FieldSpec[]> = {
     { key: "secret_access_key", label: "Secret access key" },
   ],
   sharepoint: [{ key: "client_secret", label: "Client secret", required: true }],
+  gdrive: [{ key: "service_account_json", label: "JSON da conta de serviço", required: true }],
+  gcs: [{ key: "service_account_json", label: "JSON da conta de serviço", required: true }],
 };
+
+// filtro por nome (ADR-0039): uma linha por padrão no formulário
+export function patternsOf(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(String) : [];
+}
+
+export function parsePatterns(text: string): string[] {
+  return text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
+export function filterText(c: Pick<Connector, "settings">): string {
+  const s = c.settings as Record<string, unknown>;
+  const include = patternsOf(s.include);
+  const exclude = patternsOf(s.exclude);
+  const parts: string[] = [];
+  if (include.length) parts.push(`só ${include.join(", ")}`);
+  if (exclude.length) parts.push(`fora ${exclude.join(", ")}`);
+  return parts.join(" · ");
+}
 
 export function origin(c: Pick<Connector, "kind" | "settings">): string {
   const s = c.settings as Record<string, string | null | undefined>;
   if (c.kind === "github") return `${s.repo}@${s.branch || "main"}${s.path ? `/${s.path}` : ""}`;
-  if (c.kind === "s3") return `${s.bucket}${s.prefix ? `/${s.prefix}` : ""}`;
+  if (c.kind === "s3" || c.kind === "gcs") return `${s.bucket}${s.prefix ? `/${s.prefix}` : ""}`;
+  if (c.kind === "gdrive") return `pasta ${s.folder_id}`;
   return `${s.hostname}${s.site_path ?? ""}${s.folder_path ? `/${s.folder_path}` : ""}`;
 }
 

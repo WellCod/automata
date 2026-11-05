@@ -127,6 +127,8 @@ describe("KnowledgeBasePage", () => {
     mockGet([
       content({}),
       content({ id: "c2", name: "manual", status: "processing", chunk_count: 0 }),
+      // esperando o worker de ingestão (ADR-0039)
+      content({ id: "c4", name: "fila", status: "processing", chunk_count: 0, queued: true }),
       content({
         id: "c3",
         name: "site",
@@ -137,6 +139,7 @@ describe("KnowledgeBasePage", () => {
     render(<KnowledgeBasePage />, { wrapper });
     expect(await screen.findByText("3 trechos")).toBeInTheDocument();
     expect(screen.getByText("processando…")).toBeInTheDocument();
+    expect(screen.getByText("na fila…")).toBeInTheDocument();
     expect(screen.getByText("nenhum texto extraído")).toBeInTheDocument();
   });
 
