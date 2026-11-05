@@ -18,7 +18,14 @@ from sqlalchemy.orm import Session
 from app.db import get_engine
 from app.knowledge.ingest import ingest, remove_chunks
 from app.knowledge.path_filter import allowed
-from app.knowledge.sources import SUPPORTED, RemoteFile, Source, SourceError, source_for
+from app.knowledge.sources import (
+    SUPPORTED,
+    UNKNOWN_SIZE,
+    RemoteFile,
+    Source,
+    SourceError,
+    source_for,
+)
 from app.mcp.egress import EgressDenied
 from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_connector import KnowledgeConnector
@@ -64,7 +71,11 @@ def selectable(
     include = list((settings or {}).get("include") or [])
     exclude = list((settings or {}).get("exclude") or [])
     files = [f for f in files if allowed(f.path, include, exclude)]
-    chosen = [f for f in files if f.extension in SUPPORTED and 0 < f.size <= max_bytes]
+    chosen = [
+        f
+        for f in files
+        if f.extension in SUPPORTED and (f.size == UNKNOWN_SIZE or 0 < f.size <= max_bytes)
+    ]
     skipped = len(files) - len(chosen)
     if len(chosen) > MAX_FILES:
         skipped += len(chosen) - MAX_FILES
@@ -126,7 +137,11 @@ def _status_of(content_id: UUID) -> str:
 
 
 def _upsert(
-    connector: KnowledgeConnector, base: KnowledgeBase, file: RemoteFile, existing: UUID | None
+    connector: KnowledgeConnector,
+    base: KnowledgeBase,
+    file: RemoteFile,
+    existing: UUID | None,
+    size: int,
 ) -> UUID:
     """Registra o arquivo como processing; o existente perde os trechos antigos antes."""
     with Session(get_engine()) as session:
@@ -140,7 +155,7 @@ def _upsert(
                     status_message=None,
                     chunk_count=0,
                     external_version=file.version,
-                    size_bytes=file.size,
+                    size_bytes=size,
                 )
             )
             session.commit()
@@ -151,7 +166,7 @@ def _upsert(
             source_type="connector",
             source=f"{source_of(connector).label}/{file.path}"[:2048],
             extension=file.extension,
-            size_bytes=file.size,
+            size_bytes=size,
             status="processing",
             created_by=connector.created_by,
             connector_id=connector.id,
@@ -193,7 +208,11 @@ def sync(connector_id: UUID) -> SyncSummary:
                 summary.failed += 1
                 summary.errors.append(f"{file.path}: {exc}"[:200])
                 continue
-            content_id = _upsert(connector, base, file, existing)
+            if not data or len(data) > max_bytes:
+                # tamanho desconhecido na listagem: conferido agora (ADR-0039)
+                summary.skipped += 1
+                continue
+            content_id = _upsert(connector, base, file, existing, len(data))
             ingest(content_id, data)
             if _status_of(content_id) != "completed":
                 summary.failed += 1

@@ -36,6 +36,10 @@ class SourceError(ValueError):
     pass
 
 
+# a origem não informa o tamanho (Google Docs no Drive): o limite é conferido no download
+UNKNOWN_SIZE = -1
+
+
 @dataclass(frozen=True)
 class RemoteFile:
     # caminho relativo à pasta configurada: é a chave do conteúdo na base
