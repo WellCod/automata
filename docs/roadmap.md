@@ -1451,6 +1451,7 @@ Nenhuma tela vaza em 375 px, e todas têm `h1`, rótulo em todo campo e nome em 
 
 - [x] **Baixa.** Os gatilhos de dica de p50 e p95 e a trilha "Times" e "Workflows" no topo da página têm menos de 24 px de altura.
 - [x] **Baixa.** A página do time pede o piso de guardrails pelo rascunho e, sem rascunho, recebe 404 antes de pedir pela versão publicada.
+- [x] **Baixa.** Achado ao regerar os prints: o GitHub sem token responde 403 depois de 60 chamadas por hora, e a sincronização mostrava "credencial recusada" em cada arquivo.
 - [ ] **Baixa.** Os prints do README são da Fase 33. Não mostram a Fila, os Guardrails da instância, os Titulares, o roteador nem os conectores novos.
 
 ### PRs
@@ -1463,6 +1464,7 @@ Nenhuma tela vaza em 375 px, e todas têm `h1`, rótulo em todo campo e nome em 
 - [x] `fix(security)`: classificador do piso com o modelo e o escopo do piso e saída longa examinada inteira
 - [x] `fix(security)`: template da etapa numa passada só e sugestões com os padrões próprios de dado pessoal
 - [x] `fix(web)`: alvos de 24 px nas dicas e na trilha e piso lido sem 404
+- [x] `fix(api)`: limite de chamadas da origem distinto de credencial recusada
 - [ ] `docs`: README com os prints das telas atuais
 
 **Critério de aceite da fase:**
