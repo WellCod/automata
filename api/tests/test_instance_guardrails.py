@@ -90,8 +90,9 @@ def test_classificador_combina_checagens_e_a_falha_mais_dura() -> None:
     )
     eff = effective(base, own).classifier
     assert eff is not None
+    # o modelo é o do piso (Fase 43); o escopo do agente vale porque o piso não tem um
     assert (eff.model_id, eff.checks, eff.scope, eff.on_failure) == (
-        "claude-haiku-4-5",
+        "gpt-4o-mini",
         ["off_topic", "injection"],
         "pedidos da loja",
         "block",
@@ -215,3 +216,26 @@ def test_classificador_da_saida_no_run_de_verdade(
     assert resp.json()["content"] == "Não posso."
     [run] = client.get(f"/api/v1/configs/{agent_id}/runs").json()["items"]
     assert (run["status"], run["blocked_by"]) == ("blocked", "output_classifier")
+
+
+def test_agente_nao_troca_o_modelo_nem_o_escopo_do_piso() -> None:
+    """Fase 43: modelo sem chave com falha aberta, ou outro escopo, anulavam o piso."""
+    base = _g(
+        classifier={
+            "model_id": "gpt-4o-mini",
+            "checks": ["off_topic"],
+            "scope": "pedidos da loja",
+            "on_failure": "allow",
+        }
+    )
+    own = _g(
+        classifier={
+            "model_id": "claude-haiku-4-5",
+            "checks": ["injection"],
+            "scope": "qualquer assunto",
+            "on_failure": "allow",
+        }
+    )
+    eff = effective(base, own).classifier
+    assert eff is not None
+    assert (eff.model_id, eff.scope) == ("gpt-4o-mini", "pedidos da loja")

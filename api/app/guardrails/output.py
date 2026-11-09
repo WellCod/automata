@@ -123,6 +123,10 @@ def output_guardrail(
     return check_output_classified
 
 
+# blocos de 20 mil caracteres examinados na resposta; acima disso, vale o on_failure
+MAX_OUTPUT_BLOCKS = 5
+
+
 class OutputClassifier:
     """Classificador da resposta (ADR-0034), com as regras de falha do de entrada."""
 
@@ -147,12 +151,27 @@ class OutputClassifier:
         """Detalhe do bloqueio, ou None para deixar a resposta passar."""
         from app.agents.models_map import resolve_model
         from app.evals.judge import metered
-        from app.guardrails.classifier import ClassifierBadOutput, ClassifierUnavailable, aclassify
+        from app.guardrails.classifier import (
+            MAX_CLASSIFIED_CHARS,
+            ClassifierBadOutput,
+            ClassifierUnavailable,
+            aclassify,
+        )
 
         usage = None
+        blocks = [
+            text[i : i + MAX_CLASSIFIED_CHARS] for i in range(0, len(text), MAX_CLASSIFIED_CHARS)
+        ]
         try:
+            if len(blocks) > MAX_OUTPUT_BLOCKS:
+                # resposta grande demais para examinar inteira: vale a regra de falha
+                raise ClassifierUnavailable(f"resposta com mais de {len(blocks)} blocos")
             model, usage = metered(resolve_model(self.rule.model_id))
-            result = await aclassify(model, self.rule, text)
+            # a resposta inteira, em blocos: com começo e fim só, o vazamento ia no meio (Fase 43)
+            for block in blocks:
+                result = await aclassify(model, self.rule, block)
+                if result.block:
+                    break
         except ClassifierBadOutput as exc:
             return {"category": "invalid_output", "reason": str(exc)[:300]}
         except (ClassifierUnavailable, ValueError) as exc:

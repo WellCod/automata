@@ -156,8 +156,41 @@ def test_piso_soma_o_classificador_da_saida() -> None:
     )
     merged = effective(base, own).output.classifier
     assert merged is not None
+    # o modelo é o do piso (Fase 43)
     assert (merged.model_id, merged.checks, merged.on_failure) == (
-        "gpt-4o-mini",
+        base.output.classifier.model_id if base.output.classifier else "",
         ["off_topic", "prompt_leak", "toxicity"],
         "block",
     )
+
+
+def test_resposta_longa_e_examinada_inteira(
+    judge: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fase 43: com começo e fim só, o vazamento posto no meio da resposta passava."""
+    import app.guardrails.classifier as classifier
+    from app.guardrails.classifier import Verdict
+
+    seen: list[int] = []
+
+    async def fake(model: Any, rule: Any, text: str) -> Verdict:
+        seen.append(len(text))
+        if "SEGREDO" in text:
+            return Verdict(block=True, category="prompt_leak", reason="vazou")
+        return Verdict(block=False, category=None, reason="")
+
+    monkeypatch.setattr(classifier, "aclassify", fake)
+    hook = output_guardrail(_settings(), BlockLog(), uuid4())
+    middle = "a" * 25_000 + " SEGREDO " + "b" * 25_000
+    with pytest.raises(OutputCheckError):
+        _run(hook, middle)
+    assert len(seen) == 2  # parou no bloco que bloqueou
+
+    # grande demais para examinar: vale a regra de falha
+    seen.clear()
+    strict = output_guardrail(_settings("block"), BlockLog(), uuid4())
+    with pytest.raises(OutputCheckError):
+        _run(strict, "c" * 200_000)
+    assert seen == []
+    lenient = output_guardrail(_settings("allow"), BlockLog(), uuid4())
+    assert _run(lenient, "c" * 200_000).content == "c" * 200_000

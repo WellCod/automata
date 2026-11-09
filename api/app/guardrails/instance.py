@@ -58,13 +58,19 @@ def _pii(base: PiiRule, own: PiiRule) -> PiiRule:
 def merge_classifier[R: (ClassifierRule, OutputClassifierRule)](
     base: R | None, own: R | None
 ) -> R | None:
-    """Com os dois: modelo e escopo do agente, união das checagens, falha bloqueia se um pedir."""
+    """Com os dois: modelo e escopo do piso, união das checagens, falha bloqueia se um pedir.
+
+    O modelo e o escopo saem do piso (Fase 43): com os do agente, o editor escolhia um
+    modelo sem chave na instância e, com falha aberta, toda checagem passava; ou trocava
+    o escopo e anulava o `off_topic` do piso.
+    """
     if base is None or own is None:
         return own if base is None else base
     return own.model_copy(
         update={
+            "model_id": base.model_id,
             "checks": _union(own.checks, base.checks),
-            "scope": own.scope if own.scope.strip() else base.scope,
+            "scope": base.scope if base.scope.strip() else own.scope,
             "on_failure": "block" if "block" in (own.on_failure, base.on_failure) else "allow",
         }
     )
