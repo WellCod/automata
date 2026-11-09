@@ -20,6 +20,15 @@ from app.knowledge.google_sources import (
 from app.knowledge.sources import SourceError, source_for
 from app.schemas.knowledge_connector import GCSSettings, GDriveSettings
 
+
+@pytest.fixture(autouse=True)
+def _limite_de_upload(monkeypatch: pytest.MonkeyPatch) -> None:
+    # o limite vem do Settings, que no CI sem banco não tem as variáveis obrigatórias
+    from app.knowledge import sources
+
+    monkeypatch.setattr(sources, "max_download", lambda: 20 * 1024 * 1024)
+
+
 KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 PEM = KEY.private_bytes(
     serialization.Encoding.PEM,
