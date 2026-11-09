@@ -303,6 +303,7 @@ Fase 13 ([ADR-0012](../docs/adr/0012-bases-de-conhecimento.md)). Ingestão, busc
     - Login: o JWT RS256 é assinado com a chave do JSON e trocado sempre em `oauth2.googleapis.com/token`, nunca no `token_uri` do JSON. Escopo só de leitura (`drive.readonly`, `devstorage.read_only`), sem a biblioteca do Google.
   - Filtro por nome (ADR-0039, `app/knowledge/path_filter.py`): `include` e `exclude` na configuração de todo conector, até 10 globs de até 200 caracteres cada e no máximo 3 `**`.
     - Sintaxe: `**/` é qualquer quantidade de pastas, `*` não atravessa pasta e `?` é um caractere. Comparado com o caminho relativo, sem diferenciar maiúsculas.
+    - O casamento é por autômato, sem regex: o tempo cresce com o tamanho do padrão vezes o do caminho. O regex com vários `*` tinha backtracking polinomial (Fase 43).
     - Sem `include` entra tudo, e `exclude` vence.
     - O que sai do filtro some como se não estivesse na origem: não conta como pulado e sai da base na sincronização. O teste de conexão já mostra a amostra filtrada.
   - Webhook da origem (ADR-0039, migration 0049, `app/routers/connector_webhook.py`):
@@ -312,7 +313,7 @@ Fase 13 ([ADR-0012](../docs/adr/0012-bases-de-conhecimento.md)). Ingestão, busc
     - O corpo do evento não é lido: a sincronização lista a origem de novo, como a manual. O segredo é cifrado com `MCP_SECRETS_KEY` e entra no `rotate_secrets` como `knowledge_connector_webhook`.
   - O download é nosso (`app/knowledge/sources.py`): REST do GitHub (árvore do branch e conteúdo bruto), Microsoft Graph com client credentials pelo `httpx` e `boto3` no S3. Os loaders remotos do Agno gravam pelo `Knowledge` dele, sem `content_id` por trecho e sem medir o embedder.
   - `POST .../{id}/test` lista a origem sem baixar e diz quantos arquivos entrariam. `POST .../{id}/sync` responde 202 e roda em background (409 se já estiver rodando).
-  - A sincronização (`app/knowledge/connector_sync.py`) compara pela versão remota (sha do Git, ETag do S3, eTag do Graph) guardada em `knowledge_content.external_version`: arquivo novo entra, versão mudada perde os trechos e é reindexada, arquivo que sumiu sai com os trechos, versão igual não baixa. Só extensões que a ingestão lê, até 500 arquivos e `KNOWLEDGE_MAX_UPLOAD_MB` por arquivo; o resto conta como `skipped` no `last_summary`.
+  - A sincronização (`app/knowledge/connector_sync.py`) compara pela versão remota (sha do Git, ETag do S3, eTag do Graph) guardada em `knowledge_content.external_version`: arquivo novo entra, versão mudada perde os trechos e é reindexada, arquivo que sumiu sai com os trechos, versão igual não baixa. A listagem para em 5 mil itens lidos da origem e marca `truncated`. O download conta os bytes no stream e para no `KNOWLEDGE_MAX_UPLOAD_MB`, e o arquivo acima dele conta como `skipped` (Fase 43). Só extensões que a ingestão lê, até 500 arquivos e `KNOWLEDGE_MAX_UPLOAD_MB` por arquivo; o resto conta como `skipped` no `last_summary`.
   - Apagar o conector apaga os conteúdos e os trechos dele. Cada conteúdo traz `connector_id` e `external_path`.
 - **Reindexação agendada** (ADR-0024, migration 0034, `app/knowledge/schedule.py`):
   - O conector aceita `sync_every_hours` (1 a 168; vazio = só manual).

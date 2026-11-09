@@ -312,7 +312,7 @@ def test_s3_lista_so_o_prefixo_e_baixa_pela_chave(monkeypatch: pytest.MonkeyPatc
     calls: dict[str, Any] = {}
 
     class Body:
-        def read(self) -> bytes:
+        def read(self, amount: int = -1) -> bytes:
             return b"conteudo"
 
     class Paginator:

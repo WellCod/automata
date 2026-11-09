@@ -62,3 +62,11 @@ def test_arquivo_fora_do_filtro_some_sem_contar_como_pulado() -> None:
     assert [f.path for f in chosen] == ["politicas/troca.md"]
     # a foto passou no filtro e ficou de fora pela extensão; o CHANGELOG nem conta
     assert skipped == 1
+
+
+def test_muitos_asteriscos_nao_tem_backtracking() -> None:
+    """Fase 43: o regex com vários `[^/]*` levava segundos com 22 caracteres."""
+    started = time.perf_counter()
+    assert not allowed("a" * 200, ["*a" * 13 + "*b"], [])
+    assert allowed("_" * 1000 + ".pdf", ["*_*_*_*_*_*_*_*_*_*.pdf"], [])
+    assert time.perf_counter() - started < 0.5
