@@ -593,6 +593,19 @@ def test_webhook_da_origem_sincroniza_com_assinatura(
     )
     assert again.status_code == 429
 
+    # corpo chunked não traz content-length: o teto vale lendo o stream (Fase 43)
+    def chunks() -> Any:
+        for _ in range(3):
+            yield b"x" * 512 * 1024
+
+    big = client.post(hook, content=chunks(), headers={"X-Hub-Signature-256": "sha256=00"})
+    assert big.status_code == 413
+    bad_length = client.post(hook, content=body, headers={"Content-Length": "abc"})
+    assert bad_length.status_code in (400, 413)
+    weird = client.post(
+        hook, content=body, headers={"X-Automata-Signature": "sha256=é".encode("latin-1")}
+    )
+    assert weird.status_code == 401
     assert client.delete(f"{base}/{connector['id']}/webhook").status_code == 204
     assert (
         client.post(

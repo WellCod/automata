@@ -1432,8 +1432,8 @@ Quarta rodada de verificação, sobre a `main` em `c6f14b7`, com foco no que ent
 
 ### Segurança
 
-- [ ] **Média.** O webhook da origem (ADR-0039) só confere o limite de 1 MB pelo `content-length`. Um corpo `chunked` é lido inteiro antes da checagem e, sem token nenhum, enche a memória da API. A busca do conector e a decifragem do segredo rodam síncronas no event loop, antes da assinatura e sem limite por IP. `content-length` não numérico e assinatura com caractere fora do ASCII viram 500.
-- [ ] **Média.** O e-mail de aviso (ADR-0037) faz STARTTLS com o contexto padrão do `smtplib`, que não confere o certificado. Quem está no caminho até o `SMTP_HOST` recebe a senha do `SMTP_USER`.
+- [x] **Média.** O webhook da origem (ADR-0039) só confere o limite de 1 MB pelo `content-length`. Um corpo `chunked` é lido inteiro antes da checagem e, sem token nenhum, enche a memória da API. A busca do conector e a decifragem do segredo rodam síncronas no event loop, antes da assinatura e sem limite por IP. `content-length` não numérico e assinatura com caractere fora do ASCII viram 500.
+- [x] **Média.** O e-mail de aviso (ADR-0037) faz STARTTLS com o contexto padrão do `smtplib`, que não confere o certificado. Quem está no caminho até o `SMTP_HOST` recebe a senha do `SMTP_USER`.
 - [ ] **Média.** O filtro por nome dos conectores (ADR-0039) limita só os `**`. Um padrão com vários `*` contra um nome longo e repetitivo tem backtracking polinomial: um padrão de 28 caracteres leva 0,26 s com um nome de 22, e o tempo multiplica por 4 a cada 2 caracteres. Quem escreve na origem trava a API na sincronização ou no teste do conector.
 - [ ] **Média.** Um token de integração com `data_subjects:request` (ADR-0036) pede exportação e exclusão de qualquer `user_id`. Com `user_isolation`, o Agno grava todo run de integração como `integration:<id>`, então o token lê e apaga as conversas de outras integrações e do painel. A premissa do ADR, de que o `user_id` vem do sistema da empresa, não vale.
 - [ ] **Média.** A exclusão do titular apaga o orçamento dele (ADR-0031) e troca o id no consumo pelo pseudônimo. Quem tem orçamento com bloqueio estourado pede a própria exclusão e volta a gastar.
@@ -1456,7 +1456,7 @@ Nenhuma tela vaza em 375 px, e todas têm `h1`, rótulo em todo campo e nome em 
 ### PRs
 
 - [x] `docs`: esta seção e o ADR-0036 revisado
-- [ ] `fix(security)`: webhook da origem com corpo limitado no stream e consulta fora do event loop, e SMTP com certificado conferido
+- [x] `fix(security)`: webhook da origem com corpo limitado no stream e consulta fora do event loop, e SMTP com certificado conferido
 - [ ] `fix(security)`: filtro por nome sem backtracking e listagem e download dos conectores com teto
 - [ ] `fix(api)`: job de ingestão com prazo renovado e conector preso em sincronização liberado
 - [ ] `fix(security)`: titular por token só do próprio id, orçamento mantido na exclusão e run limpo por inteiro
