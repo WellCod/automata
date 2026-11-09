@@ -66,6 +66,8 @@ services:
       KNOWLEDGE_MAX_UPLOAD_MB: ${KNOWLEDGE_MAX_UPLOAD_MB:-20}
       # true: a API só enfileira a ingestão e o ingest-worker processa (ADR-0039)
       INGEST_WORKER: ${INGEST_WORKER:-false}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-20}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
       interval: 30s
@@ -80,7 +82,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
+          # com meia CPU, só importar o app levava 47 s no boot; com uma, 19 s (Fase 44)
+          cpus: "1.0"
           memory: 512M  # embedder e leitores de documento do RAG (ADR-0012)
 
   # worker de ingestão separado (ADR-0039): sobe com --profile worker e INGEST_WORKER=true

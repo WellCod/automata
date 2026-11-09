@@ -1502,7 +1502,7 @@ Rodada de testes, falhas, desempenho e UX sobre a `main` em `ce2f4e6`, depois da
 - [x] **Média.** A lista de bases soma o histórico inteiro de `embedding_usage`, que ganha uma linha por busca.
 - [x] **Baixa.** As métricas aceitam qualquer período (`period=99999d`), o Redis do limite de chamadas não tem timeout de socket e o pool do SQLAlchemy (5 + 10) é menor que os executores que usam o banco.
 - [ ] **Baixa.** O painel carrega o Recharts (449 KB) na página do agente mesmo sem abrir a aba Desempenho.
-- [ ] **Baixa.** O boot roda três interpretadores Python em sequência (alembic, migração do Agno e uvicorn), e cada um importa o app de novo.
+- [x] **Baixa.** O boot roda três interpretadores Python em sequência (alembic, migração do Agno e uvicorn), e cada um importa o app de novo.
 
 ### UI e UX
 
@@ -1531,7 +1531,7 @@ Por valor para quem opera agentes em produção:
 - [x] `perf(api)`: índices de consumo e de execuções e conciliação com filtro por intervalo
 - [x] `perf(api)`: engine compartilhado nas bases e no banco do Agno, poller de orçamento numa consulta e retenção de memória por SQL
 - [x] `fix(api)`: suíte interrompida só sem batimento, executor próprio para sincronização e limites de período, Redis e pool
-- [ ] `perf(infra)`: migrações num processo só no boot
+- [x] `perf(infra)`: migrações num processo só no boot e uma CPU para a API
 - [ ] `fix(web)`: aprovações com pessoa e prazo, números em pt-BR, menu da conta, recusa confirmada e gráficos sob demanda
 - [ ] `fix(web)`: instruções no topo da configuração, seções avançadas recolhidas, navegação em grupos e abas roláveis no celular
 
@@ -1541,5 +1541,5 @@ Por valor para quem opera agentes em produção:
 - O consumo das etapas filhas usa índice, e a conciliação não faz seq scan.
 - Uma busca na base não cria engine novo.
 - Uma réplica que sobe não falha a suíte que outra réplica está rodando.
-- O boot da API cai em pelo menos 8 s.
+- O boot da API cai em pelo menos 8 s (medido: import do app de 47 s para 19 s com uma CPU, e migrações de 13 s para 10 s num processo só).
 - Aprovações e Alertas mostram o e-mail de quem pediu e de quem criou.
