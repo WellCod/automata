@@ -14,6 +14,7 @@ rotas próprias e o vínculo de origem só aceita run de agente, time ou workflo
 import asyncio
 import logging
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -113,10 +114,16 @@ def _enqueue_due(connectors: list[UUID], urls: list[UUID]) -> None:
         session.commit()
 
 
+SYNC_WORKERS = 2
+# sincronização longa num executor próprio: no padrão do asyncio ela ocupava as threads
+# que montam os agentes e gravam os runs (Fase 44)
+_SYNC_EXECUTOR = ThreadPoolExecutor(max_workers=SYNC_WORKERS, thread_name_prefix="kb-sync")
+
+
 async def _in_thread(fn: Callable[[UUID], object], item: UUID) -> None:
     # cada um grava o próprio resultado; aqui só não deixa a exceção sumir no loop
     try:
-        await asyncio.to_thread(fn, item)
+        await asyncio.get_running_loop().run_in_executor(_SYNC_EXECUTOR, fn, item)
     except Exception as exc:
         logger.warning("reindexação agendada falhou", extra={"id": str(item), "error": str(exc)})
 

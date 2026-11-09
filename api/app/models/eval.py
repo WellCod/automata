@@ -84,6 +84,8 @@ class EvalRun(Base):
     # cópia dos casos como estavam: o resultado continua legível depois de editar o caso
     cases: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
     started_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    # renovado a cada caso; sem sinal, a execução é dada como interrompida (Fase 44)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # manual (painel) | integration (token de consumidor) | schedule
     trigger: Mapped[str] = mapped_column(String(16), nullable=False, server_default="manual")
     # draft | current quando o alvo veio por apelido; nulo quando veio por version_id

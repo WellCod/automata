@@ -1488,7 +1488,7 @@ Rodada de testes, falhas, desempenho e UX sobre a `main` em `ce2f4e6`, depois da
 ### Falhas
 
 - [x] **Média.** O prazo da revisão humana (ADR-0023) só vale quando alguém tenta continuar o run: o Agno confere o `timeout_at` no continue e não há varredura. O run vencido fica pausado para sempre, a pendência segue em Aprovações com "Aprovar" ativo e o selo da barra lateral conta com ela. O README promete que o prazo cancela o que ficou parado.
-- [ ] **Média.** No boot, uma réplica marca como falha toda suíte em `queued` ou `running`, inclusive as que outra réplica está rodando. Num deploy com mais de uma réplica, o gate e o painel mostram falha no meio da execução.
+- [x] **Média.** No boot, uma réplica marca como falha toda suíte em `queued` ou `running`, inclusive as que outra réplica está rodando. Num deploy com mais de uma réplica, o gate e o painel mostram falha no meio da execução.
 
 ### Desempenho
 
@@ -1497,10 +1497,10 @@ Rodada de testes, falhas, desempenho e UX sobre a `main` em `ce2f4e6`, depois da
 - [x] **Alta.** A conciliação (ADR-0037) filtra por `date(timezone(created_at))`, que não usa índice, e roda a cada minuto em cada réplica: dois seq scans completos por minuto.
 - [x] **Média.** O poller de orçamento soma o mês inteiro por config e por quem chama, um SUM por linha, antes de saber se há destino de aviso ou se o aviso já saiu. Os índices de `usage_event` não cobrem `cost`.
 - [x] **Média.** A lista de execuções conta o histórico inteiro do config a cada 5 s, sem índice que sirva ao filtro `eval_run_id IS NULL`.
-- [ ] **Média.** Sem o worker de ingestão, as sincronizações rodam no executor padrão do asyncio, o mesmo que monta os agentes e grava os runs. Oito conectores grandes ao mesmo tempo deixam os runs esperando thread.
+- [x] **Média.** Sem o worker de ingestão, as sincronizações rodam no executor padrão do asyncio, o mesmo que monta os agentes e grava os runs. Oito conectores grandes ao mesmo tempo deixam os runs esperando thread.
 - [x] **Média.** A retenção de memórias carrega todas as memórias de cada agente em Python, de hora em hora; apagar uma memória também carrega todas.
 - [x] **Média.** A lista de bases soma o histórico inteiro de `embedding_usage`, que ganha uma linha por busca.
-- [ ] **Baixa.** As métricas aceitam qualquer período (`period=99999d`), o Redis do limite de chamadas não tem timeout de socket e o pool do SQLAlchemy (5 + 10) é menor que os executores que usam o banco.
+- [x] **Baixa.** As métricas aceitam qualquer período (`period=99999d`), o Redis do limite de chamadas não tem timeout de socket e o pool do SQLAlchemy (5 + 10) é menor que os executores que usam o banco.
 - [ ] **Baixa.** O painel carrega o Recharts (449 KB) na página do agente mesmo sem abrir a aba Desempenho.
 - [ ] **Baixa.** O boot roda três interpretadores Python em sequência (alembic, migração do Agno e uvicorn), e cada um importa o app de novo.
 
@@ -1530,7 +1530,7 @@ Por valor para quem opera agentes em produção:
 - [x] `fix(api)`: prazo da revisão humana vencendo sozinho, com o run cancelado e a pendência fora de Aprovações
 - [x] `perf(api)`: índices de consumo e de execuções e conciliação com filtro por intervalo
 - [x] `perf(api)`: engine compartilhado nas bases e no banco do Agno, poller de orçamento numa consulta e retenção de memória por SQL
-- [ ] `fix(api)`: suíte interrompida só sem batimento, executor próprio para sincronização e limites de período, Redis e pool
+- [x] `fix(api)`: suíte interrompida só sem batimento, executor próprio para sincronização e limites de período, Redis e pool
 - [ ] `perf(infra)`: migrações num processo só no boot
 - [ ] `fix(web)`: aprovações com pessoa e prazo, números em pt-BR, menu da conta, recusa confirmada e gráficos sob demanda
 - [ ] `fix(web)`: instruções no topo da configuração, seções avançadas recolhidas, navegação em grupos e abas roláveis no celular

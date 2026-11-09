@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # "development" liga /docs, /redoc e /openapi.json; qualquer outro valor os desliga
     app_env: str = "production"
     redis_url: str | None = None
+    # pool do SQLAlchemy por processo; multiplique pelas réplicas e compare com o
+    # max_connections do Postgres
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
     # ingestão no worker separado (ADR-0039): a API só grava o job em ingest_job
     ingest_worker: bool = False
     # IPs ou CIDRs de proxies cujo X-Forwarded-For é confiável (separados por vírgula).

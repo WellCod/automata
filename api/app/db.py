@@ -17,7 +17,14 @@ def get_db() -> PostgresDb:
 
 @lru_cache(maxsize=1)
 def _build_engine(db_url: str) -> Engine:
-    return create_engine(db_url, pool_size=5, max_overflow=10, pool_pre_ping=True)
+    settings = get_settings()
+    # o padrão (5 + 10) era menor que os executores que usam o banco (Fase 44)
+    return create_engine(
+        db_url,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+        pool_pre_ping=True,
+    )
 
 
 def get_engine() -> Engine:

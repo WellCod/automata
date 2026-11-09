@@ -201,12 +201,14 @@ def poll_once(now: datetime | None = None) -> None:
     from app.agents.review_timeout import expire_reviews
     from app.caller_budget import check_caller_budgets
     from app.data_subjects import check_requests
+    from app.evals.runner import check_stale_runs
     from app.job_queue import check_jobs
     from app.reconciliation import check_divergence
 
     checks = (
         # prazo da revisão humana vencido (Fase 44); não manda aviso, só cancela o run
         expire_reviews,
+        check_stale_runs,
         check_budgets,
         check_caller_budgets,
         check_errors,

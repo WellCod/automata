@@ -92,7 +92,8 @@ def build_series(
 
 
 def _parse_period(period: str) -> int:
-    return int(period[:-1])
+    # `99999d` varria a tabela inteira, e um número enorme estourava a data (Fase 44)
+    return max(1, min(int(period[:-1][:6]), MAX_SERIES_DAYS))
 
 
 def _resolve_range(
