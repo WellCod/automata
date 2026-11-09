@@ -11,6 +11,10 @@ import { Button } from "@/components/ui/button";
 
 type ApprovalItem = components["schemas"]["ApprovalItem"];
 
+function expired(iso: string): boolean {
+  return new Date(iso).getTime() <= Date.now();
+}
+
 function when(iso: string): string {
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
@@ -47,7 +51,7 @@ function WorkflowApprovalCard({ item }: { item: ApprovalItem }) {
           {item.agent_name || item.agent_id}
         </Link>
         <span className="text-muted-foreground text-[13px]">
-          pedido por {item.user_id} · {when(item.created_at)}
+          pedido por {item.requested_by || item.user_id} · {when(item.created_at)}
         </span>
       </div>
       {item.steps.map((step) => (
@@ -63,10 +67,16 @@ function WorkflowApprovalCard({ item }: { item: ApprovalItem }) {
               {step.output}
             </pre>
           )}
-          {step.timeout_at && (
-            <p className="text-muted-foreground text-[12px]">
-              Sem decisão até {when(step.timeout_at)}, o workflow é cancelado.
+          {step.timeout_at && expired(step.timeout_at) ? (
+            <p className="text-[12px] text-amber-600 dark:text-amber-400" role="status">
+              Prazo vencido em {when(step.timeout_at)}: o workflow é cancelado sem decisão.
             </p>
+          ) : (
+            step.timeout_at && (
+              <p className="text-muted-foreground text-[12px]">
+                Sem decisão até {when(step.timeout_at)}, o workflow é cancelado.
+              </p>
+            )
           )}
         </div>
       ))}
@@ -75,7 +85,8 @@ function WorkflowApprovalCard({ item }: { item: ApprovalItem }) {
           {decide.error.message}
         </p>
       )}
-      {active && (
+      {/* vencida, a decisão não vale mais: o poller cancela o run (Fase 44) */}
+      {active && !(active.timeout_at && expired(active.timeout_at)) && (
         <StepReviewActions
           key={`${active.step_id}-${active.retry_count}`}
           when={active.when}
@@ -123,7 +134,7 @@ function ApprovalCard({ item }: { item: ApprovalItem }) {
           {item.agent_name || item.agent_id}
         </Link>
         <span className="text-muted-foreground text-[13px]">
-          pedido por {item.user_id} ·{" "}
+          pedido por {item.requested_by || item.user_id} ·{" "}
           {new Date(item.created_at).toLocaleString("pt-BR", {
             dateStyle: "short",
             timeStyle: "short",
@@ -155,7 +166,7 @@ function ApprovalCard({ item }: { item: ApprovalItem }) {
         <Button
           disabled={decide.isPending}
           onClick={() => decide.mutate(false)}
-          variant="destructive"
+          variant="subtleDestructive"
         >
           Rejeitar
         </Button>

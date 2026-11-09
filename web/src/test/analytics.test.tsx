@@ -46,6 +46,7 @@ describe("AnalyticsPage", () => {
     });
     render(<AnalyticsPage />, { wrapper });
     expect(await screen.findByText("42")).toBeInTheDocument();
-    expect(screen.getByText("5.0%")).toBeInTheDocument();
+    // pt-BR, como o custo (Fase 44)
+    expect(screen.getByText("5%")).toBeInTheDocument();
   });
 });

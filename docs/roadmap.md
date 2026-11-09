@@ -1501,17 +1501,17 @@ Rodada de testes, falhas, desempenho e UX sobre a `main` em `ce2f4e6`, depois da
 - [x] **Média.** A retenção de memórias carrega todas as memórias de cada agente em Python, de hora em hora; apagar uma memória também carrega todas.
 - [x] **Média.** A lista de bases soma o histórico inteiro de `embedding_usage`, que ganha uma linha por busca.
 - [x] **Baixa.** As métricas aceitam qualquer período (`period=99999d`), o Redis do limite de chamadas não tem timeout de socket e o pool do SQLAlchemy (5 + 10) é menor que os executores que usam o banco.
-- [ ] **Baixa.** O painel carrega o Recharts (449 KB) na página do agente mesmo sem abrir a aba Desempenho.
+- [x] **Baixa.** O painel carrega o Recharts (449 KB) na página do agente mesmo sem abrir a aba Desempenho.
 - [x] **Baixa.** O boot roda três interpretadores Python em sequência (alembic, migração do Agno e uvicorn), e cada um importa o app de novo.
 
 ### UI e UX
 
 - [ ] **Alta.** A configuração do agente tem cerca de 4300 px, e as instruções, o que quem não programa mais edita, ficam no fim, depois de guardrails, memória, controle do run e saída estruturada.
-- [ ] **Alta.** Aprovações e Alertas mostram o id do usuário (`3a6895ec-…`) onde deveria aparecer a pessoa.
-- [ ] **Média.** "Meus dados" e "Minhas memórias" só se acham por ícones de 14 px no rodapé da barra lateral.
+- [x] **Alta.** Aprovações e Alertas mostram o id do usuário (`3a6895ec-…`) onde deveria aparecer a pessoa.
+- [x] **Média.** "Meus dados" e "Minhas memórias" só se acham por ícones de 14 px no rodapé da barra lateral.
 - [ ] **Média.** A navegação é uma lista plana de 14 itens, sem grupos.
-- [ ] **Média.** O Analytics mostra números no formato inglês (`3.7%`, `18.0 M`) ao lado de valores em reais no formato brasileiro.
-- [ ] **Média.** "Recusar" em Aprovações é vermelho sólido e não pede confirmação, embora encerre ou refaça o workflow.
+- [x] **Média.** O Analytics mostra números no formato inglês (`3.7%`, `18.0 M`) ao lado de valores em reais no formato brasileiro.
+- [x] **Média.** "Recusar" em Aprovações é vermelho sólido e não pede confirmação, embora encerre ou refaça o workflow.
 - [ ] **Média.** No celular, as abas da página do agente somem à direita sem indicação de rolagem.
 
 ### Features candidatas (Fase 45)
@@ -1532,7 +1532,7 @@ Por valor para quem opera agentes em produção:
 - [x] `perf(api)`: engine compartilhado nas bases e no banco do Agno, poller de orçamento numa consulta e retenção de memória por SQL
 - [x] `fix(api)`: suíte interrompida só sem batimento, executor próprio para sincronização e limites de período, Redis e pool
 - [x] `perf(infra)`: migrações num processo só no boot e uma CPU para a API
-- [ ] `fix(web)`: aprovações com pessoa e prazo, números em pt-BR, menu da conta, recusa confirmada e gráficos sob demanda
+- [x] `fix(web)`: aprovações com pessoa e prazo, números em pt-BR, menu da conta, recusa confirmada e gráficos sob demanda
 - [ ] `fix(web)`: instruções no topo da configuração, seções avançadas recolhidas, navegação em grupos e abas roláveis no celular
 
 **Critério de aceite da fase:**

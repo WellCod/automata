@@ -21,10 +21,16 @@ const PERIODS = [
 
 type Period = (typeof PERIODS)[number]["value"];
 
+// pt-BR, como o custo: "18,1 mi" e "3,7%" (Fase 44)
+const COMPACT = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
+const PERCENT = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 });
+
 function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)} k`;
-  return String(n);
+  return COMPACT.format(n);
+}
+
+function formatRate(rate: number): string {
+  return PERCENT.format(rate);
 }
 
 function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
@@ -205,7 +211,7 @@ export default function AnalyticsPage() {
           />
           <SummaryCard
             label="Falhas"
-            value={`${(summary.error_rate * 100).toFixed(1)}%`}
+            value={formatRate(summary.error_rate)}
             hint="percentual de respostas com erro"
           />
           <SummaryCard
@@ -285,7 +291,7 @@ export default function AnalyticsPage() {
                     <td
                       className={`px-4 py-2 text-right ${row.error_rate > 0.1 ? "text-destructive" : "text-foreground"}`}
                     >
-                      {(row.error_rate * 100).toFixed(1)}%
+                      {formatRate(row.error_rate)}
                     </td>
                     <td className="text-foreground px-4 py-2 text-right">
                       {row.blocked_runs ?? 0}

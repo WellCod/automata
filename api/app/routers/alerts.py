@@ -13,6 +13,7 @@ from app.db import SessionDep
 from app.evals import webhook
 from app.mcp.egress import EgressDenied
 from app.models.alert import AlertDestination
+from app.repositories.user import emails_by_id
 from app.schemas.alert import (
     AlertChannels,
     AlertDestinationCreate,
@@ -31,7 +32,7 @@ router = APIRouter(
 )
 
 
-def _response(d: AlertDestination) -> dict[str, Any]:
+def _response(d: AlertDestination, emails: dict[str, str] | None = None) -> dict[str, Any]:
     return {
         "id": d.id,
         "name": d.name,
@@ -39,7 +40,8 @@ def _response(d: AlertDestination) -> dict[str, Any]:
         "host": d.webhook_host,
         "emails": list(d.email_to or []),
         "events": cast(list[AlertEvent], d.events),
-        "created_by": d.created_by,
+        # e-mail de quem criou, quando é usuário do painel (Fase 44)
+        "created_by": (emails or {}).get(d.created_by, d.created_by),
         "last_status": d.last_status,
         "last_at": d.last_at,
         "created_at": d.created_at,
@@ -64,8 +66,9 @@ def channels() -> AlertChannels:
 
 @router.get("", response_model=list[AlertDestinationResponse])
 def list_destinations(session: SessionDep) -> list[AlertDestinationResponse]:
-    rows = session.scalars(select(AlertDestination).order_by(AlertDestination.created_at))
-    return [AlertDestinationResponse(**_response(d)) for d in rows]
+    rows = session.scalars(select(AlertDestination).order_by(AlertDestination.created_at)).all()
+    emails = emails_by_id(session, {d.created_by for d in rows})
+    return [AlertDestinationResponse(**_response(d, emails)) for d in rows]
 
 
 @router.post("", response_model=AlertDestinationIssued, status_code=201)

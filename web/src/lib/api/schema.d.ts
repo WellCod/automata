@@ -2010,6 +2010,11 @@ export interface components {
             /** User Id */
             user_id: string;
             /**
+             * Requested By
+             * @default
+             */
+            requested_by: string;
+            /**
              * Created At
              * Format: date-time
              */

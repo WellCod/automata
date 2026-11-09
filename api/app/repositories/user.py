@@ -1,3 +1,4 @@
+import contextlib
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -40,3 +41,15 @@ class UserRepository:
     def count(self) -> int:
         result = self._session.scalar(select(func.count()).select_from(User))
         return int(result) if result is not None else 0
+
+
+def emails_by_id(session: Session, ids: set[str]) -> dict[str, str]:
+    """E-mail de quem é usuário do painel; id que não é usuário fica de fora."""
+    uuids = []
+    for value in ids:
+        with contextlib.suppress(TypeError, ValueError):
+            uuids.append(UUID(value))
+    if not uuids:
+        return {}
+    rows = session.execute(select(User.id, User.email).where(User.id.in_(uuids)))
+    return {str(user_id): email for user_id, email in rows}
