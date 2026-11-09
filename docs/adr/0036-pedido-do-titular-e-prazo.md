@@ -20,7 +20,9 @@ O ADR-0032 deu ao owner a consulta, a exportação e a exclusão dos dados de um
 - `GET /api/v1/data-subject-requests`;
 - `.../download`.
 
-Ele vê e baixa só os pedidos que ele mesmo fez (`requested_by = integration:<id>`). A instância não sabe quais titulares são da empresa, porque o `user_id` vem do próprio sistema. Por isso a opção é do owner, token a token, e o painel avisa que ela dá acesso aos dados de qualquer titular.
+Ele vê e baixa só os pedidos que ele mesmo fez (`requested_by = integration:<id>`).
+
+**Revisão da Fase 43.** O token só pede pelo próprio titular, `integration:<id>`. A premissa original era que o `user_id` vinha do sistema da empresa, mas com `user_isolation` o Agno grava todo run de integração com o `sub` do token. Aceitar qualquer id dava ao token as conversas de outras integrações e do painel. Para separar os clientes finais de uma integração, cada sistema precisa de um token próprio.
 
 **Pedido pelo próprio usuário do painel.** `GET /api/v1/me/data` conta o que há do usuário logado. `POST /api/v1/me/data/export` e `POST /api/v1/me/data/erase` pedem a exportação e a exclusão. A exclusão exige o e-mail do usuário repetido. Os pedidos dele aparecem em `GET /api/v1/me/data/requests`, e o download só serve ao dono do pedido. A conta do painel continua existindo: o que sai é o dado de conversa, memória e consumo, como no ADR-0032.
 
@@ -33,7 +35,7 @@ Cada pedido avisa uma vez por evento. A lista de pedidos mostra o prazo, a orige
 
 ## Alternativas descartadas
 
-- **Token de integração restrito aos titulares que ele criou.** O `user_id` é do sistema da empresa, e o mesmo cliente pode falar por dois sistemas. A restrição dava falsa segurança e barrava o pedido legítimo.
+- **Token de integração com acesso a qualquer titular.** Foi a decisão original, revista na Fase 43: o `user_id` dos runs de integração é o do token, não o do sistema da empresa, então o acesso amplo só servia para ler dado de outros.
 - **Pedido do titular entrando como pendente de aprovação do owner.** A LGPD não pede intermediário, e a confirmação repetindo o id já evita o pedido por engano.
 
 ## Consequências
