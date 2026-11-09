@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 42
+# Roadmap — Fases 4 a 43
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -1426,3 +1426,51 @@ Decisão em [ADR-0039](adr/0039-conectores-e-worker-de-ingestao.md). As bases ga
 - Um push no GitHub com o webhook configurado sincroniza a base em segundos. Uma assinatura errada recebe 401.
 - Com `INGEST_WORKER=true`, o upload fica na fila até o worker processar, e dois workers não processam o mesmo job.
 
+## Fase 43 — Auditoria 2026-11-09
+
+Quarta rodada de verificação, sobre a `main` em `c6f14b7`, com foco no que entrou nas Fases 34 a 42. A UI e o UX foram conferidos em 80 telas do painel, no desktop e no celular, no tema claro e no escuro. A segurança da API teve duas revisões independentes, uma da entrada pública, das saídas e da ingestão e outra da autorização e dos dados. Os achados foram conferidos no código, e os de backtracking, TLS e autorização foram reproduzidos.
+
+### Segurança
+
+- [ ] **Média.** O webhook da origem (ADR-0039) só confere o limite de 1 MB pelo `content-length`. Um corpo `chunked` é lido inteiro antes da checagem e, sem token nenhum, enche a memória da API. A busca do conector e a decifragem do segredo rodam síncronas no event loop, antes da assinatura e sem limite por IP. `content-length` não numérico e assinatura com caractere fora do ASCII viram 500.
+- [ ] **Média.** O e-mail de aviso (ADR-0037) faz STARTTLS com o contexto padrão do `smtplib`, que não confere o certificado. Quem está no caminho até o `SMTP_HOST` recebe a senha do `SMTP_USER`.
+- [ ] **Média.** O filtro por nome dos conectores (ADR-0039) limita só os `**`. Um padrão com vários `*` contra um nome longo e repetitivo tem backtracking polinomial: um padrão de 28 caracteres leva 0,26 s com um nome de 22, e o tempo multiplica por 4 a cada 2 caracteres. Quem escreve na origem trava a API na sincronização ou no teste do conector.
+- [ ] **Média.** Um token de integração com `data_subjects:request` (ADR-0036) pede exportação e exclusão de qualquer `user_id`. Com `user_isolation`, o Agno grava todo run de integração como `integration:<id>`, então o token lê e apaga as conversas de outras integrações e do painel. A premissa do ADR, de que o `user_id` vem do sistema da empresa, não vale.
+- [ ] **Média.** A exclusão do titular apaga o orçamento dele (ADR-0031) e troca o id no consumo pelo pseudônimo. Quem tem orçamento com bloqueio estourado pede a própria exclusão e volta a gastar.
+- [ ] **Média.** No classificador herdado do piso (ADR-0034), o agente fica com o próprio modelo e o próprio escopo. O editor escolhe um modelo cujo provedor não tem chave, e com o padrão `allow` toda checagem passa. Também troca o escopo e anula o `off_topic` do piso.
+- [ ] **Baixa.** Drive e Cloud Storage listam a origem inteira, sem teto de itens, antes do corte de 500 arquivos. O download traz o objeto inteiro para a memória antes de conferir o tamanho.
+- [ ] **Baixa.** Job de ingestão que passa de 30 minutos volta à fila enquanto roda, e outra réplica do worker repete o trabalho e o embedding. Sem worker, um reinício no meio da sincronização deixa o conector em `running` para sempre.
+- [ ] **Baixa.** A exclusão do titular mantém `pending_tools`, `pending_steps` e `error` no `agent_run`, e a exportação não leva esses campos. Uma exportação já rodando quando chega a exclusão grava o arquivo de antes, e uma ainda na fila fica pendente para sempre.
+- [ ] **Baixa.** O classificador da saída examina os primeiros e os últimos 10 mil caracteres. Uma resposta longa esconde o vazamento no meio.
+- [ ] **Baixa.** O `{anterior}` digitado pelo usuário é trocado no template da etapa depois do `{entrada}`, e a etapa recebe a saída interna da anterior.
+- [ ] **Baixa.** As sugestões de caso em lote mascaram os tipos fixos de dado pessoal, mas não os padrões próprios do agente.
+
+### UI e UX
+
+Nenhuma tela vaza em 375 px, e todas têm `h1`, rótulo em todo campo e nome em todo botão. Nenhuma devolve 5xx. Os alertas de alvo pequeno dos checkboxes são falso positivo, porque o rótulo clicável é o alvo.
+
+- [ ] **Baixa.** Os gatilhos de dica de p50 e p95 e a trilha "Times" e "Workflows" no topo da página têm menos de 24 px de altura.
+- [ ] **Baixa.** A página do time pede o piso de guardrails pelo rascunho e, sem rascunho, recebe 404 antes de pedir pela versão publicada.
+- [ ] **Baixa.** Os prints do README são da Fase 33. Não mostram a Fila, os Guardrails da instância, os Titulares, o roteador nem os conectores novos.
+
+### PRs
+
+- [x] `docs`: esta seção e o ADR-0036 revisado
+- [ ] `fix(security)`: webhook da origem com corpo limitado no stream e consulta fora do event loop, e SMTP com certificado conferido
+- [ ] `fix(security)`: filtro por nome sem backtracking e listagem e download dos conectores com teto
+- [ ] `fix(api)`: job de ingestão com prazo renovado e conector preso em sincronização liberado
+- [ ] `fix(security)`: titular por token só do próprio id, orçamento mantido na exclusão e run limpo por inteiro
+- [ ] `fix(security)`: classificador do piso com o modelo e o escopo do piso e saída longa examinada inteira
+- [ ] `fix(security)`: template da etapa numa passada só e sugestões com os padrões próprios de dado pessoal
+- [ ] `fix(web)`: alvos de 24 px nas dicas e na trilha e piso lido sem 404
+- [ ] `docs`: README com os prints das telas atuais
+
+**Critério de aceite da fase:**
+
+- Um corpo `chunked` de 2 MB no webhook recebe 413 sem passar de 1 MB lido, e 100 chamadas com id aleatório não atrasam o `/health`.
+- Um padrão com 13 `*` contra um nome de 200 caracteres responde em milissegundos.
+- O SMTP com certificado de outro host falha sem mandar a senha.
+- O token A recebe 403 ao pedir os dados de `integration:<B>` ou de um usuário do painel.
+- Depois da própria exclusão, quem tem o orçamento estourado continua bloqueado.
+- Com o piso definindo o classificador, o modelo e o escopo do agente não mudam a checagem.
+- Uma mensagem com `{anterior}` chega literal à etapa com template.
