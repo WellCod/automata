@@ -7,7 +7,7 @@ Plataforma para operar agentes de IA em produção. Com ela, quem não programa 
 
 O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é a camada de produto em volta: configuração versionada em banco próprio, validação antes de publicar, rastreamento de cada execução, segurança e painel.
 
-![Workflow com etapas em paralelo e condição](docs/img/workflow.png)
+![Workflow com roteador por assunto e revisão humana na consolidação](docs/img/workflow.png)
 
 | | |
 |---|---|
@@ -95,7 +95,7 @@ O modo teste lê o stream do AgentOS e mostra cada etapa ao vivo: quem respondeu
 
 Uma etapa pode **pausar para revisão humana**: confirmar antes de rodar ou aprovar a saída antes da próxima etapa. A pendência aparece na página Aprovações e no próprio modo teste, com a saída a conferir. Recusar encerra o fluxo, pula a etapa ou a refaz com o motivo da recusa no contexto, e um prazo opcional cancela o que ficou parado.
 
-<p align="center"><img src="docs/img/workflow-teste.png" alt="Modo teste do workflow pausado na revisão humana da etapa de reembolso" width="420"></p>
+<p align="center"><img src="docs/img/workflow-teste.png" alt="Modo teste do workflow pausado na revisão humana da consolidação, depois do roteador mandar o reembolso ao financeiro" width="420"></p>
 
 ![Página Aprovações com a saída de uma etapa esperando revisão](docs/img/aprovacoes.png)
 
@@ -109,7 +109,7 @@ Cada base escolhe como buscar: a busca simples, diversidade (MMR, para manuais l
 
 A base também acompanha a origem. Um **conector** lê um repositório do GitHub, um bucket S3 ou do Cloud Storage, uma pasta do SharePoint ou do Google Drive, com a credencial cifrada. Padrões de nome escolhem os arquivos (`politicas/**/*.md`, fora `**/rascunhos/**`), e um webhook assinado deixa a própria origem disparar a sincronização a cada push. A sincronização compara pela versão de cada arquivo: arquivo novo entra, alterado é reindexado sem duplicar trecho, removido sai da base, e o que não mudou não é baixado nem cobra embedding. A sincronização pode rodar num intervalo, e uma URL pode ser baixada de novo todo dia ou toda semana, reindexando só se a página mudou.
 
-![Conector do GitHub numa base de conhecimento](docs/img/conectores.png)
+![Conector do GitHub com filtro por nome e webhook da origem](docs/img/conectores.png)
 
 ### Conversas longas
 
@@ -139,6 +139,8 @@ Regras de entrada e saída versionadas junto com o agente. O bloqueio acontece a
 Execuções barradas aparecem como **bloqueadas**, com a regra, separadas de falha no analytics.
 
 <p align="center"><img src="docs/img/guardrails.png" alt="Guardrails de um agente" width="560"></p>
+
+![Piso de guardrails da instância](docs/img/piso.png)
 
 ### Testes por agente antes de publicar
 
