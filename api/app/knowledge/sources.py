@@ -118,6 +118,17 @@ def _inside(path: str, folder: str) -> str | None:
 def _raise_for(resp: httpx.Response, what: str) -> None:
     if resp.is_redirect:
         raise SourceError(f"{what}: redirect recusado")
+    # limite da origem não é credencial errada: o GitHub sem token responde 403 depois de
+    # 60 chamadas por hora, com x-ratelimit-remaining zerado (Fase 43)
+    limited = resp.status_code == 429 or (
+        resp.status_code == 403
+        and (resp.headers.get("x-ratelimit-remaining") == "0" or "retry-after" in resp.headers)
+    )
+    if limited:
+        raise SourceError(
+            f"{what}: limite de chamadas da origem atingido (HTTP {resp.status_code}); "
+            "tente mais tarde ou use um token"
+        )
     if resp.status_code in (401, 403):
         raise SourceError(f"{what}: credencial recusada (HTTP {resp.status_code})")
     if resp.status_code == 404:

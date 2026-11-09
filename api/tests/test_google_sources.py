@@ -211,3 +211,23 @@ def test_listagem_e_download_com_teto(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sources, "max_download", lambda: 1000)
     with pytest.raises(sources.TooLarge):
         source.download(listed[0])
+
+
+@pytest.mark.parametrize(
+    ("status", "headers", "expected"),
+    [
+        (403, {"x-ratelimit-remaining": "0"}, "limite de chamadas"),
+        (429, {}, "limite de chamadas"),
+        (403, {"retry-after": "60"}, "limite de chamadas"),
+        (403, {}, "credencial recusada"),
+        (401, {}, "credencial recusada"),
+    ],
+)
+def test_limite_da_origem_nao_vira_credencial_recusada(
+    status: int, headers: dict[str, str], expected: str
+) -> None:
+    """Fase 43: o GitHub sem token devolve 403 no limite, e a mensagem culpava a credencial."""
+    from app.knowledge.sources import _raise_for
+
+    with pytest.raises(SourceError, match=expected):
+        _raise_for(httpx.Response(status, headers=headers), "GitHub acme/docs")
