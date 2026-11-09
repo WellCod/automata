@@ -7,6 +7,7 @@ segunda, falha junto com o conteúdo ou o conector.
 
 import logging
 import signal
+import threading
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -29,6 +30,8 @@ STALE_AFTER = timedelta(minutes=30)
 MAX_ATTEMPTS = 2
 KEEP_FINISHED = timedelta(days=7)
 POLL_SECONDS = 2.0
+# bem abaixo do STALE_AFTER: um batimento perdido não devolve o job à fila
+HEARTBEAT_SECONDS = 300.0
 
 
 @dataclass(frozen=True)
@@ -110,12 +113,30 @@ def _finish(job_id: UUID, status: str, error: str | None = None) -> None:
         session.commit()
 
 
+def _heartbeat(job_id: UUID, stop: threading.Event) -> None:
+    """Renova o `started_at` enquanto o job roda: job longo não volta à fila no meio (Fase 43)."""
+    while not stop.wait(HEARTBEAT_SECONDS):
+        try:
+            with Session(get_engine()) as session:
+                session.execute(
+                    update(IngestJob)
+                    .where(IngestJob.id == job_id, IngestJob.status == "running")
+                    .values(started_at=datetime.now(UTC))
+                )
+                session.commit()
+        except Exception as exc:
+            logger.warning("batimento do job falhou", extra={"error": str(exc)})
+
+
 def run_once() -> bool:
     """Executa um job; devolve se havia algum."""
     job = claim()
     if job is None:
         return False
     extra = {"job_id": str(job.id), "kind": job.kind, "target_id": str(job.target_id)}
+    stop = threading.Event()
+    beat = threading.Thread(target=_heartbeat, args=(job.id, stop), daemon=True)
+    beat.start()
     try:
         execute(job.kind, job.target_id, job.payload)
     except Exception as exc:
@@ -124,6 +145,8 @@ def run_once() -> bool:
         _finish(job.id, "failed", str(exc)[:500])
         _fail_target(job.kind, job.target_id, f"falha na ingestão: {exc}")
         return True
+    finally:
+        stop.set()
     _finish(job.id, "done")
     logger.info("job de ingestão concluído", extra=extra)
     return True

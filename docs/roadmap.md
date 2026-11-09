@@ -1439,7 +1439,7 @@ Quarta rodada de verificação, sobre a `main` em `c6f14b7`, com foco no que ent
 - [ ] **Média.** A exclusão do titular apaga o orçamento dele (ADR-0031) e troca o id no consumo pelo pseudônimo. Quem tem orçamento com bloqueio estourado pede a própria exclusão e volta a gastar.
 - [ ] **Média.** No classificador herdado do piso (ADR-0034), o agente fica com o próprio modelo e o próprio escopo. O editor escolhe um modelo cujo provedor não tem chave, e com o padrão `allow` toda checagem passa. Também troca o escopo e anula o `off_topic` do piso.
 - [x] **Baixa.** Drive e Cloud Storage listam a origem inteira, sem teto de itens, antes do corte de 500 arquivos. O download traz o objeto inteiro para a memória antes de conferir o tamanho.
-- [ ] **Baixa.** Job de ingestão que passa de 30 minutos volta à fila enquanto roda, e outra réplica do worker repete o trabalho e o embedding. Sem worker, um reinício no meio da sincronização deixa o conector em `running` para sempre.
+- [x] **Baixa.** Job de ingestão que passa de 30 minutos volta à fila enquanto roda, e outra réplica do worker repete o trabalho e o embedding. Sem worker, um reinício no meio da sincronização deixa o conector em `running` para sempre.
 - [ ] **Baixa.** A exclusão do titular mantém `pending_tools`, `pending_steps` e `error` no `agent_run`, e a exportação não leva esses campos. Uma exportação já rodando quando chega a exclusão grava o arquivo de antes, e uma ainda na fila fica pendente para sempre.
 - [ ] **Baixa.** O classificador da saída examina os primeiros e os últimos 10 mil caracteres. Uma resposta longa esconde o vazamento no meio.
 - [ ] **Baixa.** O `{anterior}` digitado pelo usuário é trocado no template da etapa depois do `{entrada}`, e a etapa recebe a saída interna da anterior.
@@ -1458,7 +1458,7 @@ Nenhuma tela vaza em 375 px, e todas têm `h1`, rótulo em todo campo e nome em 
 - [x] `docs`: esta seção e o ADR-0036 revisado
 - [x] `fix(security)`: webhook da origem com corpo limitado no stream e consulta fora do event loop, e SMTP com certificado conferido
 - [x] `fix(security)`: filtro por nome sem backtracking e listagem e download dos conectores com teto
-- [ ] `fix(api)`: job de ingestão com prazo renovado e conector preso em sincronização liberado
+- [x] `fix(api)`: job de ingestão com prazo renovado e conector preso em sincronização liberado
 - [ ] `fix(security)`: titular por token só do próprio id, orçamento mantido na exclusão e run limpo por inteiro
 - [ ] `fix(security)`: classificador do piso com o modelo e o escopo do piso e saída longa examinada inteira
 - [ ] `fix(security)`: template da etapa numa passada só e sugestões com os padrões próprios de dado pessoal

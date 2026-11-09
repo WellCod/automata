@@ -702,3 +702,69 @@ def test_job_travado_volta_uma_vez_e_depois_falha(
         assert job is not None and job.status == "failed" and job.attempts == 2
     content = client.get(f"{contents}/{content_id}").json()
     assert content["status"] == "failed" and "worker" in content["status_message"]
+
+
+def test_conector_preso_em_running_e_liberado(client: TestClient, base_id: str) -> None:
+    """Fase 43: o processo caiu no meio da sincronização e o conector ficava running."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.db import get_engine
+    from app.knowledge.schedule import release_stuck
+    from app.models.knowledge_connector import KnowledgeConnector
+
+    base = f"/api/v1/knowledge-bases/{base_id}/connectors"
+    ids = [
+        client.post(
+            base,
+            json={"kind": "github", "name": name, "settings": {"repo": "acme/docs"}},
+        ).json()["id"]
+        for name in ("Preso", "Rodando", "Antigo")
+    ]
+    now = datetime.now(UTC)
+    with Session(get_engine()) as session:
+        for cid, beat in zip(
+            ids, [now - timedelta(hours=3), now - timedelta(minutes=5), None], strict=True
+        ):
+            row = session.get(KnowledgeConnector, UUID(cid))
+            assert row is not None
+            row.last_status = "running"
+            row.sync_heartbeat_at = beat
+        session.commit()
+
+    assert release_stuck(now) >= 2
+    status = {c["name"]: c["last_status"] for c in client.get(base).json()}
+    assert status == {"Preso": "failed", "Rodando": "running", "Antigo": "failed"}
+
+
+def test_job_longo_renova_o_prazo(
+    client: TestClient, base_id: str, worker_on: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fase 43: job acima de 30 min voltava à fila enquanto rodava."""
+    import time
+    from datetime import UTC, datetime, timedelta
+
+    from app.db import get_engine
+    from app.knowledge import worker
+    from app.models.ingest_job import IngestJob
+
+    monkeypatch.setattr(worker, "HEARTBEAT_SECONDS", 0.05)
+    seen: list[datetime] = []
+
+    def slow(kind: str, target: UUID, payload: Any) -> None:
+        with Session(get_engine()) as session:
+            job = session.scalars(select(IngestJob).where(IngestJob.target_id == target)).one()
+            first = job.started_at
+        time.sleep(0.4)
+        with Session(get_engine()) as session:
+            job = session.scalars(select(IngestJob).where(IngestJob.target_id == target)).one()
+            assert job.started_at is not None and first is not None
+            seen.append(job.started_at)
+            assert job.started_at > first
+            # o renovado não é dado como travado
+            assert job.started_at > datetime.now(UTC) - timedelta(seconds=5)
+
+    monkeypatch.setattr(worker, "execute", slow)
+    contents = f"/api/v1/knowledge-bases/{base_id}/contents"
+    client.post(contents + "/text", json={"name": "Longo", "text": "texto"})
+    assert worker.run_once()
+    assert seen

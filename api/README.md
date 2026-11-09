@@ -318,6 +318,7 @@ Fase 13 ([ADR-0012](../docs/adr/0012-bases-de-conhecimento.md)). Ingestão, busc
 - **Reindexação agendada** (ADR-0024, migration 0034, `app/knowledge/schedule.py`):
   - O conector aceita `sync_every_hours` (1 a 168; vazio = só manual).
   - Conteúdo de URL aceita `refresh_every_hours` no `POST /url` e em `PUT /contents/{id}/schedule` (vazio desliga; outro tipo de conteúdo dá 422). `POST /contents/{id}/refresh` baixa agora.
+  - Conector em `running` sem batimento há mais de 2 horas (`sync_heartbeat_at`, migration 0051, renovado a cada arquivo) é liberado pelo poller como `failed`: o processo caiu no meio da sincronização (Fase 43).
   - O poller das suítes reivindica até 10 conectores e 10 URLs vencidos por minuto com `FOR UPDATE SKIP LOCKED` e marca o próximo horário no mesmo commit, antes de trabalhar.
   - A URL só volta a indexar se o sha256 do que veio for diferente do `content_hash` gravado na ingestão. Página fora do ar mantém o que já está indexado.
 - **Busca de teste** (`POST /api/v1/knowledge-bases/{id}/search`, `{query, max_results}`): devolve os trechos que o agente receberia, com documento, fonte e score (0 a 1, combinação de similaridade e full-text em português). Base sem conteúdo devolve lista vazia; embedder sem chave ou fora do ar dá 502 com o motivo, porque o `search` do PgVector engole a falha e devolveria vazio.
@@ -354,7 +355,7 @@ Fase 13 ([ADR-0012](../docs/adr/0012-bases-de-conhecimento.md)). Ingestão, busc
 - **Worker de ingestão** (ADR-0039, migration 0050, `app/knowledge/jobs.py` e `app/knowledge/worker.py`):
   - Com `INGEST_WORKER=true` a API não processa: grava um job em `ingest_job` e o `python -m app.knowledge.worker` executa. Sem a variável, tudo segue em `BackgroundTasks`.
   - Tipos: `ingest` (arquivo e texto, lidos do original guardado), `url`, `refresh` (reindexação de URL), `sync` (conector, também pelo webhook e pelo agendamento) e `reprocess` (um job por base, com a lista de conteúdos no `payload`).
-  - O worker reivindica com `FOR UPDATE SKIP LOCKED`, então várias réplicas dividem a fila. Job em `running` há mais de 30 minutos volta para a fila uma vez; na segunda, falha junto com o conteúdo ou o conector. Job terminado sai depois de 7 dias.
+  - O worker reivindica com `FOR UPDATE SKIP LOCKED`, então várias réplicas dividem a fila. Job em `running` há mais de 30 minutos volta para a fila uma vez; na segunda, falha junto com o conteúdo ou o conector. Enquanto roda, o worker renova o `started_at` a cada 5 minutos, então um job longo não volta à fila no meio (Fase 43). Job terminado sai depois de 7 dias.
   - O conteúdo esperando o worker vem com `queued: true`. Com o worker ligado, a API não marca no boot como falha o conteúdo parado em `processing`: ele está na fila.
   - No compose, o serviço `ingest-worker` fica no perfil `worker` e reaproveita a configuração da `api`: `docker compose --profile worker up -d ingest-worker`. O `/health` da API não sabe do worker.
 - O SDK da Voyage e os leitores somam ~85 MB de memória quando importados; o limite da API nos compose passou de 256M para 512M.

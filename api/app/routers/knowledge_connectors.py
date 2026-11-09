@@ -1,6 +1,7 @@
 """Conectores de uma base (ADR-0024): cadastro, teste e sincronização em background."""
 
 import secrets
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -237,6 +238,7 @@ def sync_connector(
     if connector.last_status == "running":
         raise HTTPException(status_code=409, detail="Sincronização em andamento")
     connector.last_status = "running"
+    connector.sync_heartbeat_at = datetime.now(UTC)
     connector.last_message = None
     session.commit()
     session.refresh(connector)

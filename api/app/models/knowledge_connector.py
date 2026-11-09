@@ -33,6 +33,10 @@ class KnowledgeConnector(Base):
         String(16), nullable=False, server_default="idle", default="idle"
     )
     last_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # renovado ao marcar running e a cada arquivo; parado demais, o poller libera (Fase 43)
+    sync_heartbeat_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     last_summary: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # vazio = só manual (ADR-0024)
