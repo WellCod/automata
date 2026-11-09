@@ -39,6 +39,7 @@ export function screenedText(items: { tool: string }[]): string {
 // run encerrado antes do fim sem ser erro (ADR-0031)
 export const STOP_LABELS: Record<string, string> = {
   run_cost_limit: "Parado pelo teto de custo",
+  review_timeout: "Cancelado: a revisão venceu sem decisão",
 };
 
 export function stopLabel(reason: string): string {

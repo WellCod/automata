@@ -170,3 +170,56 @@ def test_registro_de_revisoes_acrescenta_sem_perder_entrada(client: TestClient) 
         found = RunRepository(session).reviews("run-dois")
     assert found is not None
     assert sorted(e["step_id"] for e in found[1]) == ["a", "b"]
+
+
+def test_revisao_vencida_sai_de_aprovacoes_e_cancela_o_run(client: TestClient) -> None:
+    """Fase 44: o Agno só confere o prazo no continue; o run vencido ficava pausado."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.agents.review_timeout import expire_reviews
+    from app.db import get_engine
+    from app.models.run import AgentRun
+
+    owner = _h("owner", ["agent_os:admin"])
+    config = {"name": "triagem", "description": "Use para triagem"}
+    config_id = client.post("/api/v1/configs", json=config, headers=owner).json()["id"]
+    now = datetime.now(UTC)
+
+    def step(hours: float | None) -> dict[str, object]:
+        at = (now + timedelta(hours=hours)).isoformat() if hours is not None else None
+        return {
+            "step_id": "s1",
+            "step_name": "consolidação",
+            "when": "after",
+            "message": None,
+            "output": "resposta",
+            "timeout_at": at,
+        }
+
+    with Session(get_engine()) as session:
+        for run_id, hours in (("vencido", -1), ("no-prazo", 2), ("sem-prazo", None)):
+            session.add(
+                AgentRun(
+                    agent_config_id=config_id,
+                    user_id="ana",
+                    run_id=run_id,
+                    status="paused",
+                    pending_steps=[step(hours)],
+                )
+            )
+        session.commit()
+
+    with Session(get_engine()) as session:
+        assert expire_reviews(session, now) == ["vencido"]
+        assert expire_reviews(session, now) == []  # a segunda rodada não repete
+
+    pending = {i["run_id"] for i in client.get("/api/v1/approvals", headers=owner).json()}
+    assert "vencido" not in pending and {"no-prazo", "sem-prazo"} <= pending
+    with Session(get_engine()) as session:
+        run = session.query(AgentRun).filter_by(run_id="vencido").one()
+        assert (run.status, run.stop_reason, run.pending_steps) == (
+            "cancelled",
+            "review_timeout",
+            None,
+        )
+        assert run.review_log is not None and run.review_log[-1]["decision"] == "timeout"

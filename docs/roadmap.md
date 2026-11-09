@@ -1487,7 +1487,7 @@ Rodada de testes, falhas, desempenho e UX sobre a `main` em `ce2f4e6`, depois da
 
 ### Falhas
 
-- [ ] **Média.** O prazo da revisão humana (ADR-0023) só vale quando alguém tenta continuar o run: o Agno confere o `timeout_at` no continue e não há varredura. O run vencido fica pausado para sempre, a pendência segue em Aprovações com "Aprovar" ativo e o selo da barra lateral conta com ela. O README promete que o prazo cancela o que ficou parado.
+- [x] **Média.** O prazo da revisão humana (ADR-0023) só vale quando alguém tenta continuar o run: o Agno confere o `timeout_at` no continue e não há varredura. O run vencido fica pausado para sempre, a pendência segue em Aprovações com "Aprovar" ativo e o selo da barra lateral conta com ela. O README promete que o prazo cancela o que ficou parado.
 - [ ] **Média.** No boot, uma réplica marca como falha toda suíte em `queued` ou `running`, inclusive as que outra réplica está rodando. Num deploy com mais de uma réplica, o gate e o painel mostram falha no meio da execução.
 
 ### Desempenho
@@ -1527,7 +1527,7 @@ Por valor para quem opera agentes em produção:
 ### PRs
 
 - [x] `docs`: esta seção
-- [ ] `fix(api)`: prazo da revisão humana vencendo sozinho, com o run cancelado e a pendência fora de Aprovações
+- [x] `fix(api)`: prazo da revisão humana vencendo sozinho, com o run cancelado e a pendência fora de Aprovações
 - [ ] `perf(api)`: índices de consumo e de execuções e conciliação com filtro por intervalo
 - [ ] `perf(api)`: engine compartilhado nas bases e no banco do Agno, poller de orçamento numa consulta e retenção de memória por SQL
 - [ ] `fix(api)`: suíte interrompida só sem batimento, executor próprio para sincronização e limites de período, Redis e pool
