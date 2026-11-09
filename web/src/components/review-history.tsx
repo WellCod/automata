@@ -14,6 +14,7 @@ export const DECISION_LABEL: Record<string, string> = {
   edited: "editou e aprovou",
   loop_done: "seguiu com a volta",
   loop_again: "pediu outra volta",
+  timeout: "venceu sem decisão e cancelou o workflow",
 };
 
 function when(iso: string): string {
