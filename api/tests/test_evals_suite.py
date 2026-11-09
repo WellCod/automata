@@ -220,3 +220,22 @@ def test_sugestao_sem_tools_nem_resposta_fica_so_com_resposta_nao_vazia() -> Non
     found = suggest(_conversa("oi", content=""), [])
     assert found.checks == [{"type": "text", "kind": "not_empty"}]
     assert (found.judge_criteria, found.context, found.notes) == (None, [], [])
+
+
+def test_sugestao_mascara_os_padroes_proprios_do_agente() -> None:
+    """Fase 43: matrícula e protocolo da empresa chegavam ao caso sem máscara."""
+    from types import SimpleNamespace
+
+    from app.evals.suggest import suggest
+    from app.schemas.config import PiiRule
+
+    custom = PiiRule.model_validate(
+        {"custom": [{"label": "matrícula", "prefix": "MAT-", "min_digits": 8, "max_digits": 8}]}
+    ).custom_patterns()
+    run = SimpleNamespace(
+        input=SimpleNamespace(input_content="minha matrícula é MAT-12345678"),
+        content="Achei a MAT-12345678.",
+        tools=[],
+    )
+    found = suggest(run, [], custom)
+    assert "12345678" not in str(found)

@@ -143,6 +143,9 @@ def _find(outputs: dict[str, StepOutput] | None, name: str) -> StepOutput | None
     return None
 
 
+_PLACEHOLDER = re.compile(r"\{entrada\}|\{anterior\}|" + STEP_REF.pattern)
+
+
 def render_input(
     mode: str, template: str | None, message: Any, outputs: dict[str, StepOutput] | None
 ) -> Any:
@@ -151,12 +154,19 @@ def render_input(
         return message
     previous = _deepest(list(outputs.values())[-1]) if outputs else ""
 
-    def named(match: re.Match[str]) -> str:
+    entrada = _text(message)
+
+    def fill(match: re.Match[str]) -> str:
+        if match.group(0) == "{entrada}":
+            return entrada
+        if match.group(0) == "{anterior}":
+            return previous
         found = _find(outputs, match.group(1).strip())
         return _deepest(found) if found else ""
 
-    text = STEP_REF.sub(named, template or "")
-    return text.replace("{entrada}", _text(message)).replace("{anterior}", previous)
+    # uma passada só: o texto que entra não é relido, e o `{anterior}` digitado pelo
+    # usuário chega literal (Fase 43)
+    return _PLACEHOLDER.sub(fill, template or "")
 
 
 class MappedStep(Step):

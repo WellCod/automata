@@ -407,7 +407,7 @@ Com `TRACING_ENABLED=true` (padrão), o AgentOS grava em banco, via OpenTelemetr
 Workflow é um config com `kind: "workflow"`, criado com `POST /api/v1/configs` e `"kind": "workflow"`. Tem rascunho, publicação, rollback e versões como agente e time. O payload não tem modelo (`model_id` fica `null`; o serviço recusa modelo em workflow e exige em agente e time). A estrutura vai na seção `workflow.steps`, uma árvore de nós com `type`:
 
 - `step`: `name`, `agent_id` **ou** `team_id`, `version_id` opcional (fixa a versão), `on_error` (`stop` para o fluxo, padrão; `continue` passa o erro adiante), `max_retries` (0 a 3) e `review` opcional (ADR-0023): `when` (`before` confirma antes de rodar, `after` aprova a saída), `message` (até 300), `on_reject` (`skip`, `cancel`, padrão, ou `retry`, só com `after`) e `timeout_hours` (1 a 168; vencido, cancela).
-  - Entrada da etapa (ADR-0038): `input` pode ser `previous` (padrão do Agno, a saída mais funda da etapa anterior), `original` (a mensagem do usuário) ou `template`. No `template` (até 2000 caracteres), `{entrada}` é a mensagem, `{anterior}` a saída anterior e `{etapa:Nome}` a saída de uma etapa que já rodou, achada também dentro de contêineres. Etapa citada que não existe dá erro na escrita.
+  - Entrada da etapa (ADR-0038): `input` pode ser `previous` (padrão do Agno, a saída mais funda da etapa anterior), `original` (a mensagem do usuário) ou `template`. No `template` (até 2000 caracteres), `{entrada}` é a mensagem, `{anterior}` a saída anterior e `{etapa:Nome}` a saída de uma etapa que já rodou, achada também dentro de contêineres. Etapa citada que não existe dá erro na escrita. A troca é numa passada só: um marcador que vem na mensagem do usuário chega literal (Fase 43).
   - A montagem é uma subclasse de `Step` (`MappedStep`) que troca o `_prepare_message`. Ela está registrada no `STEP_TYPE_MAPPING` do Agno, que descreve a etapa pelo tipo exato.
 - `parallel`: `name` e `branches`, de 2 a 5 etapas `step` que recebem a mesma entrada.
 - `condition`: `name`, `rule`, `steps` e `else_steps` opcional.
@@ -466,7 +466,7 @@ Um caso pode trazer `context`, com até 5 mensagens anteriores (ADR-0016, migrat
 
 Salvar usa o `POST` de casos com `source_run_id` (migration 0027), que fica no caso para mostrar de onde veio.
 
-`GET /api/v1/configs/{id}/eval-cases/suggestions?limit=10` (ADR-0038, até 20) traz sugestões em lote, montadas do mesmo jeito.
+`GET /api/v1/configs/{id}/eval-cases/suggestions?limit=10` (ADR-0038, até 20) traz sugestões em lote, montadas do mesmo jeito. Nas duas, a máscara usa também os padrões próprios do agente e do piso (Fase 43).
 - Fonte: as conversas mais recentes que terminaram bem, de primeiro nível e fora da suíte. Quem não é admin vê só as próprias.
 - Pula o run que já é `source_run_id` de algum caso e o que não está mais guardado no Agno.
 - Não grava nada, e workflow dá 422.

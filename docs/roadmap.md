@@ -1442,8 +1442,8 @@ Quarta rodada de verificação, sobre a `main` em `c6f14b7`, com foco no que ent
 - [x] **Baixa.** Job de ingestão que passa de 30 minutos volta à fila enquanto roda, e outra réplica do worker repete o trabalho e o embedding. Sem worker, um reinício no meio da sincronização deixa o conector em `running` para sempre.
 - [x] **Baixa.** A exclusão do titular mantém `pending_tools`, `pending_steps` e `error` no `agent_run`, e a exportação não leva esses campos. Uma exportação já rodando quando chega a exclusão grava o arquivo de antes, e uma ainda na fila fica pendente para sempre.
 - [x] **Baixa.** O classificador da saída examina os primeiros e os últimos 10 mil caracteres. Uma resposta longa esconde o vazamento no meio.
-- [ ] **Baixa.** O `{anterior}` digitado pelo usuário é trocado no template da etapa depois do `{entrada}`, e a etapa recebe a saída interna da anterior.
-- [ ] **Baixa.** As sugestões de caso em lote mascaram os tipos fixos de dado pessoal, mas não os padrões próprios do agente.
+- [x] **Baixa.** O `{anterior}` digitado pelo usuário é trocado no template da etapa depois do `{entrada}`, e a etapa recebe a saída interna da anterior.
+- [x] **Baixa.** As sugestões de caso em lote mascaram os tipos fixos de dado pessoal, mas não os padrões próprios do agente.
 
 ### UI e UX
 
@@ -1461,7 +1461,7 @@ Nenhuma tela vaza em 375 px, e todas têm `h1`, rótulo em todo campo e nome em 
 - [x] `fix(api)`: job de ingestão com prazo renovado e conector preso em sincronização liberado
 - [x] `fix(security)`: titular por token só do próprio id, orçamento mantido na exclusão e run limpo por inteiro
 - [x] `fix(security)`: classificador do piso com o modelo e o escopo do piso e saída longa examinada inteira
-- [ ] `fix(security)`: template da etapa numa passada só e sugestões com os padrões próprios de dado pessoal
+- [x] `fix(security)`: template da etapa numa passada só e sugestões com os padrões próprios de dado pessoal
 - [ ] `fix(web)`: alvos de 24 px nas dicas e na trilha e piso lido sem 404
 - [ ] `docs`: README com os prints das telas atuais
 
