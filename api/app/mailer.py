@@ -7,6 +7,7 @@ SMTP_FROM e SMTP_STARTTLS (true). Sem SMTP_HOST o tipo e-mail não é oferecido.
 import logging
 import os
 import smtplib
+import ssl
 from email.message import EmailMessage
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,8 @@ def send(to: list[str], subject: str, text: str) -> str:
         port = int(os.environ.get("SMTP_PORT", "587"))
         with smtplib.SMTP(host, port, timeout=TIMEOUT_S) as smtp:
             if os.environ.get("SMTP_STARTTLS", "true").lower() != "false":
-                smtp.starttls()
+                # o contexto padrão do smtplib não confere o certificado (Fase 43)
+                smtp.starttls(context=ssl.create_default_context())
             user = os.environ.get("SMTP_USER")
             if user:
                 smtp.login(user, os.environ.get("SMTP_PASSWORD", ""))

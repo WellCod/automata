@@ -1,6 +1,7 @@
 """Destino de aviso por e-mail (ADR-0037)."""
 
 import os
+import ssl
 from collections.abc import Generator
 from typing import Any
 
@@ -29,7 +30,10 @@ class FakeSMTP:
     def __exit__(self, *args: Any) -> None:
         return None
 
-    def starttls(self) -> None:
+    def starttls(self, context: Any = None) -> None:
+        # sem contexto, o smtplib não confere o certificado (Fase 43)
+        assert context is not None and context.verify_mode == ssl.CERT_REQUIRED
+        assert context.check_hostname is True
         self.tls = True
 
     def login(self, user: str, password: str) -> None:
