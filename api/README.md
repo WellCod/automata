@@ -21,7 +21,7 @@ Para desenvolvimento, a API roda em Docker junto com o banco. A partir da raiz d
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
-A API sobe em `http://localhost:8000` com hot-reload ativo e `APP_ENV=development`. As migrations rodam automaticamente no boot: o `entrypoint.sh` roda `alembic upgrade head`, depois `python -m app.agno_migrations` e só então executa o `command:` do compose (sem ele, o `CMD` da imagem: uvicorn sem reload). Fora do override de dev a porta 8000 não é publicada.
+A API sobe em `http://localhost:8000` com hot-reload ativo e `APP_ENV=development`. As migrations rodam automaticamente no boot: o `entrypoint.sh` roda `python -m app.migrate`, que faz o `alembic upgrade head` e depois a migração do Agno (`app/agno_migrations.py`) num processo só, e então executa o `command:` do compose (sem ele, o `CMD` da imagem: uvicorn sem reload). Fora do override de dev a porta 8000 não é publicada.
 
 O Alembic cuida só das tabelas do Automata. As do Agno, no schema `ai`, têm versão própria e são migradas pelo `MigrationManager` do Agno em `app/agno_migrations.py`. Na v3, os runs saíram do JSON da sessão para `ai.agno_runs`. A migração é idempotente e não apaga nada: a coluna antiga `runs` de `ai.agno_sessions` fica como backup. Removê-la (`cleanup_legacy_runs_column`) é decisão manual, depois de conferir o histórico e ter um backup restaurável.
 
