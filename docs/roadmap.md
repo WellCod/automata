@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 43
+# Roadmap — Fases 4 a 44
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -1476,3 +1476,70 @@ Nenhuma tela vaza em 375 px, e todas têm `h1`, rótulo em todo campo e nome em 
 - Depois da própria exclusão, quem tem o orçamento estourado continua bloqueado.
 - Com o piso definindo o classificador, o modelo e o escopo do agente não mudam a checagem.
 - Uma mensagem com `{anterior}` chega literal à etapa com template.
+
+## Fase 44 — Bateria de 2026-11-09
+
+Rodada de testes, falhas, desempenho e UX sobre a `main` em `ce2f4e6`, depois da Fase 43.
+
+**Testes.** No CI, 1176 testes da API passam em 5 min 35 s, e os 233 do painel passam duas vezes seguidas. Localmente, a suíte da API passa de 50 minutos, porque cada módulo sobe o próprio Postgres. Três testes do painel estouram o tempo quando a máquina está carregada.
+
+**Carga.** Com 200 mil execuções e 200 mil eventos de consumo, nenhum endpoint de leitura passa de 200 ms aquecido, e o poller de orçamento leva 5 ms. A primeira chamada depois do boot leva até 16 s, e o boot da API leva 52 s: 8 s no alembic, 8 s na migração do Agno e 32 s importando `app.main`, com o container limitado a 0,5 CPU.
+
+### Falhas
+
+- [ ] **Média.** O prazo da revisão humana (ADR-0023) só vale quando alguém tenta continuar o run: o Agno confere o `timeout_at` no continue e não há varredura. O run vencido fica pausado para sempre, a pendência segue em Aprovações com "Aprovar" ativo e o selo da barra lateral conta com ela. O README promete que o prazo cancela o que ficou parado.
+- [ ] **Média.** No boot, uma réplica marca como falha toda suíte em `queued` ou `running`, inclusive as que outra réplica está rodando. Num deploy com mais de uma réplica, o gate e o painel mostram falha no meio da execução.
+
+### Desempenho
+
+- [ ] **Alta.** `usage_event.run_id` não tem índice, e o consumo das etapas filhas de um workflow faz join por ele. A aba de execuções do workflow, que consulta a cada 5 s, lê a tabela inteira.
+- [ ] **Alta.** `PgVector` e `PostgresDb` são criados a cada busca, ingestão e sugestão de caso, e cada um abre um engine e um pool novos que nunca passam por `dispose()`. Um conector de 10 mil arquivos cria cerca de 25 mil engines, e com várias réplicas isso pressiona o `max_connections` do Postgres.
+- [ ] **Alta.** A conciliação (ADR-0037) filtra por `date(timezone(created_at))`, que não usa índice, e roda a cada minuto em cada réplica: dois seq scans completos por minuto.
+- [ ] **Média.** O poller de orçamento soma o mês inteiro por config e por quem chama, um SUM por linha, antes de saber se há destino de aviso ou se o aviso já saiu. Os índices de `usage_event` não cobrem `cost`.
+- [ ] **Média.** A lista de execuções conta o histórico inteiro do config a cada 5 s, sem índice que sirva ao filtro `eval_run_id IS NULL`.
+- [ ] **Média.** Sem o worker de ingestão, as sincronizações rodam no executor padrão do asyncio, o mesmo que monta os agentes e grava os runs. Oito conectores grandes ao mesmo tempo deixam os runs esperando thread.
+- [ ] **Média.** A retenção de memórias carrega todas as memórias de cada agente em Python, de hora em hora; apagar uma memória também carrega todas.
+- [ ] **Média.** A lista de bases soma o histórico inteiro de `embedding_usage`, que ganha uma linha por busca.
+- [ ] **Baixa.** As métricas aceitam qualquer período (`period=99999d`), o Redis do limite de chamadas não tem timeout de socket e o pool do SQLAlchemy (5 + 10) é menor que os executores que usam o banco.
+- [ ] **Baixa.** O painel carrega o Recharts (449 KB) na página do agente mesmo sem abrir a aba Desempenho.
+- [ ] **Baixa.** O boot roda três interpretadores Python em sequência (alembic, migração do Agno e uvicorn), e cada um importa o app de novo.
+
+### UI e UX
+
+- [ ] **Alta.** A configuração do agente tem cerca de 4300 px, e as instruções, o que quem não programa mais edita, ficam no fim, depois de guardrails, memória, controle do run e saída estruturada.
+- [ ] **Alta.** Aprovações e Alertas mostram o id do usuário (`3a6895ec-…`) onde deveria aparecer a pessoa.
+- [ ] **Média.** "Meus dados" e "Minhas memórias" só se acham por ícones de 14 px no rodapé da barra lateral.
+- [ ] **Média.** A navegação é uma lista plana de 14 itens, sem grupos.
+- [ ] **Média.** O Analytics mostra números no formato inglês (`3.7%`, `18.0 M`) ao lado de valores em reais no formato brasileiro.
+- [ ] **Média.** "Recusar" em Aprovações é vermelho sólido e não pede confirmação, embora encerre ou refaça o workflow.
+- [ ] **Média.** No celular, as abas da página do agente somem à direita sem indicação de rolagem.
+
+### Features candidatas (Fase 45)
+
+Por valor para quem opera agentes em produção:
+
+1. **Liberação gradual de versão.** Uma fração das conversas vai para a versão nova, o painel compara erro, custo e suíte, e a promoção é manual.
+2. **Trilha de auditoria.** Quem publicou, fez rollback, mudou o piso, apagou um titular ou trocou uma chave, com data e o antes e depois.
+3. **Login por SSO (OIDC)** no painel, com o papel vindo do grupo.
+4. **Exportação dos traces para OpenTelemetry**, além do banco.
+5. **Importação de casos da suíte por CSV.**
+
+### PRs
+
+- [x] `docs`: esta seção
+- [ ] `fix(api)`: prazo da revisão humana vencendo sozinho, com o run cancelado e a pendência fora de Aprovações
+- [ ] `perf(api)`: índices de consumo e de execuções e conciliação com filtro por intervalo
+- [ ] `perf(api)`: engine compartilhado nas bases e no banco do Agno, poller de orçamento numa consulta e retenção de memória por SQL
+- [ ] `fix(api)`: suíte interrompida só sem batimento, executor próprio para sincronização e limites de período, Redis e pool
+- [ ] `perf(infra)`: migrações num processo só no boot
+- [ ] `fix(web)`: aprovações com pessoa e prazo, números em pt-BR, menu da conta, recusa confirmada e gráficos sob demanda
+- [ ] `fix(web)`: instruções no topo da configuração, seções avançadas recolhidas, navegação em grupos e abas roláveis no celular
+
+**Critério de aceite da fase:**
+
+- Uma revisão com prazo de 1 hora vencido sai de Aprovações na rodada seguinte do poller, e o run fica `cancelled` com o motivo.
+- O consumo das etapas filhas usa índice, e a conciliação não faz seq scan.
+- Uma busca na base não cria engine novo.
+- Uma réplica que sobe não falha a suíte que outra réplica está rodando.
+- O boot da API cai em pelo menos 8 s.
+- Aprovações e Alertas mostram o e-mail de quem pediu e de quem criou.
