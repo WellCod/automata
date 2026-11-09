@@ -10,7 +10,7 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -412,6 +412,9 @@ def _save_result(run_id: UUID, row: EvalResult) -> None:
     with Session(get_engine()) as session:
         row.eval_run_id = run_id
         session.add(row)
+        session.execute(
+            update(EvalRun).where(EvalRun.id == run_id).values(heartbeat_at=datetime.now(UTC))
+        )
         session.commit()
 
 
@@ -470,7 +473,8 @@ async def execute(run_id: UUID) -> None:
         config_id, kind, version_id, actor, snapshots, judge_model = await asyncio.to_thread(
             _load, run_id
         )
-        await asyncio.to_thread(_set, run_id, status="running", started_at=datetime.now(UTC))
+        now = datetime.now(UTC)
+        await asyncio.to_thread(_set, run_id, status="running", started_at=now, heartbeat_at=now)
         judge: Any = None
         usage = JudgeUsage()
         unavailable: str | None = None
@@ -545,12 +549,24 @@ async def execute(run_id: UUID) -> None:
     )
 
 
-def fail_stale() -> int:
-    """Execução que estava rodando quando a API reiniciou não termina mais: vira falha."""
+# um caso tem prazo próprio; 15 min sem nenhum caso terminar é réplica que caiu
+STALE_AFTER = timedelta(minutes=15)
+
+
+def fail_stale(now: datetime | None = None) -> int:
+    """Execução sem sinal há mais de STALE_AFTER: a réplica que rodava caiu.
+
+    Antes valia para toda execução em andamento, e a réplica que subia num deploy
+    falhava a suíte que outra réplica estava rodando (Fase 44).
+    """
+    limit = (now or datetime.now(UTC)) - STALE_AFTER
     with Session(get_engine()) as session:
         result = session.execute(
             update(EvalRun)
-            .where(EvalRun.status.in_(("queued", "running")))
+            .where(
+                EvalRun.status.in_(("queued", "running")),
+                func.coalesce(EvalRun.heartbeat_at, EvalRun.created_at) < limit,
+            )
             .values(
                 status="failed",
                 error="interrompida por reinício da API; rode de novo",
@@ -559,3 +575,9 @@ def fail_stale() -> int:
         )
         session.commit()
         return int(getattr(result, "rowcount", 0) or 0)
+
+
+def check_stale_runs(session: Session, now: datetime) -> list[UUID]:
+    """Rodada do poller: a réplica que caiu não espera o próximo boot para liberar o gate."""
+    fail_stale(now)
+    return []

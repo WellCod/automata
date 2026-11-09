@@ -121,3 +121,13 @@ def test_build_series_preenche_dias_vazios() -> None:
     assert series[0].total_runs == 0 and series[0].p50_ms is None and series[0].total_cost is None
     assert series[1].total_runs == 4 and series[1].error_count == 1 and series[1].p95_ms == 900.0
     assert series[2].total_tokens == 300 and series[2].total_cost == 0.5
+
+
+def test_periodo_das_metricas_tem_teto() -> None:
+    """Fase 44: `99999d` varria a tabela inteira, e um número enorme estourava a data."""
+    from app.routers.metrics import MAX_SERIES_DAYS, _parse_period
+
+    assert _parse_period("30d") == 30
+    assert _parse_period("99999d") == MAX_SERIES_DAYS
+    assert _parse_period("9" * 40 + "d") == MAX_SERIES_DAYS
+    assert _parse_period("0d") == 1

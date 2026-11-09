@@ -27,7 +27,10 @@ class MemoryRateLimiter:
 
 class RedisRateLimiter:
     def __init__(self, redis_url: str, limit: int = 10, window: int = 60) -> None:
-        self._client: Redis = Redis.from_url(redis_url, decode_responses=True)
+        # Redis travado não pendura o login (Fase 44)
+        self._client: Redis = Redis.from_url(
+            redis_url, decode_responses=True, socket_timeout=2, socket_connect_timeout=2
+        )
         self._limit = limit
         self._window = window
 

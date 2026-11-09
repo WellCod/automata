@@ -3,6 +3,7 @@
 import os
 import uuid
 from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -205,7 +206,10 @@ def test_sem_casos_execucao_ativa_e_reinicio(client: TestClient) -> None:
     resp = _start(client, agent)
     assert resp.status_code == 409
 
-    assert fail_stale() >= 1
+    # Fase 44: a execução recente pode ser de outra réplica, e fica
+    assert fail_stale() == 0
+    later = datetime.now(UTC) + timedelta(minutes=16)
+    assert fail_stale(later) >= 1
     stale = client.get(f"/api/v1/configs/{agent}/eval-runs").json()[0]
     assert stale["status"] == "failed" and "reinício" in stale["error"]
     assert _start(client, agent).status_code == 202

@@ -90,6 +90,8 @@ Arquivos:
 
 O rollup agrega tokens e custo por `(agent_config_id, period)`. Campos: `run_count`, `input_tokens`, `output_tokens`, `total_tokens`, `cost`.
 
+**Pool e limites** (Fase 44): `DB_POOL_SIZE` (10) e `DB_MAX_OVERFLOW` (20) por processo; o padrão anterior (5 + 10) era menor que os executores que usam o banco. O Redis do limite de chamadas tem timeout de 2 s. O período das métricas fica entre 1 e 366 dias. Sem o worker de ingestão, as sincronizações agendadas rodam num executor próprio de 2 threads, longe das que montam os agentes e gravam os runs. A suíte em `queued` ou `running` só é dada como interrompida sem nenhum caso terminar há 15 minutos (`eval_run.heartbeat_at`, migration 0053), no boot e a cada rodada do poller, e não falha mais a suíte que outra réplica está rodando.
+
 **Conexões** (Fase 44): o `PgVector` de cada base e o `PostgresDb` do `get_db()` usam o engine da API (`db_engine=get_engine()`). Com `db_url`, cada busca, ingestão e sugestão de caso abria um engine e um pool novos, nunca descartados.
 
 **Poller de orçamento** (Fase 44): sem destino para os eventos de orçamento, não soma nada. Com destino, soma o mês de todos os configs, e de todos os titulares com orçamento, numa consulta agrupada cada.
