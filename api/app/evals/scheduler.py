@@ -138,6 +138,9 @@ async def run_forever(poll_seconds: int = POLL_SECONDS) -> None:
         await asyncio.to_thread(memory_admin.purge_if_due)
         # conectores e URLs com reindexação vencida (ADR-0024)
         try:
+            released = await asyncio.to_thread(knowledge_schedule.release_stuck)
+            if released:
+                logger.warning("conectores presos liberados", extra={"count": released})
             connectors, urls = await asyncio.to_thread(knowledge_schedule.claim_due)
             if knowledge_jobs.worker_enabled():
                 # com o worker separado (ADR-0039) a API só enfileira

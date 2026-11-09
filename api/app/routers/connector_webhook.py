@@ -82,6 +82,7 @@ def _claim(connector_id: UUID, body: bytes, header: str | None, limiter: Any) ->
         if connector.last_status == "running":
             return "running"
         connector.last_status = "running"
+        connector.sync_heartbeat_at = datetime.now(UTC)
         connector.last_message = None
         session.commit()
     return "queued"

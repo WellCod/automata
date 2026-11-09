@@ -131,6 +131,16 @@ def _finish(connector_id: UUID, status: str, message: str | None, summary: SyncS
         session.commit()
 
 
+def _beat(connector_id: UUID) -> None:
+    with Session(get_engine()) as session:
+        session.execute(
+            update(KnowledgeConnector)
+            .where(KnowledgeConnector.id == connector_id)
+            .values(sync_heartbeat_at=datetime.now(UTC))
+        )
+        session.commit()
+
+
 def _status_of(content_id: UUID) -> str:
     with Session(get_engine()) as session:
         content = session.get(KnowledgeContent, content_id)
@@ -216,6 +226,7 @@ def sync(connector_id: UUID) -> SyncSummary:
                 # tamanho desconhecido na listagem: conferido agora (ADR-0039)
                 summary.skipped += 1
                 continue
+            _beat(connector_id)
             content_id = _upsert(connector, base, file, existing, len(data))
             ingest(content_id, data)
             if _status_of(content_id) != "completed":

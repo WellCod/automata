@@ -10,7 +10,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
 
 from app.db import get_engine
@@ -28,8 +28,38 @@ logger = logging.getLogger(__name__)
 BATCH = 10
 
 
+# sem batimento por este tempo, o conector em running é dado como interrompido
+STUCK_AFTER = timedelta(hours=2)
+
+
 def next_at(hours: int | None, now: datetime | None = None) -> datetime | None:
     return (now or datetime.now(UTC)) + timedelta(hours=hours) if hours else None
+
+
+def release_stuck(now: datetime | None = None) -> int:
+    """Conector em running sem sinal há mais de 2 h: o processo caiu no meio (Fase 43).
+
+    Sem isso, o webhook responde `running`, a sincronização manual dá 409 e o agendamento
+    pula o conector para sempre.
+    """
+    limit = (now or datetime.now(UTC)) - STUCK_AFTER
+    with Session(get_engine()) as session:
+        result = session.execute(
+            update(KnowledgeConnector)
+            .where(
+                KnowledgeConnector.last_status == "running",
+                or_(
+                    KnowledgeConnector.sync_heartbeat_at.is_(None),
+                    KnowledgeConnector.sync_heartbeat_at < limit,
+                ),
+            )
+            .values(
+                last_status="failed",
+                last_message="sincronização interrompida; sincronize de novo",
+            )
+        )
+        session.commit()
+        return int(getattr(result, "rowcount", 0) or 0)
 
 
 def claim_due(now: datetime | None = None) -> tuple[list[UUID], list[UUID]]:
@@ -51,6 +81,7 @@ def claim_due(now: datetime | None = None) -> tuple[list[UUID], list[UUID]]:
             c.next_sync_at = next_at(c.sync_every_hours, now)
             c.last_status = "running"
             c.last_message = None
+            c.sync_heartbeat_at = now
         contents = session.scalars(
             select(KnowledgeContent)
             .where(
