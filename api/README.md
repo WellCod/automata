@@ -90,12 +90,15 @@ Arquivos:
 
 O rollup agrega tokens e custo por `(agent_config_id, period)`. Campos: `run_count`, `input_tokens`, `output_tokens`, `total_tokens`, `cost`.
 
+**Índices de consumo** (migration 0052, Fase 44): `usage_event.run_id`, para o consumo das etapas filhas do workflow; `(period, agent_config_id)` e `(user_id, period)` com `INCLUDE (cost)`, para a soma do orçamento sair só do índice; `agent_run (agent_config_id, created_at) WHERE eval_run_id IS NULL`, para a lista de execuções e as métricas por agente; e `embedding_usage (base_id) INCLUDE (tokens, cost)`. Criados com `CONCURRENTLY`, fora da transação.
+
 **Conciliação** (ADR-0037, `app/reconciliation.py`, migration 0047 `provider_cost`):
 - Fonte: com `ANTHROPIC_ADMIN_KEY` ou `OPENAI_ADMIN_KEY`, o poller de avisos busca de hora em hora o custo dos últimos 3 dias de cada provedor e grava por dia.
   - Anthropic: `/v1/organizations/cost_report`, valor em centavos.
   - OpenAI: `/v1/organization/costs`, valor em dólares.
   - Paginação pelo `next_page`. Falha do provedor fica no log só com o tipo do erro.
 - Comparação: `GET /api/v1/metrics/reconciliation?days=30` compara, por dia e provedor, o informado com o estimado (`usage_event` mais embedding dos modelos do provedor, pelo prefixo do id).
+- O estimado filtra por intervalo em `created_at`, que usa o índice; com `date()` no filtro era seq scan a cada minuto (Fase 44).
 - Aviso: dia fechado com diferença acima de `RECONCILIATION_ALERT_PERCENT` (20) e pelo menos US$ 1 informado gera `cost.divergence`, uma vez por provedor e dia.
 
 `GET /api/v1/metrics/timeseries?period=30d|start=&end=&agent_id=<uuid>` — um ponto por dia (UTC) com `total_runs`, `error_count`, `p50_ms`, `p95_ms`, `total_tokens` e `total_cost`. Dia sem execução vem zerado, com latência e custo nulos. Limite de 366 dias. Alimenta os gráficos do analytics e da aba Desempenho do agente.

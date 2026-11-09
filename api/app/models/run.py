@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -13,6 +13,13 @@ class AgentRun(Base):
     __tablename__ = "agent_run"
     __table_args__ = (
         Index("ix_agent_run_config_created", "agent_config_id", "created_at"),
+        # só conversas: lista de execuções e métricas por agente (Fase 44)
+        Index(
+            "ix_agent_run_config_conversation",
+            "agent_config_id",
+            "created_at",
+            postgresql_where=text("eval_run_id IS NULL"),
+        ),
         Index("ix_agent_run_created_at", "created_at"),
         Index("ix_agent_run_run_id", "run_id"),
         Index("ix_agent_run_status", "status"),

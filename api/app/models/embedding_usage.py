@@ -19,7 +19,7 @@ class EmbeddingUsage(Base):
     __table_args__ = (
         Index("ix_embedding_usage_created_at", "created_at"),
         Index("ix_embedding_usage_period_agent", "period", "agent_config_id"),
-        Index("ix_embedding_usage_base", "base_id"),
+        Index("ix_embedding_usage_base_cost", "base_id", postgresql_include=["tokens", "cost"]),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
