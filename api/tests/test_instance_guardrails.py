@@ -163,6 +163,9 @@ def test_piso_vale_no_proximo_run_sem_publicar(client: TestClient) -> None:
     assert eff["own"]["pii"]["mode"] == "off"
     assert eff["floor"]["pii"]["mode"] == "block"
     assert eff["effective"]["pii"]["types"] == ["cpf"]
+    # sem rascunho, o pedido pelo rascunho responde pela vigente, sem 404 (Fase 43)
+    as_draft = client.get(f"/api/v1/configs/{agent_id}/guardrails/effective?draft=true")
+    assert as_draft.status_code == 200 and as_draft.json()["floor"] == eff["floor"]
 
     resp = client.post(
         f"/agents/{agent_id}/runs", data={"message": f"meu cpf é {CPF}", "stream": "false"}

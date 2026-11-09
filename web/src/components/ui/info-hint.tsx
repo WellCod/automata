@@ -23,7 +23,8 @@ function InfoHint({ label, ariaLabel, children, className }: Props) {
         aria-label={ariaLabel}
         render={<button type="button" />}
         className={cn(
-          "text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex items-center gap-1 rounded text-[11px] focus-visible:ring-2 focus-visible:outline-none",
+          // alvo de 24 px no mínimo (WCAG 2.5.8), sem mudar o tamanho do ícone
+          "text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex min-h-6 min-w-6 items-center justify-center gap-1 rounded text-[11px] focus-visible:ring-2 focus-visible:outline-none",
           className,
         )}
       >
