@@ -1,8 +1,8 @@
 """Direitos do titular (ADR-0032 e ADR-0036).
 
 O owner pede por qualquer titular. Um token de integração com `data_subjects:request`
-usa as mesmas rotas e só vê os pedidos que ele fez. Quem usa o painel pede os
-próprios dados em `/me/data`.
+usa as mesmas rotas só pelo próprio titular, `integration:<id>`, e só vê os pedidos que ele
+fez. Quem usa o painel pede os próprios dados em `/me/data`.
 """
 
 import contextlib
@@ -46,6 +46,16 @@ def _is_admin(request: Request) -> bool:
         return True
     scopes, admin = _scopes(request)
     return has_required_scopes(scopes, [Scope.DATA_SUBJECTS_ADMIN], admin_scope=admin)
+
+
+def _own_subject(request: Request, user_id: str) -> None:
+    """Token de integração só pede pelo próprio titular (ADR-0036, revisto na Fase 43).
+
+    Com `user_isolation`, o Agno grava todo run do token como `integration:<id>`; aceitar
+    outro id dava a ele as conversas de outras integrações e do painel.
+    """
+    if not _is_admin(request) and user_id != _actor(request):
+        raise HTTPException(status_code=403, detail="O token só pede pelo próprio titular")
 
 
 def require_subject_access(request: Request) -> None:
@@ -198,7 +208,8 @@ def _download(row: DataSubjectRequest | None) -> Response:
 
 
 @router.get("/data-subjects/{user_id}", response_model=SubjectInventory)
-def get_subject(user_id: str) -> SubjectInventory:
+def get_subject(user_id: str, request: Request) -> SubjectInventory:
+    _own_subject(request, user_id)
     counts = inventory(user_id)
     return SubjectInventory(user_id=user_id, counts=counts, total=sum(counts.values()))
 
@@ -211,6 +222,7 @@ def get_subject(user_id: str) -> SubjectInventory:
 def export_subject(
     user_id: str, session: SessionDep, request: Request, background: BackgroundTasks
 ) -> DataSubjectRequestResponse:
+    _own_subject(request, user_id)
     actor = _actor(request)
     return _response(create_export(session, user_id, actor, _source(actor), background))
 
@@ -232,6 +244,7 @@ def erase_subject(
     request: Request,
     background: BackgroundTasks,
 ) -> DataSubjectRequestResponse:
+    _own_subject(request, user_id)
     if body.confirm != user_id:
         raise HTTPException(status_code=422, detail="Repita o id do titular para confirmar")
     actor = _actor(request)

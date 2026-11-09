@@ -237,3 +237,45 @@ def test_aviso_de_falha_e_de_vencimento_sai_uma_vez(
     # a exclusão não guarda o id: o aviso pede para refazer
     assert "ffffffffffff" in failed_text and "Refaça o pedido" in failed_text
     assert all("@" not in text for _, text in sent)
+
+
+def test_exportacao_nao_grava_depois_da_exclusao(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fase 43: a exclusão que chega durante a exportação ganha; a da fila não fica pendente."""
+    from uuid import UUID
+
+    from app import data_subjects
+    from app.db import get_engine
+    from app.models.data_subject import DataSubjectRequest
+
+    def wipe(request_id: UUID) -> None:
+        with Session(get_engine()) as session:
+            row = session.get(DataSubjectRequest, request_id)
+            assert row is not None
+            # o que o create_erase faz com a exportação do mesmo titular
+            row.subject = None
+            row.result = None
+            row.status = "pending"
+            session.commit()
+
+    queued = client.post("/api/v1/data-subjects/zeca@cliente.com/export").json()["id"]
+    wipe(UUID(queued))
+    data_subjects.run_export(UUID(queued))
+
+    running = client.post("/api/v1/data-subjects/zeca@cliente.com/export").json()["id"]
+    real = data_subjects.build_export
+
+    def build_then_erase(user_id: str) -> dict[str, Any]:
+        result = real(user_id)
+        wipe(UUID(running))
+        return result
+
+    monkeypatch.setattr(data_subjects, "build_export", build_then_erase)
+    data_subjects.run_export(UUID(running))
+
+    with Session(get_engine()) as session:
+        for request_id in (queued, running):
+            row = session.get(DataSubjectRequest, UUID(request_id))
+            assert row is not None
+            assert (row.status, row.result) == ("expired", None)

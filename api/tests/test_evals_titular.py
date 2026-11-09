@@ -220,7 +220,12 @@ def test_exclusao_completa_isolada_e_sem_mudar_os_numeros(client: TestClient, db
     [kept] = [c for c in cases if c["id"] == case.json()["id"]]
     assert kept["source_run_id"] is None
     with Session(get_engine()) as session:
+        from app.data_subjects import pseudonym
+
+        # o orçamento fica, com o pseudônimo no lugar do id (Fase 43)
         assert session.get(CallerBudget, ANA) is None
+        kept_budget = session.get(CallerBudget, pseudonym(ANA))
+        assert kept_budget is not None and kept_budget.monthly_usd == Decimal("5")
 
     # a exportação pedida antes perdeu o arquivo e o id em claro
     requests = client.get("/api/v1/data-subject-requests").json()

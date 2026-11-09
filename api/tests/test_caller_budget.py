@@ -196,3 +196,27 @@ def test_aviso_sai_uma_vez_por_mes(client: TestClient, monkeypatch: pytest.Monke
     with Session(get_engine()) as session:
         check_caller_budgets(session, now)
     assert [e for e, d in sent if d["subject"] == subject] == [CALLER_WARNING, CALLER_EXCEEDED]
+
+
+def test_exclusao_do_titular_nao_libera_o_orcamento(client: TestClient) -> None:
+    """Fase 43: pedir a própria exclusão apagava o orçamento e zerava o gasto do mês."""
+    from app import caller_budget
+    from app.caller_budget import CALLER_BUDGET_MESSAGE
+    from app.data_subjects import erase
+
+    agent_id = _agent(client, "fuga")
+    gastador = _token("fujao")
+    _spend(agent_id, gastador, 2.0)
+    client.put(
+        f"/api/v1/caller-budgets/{gastador}", json={"monthly_usd": 1.0, "hard_stop": True}
+    ).raise_for_status()
+
+    erase(gastador)
+    caller_budget.forget(gastador)
+
+    blocked = client.post(
+        f"/agents/{agent_id}/runs",
+        data={"message": "oi", "stream": "false", "user_id": gastador},
+    )
+    assert blocked.json()["content"] == CALLER_BUDGET_MESSAGE
+    assert gastador not in str(client.get("/api/v1/caller-budgets").json())

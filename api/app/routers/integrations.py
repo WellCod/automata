@@ -31,7 +31,7 @@ class IntegrationInput(BaseModel):
     team_ids: list[UUID] = Field(default_factory=list)
     # agentes e times cuja suíte de testes o token pode rodar e consultar
     eval_ids: list[UUID] = Field(default_factory=list)
-    # pedidos de exportação e exclusão de qualquer titular (ADR-0036)
+    # pedidos de exportação e exclusão do próprio titular, integration:<id> (ADR-0036)
     data_subjects: bool = False
     expires_in_days: int = Field(default=30, ge=1, le=MAX_DAYS)
 
