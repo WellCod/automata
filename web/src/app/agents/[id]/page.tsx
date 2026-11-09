@@ -65,6 +65,7 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AdvancedSection } from "@/components/advanced-section";
 import { VersionsPanel } from "@/components/versions-panel";
 import client from "@/lib/api/client";
 import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes";
@@ -181,6 +182,8 @@ function TeamsUsingAgent({ agentId }: { agentId: string }) {
     </p>
   );
 }
+
+const ADVANCED_FIELDS = ["guardrails", "conversation", "memory", "run", "output_schema"] as const;
 
 export default function AgentEditPage() {
   const { id } = useParams<{ id: string }>();
@@ -384,7 +387,7 @@ export default function AgentEditPage() {
           onValueChange={(v) => setTab(v as PageTab)}
           className="min-w-0 flex-1 px-4 pt-2 pb-6 md:px-8"
         >
-          <TabsList className="overflow-x-auto">
+          <TabsList className="overflow-x-auto [mask-image:linear-gradient(to_right,black_85%,transparent)] md:[mask-image:none]">
             {PAGE_TABS.map(({ id: tid, label, icon: Icon }) => (
               <TabsTrigger key={tid} value={tid}>
                 <Icon />
@@ -446,79 +449,7 @@ export default function AgentEditPage() {
                 )}
               />
 
-              <Controller
-                name="mcp_servers"
-                control={form.control}
-                render={({ field }) => (
-                  <McpToolsSelector value={field.value} onChange={field.onChange} />
-                )}
-              />
-
-              <Controller
-                name="knowledge"
-                control={form.control}
-                render={({ field }) => (
-                  <KnowledgeSelector value={field.value} onChange={field.onChange} />
-                )}
-              />
-
-              <Controller
-                name="guardrails"
-                control={form.control}
-                render={({ field }) => (
-                  <GuardrailsEditor value={field.value} onChange={field.onChange} floor={floor} />
-                )}
-              />
-
-              <Controller
-                name="conversation"
-                control={form.control}
-                render={({ field }) => (
-                  <ConversationEditor value={field.value} onChange={field.onChange} />
-                )}
-              />
-
-              <Controller
-                name="memory"
-                control={form.control}
-                render={({ field }) => (
-                  <MemoryEditor value={field.value} onChange={field.onChange} />
-                )}
-              />
-
-              <Controller
-                name="run"
-                control={form.control}
-                render={({ field }) => (
-                  <RunControlsEditor
-                    value={field.value}
-                    onChange={field.onChange}
-                    modelId={form.watch("model_id")}
-                    capabilities={form.watch("capabilities")}
-                  />
-                )}
-              />
-
-              <Controller
-                name="output_schema"
-                control={form.control}
-                render={({ field }) => (
-                  <OutputSchemaEditor
-                    value={field.value}
-                    modelId={form.watch("model_id")}
-                    onChange={(schema) => {
-                      field.onChange(schema);
-                      // o schema é o que dá sentido à capability (ADR-0027)
-                      form.setValue(
-                        "capabilities",
-                        { ...form.getValues("capabilities"), structured_output: schema != null },
-                        { shouldDirty: true },
-                      );
-                    }}
-                  />
-                )}
-              />
-
+              {/* o que quem não programa mais edita vem logo depois do modelo (Fase 44) */}
               <FieldSet className="border-border rounded border px-4 pt-3 pb-4">
                 <FieldLegend className="px-1">Instruções</FieldLegend>
                 <FieldGroup>
@@ -539,6 +470,84 @@ export default function AgentEditPage() {
                   )}
                 </FieldGroup>
               </FieldSet>
+
+              <Controller
+                name="mcp_servers"
+                control={form.control}
+                render={({ field }) => (
+                  <McpToolsSelector value={field.value} onChange={field.onChange} />
+                )}
+              />
+
+              <Controller
+                name="knowledge"
+                control={form.control}
+                render={({ field }) => (
+                  <KnowledgeSelector value={field.value} onChange={field.onChange} />
+                )}
+              />
+
+              <AdvancedSection
+                summary="Guardrails, conversa longa, memória do usuário, controle do run e saída estruturada"
+                forceOpen={ADVANCED_FIELDS.some((f) => f in form.formState.errors)}
+              >
+                <Controller
+                  name="guardrails"
+                  control={form.control}
+                  render={({ field }) => (
+                    <GuardrailsEditor value={field.value} onChange={field.onChange} floor={floor} />
+                  )}
+                />
+
+                <Controller
+                  name="conversation"
+                  control={form.control}
+                  render={({ field }) => (
+                    <ConversationEditor value={field.value} onChange={field.onChange} />
+                  )}
+                />
+
+                <Controller
+                  name="memory"
+                  control={form.control}
+                  render={({ field }) => (
+                    <MemoryEditor value={field.value} onChange={field.onChange} />
+                  )}
+                />
+
+                <Controller
+                  name="run"
+                  control={form.control}
+                  render={({ field }) => (
+                    <RunControlsEditor
+                      value={field.value}
+                      onChange={field.onChange}
+                      modelId={form.watch("model_id")}
+                      capabilities={form.watch("capabilities")}
+                    />
+                  )}
+                />
+
+                <Controller
+                  name="output_schema"
+                  control={form.control}
+                  render={({ field }) => (
+                    <OutputSchemaEditor
+                      value={field.value}
+                      modelId={form.watch("model_id")}
+                      onChange={(schema) => {
+                        field.onChange(schema);
+                        // o schema é o que dá sentido à capability (ADR-0027)
+                        form.setValue(
+                          "capabilities",
+                          { ...form.getValues("capabilities"), structured_output: schema != null },
+                          { shouldDirty: true },
+                        );
+                      }}
+                    />
+                  )}
+                />
+              </AdvancedSection>
 
               <section className="border-border rounded border px-4 py-3">
                 <LintPanel getPayload={getPayload} />

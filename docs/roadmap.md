@@ -1506,13 +1506,13 @@ Rodada de testes, falhas, desempenho e UX sobre a `main` em `ce2f4e6`, depois da
 
 ### UI e UX
 
-- [ ] **Alta.** A configuração do agente tem cerca de 4300 px, e as instruções, o que quem não programa mais edita, ficam no fim, depois de guardrails, memória, controle do run e saída estruturada.
+- [x] **Alta.** A configuração do agente tem cerca de 4300 px, e as instruções, o que quem não programa mais edita, ficam no fim, depois de guardrails, memória, controle do run e saída estruturada.
 - [x] **Alta.** Aprovações e Alertas mostram o id do usuário (`3a6895ec-…`) onde deveria aparecer a pessoa.
 - [x] **Média.** "Meus dados" e "Minhas memórias" só se acham por ícones de 14 px no rodapé da barra lateral.
-- [ ] **Média.** A navegação é uma lista plana de 14 itens, sem grupos.
+- [x] **Média.** A navegação é uma lista plana de 14 itens, sem grupos.
 - [x] **Média.** O Analytics mostra números no formato inglês (`3.7%`, `18.0 M`) ao lado de valores em reais no formato brasileiro.
 - [x] **Média.** "Recusar" em Aprovações é vermelho sólido e não pede confirmação, embora encerre ou refaça o workflow.
-- [ ] **Média.** No celular, as abas da página do agente somem à direita sem indicação de rolagem.
+- [x] **Média.** No celular, as abas da página do agente somem à direita sem indicação de rolagem.
 
 ### Features candidatas (Fase 45)
 
@@ -1533,7 +1533,7 @@ Por valor para quem opera agentes em produção:
 - [x] `fix(api)`: suíte interrompida só sem batimento, executor próprio para sincronização e limites de período, Redis e pool
 - [x] `perf(infra)`: migrações num processo só no boot e uma CPU para a API
 - [x] `fix(web)`: aprovações com pessoa e prazo, números em pt-BR, menu da conta, recusa confirmada e gráficos sob demanda
-- [ ] `fix(web)`: instruções no topo da configuração, seções avançadas recolhidas, navegação em grupos e abas roláveis no celular
+- [x] `fix(web)`: instruções no topo da configuração, seções avançadas recolhidas, navegação em grupos e abas roláveis no celular
 
 **Critério de aceite da fase:**
 

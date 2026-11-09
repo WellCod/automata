@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import { cn } from "@/lib/utils";
 import {
   BarChart3,
@@ -27,21 +28,76 @@ import { usePendingApprovals } from "@/lib/api/approvals";
 import { useMe } from "@/lib/api/users";
 import { ThemeToggle } from "./theme";
 
+// em grupos: 14 itens numa lista só não se liam (Fase 44)
 const navItems = [
-  { href: "/", label: "Agentes", icon: LayoutGrid, exact: true },
-  { href: "/times", label: "Times", icon: Users, exact: false },
-  { href: "/workflows", label: "Workflows", icon: Workflow, exact: false },
-  { href: "/analytics", label: "Analytics", icon: BarChart3, exact: true },
-  { href: "/conhecimento", label: "Conhecimento", icon: BookOpen, exact: false },
-  { href: "/mcp", label: "Servidores MCP", icon: Plug, exact: true },
-  { href: "/aprovacoes", label: "Aprovações", icon: ShieldCheck, exact: true },
-  { href: "/integracoes", label: "Integrações", icon: KeyRound, exact: true },
-  { href: "/alertas", label: "Alertas", icon: Bell, exact: true, ownerOnly: true },
-  { href: "/usuarios", label: "Usuários", icon: UserCog, exact: true, ownerOnly: true },
-  { href: "/fila", label: "Fila", icon: ListOrdered, exact: true, ownerOnly: true },
-  { href: "/guardrails", label: "Guardrails", icon: ShieldHalf, exact: true, ownerOnly: true },
-  { href: "/titulares", label: "Titulares", icon: UserSearch, exact: true, ownerOnly: true },
-  { href: "/chaves", label: "Chaves", icon: LockKeyhole, exact: true, ownerOnly: true },
+  { group: "Construir", href: "/", label: "Agentes", icon: LayoutGrid, exact: true },
+  { group: "Construir", href: "/times", label: "Times", icon: Users, exact: false },
+  { group: "Construir", href: "/workflows", label: "Workflows", icon: Workflow, exact: false },
+  {
+    group: "Construir",
+    href: "/conhecimento",
+    label: "Conhecimento",
+    icon: BookOpen,
+    exact: false,
+  },
+  { group: "Construir", href: "/mcp", label: "Servidores MCP", icon: Plug, exact: true },
+  { group: "Acompanhar", href: "/analytics", label: "Analytics", icon: BarChart3, exact: true },
+  { group: "Acompanhar", href: "/aprovacoes", label: "Aprovações", icon: ShieldCheck, exact: true },
+  {
+    group: "Acompanhar",
+    href: "/alertas",
+    label: "Alertas",
+    icon: Bell,
+    exact: true,
+    ownerOnly: true,
+  },
+  {
+    group: "Acompanhar",
+    href: "/fila",
+    label: "Fila",
+    icon: ListOrdered,
+    exact: true,
+    ownerOnly: true,
+  },
+  {
+    group: "Administração",
+    href: "/integracoes",
+    label: "Integrações",
+    icon: KeyRound,
+    exact: true,
+  },
+  {
+    group: "Administração",
+    href: "/usuarios",
+    label: "Usuários",
+    icon: UserCog,
+    exact: true,
+    ownerOnly: true,
+  },
+  {
+    group: "Administração",
+    href: "/guardrails",
+    label: "Guardrails",
+    icon: ShieldHalf,
+    exact: true,
+    ownerOnly: true,
+  },
+  {
+    group: "Administração",
+    href: "/titulares",
+    label: "Titulares",
+    icon: UserSearch,
+    exact: true,
+    ownerOnly: true,
+  },
+  {
+    group: "Administração",
+    href: "/chaves",
+    label: "Chaves",
+    icon: LockKeyhole,
+    exact: true,
+    ownerOnly: true,
+  },
 ];
 
 export const SIDEBAR_ID = "menu-lateral";
@@ -96,28 +152,35 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
       </div>
 
       <nav className="flex-1 px-3 py-2">
-        {visible.map(({ href, label, icon: Icon, exact }) => {
+        {visible.map(({ group, href, label, icon: Icon, exact }, index) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
+          const heading = index === 0 || visible[index - 1].group !== group;
           return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "flex h-8 items-center gap-2 px-0 text-[13px] transition-colors",
-                active ? "text-accent" : "text-muted-foreground hover:text-foreground",
+            <Fragment key={href}>
+              {heading && (
+                <p className="text-muted-foreground/70 mt-3 mb-1 text-[11px] font-medium first:mt-1">
+                  {group}
+                </p>
               )}
-            >
-              <Icon className="h-4 w-4" />
-              {label}
-              {href === "/aprovacoes" && pending && pending.length > 0 && (
-                <span
-                  className="ml-auto rounded border border-amber-500/50 px-1.5 text-[11px] text-amber-600 dark:text-amber-400"
-                  aria-label={`${pending.length} aguardando`}
-                >
-                  {pending.length}
-                </span>
-              )}
-            </Link>
+              <Link
+                href={href}
+                className={cn(
+                  "flex h-8 items-center gap-2 px-0 text-[13px] transition-colors",
+                  active ? "text-accent" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+                {href === "/aprovacoes" && pending && pending.length > 0 && (
+                  <span
+                    className="ml-auto rounded border border-amber-500/50 px-1.5 text-[11px] text-amber-600 dark:text-amber-400"
+                    aria-label={`${pending.length} aguardando`}
+                  >
+                    {pending.length}
+                  </span>
+                )}
+              </Link>
+            </Fragment>
           );
         })}
       </nav>
