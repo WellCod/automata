@@ -55,6 +55,22 @@ def month_spend(session: Session, subject: str, period: str | None = None) -> fl
     return float(total or 0)
 
 
+def month_spends(session: Session, subjects: list[str], period: str) -> dict[str, float]:
+    """Gasto do mês de vários titulares numa consulta, com o pseudônimo somado (Fase 44)."""
+    keys = {key: subject for subject in subjects for key in _keys(subject)}
+    if not keys:
+        return {}
+    out = dict.fromkeys(subjects, 0.0)
+    rows = session.execute(
+        select(UsageEvent.user_id, func.coalesce(func.sum(UsageEvent.cost), 0))
+        .where(UsageEvent.user_id.in_(list(keys)), UsageEvent.period == period)
+        .group_by(UsageEvent.user_id)
+    )
+    for key, total in rows:
+        out[keys[key]] += float(total or 0)
+    return out
+
+
 def _cached_budget(subject: str) -> CallerBudget | None:
     hit = _budgets.get(subject)
     if hit is not None and monotonic() - hit[0] < CACHE_S:
@@ -158,9 +174,14 @@ def check_caller_budgets(session: Session, now: datetime) -> list[tuple[str, str
 
     period = current_period(now)
     sent: list[tuple[str, str]] = []
+    if not destinations_for(session, CALLER_WARNING) and not destinations_for(
+        session, CALLER_EXCEEDED
+    ):
+        return sent
     budgets = session.scalars(select(CallerBudget)).all()
+    spends = month_spends(session, [b.subject for b in budgets], period)
     for budget in budgets:
-        state = state_for(budget, month_spend(session, budget.subject, period))
+        state = state_for(budget, spends.get(budget.subject, 0.0))
         event = {"warning": CALLER_WARNING, "exceeded": CALLER_EXCEEDED}.get(state.level)
         if event is None or not destinations_for(session, event):
             continue

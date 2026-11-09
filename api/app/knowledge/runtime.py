@@ -5,9 +5,9 @@ from typing import cast
 from agno.vectordb.pgvector import PgVector
 from agno.vectordb.search import SearchType
 
+from app.db import get_engine
 from app.knowledge.embedders import InputType, MeteredEmbedder, build_embedder
 from app.models.knowledge_base import KnowledgeBase
-from app.settings import get_settings
 
 VECTOR_SCHEMA = "ai"
 
@@ -20,7 +20,8 @@ def vector_db_for(
     return PgVector(
         table_name=base.vector_table,
         schema=VECTOR_SCHEMA,
-        db_url=get_settings().database_url,
+        # o pool da API: com db_url o Agno criava um engine novo a cada busca (Fase 44)
+        db_engine=get_engine(),
         embedder=MeteredEmbedder(
             inner=build_embedder(base.embedder, base.embedder_model, base.dimensions, input_type)
         ),

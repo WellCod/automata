@@ -52,7 +52,7 @@ def agno_table_names() -> dict[str, str]:
     from agno.db.postgres import PostgresDb
 
     # o construtor não conecta: serve só para ler os nomes que o Agno usa
-    db = PostgresDb(db_url=get_settings().database_url)
+    db = PostgresDb(db_engine=get_engine())
     names = {key: getattr(db, attr) for key, attr in AGNO_BY_USER.items()}
     names["spans"] = db.span_table_name
     names["transcripts"] = db.transcripts_table_name

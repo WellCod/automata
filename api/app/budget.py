@@ -49,6 +49,18 @@ def month_spend(session: Session, config_id: UUID, period: str | None = None) ->
     return float(total or 0)
 
 
+def month_spends(session: Session, config_ids: list[UUID], period: str) -> dict[UUID, float]:
+    """Gasto do mês de vários configs numa consulta, pelo índice com o custo (Fase 44)."""
+    if not config_ids:
+        return {}
+    rows = session.execute(
+        select(UsageEvent.agent_config_id, func.coalesce(func.sum(UsageEvent.cost), 0))
+        .where(UsageEvent.period == period, UsageEvent.agent_config_id.in_(config_ids))
+        .group_by(UsageEvent.agent_config_id)
+    )
+    return {config_id: float(total or 0) for config_id, total in rows}
+
+
 def cached_spend(config_id: UUID) -> float:
     # um run por mensagem consultaria o banco a cada turno; 30 s bastam para barrar
     hit = _cache.get(config_id)

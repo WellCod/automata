@@ -102,12 +102,18 @@ def _budget_text(event: str, config: AgentConfig, state: budget.BudgetState) -> 
 def check_budgets(session: Session, now: datetime) -> list[tuple[UUID, str]]:
     period = budget.current_period(now)
     sent: list[tuple[UUID, str]] = []
+    # sem destino para o aviso, nada a somar (Fase 44)
+    if not destinations_for(session, BUDGET_WARNING) and not destinations_for(
+        session, BUDGET_EXCEEDED
+    ):
+        return sent
     # lista fechada antes do laço: o claim faz commit no meio
     configs = session.scalars(
         select(AgentConfig).where(AgentConfig.budget_monthly_usd.is_not(None))
     ).all()
+    spends = budget.month_spends(session, [c.id for c in configs], period)
     for config in configs:
-        state = budget.state_for(config, budget.month_spend(session, config.id, period))
+        state = budget.state_for(config, spends.get(config.id, 0.0))
         # estourar direto, sem passar pelo aviso, manda só o estouro
         event = {"warning": BUDGET_WARNING, "exceeded": BUDGET_EXCEEDED}.get(state.level or "")
         if event is None or not destinations_for(session, event):

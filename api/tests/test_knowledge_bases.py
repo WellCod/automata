@@ -166,3 +166,24 @@ def test_viewer_le_e_editor_escreve(
     write = client.post("/api/v1/knowledge-bases", json=_BODY, headers=headers).status_code
     assert (write not in (401, 403)) is pode_escrever
     get_settings.cache_clear()
+
+
+def test_base_e_banco_do_agno_usam_o_engine_da_api(db_url: str) -> None:
+    """Fase 44: com db_url, cada busca e cada sugestão abria um engine e um pool novos."""
+    from uuid import uuid4
+
+    from app.db import get_db, get_engine
+    from app.knowledge.runtime import vector_db_for
+    from app.models.knowledge_base import KnowledgeBase
+
+    base = KnowledgeBase(
+        id=uuid4(),
+        vector_table="kb_teste",
+        name="x",
+        slug="x",
+        embedder="voyage",
+        embedder_model="voyage-3.5",
+        dimensions=1024,
+    )
+    assert vector_db_for(base).db_engine is get_engine()
+    assert get_db().db_engine is get_engine()

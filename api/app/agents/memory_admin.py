@@ -11,7 +11,7 @@ from time import monotonic
 from uuid import UUID
 
 from agno.db.schemas.memory import UserMemory
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.agents.memory import memory_db
@@ -79,10 +79,22 @@ def purge_expired(now: datetime | None = None) -> int:
     with Session(get_engine()) as session:
         retention = retention_by_agent(session)
     removed = 0
-    for config_id, (kind, days) in retention.items():
-        ids = expired(of_config(config_id, kind), days, now)
-        delete(ids)
-        removed += len(ids)
+    db = memory_db()
+    table = f'"{db.db_schema}"."{db.memory_table_name}"'
+    # direto na tabela: carregar todas as memórias de cada agente em Python, de hora em
+    # hora, crescia com o histórico (Fase 44)
+    with get_engine().begin() as conn:
+        for config_id, (kind, days) in retention.items():
+            column = "team_id" if kind == "team" else "agent_id"
+            limit = int((now - timedelta(days=days)).timestamp())
+            result = conn.execute(
+                text(
+                    f"DELETE FROM {table} WHERE {column} = :config_id "
+                    "AND COALESCE(updated_at, created_at, 0) < :limit"
+                ),
+                {"config_id": config_id, "limit": limit},
+            )
+            removed += int(result.rowcount or 0)
     if removed:
         logger.info("memórias vencidas apagadas", extra={"count": removed})
     return removed

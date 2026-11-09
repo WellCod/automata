@@ -11,7 +11,8 @@ from app.settings import get_settings
 
 
 def get_db() -> PostgresDb:
-    return PostgresDb(db_url=get_settings().database_url)
+    # o engine da API: com db_url cada chamada abria um pool novo, nunca descartado (Fase 44)
+    return PostgresDb(db_engine=get_engine())
 
 
 @lru_cache(maxsize=1)
