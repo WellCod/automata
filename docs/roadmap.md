@@ -1437,11 +1437,11 @@ Quarta rodada de verificação, sobre a `main` em `c6f14b7`, com foco no que ent
 - [x] **Média.** O filtro por nome dos conectores (ADR-0039) limita só os `**`. Um padrão com vários `*` contra um nome longo e repetitivo tem backtracking polinomial: um padrão de 28 caracteres leva 0,26 s com um nome de 22, e o tempo multiplica por 4 a cada 2 caracteres. Quem escreve na origem trava a API na sincronização ou no teste do conector.
 - [x] **Média.** Um token de integração com `data_subjects:request` (ADR-0036) pede exportação e exclusão de qualquer `user_id`. Com `user_isolation`, o Agno grava todo run de integração como `integration:<id>`, então o token lê e apaga as conversas de outras integrações e do painel. A premissa do ADR, de que o `user_id` vem do sistema da empresa, não vale.
 - [x] **Média.** A exclusão do titular apaga o orçamento dele (ADR-0031) e troca o id no consumo pelo pseudônimo. Quem tem orçamento com bloqueio estourado pede a própria exclusão e volta a gastar.
-- [ ] **Média.** No classificador herdado do piso (ADR-0034), o agente fica com o próprio modelo e o próprio escopo. O editor escolhe um modelo cujo provedor não tem chave, e com o padrão `allow` toda checagem passa. Também troca o escopo e anula o `off_topic` do piso.
+- [x] **Média.** No classificador herdado do piso (ADR-0034), o agente fica com o próprio modelo e o próprio escopo. O editor escolhe um modelo cujo provedor não tem chave, e com o padrão `allow` toda checagem passa. Também troca o escopo e anula o `off_topic` do piso.
 - [x] **Baixa.** Drive e Cloud Storage listam a origem inteira, sem teto de itens, antes do corte de 500 arquivos. O download traz o objeto inteiro para a memória antes de conferir o tamanho.
 - [x] **Baixa.** Job de ingestão que passa de 30 minutos volta à fila enquanto roda, e outra réplica do worker repete o trabalho e o embedding. Sem worker, um reinício no meio da sincronização deixa o conector em `running` para sempre.
 - [x] **Baixa.** A exclusão do titular mantém `pending_tools`, `pending_steps` e `error` no `agent_run`, e a exportação não leva esses campos. Uma exportação já rodando quando chega a exclusão grava o arquivo de antes, e uma ainda na fila fica pendente para sempre.
-- [ ] **Baixa.** O classificador da saída examina os primeiros e os últimos 10 mil caracteres. Uma resposta longa esconde o vazamento no meio.
+- [x] **Baixa.** O classificador da saída examina os primeiros e os últimos 10 mil caracteres. Uma resposta longa esconde o vazamento no meio.
 - [ ] **Baixa.** O `{anterior}` digitado pelo usuário é trocado no template da etapa depois do `{entrada}`, e a etapa recebe a saída interna da anterior.
 - [ ] **Baixa.** As sugestões de caso em lote mascaram os tipos fixos de dado pessoal, mas não os padrões próprios do agente.
 
@@ -1460,7 +1460,7 @@ Nenhuma tela vaza em 375 px, e todas têm `h1`, rótulo em todo campo e nome em 
 - [x] `fix(security)`: filtro por nome sem backtracking e listagem e download dos conectores com teto
 - [x] `fix(api)`: job de ingestão com prazo renovado e conector preso em sincronização liberado
 - [x] `fix(security)`: titular por token só do próprio id, orçamento mantido na exclusão e run limpo por inteiro
-- [ ] `fix(security)`: classificador do piso com o modelo e o escopo do piso e saída longa examinada inteira
+- [x] `fix(security)`: classificador do piso com o modelo e o escopo do piso e saída longa examinada inteira
 - [ ] `fix(security)`: template da etapa numa passada só e sugestões com os padrões próprios de dado pessoal
 - [ ] `fix(web)`: alvos de 24 px nas dicas e na trilha e piso lido sem 404
 - [ ] `docs`: README com os prints das telas atuais

@@ -25,7 +25,7 @@ A combinação é feita ao carregar a versão (`load_version`), então entrada, 
 - injeção, moderação e exame de tool por termos ou classificador: ligado se qualquer um ligar;
 - termos extras de injeção, tópicos proibidos e termos proibidos na saída: união;
 - tamanho máximo da entrada: o menor;
-- classificador, na entrada e na saída: com os dois definidos, o modelo e o escopo são os do agente, as checagens são a união, e a falha bloqueia se qualquer um pedir. Com um só, vale ele;
+- classificador, na entrada e na saída: com os dois definidos, o modelo e o escopo são os do piso (o escopo do agente só vale quando o piso não tem um), as checagens são a união, e a falha bloqueia se qualquer um pedir. Com um só, vale ele. Revisto na Fase 43: com o modelo e o escopo do agente, o editor anulava o piso escolhendo um modelo sem chave ou outro escopo;
 - mensagem de bloqueio: a do agente.
 
 `GET /api/v1/configs/{id}/guardrails/effective` mostra o efetivo da versão vigente, ou do rascunho com `?draft=true`, e o painel marca o que veio da instância. O piso vale a partir do próximo run, sem publicar os agentes de novo, porque não é parte da versão. A mudança no piso fica no log com quem fez.
