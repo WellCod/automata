@@ -15,6 +15,7 @@ import jwt
 
 from app.knowledge.sources import (
     MAX_DEPTH,
+    MAX_LISTED,
     SUPPORTED,
     TIMEOUT_S,
     UNKNOWN_SIZE,
@@ -22,6 +23,7 @@ from app.knowledge.sources import (
     SourceError,
     _inside,
     _raise_for,
+    capped_get,
 )
 from app.mcp.egress import guarded_client
 from app.schemas.knowledge_connector import GCSSettings, GDriveSettings
@@ -109,6 +111,11 @@ class GDriveSource:
         _raise_for(resp, "Google Drive")
         return resp
 
+    def _download(self, url: str, params: dict[str, Any]) -> bytes:
+        return capped_get(
+            self._http, url, "Google Drive", params=params, headers=self._auth.headers()
+        )
+
     def _children(self, folder: str) -> Iterator[dict[str, Any]]:
         params: dict[str, Any] = {
             "q": f"'{folder}' in parents and trashed=false",
@@ -128,8 +135,16 @@ class GDriveSource:
     def list_files(self) -> list[RemoteFile]:
         files: list[RemoteFile] = []
 
+        seen = 0
+
         def walk(folder: str, relative: str, depth: int) -> None:
+            nonlocal seen
             for item in self._children(folder):
+                seen += 1
+                if seen > MAX_LISTED:
+                    # pasta enorme: para de listar em vez de ler tudo (Fase 43)
+                    self.truncated = True
+                    return
                 name = str(item["name"])
                 path = f"{relative}/{name}" if relative else name
                 mime = str(item.get("mimeType") or "")
@@ -162,11 +177,11 @@ class GDriveSource:
         file_id, _, mime = file.ref.partition("|")
         if mime in EXPORTS:
             url = f"{DRIVE}/files/{quote(file_id, safe='')}/export"
-            return self._get(url, {"mimeType": EXPORTS[mime][0]}).content
+            return self._download(url, {"mimeType": EXPORTS[mime][0]})
         params: dict[str, Any] = {"alt": "media"}
         if self.settings.shared_drive:
             params["supportsAllDrives"] = "true"
-        return self._get(f"{DRIVE}/files/{quote(file_id, safe='')}", params).content
+        return self._download(f"{DRIVE}/files/{quote(file_id, safe='')}", params)
 
 
 class GCSSource:
@@ -184,14 +199,23 @@ class GCSSource:
         _raise_for(resp, f"Cloud Storage {self.settings.bucket}")
         return resp
 
+    def _download(self, url: str, params: dict[str, Any]) -> bytes:
+        what = f"Cloud Storage {self.settings.bucket}"
+        return capped_get(self._http, url, what, params=params, headers=self._auth.headers())
+
     def list_files(self) -> list[RemoteFile]:
         prefix = self.settings.prefix.strip("/")
         params: dict[str, Any] = {"prefix": f"{prefix}/" if prefix else "", "maxResults": 1000}
         bucket = quote(self.settings.bucket, safe="")
         files: list[RemoteFile] = []
+        seen = 0
         while True:
             page = self._get(f"{STORAGE}/b/{bucket}/o", params).json()
             for obj in page.get("items", []):
+                seen += 1
+                if seen > MAX_LISTED:
+                    self.truncated = True
+                    return files
                 key = str(obj["name"])
                 relative = _inside(key, prefix)
                 if relative is None or key.endswith("/"):
@@ -212,4 +236,4 @@ class GCSSource:
     def download(self, file: RemoteFile) -> bytes:
         bucket = quote(self.settings.bucket, safe="")
         url = f"{STORAGE}/b/{bucket}/o/{quote(file.ref, safe='')}"
-        return self._get(url, {"alt": "media"}).content
+        return self._download(url, {"alt": "media"})

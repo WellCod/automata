@@ -24,6 +24,7 @@ from app.knowledge.sources import (
     RemoteFile,
     Source,
     SourceError,
+    TooLarge,
     source_for,
 )
 from app.mcp.egress import EgressDenied
@@ -204,6 +205,9 @@ def sync(connector_id: UUID) -> SyncSummary:
         for file, existing in todo.fetch:
             try:
                 data = source.download(file)
+            except TooLarge:
+                summary.skipped += 1
+                continue
             except (SourceError, EgressDenied) as exc:
                 summary.failed += 1
                 summary.errors.append(f"{file.path}: {exc}"[:200])

@@ -30,10 +30,47 @@ GRAPH = "https://graph.microsoft.com/v1.0"
 LOGIN = "https://login.microsoftonline.com"
 # pastas do SharePoint visitadas a partir da configurada
 MAX_DEPTH = 5
+# itens lidos da origem antes de parar a listagem; a sincronização usa só 500 (Fase 43)
+MAX_LISTED = 5000
 
 
 class SourceError(ValueError):
     pass
+
+
+class TooLarge(SourceError):
+    """Arquivo acima do limite de upload: conta como pulado, não como falha."""
+
+
+def max_download() -> int:
+    from app.settings import get_settings
+
+    return get_settings().knowledge_max_upload_mb * 1024 * 1024
+
+
+def capped_get(
+    client: httpx.Client,
+    url: str,
+    what: str,
+    *,
+    params: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+) -> bytes:
+    """Baixa contando bytes: o tamanho da listagem pode mudar até o download (Fase 43)."""
+    limit = max_download()
+    with client.stream("GET", url, params=params, headers=headers) as resp:
+        _raise_for(resp, what)
+        declared = resp.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > limit:
+            raise TooLarge(f"{what}: acima do limite de upload")
+        chunks: list[bytes] = []
+        size = 0
+        for chunk in resp.iter_bytes():
+            size += len(chunk)
+            if size > limit:
+                raise TooLarge(f"{what}: acima do limite de upload")
+            chunks.append(chunk)
+    return b"".join(chunks)
 
 
 # a origem não informa o tamanho (Google Docs no Drive): o limite é conferido no download
@@ -110,6 +147,13 @@ class GitHubSource:
         _raise_for(resp, f"GitHub {self.settings.repo}")
         return resp
 
+    def _download(self, url: str, **headers: str) -> bytes:
+        check_url(url)
+        with guarded_client(timeout=TIMEOUT_S) as client:
+            return capped_get(
+                client, url, f"GitHub {self.settings.repo}", headers={**self._headers, **headers}
+            )
+
     def list_files(self) -> list[RemoteFile]:
         s = self.settings
         tree = self._get(
@@ -138,7 +182,7 @@ class GitHubSource:
         url = (
             f"{self._api}/repos/{s.repo}/contents/{quote(file.ref)}?ref={quote(s.branch, safe='')}"
         )
-        return self._get(url, Accept="application/vnd.github.raw").content
+        return self._download(url, Accept="application/vnd.github.raw")
 
 
 class S3Source:
@@ -196,9 +240,12 @@ class S3Source:
     def download(self, file: RemoteFile) -> bytes:
         try:
             obj = self._client().get_object(Bucket=self.settings.bucket, Key=file.ref)
-            data: bytes = obj["Body"].read()
+            limit = max_download()
+            data: bytes = obj["Body"].read(limit + 1)
         except Exception as exc:
             raise SourceError(f"S3 {file.ref}: {type(exc).__name__}: {exc}") from exc
+        if len(data) > limit:
+            raise TooLarge(f"S3 {file.ref}: acima do limite de upload")
         return data
 
 
@@ -260,8 +307,15 @@ class SharePointSource:
         root = self.settings.folder_path.strip("/")
         files: list[RemoteFile] = []
 
+        seen = 0
+
         def walk(folder: str, relative: str, depth: int) -> None:
+            nonlocal seen
             for item in self._children(site, folder):
+                seen += 1
+                if seen > MAX_LISTED:
+                    self.truncated = True
+                    return
                 name = str(item["name"])
                 path = f"{relative}/{name}" if relative else name
                 if "folder" in item and depth < MAX_DEPTH:
@@ -282,9 +336,7 @@ class SharePointSource:
     def download(self, file: RemoteFile) -> bytes:
         # URL assinada e curta do próprio Graph; sem cabeçalho de autorização
         check_url(file.ref)
-        resp = self._http.get(file.ref)
-        _raise_for(resp, f"SharePoint {file.path}")
-        return resp.content
+        return capped_get(self._http, file.ref, f"SharePoint {file.path}")
 
 
 def source_for(kind: str, settings: dict[str, Any], secret: dict[str, str]) -> Source:

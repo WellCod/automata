@@ -186,3 +186,28 @@ def test_conta_de_servico_invalida(secret: dict[str, str]) -> None:
 def test_escopo_do_drive_e_so_leitura() -> None:
     assert DRIVE_SCOPE.endswith("drive.readonly")
     assert STORAGE_SCOPE.endswith("devstorage.read_only")
+
+
+def test_listagem_e_download_com_teto(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fase 43: bucket enorme para de listar, e objeto grande não entra na memória."""
+    from app.knowledge import google_sources, sources
+
+    monkeypatch.setattr(google_sources, "MAX_LISTED", 3)
+    page = {
+        "items": [{"name": f"doc{i}.md", "generation": str(i), "size": "10"} for i in range(5)],
+        "nextPageToken": "sempre",
+    }
+
+    def objects(request: httpx.Request) -> Any:
+        if request.url.params.get("alt") == "media":
+            return b"x" * 4096
+        return page
+
+    google = Google({"/storage/v1/b/manuais/o": objects})
+    source = GCSSource(GCSSettings(bucket="manuais"), SECRET, google.client())
+    listed = source.list_files()
+    assert len(listed) == 3 and source.truncated is True
+
+    monkeypatch.setattr(sources, "max_download", lambda: 1000)
+    with pytest.raises(sources.TooLarge):
+        source.download(listed[0])
