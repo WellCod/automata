@@ -6,10 +6,11 @@ mesmo que o agente não tenha guardrail de PII: o caso fica num cadastro que out
 editores veem, e a conversa original não.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.guardrails.pii import PII_TYPES, find_pii, mask
+from app.guardrails.pii import PII_TYPES, CustomPattern, find_pii, mask
 from app.schemas.eval import MAX_CONTEXT
 
 # resposta de referência no critério do juiz: o bastante para julgar, sem copiar a conversa
@@ -17,8 +18,9 @@ _REFERENCE_CHARS = 600
 _NAME_CHARS = 60
 
 
-def masked(text: str) -> str:
-    return mask(text, find_pii(text, PII_TYPES))
+def masked(text: str, custom: Sequence[CustomPattern] = ()) -> str:
+    # os padrões próprios do agente também: matrícula e protocolo da empresa (Fase 43)
+    return mask(text, find_pii(text, PII_TYPES, tuple(custom)))
 
 
 def _input_of(run: Any) -> str:
@@ -48,16 +50,16 @@ class Suggestion:
     notes: list[str] = field(default_factory=list)
 
 
-def suggest(run: Any, previous: list[Any]) -> Suggestion:
+def suggest(run: Any, previous: list[Any], custom: Sequence[CustomPattern] = ()) -> Suggestion:
     """`previous` são os runs anteriores da mesma sessão, do mais antigo ao mais recente."""
-    message = masked(_input_of(run))
-    context = [masked(_input_of(r)) for r in previous if _input_of(r)][-MAX_CONTEXT:]
+    message = masked(_input_of(run), custom)
+    context = [masked(_input_of(r), custom) for r in previous if _input_of(r)][-MAX_CONTEXT:]
     checks: list[dict[str, Any]] = [{"type": "text", "kind": "not_empty"}]
     tools = tools_called(run)
     if tools:
         # tools que o run chamou são objetivas; texto da resposta prenderia o caso à redação
         checks.append({"type": "tools", "tools": tools, "allow_additional": True})
-    reply = masked("" if getattr(run, "content", None) is None else str(run.content))
+    reply = masked("" if getattr(run, "content", None) is None else str(run.content), custom)
     criteria = None
     if reply.strip():
         reference = reply[:_REFERENCE_CHARS] + ("…" if len(reply) > _REFERENCE_CHARS else "")

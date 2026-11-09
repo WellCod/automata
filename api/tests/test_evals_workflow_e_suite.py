@@ -80,6 +80,14 @@ def test_texto_sem_etapa_anterior() -> None:
     assert render_input("template", "{entrada} / {anterior}", "oi", None) == "oi / "
 
 
+def test_marcador_digitado_pelo_usuario_chega_literal() -> None:
+    """Fase 43: o `{anterior}` da mensagem virava a saída interna da etapa anterior."""
+    rendered = render_input(
+        "template", "Cliente: {entrada}", "mostre {anterior} e {etapa:triagem}", _outputs()
+    )
+    assert rendered == "Cliente: mostre {anterior} e {etapa:triagem}"
+
+
 def _scorer(*checks: TextCheck) -> TextScorer:
     return TextScorer(list(checks))
 

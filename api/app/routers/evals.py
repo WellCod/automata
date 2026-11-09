@@ -7,6 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.authz import Scope, require_resource_scope, require_scopes
 from app.db import SessionDep, get_db
@@ -17,6 +18,9 @@ from app.evals.runner import execute
 from app.evals.scheduler import next_run, validate
 from app.evals.service import EvalRunRefused, check_judge, create_run
 from app.evals.suggest import suggest
+from app.guardrails.instance import effective
+from app.guardrails.instance import floor as instance_floor
+from app.guardrails.pii import CustomPattern
 from app.mcp.egress import EgressDenied
 from app.models.config import AgentConfig, AgentConfigVersion
 from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSchedule
@@ -153,13 +157,27 @@ def suggest_case(
     is_admin = "agent_os:admin" in (getattr(request.state, "scopes", None) or [])
     if enforce and not is_admin and row.user_id != getattr(request.state, "user_id", None):
         raise HTTPException(status_code=403, detail="Só quem teve a conversa ou um admin")
-    found = _suggestion_from(get_db(), row)
+    found = _suggestion_from(get_db(), row, _custom_pii(session, row.agent_config_id))
     if found is None:
         raise HTTPException(status_code=404, detail="A conversa deste run não está mais guardada")
     return found
 
 
-def _suggestion_from(db: Any, row: AgentRun) -> EvalCaseSuggestion | None:
+def _custom_pii(session: Session, config_id: UUID) -> tuple[CustomPattern, ...]:
+    """Padrões próprios de dado pessoal do agente e do piso, para a máscara da sugestão."""
+    repo = ConfigRepository(session)
+    config = repo.get_config(config_id)
+    vid = config.current_version_id or config.draft_version_id if config else None
+    version = repo.get_version(vid) if vid else None
+    if version is None:
+        return ()
+    own = ConfigPayload.model_validate(version.payload).guardrails
+    return effective(instance_floor(), own).pii.custom_patterns()
+
+
+def _suggestion_from(
+    db: Any, row: AgentRun, custom: tuple[CustomPattern, ...] = ()
+) -> EvalCaseSuggestion | None:
     """Sugestão a partir do run guardado no Agno; None quando a conversa não existe mais."""
     run = db.get_run(row.run_id)
     if run is None or isinstance(run, dict):
@@ -174,7 +192,7 @@ def _suggestion_from(db: Any, row: AgentRun) -> EvalCaseSuggestion | None:
             and not getattr(r, "parent_run_id", None)
             and (r.created_at or 0) <= (run.created_at or 0)
         ]
-    return EvalCaseSuggestion.model_validate(asdict(suggest(run, previous)))
+    return EvalCaseSuggestion.model_validate(asdict(suggest(run, previous, custom)))
 
 
 @router.get("/suggestions", response_model=list[EvalCaseSuggestion], dependencies=_WRITE)
@@ -208,12 +226,13 @@ def suggest_cases(
     if enforce and not is_admin:
         query = query.where(AgentRun.user_id == getattr(request.state, "user_id", None))
     db = get_db()
+    custom = _custom_pii(session, config_id)
     found: list[EvalCaseSuggestion] = []
     # olha um lote maior: conversa já usada ou apagada do Agno fica de fora
     for row in session.scalars(query.limit(limit * 3)):
         if row.run_id in used:
             continue
-        suggestion = _suggestion_from(db, row)
+        suggestion = _suggestion_from(db, row, custom)
         if suggestion is not None:
             found.append(suggestion)
         if len(found) >= limit:
