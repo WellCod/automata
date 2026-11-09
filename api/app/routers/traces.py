@@ -5,22 +5,19 @@ tipado para o painel; as rotas /traces do Agno ficam fora do OpenAPI que
 gera os tipos do client.
 """
 
-import contextlib
 from datetime import datetime
 from typing import Any
-from uuid import UUID
 
 from agno.os.routers.traces.schemas import TraceDetail
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.authz import Scope, require_scopes, sees_everyone
 from app.db import get_engine
-from app.models.user import User
 from app.repositories.run import RunRepository
+from app.repositories.user import emails_by_id
 
 router = APIRouter(
     prefix="/api/v1/runs",
@@ -124,12 +121,4 @@ def get_run_reviews(run_id: str, request: Request) -> list[ReviewEntry]:
     ]
 
 
-def _emails(session: Session, ids: set[str]) -> dict[str, str]:
-    uuids = []
-    for value in ids:
-        with contextlib.suppress(TypeError, ValueError):
-            uuids.append(UUID(value))
-    if not uuids:
-        return {}
-    rows = session.execute(select(User.id, User.email).where(User.id.in_(uuids)))
-    return {str(user_id): email for user_id, email in rows}
+_emails = emails_by_id

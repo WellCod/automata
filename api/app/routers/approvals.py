@@ -19,6 +19,7 @@ from app.authz import Scope, require_scopes, sees_everyone
 from app.db import SessionDep
 from app.models.config import AgentConfig
 from app.repositories.run import RunRepository
+from app.repositories.user import emails_by_id
 
 router = APIRouter(
     prefix="/api/v1/approvals",
@@ -54,6 +55,8 @@ class ApprovalItem(BaseModel):
     kind: str
     session_id: str | None
     user_id: str
+    # e-mail de quem pediu, quando é usuário do painel; senão o próprio id (Fase 44)
+    requested_by: str = ""
     created_at: datetime
     tools: list[PendingTool]
     steps: list[PendingStep]
@@ -71,6 +74,7 @@ def list_pending(
     runs = RunRepository(session).list_paused([agent_id] if agent_id else None, user_id=user_id)
     ids = list({r.agent_config_id for r in runs})
     configs = {c.id: c for c in session.scalars(select(AgentConfig).where(AgentConfig.id.in_(ids)))}
+    emails = emails_by_id(session, {r.user_id for r in runs})
     return [
         ApprovalItem(
             run_id=r.run_id or "",
@@ -79,6 +83,7 @@ def list_pending(
             kind=configs[r.agent_config_id].kind if r.agent_config_id in configs else "agent",
             session_id=r.session_id,
             user_id=r.user_id,
+            requested_by=emails.get(r.user_id, r.user_id),
             created_at=r.created_at,
             tools=[
                 PendingTool(

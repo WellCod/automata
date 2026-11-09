@@ -58,6 +58,7 @@ export function StepReviewActions({
 }) {
   const id = useId();
   const [feedback, setFeedback] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const [editing, setEditing] = useState(false);
   const [edited, setEdited] = useState(output ?? "");
   const changed = editing && edited.trim() !== "" && edited !== (output ?? "");
@@ -167,14 +168,36 @@ export function StepReviewActions({
                 Editar saída
               </Button>
             )}
-            <Button
-              size={size}
-              variant="destructive"
-              disabled={busy}
-              onClick={() => decide({ approve: false, feedback })}
-            >
-              Recusar
-            </Button>
+            {/* recusar encerra, pula ou refaz a etapa: pede confirmação (Fase 44) */}
+            {confirming ? (
+              <>
+                <Button
+                  size={size}
+                  variant="destructive"
+                  disabled={busy}
+                  onClick={() => decide({ approve: false, feedback })}
+                >
+                  Confirmar recusa
+                </Button>
+                <Button
+                  size={size}
+                  variant="muted"
+                  disabled={busy}
+                  onClick={() => setConfirming(false)}
+                >
+                  Voltar
+                </Button>
+              </>
+            ) : (
+              <Button
+                size={size}
+                variant="subtleDestructive"
+                disabled={busy}
+                onClick={() => setConfirming(true)}
+              >
+                Recusar
+              </Button>
+            )}
           </>
         )}
       </div>

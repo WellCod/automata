@@ -122,6 +122,36 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
         })}
       </nav>
 
+      {/* páginas pessoais com nome: o ícone sozinho não se achava (Fase 44) */}
+      <nav
+        aria-label="Sua conta"
+        className="border-sidebar-border flex flex-col border-t px-4 py-2"
+      >
+        <Link
+          href="/meus-dados"
+          className={cn(
+            "flex h-7 items-center gap-2 text-[12px] transition-colors",
+            pathname === "/meus-dados"
+              ? "text-accent"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <FileLock className="h-3.5 w-3.5" aria-hidden />
+          Meus dados
+        </Link>
+        <Link
+          href="/minhas-memorias"
+          className={cn(
+            "flex h-7 items-center gap-2 text-[12px] transition-colors",
+            pathname === "/minhas-memorias"
+              ? "text-accent"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <Brain className="h-3.5 w-3.5" aria-hidden />
+          Minhas memórias
+        </Link>
+      </nav>
       <div className="border-sidebar-border flex items-center justify-between border-t px-3 py-2">
         <span
           className="text-muted-foreground min-w-0 truncate text-[11px]"
@@ -130,22 +160,6 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
           {me?.email ?? "v0.1"}
         </span>
         <div className="flex items-center gap-1">
-          <Link
-            href="/meus-dados"
-            aria-label="Meus dados"
-            title="Meus dados"
-            className="text-muted-foreground hover:border-border hover:text-foreground focus-visible:ring-ring/50 flex h-6 w-6 items-center justify-center rounded border border-transparent transition-colors focus-visible:ring-2 focus-visible:outline-none"
-          >
-            <FileLock className="h-3.5 w-3.5" />
-          </Link>
-          <Link
-            href="/minhas-memorias"
-            aria-label="Minhas memórias"
-            title="Minhas memórias"
-            className="text-muted-foreground hover:border-border hover:text-foreground focus-visible:ring-ring/50 flex h-6 w-6 items-center justify-center rounded border border-transparent transition-colors focus-visible:ring-2 focus-visible:outline-none"
-          >
-            <Brain className="h-3.5 w-3.5" />
-          </Link>
           <ThemeToggle />
           <button
             type="button"

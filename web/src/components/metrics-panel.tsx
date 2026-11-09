@@ -1,16 +1,24 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { formatDuration } from "@/lib/format";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { BudgetSection } from "@/components/budget-section";
-import { MetricsCharts } from "@/components/metrics-charts";
 import { Button } from "@/components/ui/button";
 import { InfoHint } from "@/components/ui/info-hint";
 import client from "@/lib/api/client";
 import { blockedHint } from "@/lib/guardrail-labels";
 import { LATENCY_HINTS } from "@/lib/metric-hints";
 import type { components } from "@/lib/api/schema.d.ts";
+
+// Recharts (449 KB) só quando a aba Desempenho abre (Fase 44)
+const MetricsCharts = dynamic(
+  () => import("@/components/metrics-charts").then((m) => m.MetricsCharts),
+  {
+    ssr: false,
+  },
+);
 
 type AgentMetricsResponse = components["schemas"]["AgentMetricsResponse"];
 

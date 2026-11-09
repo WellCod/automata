@@ -113,7 +113,8 @@ describe("Aprovações com etapa de workflow", () => {
           agent_name: "Reembolso",
           kind: "workflow",
           session_id: "s1",
-          user_id: "ana",
+          user_id: "3a6895ec-0000-0000-0000-000000000000",
+          requested_by: "ana@cliente.com",
           created_at: "2026-10-21T10:00:00Z",
           tools: [],
           steps: [
@@ -156,6 +157,8 @@ describe("Aprovações com etapa de workflow", () => {
     );
     await user.type(screen.getByLabelText("Motivo da recusa"), "faltou o pedido");
     await user.click(screen.getByRole("button", { name: "Recusar" }));
+    // a recusa pede confirmação (Fase 44)
+    await user.click(screen.getByRole("button", { name: "Confirmar recusa" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(fetchMock.mock.calls[0][0]).toBe("/api/workflows/w1/runs/r1?session_id=s1");
@@ -173,5 +176,41 @@ describe("Aprovações com etapa de workflow", () => {
       },
     ]);
     expect(init.body.get("session_id")).toBe("s1");
+  });
+
+  it("mostra o e-mail de quem pediu e trava a decisão com o prazo vencido", async () => {
+    // Fase 44: o id cru aparecia no lugar da pessoa, e "Aprovar" seguia ativo depois do prazo
+    vi.mocked(client.GET).mockResolvedValue({
+      data: [
+        {
+          run_id: "r2",
+          agent_id: "w1",
+          agent_name: "Reembolso",
+          kind: "workflow",
+          session_id: "s2",
+          user_id: "3a6895ec-0000-0000-0000-000000000000",
+          requested_by: "ana@cliente.com",
+          created_at: "2026-10-21T10:00:00Z",
+          tools: [],
+          steps: [
+            {
+              step_id: "st9",
+              step_name: "consolidação",
+              when: "after",
+              message: null,
+              output: "texto",
+              timeout_at: "2026-10-22T10:00:00Z",
+              retry_count: 0,
+            },
+          ],
+        },
+      ],
+      error: undefined,
+    } as never);
+    render(<ApprovalsPage />, { wrapper });
+    expect(await screen.findByText(/pedido por ana@cliente.com/)).toBeInTheDocument();
+    expect(screen.queryByText(/3a6895ec/)).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent("Prazo vencido");
+    expect(screen.queryByRole("button", { name: "Aprovar" })).toBeNull();
   });
 });

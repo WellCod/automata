@@ -223,3 +223,34 @@ def test_revisao_vencida_sai_de_aprovacoes_e_cancela_o_run(client: TestClient) -
             None,
         )
         assert run.review_log is not None and run.review_log[-1]["decision"] == "timeout"
+
+
+def test_aprovacao_mostra_o_email_de_quem_pediu(client: TestClient) -> None:
+    """Fase 44: Aprovações mostrava o id do usuário onde deveria aparecer a pessoa."""
+    from app.db import get_engine
+    from app.models.run import AgentRun
+    from app.models.user import User
+    from app.schemas.user import UserRole
+
+    owner = _h("owner", ["agent_os:admin"])
+    config = {"name": "estorno", "description": "Use para estorno"}
+    config_id = client.post("/api/v1/configs", json=config, headers=owner).json()["id"]
+    tool = {"tool_call_id": "c9", "tool_name": "estornar", "tool_args": {}}
+    with Session(get_engine()) as session:
+        dora = User(email="dora@exemplo.com", hashed_password="x", role=UserRole.editor)
+        session.add(dora)
+        session.flush()
+        for user_id, run_id in ((str(dora.id), "run-dora"), ("integration:abc", "run-token")):
+            session.add(
+                AgentRun(
+                    agent_config_id=config_id,
+                    user_id=user_id,
+                    run_id=run_id,
+                    status="paused",
+                    pending_tools=[tool],
+                )
+            )
+        session.commit()
+    items = {i["run_id"]: i for i in client.get("/api/v1/approvals", headers=owner).json()}
+    assert items["run-dora"]["requested_by"] == "dora@exemplo.com"
+    assert items["run-token"]["requested_by"] == "integration:abc"
