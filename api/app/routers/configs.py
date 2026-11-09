@@ -141,7 +141,10 @@ def get_effective_guardrails(
     config = repo.get_config(config_id)
     if config is None:
         raise HTTPException(status_code=404, detail="Config não encontrada")
-    version_id = config.draft_version_id if draft else config.current_version_id
+    # sem rascunho, o rascunho é a vigente: o painel pede uma vez só (Fase 43)
+    version_id = (
+        config.draft_version_id or config.current_version_id if draft else config.current_version_id
+    )
     version = repo.get_version(version_id) if version_id else None
     if version is None:
         raise HTTPException(status_code=404, detail="Versão não encontrada")

@@ -122,7 +122,7 @@ export default function WorkflowEditPage() {
         <nav aria-label="Trilha" className="flex items-center gap-2 text-[13px]">
           <Link
             href="/workflows"
-            className="text-muted-foreground hover:text-foreground flex items-center gap-1"
+            className="text-muted-foreground hover:text-foreground flex min-h-6 items-center gap-1"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
             Workflows

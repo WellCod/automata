@@ -1449,8 +1449,8 @@ Quarta rodada de verificação, sobre a `main` em `c6f14b7`, com foco no que ent
 
 Nenhuma tela vaza em 375 px, e todas têm `h1`, rótulo em todo campo e nome em todo botão. Nenhuma devolve 5xx. Os alertas de alvo pequeno dos checkboxes são falso positivo, porque o rótulo clicável é o alvo.
 
-- [ ] **Baixa.** Os gatilhos de dica de p50 e p95 e a trilha "Times" e "Workflows" no topo da página têm menos de 24 px de altura.
-- [ ] **Baixa.** A página do time pede o piso de guardrails pelo rascunho e, sem rascunho, recebe 404 antes de pedir pela versão publicada.
+- [x] **Baixa.** Os gatilhos de dica de p50 e p95 e a trilha "Times" e "Workflows" no topo da página têm menos de 24 px de altura.
+- [x] **Baixa.** A página do time pede o piso de guardrails pelo rascunho e, sem rascunho, recebe 404 antes de pedir pela versão publicada.
 - [ ] **Baixa.** Os prints do README são da Fase 33. Não mostram a Fila, os Guardrails da instância, os Titulares, o roteador nem os conectores novos.
 
 ### PRs
@@ -1462,7 +1462,7 @@ Nenhuma tela vaza em 375 px, e todas têm `h1`, rótulo em todo campo e nome em 
 - [x] `fix(security)`: titular por token só do próprio id, orçamento mantido na exclusão e run limpo por inteiro
 - [x] `fix(security)`: classificador do piso com o modelo e o escopo do piso e saída longa examinada inteira
 - [x] `fix(security)`: template da etapa numa passada só e sugestões com os padrões próprios de dado pessoal
-- [ ] `fix(web)`: alvos de 24 px nas dicas e na trilha e piso lido sem 404
+- [x] `fix(web)`: alvos de 24 px nas dicas e na trilha e piso lido sem 404
 - [ ] `docs`: README com os prints das telas atuais
 
 **Critério de aceite da fase:**
