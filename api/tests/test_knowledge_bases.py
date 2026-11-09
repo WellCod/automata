@@ -170,11 +170,11 @@ def test_viewer_le_e_editor_escreve(
 
 def test_base_e_banco_do_agno_usam_o_engine_da_api(db_url: str) -> None:
     """Fase 44: com db_url, cada busca e cada sugestão abria um engine e um pool novos."""
+    from uuid import uuid4
+
     from app.db import get_db, get_engine
     from app.knowledge.runtime import vector_db_for
     from app.models.knowledge_base import KnowledgeBase
-
-    from uuid import uuid4
 
     base = KnowledgeBase(
         id=uuid4(),
