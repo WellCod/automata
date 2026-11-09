@@ -36,10 +36,20 @@ _spend: dict[str, tuple[float, float]] = {}
 _budgets: dict[str, tuple[float, CallerBudget | None]] = {}
 
 
+def _keys(subject: str) -> list[str]:
+    """O id e o pseudônimo que a exclusão do titular deixa no lugar dele (Fase 43)."""
+    from app.data_subjects import pseudonym
+
+    if subject.startswith("apagado:"):
+        return [subject]
+    return [subject, pseudonym(subject)]
+
+
 def month_spend(session: Session, subject: str, period: str | None = None) -> float:
     total = session.scalar(
         select(func.coalesce(func.sum(UsageEvent.cost), 0)).where(
-            UsageEvent.user_id == subject, UsageEvent.period == (period or current_period())
+            UsageEvent.user_id.in_(_keys(subject)),
+            UsageEvent.period == (period or current_period()),
         )
     )
     return float(total or 0)
@@ -50,7 +60,11 @@ def _cached_budget(subject: str) -> CallerBudget | None:
     if hit is not None and monotonic() - hit[0] < CACHE_S:
         return hit[1]
     with Session(get_engine()) as session:
-        budget = session.get(CallerBudget, subject)
+        budget = None
+        for key in _keys(subject):
+            budget = session.get(CallerBudget, key)
+            if budget is not None:
+                break
         if budget is not None:
             session.expunge(budget)
     _budgets[subject] = (monotonic(), budget)

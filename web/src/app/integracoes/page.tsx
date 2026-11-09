@@ -249,13 +249,13 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
             onChange={(e) => setDataSubjects(e.target.checked)}
           />
           <span className="text-foreground">
-            Consultar, exportar e apagar os dados de titulares pelo sistema da empresa
+            Consultar, exportar e apagar os próprios dados de conversa pelo sistema da empresa
           </span>
         </label>
         {dataSubjects && (
           <p className="text-[11px] text-amber-600 dark:text-amber-400">
-            O token passa a pedir os dados de qualquer titular da instância, pelo id que o sistema
-            enviar. Ele só vê e baixa os pedidos que fez.
+            O token pede pelo próprio titular, que reúne todas as conversas feitas com ele. Para
+            separar clientes finais, use um token por sistema.
           </p>
         )}
       </fieldset>

@@ -124,6 +124,9 @@ def build_export(user_id: str) -> dict[str, Any]:
                 "review_log": r.review_log,
                 "screened_tools": r.screened_tools,
                 "block_detail": r.block_detail,
+                "pending_tools": r.pending_tools,
+                "pending_steps": r.pending_steps,
+                "error": r.error,
             }
             for r in session.scalars(select(AgentRun).where(AgentRun.user_id == user_id))
         ]
@@ -159,7 +162,13 @@ def run_export(request_id: UUID) -> None:
     """Background: gera o arquivo e guarda por 7 dias. Nunca levanta."""
     with Session(get_engine()) as session:
         request = session.get(DataSubjectRequest, request_id)
-        if request is None or request.subject is None:
+        if request is None:
+            return
+        if request.subject is None:
+            # a exclusão do mesmo titular chegou antes: não há o que exportar (Fase 43)
+            request.status = "expired"
+            request.finished_at = datetime.now(UTC)
+            session.commit()
             return
         user_id = request.subject
         request.status = "running"
@@ -170,14 +179,27 @@ def run_export(request_id: UUID) -> None:
         counts = {key: len(rows) for key, rows in data["agno"].items()}
         counts["agent_runs"] = len(data["agent_runs"])
         counts["usage_periods"] = len(data["usage"])
-        _finish(
-            request_id,
-            status="done",
-            counts=counts,
-            result=gzip.compress(payload),
-            expires_at=datetime.now(UTC) + EXPORT_TTL,
-        )
-        logger.info("exportação do titular pronta", extra={"request_id": str(request_id)})
+        with Session(get_engine()) as session:
+            # só grava se a exclusão não zerou o pedido enquanto o arquivo era montado
+            done = session.execute(
+                update(DataSubjectRequest)
+                .where(
+                    DataSubjectRequest.id == request_id,
+                    DataSubjectRequest.subject.is_not(None),
+                )
+                .values(
+                    status="done",
+                    counts=counts,
+                    result=gzip.compress(payload),
+                    expires_at=datetime.now(UTC) + EXPORT_TTL,
+                    finished_at=datetime.now(UTC),
+                )
+            )
+            session.commit()
+        if _affected(done):
+            logger.info("exportação do titular pronta", extra={"request_id": str(request_id)})
+        else:
+            _finish(request_id, status="expired")
     except Exception as exc:
         logger.warning("exportação do titular falhou", extra={"request_id": str(request_id)})
         _finish(request_id, status="failed", error=str(exc)[:500], subject=None)
@@ -263,7 +285,16 @@ def erase(user_id: str) -> dict[str, int]:
             session.execute(
                 update(AgentRun)
                 .where(AgentRun.user_id == user_id)
-                .values(user_id=alias, review_log=None, screened_tools=None, block_detail=None)
+                .values(
+                    user_id=alias,
+                    review_log=None,
+                    screened_tools=None,
+                    block_detail=None,
+                    # conteúdo de conversa que o run guardava (Fase 43)
+                    pending_tools=None,
+                    pending_steps=None,
+                    error=None,
+                )
             )
         )
         counts["usage_events"] = _affected(
@@ -282,9 +313,20 @@ def erase(user_id: str) -> dict[str, int]:
             if run_ids
             else 0
         )
-        counts["caller_budget"] = _affected(
-            session.execute(delete(CallerBudget).where(CallerBudget.subject == user_id))
-        )
+        # o orçamento é configuração do owner: fica, com o pseudônimo no lugar do id. Apagar
+        # deixava quem estourou o próprio orçamento pedir a exclusão e voltar a gastar (Fase 43)
+        if session.get(CallerBudget, alias) is not None:
+            counts["caller_budget"] = _affected(
+                session.execute(delete(CallerBudget).where(CallerBudget.subject == user_id))
+            )
+        else:
+            counts["caller_budget"] = _affected(
+                session.execute(
+                    update(CallerBudget)
+                    .where(CallerBudget.subject == user_id)
+                    .values(subject=alias)
+                )
+            )
         session.commit()
     return counts
 

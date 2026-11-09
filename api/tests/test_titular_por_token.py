@@ -50,6 +50,12 @@ def _owner() -> dict[str, str]:
 
 
 def _token(client: TestClient, name: str, data_subjects: bool) -> dict[str, str]:
+    return _token_and_subject(client, name, data_subjects)[0]
+
+
+def _token_and_subject(
+    client: TestClient, name: str, data_subjects: bool
+) -> tuple[dict[str, str], str]:
     agent = client.post(
         "/api/v1/configs", json={"name": f"a {name}", "description": "x"}, headers=_owner()
     ).json()["id"]
@@ -66,7 +72,7 @@ def _token(client: TestClient, name: str, data_subjects: bool) -> dict[str, str]
     )
     assert issued.status_code == 201, issued.text
     assert issued.json()["data_subjects"] is data_subjects
-    return _bearer(issued.json()["token"])
+    return _bearer(issued.json()["token"]), f"integration:{issued.json()['id']}"
 
 
 def test_token_sem_a_opcao_nao_pede(client: TestClient) -> None:
@@ -76,12 +82,22 @@ def test_token_sem_a_opcao_nao_pede(client: TestClient) -> None:
 
 
 def test_token_pede_e_ve_so_os_proprios_pedidos(client: TestClient) -> None:
-    loja = _token(client, "loja", True)
-    banco = _token(client, "banco", True)
-    assert client.get("/api/v1/data-subjects/ana", headers=loja).status_code == 200
-    mine = client.post("/api/v1/data-subjects/ana/export", headers=loja).json()
+    loja, loja_id = _token_and_subject(client, "loja", True)
+    banco, banco_id = _token_and_subject(client, "banco", True)
+    assert client.get(f"/api/v1/data-subjects/{loja_id}", headers=loja).status_code == 200
+    mine = client.post(f"/api/v1/data-subjects/{loja_id}/export", headers=loja).json()
     assert mine["source"] == "integration"
-    other = client.post("/api/v1/data-subjects/bia/export", headers=banco).json()
+    other = client.post(f"/api/v1/data-subjects/{banco_id}/export", headers=banco).json()
+    # Fase 43: só o próprio titular; o run de integração é sempre gravado como integration:<id>
+    for subject in (banco_id, "ana", "owner"):
+        assert client.get(f"/api/v1/data-subjects/{subject}", headers=loja).status_code == 403
+        assert (
+            client.post(f"/api/v1/data-subjects/{subject}/export", headers=loja).status_code == 403
+        )
+        erase = client.post(
+            f"/api/v1/data-subjects/{subject}/erase", json={"confirm": subject}, headers=loja
+        )
+        assert erase.status_code == 403
 
     listed = {r["id"] for r in client.get("/api/v1/data-subject-requests", headers=loja).json()}
     assert mine["id"] in listed and other["id"] not in listed
