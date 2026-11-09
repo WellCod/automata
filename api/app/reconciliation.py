@@ -163,18 +163,21 @@ def refresh(now: datetime, client: httpx.Client | None = None) -> dict[str, int]
 def estimated(session: Session, start: date, end: date) -> dict[tuple[str, date], float]:
     """Custo estimado pelo Automata por provedor e dia: runs, consumo lateral e embeddings."""
     out: dict[tuple[str, date], float] = {}
+    # filtro pelo intervalo em created_at: com date() no WHERE o índice não servia (Fase 44)
+    since = datetime.combine(start, time.min, tzinfo=UTC)
+    until = datetime.combine(end, time.min, tzinfo=UTC)
     day = func.date(func.timezone("UTC", UsageEvent.created_at))
     rows: list[Any] = list(
         session.execute(
             select(UsageEvent.model_id, day, func.sum(UsageEvent.cost))
-            .where(day >= start, day < end)
+            .where(UsageEvent.created_at >= since, UsageEvent.created_at < until)
             .group_by(UsageEvent.model_id, day)
         ).all()
     )
     emb_day = func.date(func.timezone("UTC", EmbeddingUsage.created_at))
     rows += session.execute(
         select(EmbeddingUsage.model, emb_day, func.sum(EmbeddingUsage.cost))
-        .where(emb_day >= start, emb_day < end)
+        .where(EmbeddingUsage.created_at >= since, EmbeddingUsage.created_at < until)
         .group_by(EmbeddingUsage.model, emb_day)
     ).all()
     for model_id, when, cost in rows:

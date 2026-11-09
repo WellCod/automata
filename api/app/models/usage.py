@@ -11,11 +11,19 @@ from app.models.config import Base
 class UsageEvent(Base):
     __tablename__ = "usage_event"
     __table_args__ = (
-        Index("ix_usage_event_period_agent_config_id", "period", "agent_config_id"),
+        # com o custo: a soma do orçamento sai só do índice (Fase 44)
+        Index(
+            "ix_usage_event_period_config_cost",
+            "period",
+            "agent_config_id",
+            postgresql_include=["cost"],
+        ),
+        # consumo das etapas filhas do workflow (Fase 44)
+        Index("ix_usage_event_run_id", "run_id"),
         Index("ix_usage_event_created_at", "created_at"),
         Index("ix_usage_event_eval_run_id", "eval_run_id"),
         # orçamento por quem chama (ADR-0031)
-        Index("ix_usage_event_user_period", "user_id", "period"),
+        Index("ix_usage_event_user_period_cost", "user_id", "period", postgresql_include=["cost"]),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
