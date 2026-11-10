@@ -74,3 +74,13 @@ describe("GET /api/auth/oidc/callback", () => {
     );
   });
 });
+
+describe("redirect pelo endereço que o navegador usou", () => {
+  it("usa o host da requisição e não o endereço em que o Next escuta", async () => {
+    const req = new NextRequest("http://0.0.0.0:3000/api/auth/oidc/callback?error=x", {
+      headers: { host: "painel.empresa.com", "x-forwarded-proto": "https" },
+    });
+    const res = await callback(req);
+    expect(res.headers.get("location")).toMatch(/^https:\/\/painel\.empresa\.com\/login\?/);
+  });
+});

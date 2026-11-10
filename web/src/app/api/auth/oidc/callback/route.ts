@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { API_URL, STATE_COOKIE, forwardHeaders } from "@/lib/bff/oidc";
+import { API_URL, STATE_COOKIE, forwardHeaders, publicUrl } from "@/lib/bff/oidc";
 
 function back(req: NextRequest, message: string) {
-  const url = new URL("/login", req.url);
+  const url = publicUrl(req, "/login");
   url.searchParams.set("sso_erro", message);
   const res = NextResponse.redirect(url);
   res.cookies.delete({ name: STATE_COOKIE, path: "/api/auth/oidc" });
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     return back(req, typeof data.detail === "string" ? data.detail : "Login recusado");
   }
 
-  const res = NextResponse.redirect(new URL("/", req.url));
+  const res = NextResponse.redirect(publicUrl(req, "/"));
   res.cookies.delete({ name: STATE_COOKIE, path: "/api/auth/oidc" });
   res.cookies.set("automata_token", data.access_token, {
     httpOnly: true,

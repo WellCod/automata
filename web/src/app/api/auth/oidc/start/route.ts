@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { API_URL, STATE_COOKIE, forwardHeaders, safeRedirect } from "@/lib/bff/oidc";
+import { API_URL, STATE_COOKIE, forwardHeaders, publicUrl, safeRedirect } from "@/lib/bff/oidc";
 
 function back(req: NextRequest, message: string) {
-  const url = new URL("/login", req.url);
+  const url = publicUrl(req, "/login");
   url.searchParams.set("sso_erro", message);
   return NextResponse.redirect(url);
 }

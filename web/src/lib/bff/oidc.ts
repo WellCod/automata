@@ -24,3 +24,13 @@ export function safeRedirect(url: unknown): string | null {
     return null;
   }
 }
+
+// no standalone, req.url traz o endereço em que o Next escuta (0.0.0.0:3000); o
+// redirect precisa do endereço que o navegador usou
+export function publicUrl(req: NextRequest, path: string): URL {
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  const proto =
+    req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ??
+    req.nextUrl.protocol.replace(":", "");
+  return host ? new URL(path, `${proto}://${host}`) : new URL(path, req.url);
+}
