@@ -14,7 +14,7 @@ O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é
 | **Backend** | Python 3.12 · FastAPI · Agno 3.1.8 · PostgreSQL 17 + pgvector · Redis · Alembic |
 | **Frontend** | Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · TanStack Query |
 | **Qualidade** | mypy strict · ruff · ~1.160 testes pytest (testcontainers) · 233 testes Vitest · Playwright · evals |
-| **Decisões** | 39 ADRs com contexto, alternativas descartadas e gatilho de reversão |
+| **Decisões** | 40 ADRs com contexto, alternativas descartadas e gatilho de reversão |
 
 ---
 
@@ -410,6 +410,7 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0037](docs/adr/0037-operacao-fila-conciliacao-e-avisos.md) | Painel da fila, retry por agente idempotente, conciliação de custo e aviso por e-mail |
 | [0038](docs/adr/0038-workflow-e-suite.md) | Roteador, entrada por etapa, histórico no workflow e casos de suíte a partir das conversas |
 | [0039](docs/adr/0039-conectores-e-worker-de-ingestao.md) | Google Drive e Cloud Storage, filtro por nome, webhook da origem e worker de ingestão |
+| [0040](docs/adr/0040-liberacao-gradual-de-versao.md) | Liberação gradual de versão: canário por sessão, comparação e promoção manual (proposto, Fase 45) |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 
@@ -487,7 +488,7 @@ web/
   src/lib/        client gerado do OpenAPI, SSE, progresso do workflow
   e2e/            Playwright
 docs/
-  adr/            39 Architecture Decision Records
+  adr/            40 Architecture Decision Records
   roadmap.md      fases, auditorias e critérios de aceite
 DESIGN.md         sistema visual do painel
 DEMO.md           demo local sem chave de LLM
