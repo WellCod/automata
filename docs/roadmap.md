@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 44
+# Roadmap — Fases 4 a 45
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -1543,3 +1543,21 @@ Por valor para quem opera agentes em produção:
 - Uma réplica que sobe não falha a suíte que outra réplica está rodando.
 - O boot da API cai em pelo menos 8 s (medido: import do app de 47 s para 19 s com uma CPU, e migrações de 13 s para 10 s num processo só).
 - Aprovações e Alertas mostram o e-mail de quem pediu e de quem criou.
+
+## Fase 45 — Liberação gradual de versão
+
+Decisão em [ADR-0040](adr/0040-liberacao-gradual-de-versao.md). Uma versão nova recebe uma fração das conversas, escolhida pela sessão, enquanto a vigente segue com o resto. O painel compara erro, latência, custo e suíte das duas, e quem opera promove ou desliga.
+
+- [x] `docs(adr)`: ADR-0040 e esta seção
+- [ ] `feat(api)`: canário por sessão com a versão gravada no run, comparação e promoção
+- [ ] `feat(web)`: canário na aba Versões, com a comparação e a promoção
+- [ ] `test(api)`: evals da escolha por sessão, da comparação e da promoção
+
+**Critério de aceite da fase:**
+
+- Com canário em 20%, perto de 20% das sessões caem na versão nova, e cada sessão fica sempre na mesma versão.
+- O modo teste continua escolhendo a versão pedida.
+- A comparação mostra, separados, os runs, a taxa de erro, o p50, o custo médio e a suíte de cada versão.
+- Promover move a vigente; publicar ou fazer rollback desliga o canário.
+- Com o gate ligado, o canário a partir do rascunho exige a suíte verde, como a publicação.
+
