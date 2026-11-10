@@ -187,6 +187,11 @@ function UserRow({ user, isSelf }: { user: UserAccount; isSelf: boolean }) {
           <span className="text-foreground text-[13px] font-medium">
             {user.email}
             {isSelf && <span className="text-muted-foreground font-normal"> (você)</span>}
+            {user.sso && (
+              <span className="bg-accent/10 text-accent ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+                SSO
+              </span>
+            )}
           </span>
           <span className="text-muted-foreground text-[11px]">
             último acesso: {formatDate(user.last_login_at)}

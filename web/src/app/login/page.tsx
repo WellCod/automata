@@ -1,12 +1,14 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
+import { cn } from "@/lib/utils";
 
 const schema = z.object({
   email: z.string().email("Email inválido"),
@@ -30,9 +32,26 @@ function LogoMark() {
   );
 }
 
+type SsoInfo = { enabled: boolean; label: string; password_login: boolean };
+
 export default function LoginPage() {
+  // useSearchParams pede Suspense na renderização estática
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
-  const [serverError, setServerError] = useState("");
+  // erro do retorno do provedor vem na URL (ADR-0042)
+  const [serverError, setServerError] = useState(useSearchParams().get("sso_erro") ?? "");
+  const { data: sso } = useQuery({
+    queryKey: ["sso-info"],
+    queryFn: async (): Promise<SsoInfo> => (await fetch("/api/auth/oidc")).json(),
+    staleTime: 5 * 60_000,
+  });
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -66,6 +85,21 @@ export default function LoginPage() {
           <LogoMark />
           <span className="text-foreground text-[13px] font-medium tracking-tight">automata</span>
         </div>
+
+        {sso?.enabled && (
+          <div className="mb-6 flex flex-col gap-3">
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- rota do BFF que redireciona para o provedor: precisa de navegação completa, não do Link */}
+            <a
+              href="/api/auth/oidc/start"
+              className={cn(buttonVariants({ variant: "strong" }), "h-8 w-full")}
+            >
+              Entrar com {sso.label}
+            </a>
+            <p className="text-muted-foreground text-center text-[11px]">
+              {sso.password_login ? "ou com e-mail e senha" : "E-mail e senha só para o owner"}
+            </p>
+          </div>
+        )}
 
         <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
