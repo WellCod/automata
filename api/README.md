@@ -198,6 +198,7 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | `evals:<id>:read`, `evals:<id>:run` | As mesmas rotas de `eval-runs`, só para aquele config. Vêm nos tokens de integração com `eval_ids`; a checagem é o `require_resource_scope` de `app/authz.py`, que aceita o escopo global ou o do `config_id` da rota |
 | `knowledge_connectors:write` | `POST`, `PUT` e `DELETE` em `/api/v1/knowledge-bases/{id}/connectors` (ADR-0024) — só owner. Testar e sincronizar pedem `knowledge_bases:write` |
 | `memories:admin` | `/api/v1/configs/{id}/memories`: listar por usuário, apagar uma e apagar todas de um usuário (ADR-0025) — só owner |
+| `audit:read` | `GET /api/v1/audit` (ADR-0041) — só owner |
 | `users:admin` | `/api/v1/users` (listar, criar, alterar papel e situação, redefinir senha, remover) — só owner (`agent_os:admin`) |
 | `agent_os:admin` | `POST /api/v1/auth/users`; `integrations:write` (rotas `/api/v1/integrations`) só vem pelo admin |
 
@@ -220,6 +221,14 @@ Página **Usuários** do painel, só para owner, sobre `/api/v1/users`:
 - A instância precisa de ao menos um owner ativo: rebaixar ou desativar o último dá 409.
 - Remover exige usuário desativado (o corte de sessão acontece na desativação) e não vale para a própria conta.
 - `last_login_at` é gravado a cada login.
+
+### Trilha de auditoria
+
+ADR-0041, `app/audit.py`, migration 0055. O `AuditMiddleware`, no app externo e dentro do `RequestIDMiddleware`, grava em `audit_event` depois da resposta toda requisição `POST`, `PUT`, `PATCH` e `DELETE` em `/api/v1` e o `continue` das aprovações (`/agents|teams|workflows/{id}/runs/{run_id}/continue`), inclusive as recusadas com 4xx. Cada linha tem `actor` (o `user_id` do token: usuário do painel ou `integration:<id>`), `action` (método e rota modelo), `config_id` quando a rota tem um, os outros parâmetros do path, `status_code`, IP (de `get_client_ip`), `request_id` e `detail`. O corpo nunca entra. Ficam de fora `/api/v1/auth/*`, o linter, o webhook público das origens e os `POST` que só leem (busca de teste, comparação de busca e prévia de corte). O id do titular nas rotas `/data-subjects/{user_id}` já entra como pseudônimo, e a exclusão (ADR-0032) troca o id do titular pelo pseudônimo como autor e como alvo das outras linhas. A gravação roda no threadpool e uma falha vira log de erro, nunca erro da requisição.
+
+As rotas que mudam produção preenchem `detail` com `note(request, ...)`: publicação e rollback (`current_before`, `current_after`), canário (versão, percentual e promoção), piso da instância, papel e situação do usuário, orçamento do config e de quem chama (`before`, `after`).
+
+`GET /api/v1/audit` filtra por `actor`, `config_id`, `action` (trecho), `since` e `until`, do mais novo para o mais antigo, com até 100 por página e `next_cursor`. Cada item traz `actor_label`, com o e-mail do usuário ou o nome do token. A retenção é de `AUDIT_RETENTION_DAYS` dias (365), apagada pelo poller de avisos uma vez por dia em cada processo.
 
 ### Chaves
 

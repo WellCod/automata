@@ -6,6 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
+from app.audit import note
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.models.user import User
@@ -90,6 +91,8 @@ def create_user(body: CreateUserInput, session: SessionDep, request: Request) ->
 def update_user(
     user_id: UUID, body: UpdateUserInput, session: SessionDep, request: Request
 ) -> UserResponse:
+    previous = UserRepository(session).get(user_id)
+    before = {"role": previous.role, "is_active": previous.is_active} if previous else None
     try:
         user, cut = UserService(UserRepository(session)).update(
             user_id, role=body.role, is_active=body.is_active
@@ -99,6 +102,7 @@ def update_user(
     except ConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     session.commit()
+    note(request, before=before, after={"role": user.role, "is_active": user.is_active})
     _cut(request, user, cut)
     logger.info(
         "usuário alterado",

@@ -313,6 +313,9 @@ def erase(user_id: str) -> dict[str, int]:
             if run_ids
             else 0
         )
+        from app.audit import forget_subject
+
+        counts["audit_events"] = forget_subject(session, user_id, alias)
         # o orçamento é configuração do owner: fica, com o pseudônimo no lugar do id. Apagar
         # deixava quem estourou o próprio orçamento pedir a exclusão e voltar a gastar (Fase 43)
         if session.get(CallerBudget, alias) is not None:

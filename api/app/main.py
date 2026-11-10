@@ -25,6 +25,7 @@ from app.agents.factory import make_agent_factory, make_team_factory
 from app.agents.models_map import demo_replay
 from app.agents.registry import PublishedAgents
 from app.agents.workflow_factory import make_workflow_factory
+from app.audit import AuditMiddleware
 from app.auth import verification_keys
 from app.background import background_queue
 from app.evals.runner import fail_stale as fail_stale_evals
@@ -226,6 +227,8 @@ def create_app(
     outer.add_middleware(SyncPublishedAgentsMiddleware, published=published)
     if enable_auth:
         outer.add_middleware(RevocationMiddleware, revoked=revoked)
+    # dentro do RequestID, para a trilha levar o mesmo request_id do log (ADR-0041)
+    outer.add_middleware(AuditMiddleware)
     outer.add_middleware(SecurityHeadersMiddleware)
     outer.add_middleware(RequestIDMiddleware)
     outer.include_router(auth_router)

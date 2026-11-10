@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
+from app.audit import note
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.evals.gate import draft_verdict
@@ -192,6 +193,7 @@ def publish_draft(
 ) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
     config = repo.get_config(config_id)
+    before = config.current_version_id if config is not None else None
     if config is not None and config.require_passing_evals:
         verdict = draft_verdict(session, config)
         if not verdict.ok:
@@ -206,6 +208,7 @@ def publish_draft(
         raise HTTPException(status_code=400, detail=str(e)) from e
     result = _to_version_summary(version)
     session.commit()
+    note(request, current_before=before, current_after=version.id)
     # Primeira publicação: o agente passa a responder sem restart
     request.app.state.published_agents.sync()
     logger.info(
@@ -221,9 +224,11 @@ def publish_draft(
     dependencies=[Depends(require_scopes(Scope.CONFIGS_PUBLISH))],
 )
 def rollback(
-    config_id: UUID, body: RollbackInput, session: SessionDep
+    config_id: UUID, body: RollbackInput, session: SessionDep, request: Request
 ) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
+    found = repo.get_config(config_id)
+    before = found.current_version_id if found is not None else None
     service = ConfigService(repo, McpServerRepository(session), KnowledgeBaseRepository(session))
     try:
         config = service.rollback(config_id=config_id, version_id=body.version_id)
@@ -233,6 +238,7 @@ def rollback(
         raise HTTPException(status_code=500, detail="Estado inválido após rollback")
     result = _to_version_summary(config.current_version)
     session.commit()
+    note(request, current_before=before, current_after=body.version_id)
     logger.info(
         "config rolled back",
         extra={"config_id": str(config_id), "version_id": str(body.version_id)},

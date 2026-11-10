@@ -6,6 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from app.audit import note
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.guardrails.instance import forget
@@ -54,6 +55,11 @@ def put_floor(
 ) -> InstanceGuardrailsResponse:
     actor = str(getattr(request.state, "user_id", None) or "panel")
     row = session.get(InstanceGuardrails, 1)
+    note(
+        request,
+        before=row.settings if row is not None else None,
+        after=body.settings.model_dump(mode="json") if body.settings is not None else None,
+    )
     if body.settings is None:
         if row is not None:
             session.delete(row)

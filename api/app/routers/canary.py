@@ -5,12 +5,13 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.agents.canary import MAX_PERCENT
+from app.audit import note
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.evals.gate import draft_verdict
@@ -150,7 +151,9 @@ def get_canary(config_id: UUID, session: SessionDep) -> CanaryState:
 
 
 @router.post("", response_model=CanaryState, status_code=201, dependencies=_PUBLISH)
-def start_canary(config_id: UUID, body: CanaryStart, session: SessionDep) -> CanaryState:
+def start_canary(
+    config_id: UUID, body: CanaryStart, session: SessionDep, request: Request
+) -> CanaryState:
     config = _config_or_404(session, config_id)
     if config.canary_version_id is not None:
         raise HTTPException(status_code=409, detail="Já há um canário; promova ou desligue antes")
@@ -189,6 +192,9 @@ def start_canary(config_id: UUID, body: CanaryStart, session: SessionDep) -> Can
     config.canary_percent = body.percent
     config.canary_started_at = datetime.now(UTC)
     session.commit()
+    note(
+        request, canary_version=version.id, percent=body.percent, from_draft=body.version_id is None
+    )
     logger.info(
         "canário ligado",
         extra={"config_id": str(config_id), "version_id": str(version.id), "percent": body.percent},
@@ -197,21 +203,25 @@ def start_canary(config_id: UUID, body: CanaryStart, session: SessionDep) -> Can
 
 
 @router.patch("", response_model=CanaryState, dependencies=_PUBLISH)
-def change_percent(config_id: UUID, body: CanaryPercent, session: SessionDep) -> CanaryState:
+def change_percent(
+    config_id: UUID, body: CanaryPercent, session: SessionDep, request: Request
+) -> CanaryState:
     config = _config_or_404(session, config_id)
     if config.canary_version_id is None:
         raise HTTPException(status_code=409, detail="Não há canário ligado")
+    note(request, percent_before=config.canary_percent, percent_after=body.percent)
     config.canary_percent = body.percent
     session.commit()
     return _state(session, config)
 
 
 @router.post("/promote", response_model=CanaryState, dependencies=_PUBLISH)
-def promote(config_id: UUID, session: SessionDep) -> CanaryState:
+def promote(config_id: UUID, session: SessionDep, request: Request) -> CanaryState:
     config = _config_or_404(session, config_id)
     if config.canary_version_id is None:
         raise HTTPException(status_code=409, detail="Não há canário ligado")
     promoted = config.canary_version_id
+    note(request, current_before=config.current_version_id, current_after=promoted)
     ConfigRepository(session).set_current_version(config, promoted)
     stop_canary(config)
     session.commit()
@@ -222,8 +232,9 @@ def promote(config_id: UUID, session: SessionDep) -> CanaryState:
 
 
 @router.delete("", response_model=CanaryState, dependencies=_PUBLISH)
-def stop(config_id: UUID, session: SessionDep) -> CanaryState:
+def stop(config_id: UUID, session: SessionDep, request: Request) -> CanaryState:
     config = _config_or_404(session, config_id)
+    note(request, canary_version=config.canary_version_id, percent=config.canary_percent)
     stop_canary(config)
     session.commit()
     return _state(session, config)
