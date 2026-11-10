@@ -203,6 +203,8 @@ def test_publicar_rollback_e_desligar_encerram_o_canario(client: TestClient) -> 
     stopped = client.delete(f"/api/v1/configs/{agent}/canary")
     assert stopped.status_code == 200
     assert stopped.json()["active"] is False
+    # sem canário ligado não há o que desligar, nem linha vazia na trilha
+    assert client.delete(f"/api/v1/configs/{agent}/canary").status_code == 409
 
 
 def test_versao_pedida_vence_o_canario(client: TestClient) -> None:

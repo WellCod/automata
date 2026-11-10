@@ -234,6 +234,8 @@ def promote(config_id: UUID, session: SessionDep, request: Request) -> CanarySta
 @router.delete("", response_model=CanaryState, dependencies=_PUBLISH)
 def stop(config_id: UUID, session: SessionDep, request: Request) -> CanaryState:
     config = _config_or_404(session, config_id)
+    if config.canary_version_id is None:
+        raise HTTPException(status_code=409, detail="Não há canário ligado")
     note(request, canary_version=config.canary_version_id, percent=config.canary_percent)
     stop_canary(config)
     session.commit()
