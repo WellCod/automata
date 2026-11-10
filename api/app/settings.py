@@ -38,6 +38,19 @@ class Settings(BaseSettings):
     data_subject_deadline_days: int = 15
     # trilha de auditoria (ADR-0041)
     audit_retention_days: int = 365
+    # login por SSO (ADR-0042); sem issuer, client_id e redirect, o botão não aparece
+    oidc_issuer: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: str = ""
+    oidc_redirect_uri: str = ""
+    oidc_label: str = "SSO"
+    oidc_scopes: str = "openid email profile"
+    oidc_role_claim: str = ""
+    oidc_role_map: str = ""
+    oidc_default_role: str = ""
+    oidc_allowed_domains: str = ""
+    # false: só o owner entra por senha (emergência); o resto, pelo SSO
+    password_login: bool = True
     # Spans de agente, time, modelo e tool gravados no banco (árvore de execução)
     tracing_enabled: bool = True
     # Laço que roda as suítes agendadas (ADR-0016); no modo demo fica desligado de qualquer jeito

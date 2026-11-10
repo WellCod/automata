@@ -235,6 +235,19 @@ As rotas que mudam produção preenchem `detail` com `note(request, ...)`: publi
 
 A chave privada (`JWT_PRIVATE_KEY`) existe só no processo da API, que emite os tokens. O painel recebe apenas `JWT_PUBLIC_KEY` para verificar o cookie no proxy (ADR-0005). Os testes geram um par em memória.
 
+### Login por SSO
+
+ADR-0042, `app/oidc.py`, migration 0056. Com `OIDC_ISSUER`, `OIDC_CLIENT_ID` e `OIDC_REDIRECT_URI` definidos, o painel mostra "Entrar com" `OIDC_LABEL`. Serve qualquer provedor OIDC com discovery (Entra ID, Google, Okta, Keycloak, Clerk como provedor OAuth).
+
+- `GET /api/v1/auth/oidc` é público e diz se o SSO está ligado, o rótulo e se o login por senha vale para todos.
+- `POST /api/v1/auth/oidc/start` gera `state`, `nonce` e o verificador do PKCE (S256), guarda em `oidc_login` por 10 minutos e devolve a URL do provedor.
+- `POST /api/v1/auth/oidc/callback` recebe `code` e `state`, consome a linha (uso único), troca o código no `token_endpoint` (basic auth quando o provedor aceita, senão no corpo) e confere o `id_token`: assinatura pela chave do `jwks_uri` só em RS*, PS256 e ES*, `iss`, `aud` (com `azp` quando há mais de uma audiência), `exp`, `iat` e `nonce`, com 60 s de folga. Devolve o JWT de sempre.
+- Discovery, token e JWKS saem pelo `guarded_client`. Discovery e JWKS ficam uma hora em cache, e um `kid` desconhecido força buscar o JWKS de novo. O discovery precisa ter o mesmo `issuer` configurado e endpoints em https.
+
+A conta é achada por `(sso_issuer, sso_subject)`. Na primeira vez, por e-mail, só com `email_verified`; sem conta, é criada sem senha. O papel vem de `OIDC_ROLE_CLAIM` (caminho com ponto) pelo `OIDC_ROLE_MAP` (`grupo=papel,...`), o maior entre os grupos mapeados; sem grupo mapeado, `OIDC_DEFAULT_ROLE`; sem padrão, 403. `OIDC_ALLOWED_DOMAINS` limita o domínio do e-mail. O papel é sincronizado a cada login pelo `UserService.update`: corta as sessões antigas e não rebaixa o último owner ativo. Conta desativada recebe 403. Conta sem senha falha no login por senha como credencial inválida, com o mesmo custo de argon2. Com `PASSWORD_LOGIN=false`, só o owner entra por senha.
+
+`GET /api/v1/users` traz `sso: true` nas contas ligadas ao provedor.
+
 ### Rate limit do login
 
 5 tentativas por minuto por e-mail e IP, 30 por e-mail de qualquer IP e 20 por IP. Assim ninguém trava o login de outra pessoa com 5 tentativas, e força bruta distribuída ainda para no limite por e-mail. O log grava `email_ref` (hash curto do e-mail digitado), não o e-mail. O IP vem de `X-Forwarded-For` só quando a conexão chega de um proxy listado em `TRUSTED_PROXIES` (IPs ou CIDRs); o header é lido da direita para a esquerda e vale o primeiro hop fora da lista. Sem `TRUSTED_PROXIES`, vale o IP da conexão. O BFF repassa o IP do cliente na rota `/api/auth/login` só a partir do cabeçalho configurado em `CLIENT_IP_HEADER` no painel: `x-real-ip` (padrão no Vercel, onde a borda sobrescreve) ou `x-forwarded-for` (último hop, para proxy reverso próprio). Sem configuração, nada é repassado, porque com o Next exposto direto qualquer cabeçalho vem do cliente. Ele também descarta cabeçalhos de encaminhamento vindos do browser no proxy genérico, que também recusa `v1/auth/login`.
