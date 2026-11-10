@@ -57,4 +57,13 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0029](0029-chunking-por-base-e-compressao.md) | Chunking por base com prévia e reprocessamento, e compressão do resultado de tool | Aceito |
 | [0030](0030-guardrails-por-modelo.md) | Classificador por modelo na entrada e exame do resultado de tool e dos documentos | Aceito |
 | [0031](0031-controle-de-custo-no-run.md) | Teto de custo por run e orçamento mensal por usuário e por token de integração | Aceito |
-| [0032](0032-direitos-do-titular.md) | Direitos do titular: consulta, exportação e exclusão por usuário, e máscara com padrões próprios | Proposto |
+| [0032](0032-direitos-do-titular.md) | Direitos do titular: consulta, exportação e exclusão por usuário, e máscara com padrões próprios | Aceito |
+| [0033](0033-reranker-e-filtros-na-recuperacao.md) | Reranker por cross-encoder e filtros escolhidos pelo modelo na recuperação | Aceito |
+| [0034](0034-guardrails-da-instancia-e-classificador-na-saida.md) | Piso de guardrails da instância e classificador na saída | Aceito |
+| [0035](0035-memoria-e-conversa-em-time.md) | Memória do usuário no time e modelo próprio para o resumo da compactação | Aceito |
+| [0036](0036-pedido-do-titular-e-prazo.md) | Pedido do titular por integração e pelo próprio usuário, com prazo e aviso | Aceito |
+| [0037](0037-operacao-fila-conciliacao-e-avisos.md) | Operação: painel da fila, retry por agente idempotente, conciliação de custo e aviso por e-mail | Aceito |
+| [0038](0038-workflow-e-suite.md) | Roteador, entrada por etapa, histórico no workflow e casos de suíte a partir das conversas | Aceito |
+| [0039](0039-conectores-e-worker-de-ingestao.md) | Google Drive e Cloud Storage, filtro por nome, webhook da origem e worker de ingestão | Aceito |
+| [0040](0040-liberacao-gradual-de-versao.md) | Liberação gradual de versão | Proposto |
+| [0041](0041-trilha-de-auditoria.md) | Trilha de auditoria | Proposto |
