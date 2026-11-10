@@ -68,7 +68,7 @@ function renderPanel() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <CanaryPanel configId={ID} versions={versions} currentVersionId="v2" />
+      <CanaryPanel configId={ID} versions={versions} currentVersionId="v2" draftVersionId="v3" />
     </QueryClientProvider>,
   );
 }

@@ -515,6 +515,7 @@ export default function TeamEditPage() {
                 suite
                 canary
                 currentVersionId={data?.current_version?.id}
+                draftVersionId={data ? (data.draft_version?.id ?? null) : undefined}
               />
             )}
             {activePanel === "runs" && (
