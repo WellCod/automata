@@ -1584,7 +1584,7 @@ Decisão em [ADR-0041](adr/0041-trilha-de-auditoria.md). Toda escrita em `/api/v
 Decisão em [ADR-0042](adr/0042-login-por-oidc.md). O painel ganha "Entrar com" o provedor de identidade da empresa, por OIDC genérico (Entra ID, Google, Okta, Keycloak, Clerk). O papel vem do grupo, a conta é criada no primeiro login e o login por senha fica para o owner de emergência.
 
 - [x] `docs(adr)`: ADR-0042 e esta seção, ADRs 0040 e 0041 aceitos
-- [ ] `feat(api)`: login por OIDC com PKCE, conta pelo sujeito do provedor e papel pelo grupo
+- [x] `feat(api)`: login por OIDC com PKCE, conta pelo sujeito do provedor e papel pelo grupo
 - [ ] `feat(web)`: botão do provedor no login, retorno do SSO e conta SSO na página de usuários
 - [ ] `test(api)`: evals do login por OIDC com provedor falso
 

@@ -4,6 +4,7 @@ from uuid import UUID
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
+from sqlalchemy import select
 
 from app.models.user import User, UserRole
 from app.repositories.user import UserRepository
@@ -84,6 +85,11 @@ class UserService:
             with suppress(VerifyMismatchError):
                 _ph.verify(_DUMMY_HASH, password)
             raise ValueError("Credenciais inválidas")
+        if not user.hashed_password:
+            # conta do SSO: sem senha, mesmo custo e mesma resposta de credencial errada
+            with suppress(VerifyMismatchError):
+                _ph.verify(_DUMMY_HASH, password)
+            raise ValueError("Credenciais inválidas")
         try:
             _ph.verify(user.hashed_password, password)
         except VerifyMismatchError as e:
@@ -93,3 +99,47 @@ class UserService:
             user.hashed_password = _ph.hash(password)
             self._repo._session.flush()
         return user
+
+    def sso_login(
+        self,
+        *,
+        issuer: str,
+        subject: str,
+        email: str | None,
+        email_verified: bool,
+        role: UserRole,
+    ) -> tuple[User, datetime | None]:
+        """Conta do login por SSO (ADR-0042). Devolve o corte de sessão quando o papel mudou."""
+        session = self._repo._session
+        user = session.scalars(
+            select(User).where(User.sso_issuer == issuer, User.sso_subject == subject)
+        ).first()
+        if user is None:
+            if not email:
+                raise PermissionError("O provedor não informou o e-mail")
+            user = self._repo.get_by_email(email)
+            if user is not None:
+                # ligar por e-mail só com e-mail confirmado pelo provedor: senão qualquer
+                # conta do provedor com o e-mail do owner tomaria a conta dele
+                if not email_verified:
+                    raise PermissionError("E-mail não verificado no provedor")
+                if user.sso_subject is not None:
+                    raise PermissionError("Conta já ligada a outro login do provedor")
+            else:
+                user = User(email=email, hashed_password=None, role=role)
+                session.add(user)
+            user.sso_issuer = issuer
+            user.sso_subject = subject
+            session.flush()
+        if not user.is_active:
+            raise PermissionError("Conta desativada")
+        cut: datetime | None = None
+        if user.role != role:
+            try:
+                user, cut = self.update(user.id, role=role, is_active=None)
+            except ConflictError:
+                # último owner ativo: entra com o papel atual
+                cut = None
+        user.last_login_at = datetime.now(UTC)
+        session.flush()
+        return user, cut

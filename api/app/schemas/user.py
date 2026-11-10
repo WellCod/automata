@@ -89,6 +89,8 @@ class UserResponse(BaseModel):
     is_active: bool
     created_at: datetime
     last_login_at: datetime | None = None
+    # conta que entra pelo SSO (ADR-0042)
+    sso: bool = False
 
 
 class MeResponse(BaseModel):

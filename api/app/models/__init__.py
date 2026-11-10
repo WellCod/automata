@@ -12,6 +12,7 @@ from app.models.knowledge_base import KnowledgeBase
 from app.models.knowledge_connector import KnowledgeConnector
 from app.models.knowledge_content import KnowledgeContent, KnowledgeContentOriginal
 from app.models.mcp_server import McpServer
+from app.models.oidc_login import OidcLogin
 from app.models.provider_cost import ProviderCost
 from app.models.revoked_token import RevokedToken
 from app.models.run import AgentRun
@@ -41,6 +42,7 @@ __all__ = [
     "KnowledgeContent",
     "KnowledgeContentOriginal",
     "McpServer",
+    "OidcLogin",
     "ProviderCost",
     "RevokedToken",
     "UsageEvent",

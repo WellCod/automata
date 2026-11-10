@@ -37,6 +37,7 @@ def to_response(u: User) -> UserResponse:
         is_active=u.is_active,
         created_at=u.created_at,
         last_login_at=u.last_login_at,
+        sso=u.sso_subject is not None,
     )
 
 
