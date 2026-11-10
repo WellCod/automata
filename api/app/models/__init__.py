@@ -1,4 +1,5 @@
 from app.models.alert import AlertDestination, AlertSent
+from app.models.audit import AuditEvent
 from app.models.caller_budget import CallerBudget
 from app.models.config import AgentConfig, AgentConfigVersion, Base
 from app.models.data_subject import DataSubjectRequest
@@ -18,6 +19,7 @@ from app.models.usage import UsageEvent
 from app.models.user import User, UserRole
 
 __all__ = [
+    "AuditEvent",
     "AlertDestination",
     "AlertSent",
     "CallerBudget",

@@ -1566,7 +1566,7 @@ Decisão em [ADR-0040](adr/0040-liberacao-gradual-de-versao.md). Uma versão nov
 Decisão em [ADR-0041](adr/0041-trilha-de-auditoria.md). Toda escrita em `/api/v1` e toda decisão de aprovação fica registrada com quem, quando, de onde, o alvo e o resultado, sem o corpo. As ações que mudam produção guardam o antes e o depois. O owner consulta na página Auditoria.
 
 - [x] `docs(adr)`: ADR-0041 e esta seção
-- [ ] `feat(api)`: trilha de auditoria das escritas, com o antes e o depois nas ações de produção
+- [x] `feat(api)`: trilha de auditoria das escritas, com o antes e o depois nas ações de produção
 - [ ] `feat(web)`: página de auditoria e histórico de ações na aba Versões
 - [ ] `test(api)`: evals da trilha de auditoria
 

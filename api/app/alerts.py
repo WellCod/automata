@@ -199,6 +199,7 @@ def poll_once(now: datetime | None = None) -> None:
     """Uma rodada do poller: orçamento e pico de erro. Nunca levanta."""
     moment = now or datetime.now(UTC)
     from app.agents.review_timeout import expire_reviews
+    from app.audit import purge_daily
     from app.caller_budget import check_caller_budgets
     from app.data_subjects import check_requests
     from app.evals.runner import check_stale_runs
@@ -215,6 +216,7 @@ def poll_once(now: datetime | None = None) -> None:
         check_requests,
         check_jobs,
         check_divergence,
+        purge_daily,
     )
     for check in checks:
         try:

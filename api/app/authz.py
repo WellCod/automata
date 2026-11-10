@@ -47,6 +47,8 @@ class Scope:
     GUARDRAILS_ADMIN = "guardrails:admin"
     # fila durável dos runs em background (ADR-0037): só owner
     QUEUE_ADMIN = "queue:admin"
+    # trilha de auditoria (ADR-0041): só owner
+    AUDIT_READ = "audit:read"
 
 
 def require_resource_scope(resource: str, action: str) -> Callable[[Request], None]:

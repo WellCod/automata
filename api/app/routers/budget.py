@@ -3,9 +3,10 @@
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app import budget
+from app.audit import note
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.models.config import AgentConfig
@@ -50,8 +51,21 @@ def read_budget(config_id: UUID, session: SessionDep) -> BudgetResponse:
     response_model=BudgetResponse,
     dependencies=[Depends(require_scopes(Scope.CONFIGS_WRITE))],
 )
-def update_budget(config_id: UUID, body: BudgetInput, session: SessionDep) -> BudgetResponse:
+def update_budget(
+    config_id: UUID, body: BudgetInput, session: SessionDep, request: Request
+) -> BudgetResponse:
     config = _config_or_404(session, config_id)
+    note(
+        request,
+        before={
+            "monthly_usd": float(config.budget_monthly_usd)
+            if config.budget_monthly_usd is not None
+            else None,
+            "alert_percent": config.budget_alert_percent,
+            "hard_stop": config.budget_hard_stop,
+        },
+        after=body.model_dump(mode="json"),
+    )
     config.budget_monthly_usd = (
         Decimal(str(round(body.monthly_usd, 2))) if body.monthly_usd is not None else None
     )

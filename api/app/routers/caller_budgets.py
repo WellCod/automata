@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.audit import note
 from app.authz import Scope, require_scopes
 from app.budget import current_period
 from app.caller_budget import forget, month_spend, state_for
@@ -92,6 +93,17 @@ def put_budget(
     if _label(session, subject) is None:
         raise HTTPException(status_code=404, detail="Usuário ou token de integração não encontrado")
     budget = session.get(CallerBudget, subject)
+    note(
+        request,
+        before={
+            "monthly_usd": float(budget.monthly_usd),
+            "warn_percent": budget.warn_percent,
+            "hard_stop": budget.hard_stop,
+        }
+        if budget is not None
+        else None,
+        after=body.model_dump(mode="json"),
+    )
     if budget is None:
         budget = CallerBudget(subject=subject, updated_by="")
         session.add(budget)
