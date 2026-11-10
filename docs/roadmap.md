@@ -1568,7 +1568,7 @@ Decisão em [ADR-0041](adr/0041-trilha-de-auditoria.md). Toda escrita em `/api/v
 - [x] `docs(adr)`: ADR-0041 e esta seção
 - [x] `feat(api)`: trilha de auditoria das escritas, com o antes e o depois nas ações de produção
 - [x] `feat(web)`: página de auditoria e histórico de ações na aba Versões
-- [ ] `test(api)`: evals da trilha de auditoria
+- [x] `test(api)`: evals da trilha de auditoria
 
 **Critério de aceite da fase:**
 
