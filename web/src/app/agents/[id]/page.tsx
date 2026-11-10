@@ -593,6 +593,7 @@ export default function AgentEditPage() {
                 canary
                 agentId={id}
                 currentVersionId={data?.current_version?.id}
+                draftVersionId={data ? (data.draft_version?.id ?? null) : undefined}
                 hasUnsavedChanges={isDirty}
               />
             </div>
