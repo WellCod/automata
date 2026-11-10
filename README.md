@@ -54,6 +54,8 @@ Cada agente é uma configuração versionada: modelo, instruções em seções (
 
 Uma versão nova também pode sair aos poucos. O **canário** manda uma parte das conversas, até 50%, para o rascunho ou outra versão publicada, sem mexer na vigente. A escolha é pela sessão, então a conversa não troca de versão no meio. A aba Versões compara as duas desde o início do canário (conversas, taxa de erro, p50 e p95, custo médio e a última suíte), e a promoção é manual ([ADR-0040](docs/adr/0040-liberacao-gradual-de-versao.md)).
 
+O que muda produção fica registrado. A **trilha de auditoria** guarda cada escrita do painel e dos tokens e cada decisão de aprovação: quem fez, quando, de onde, em que agente e com que resultado, inclusive as tentativas recusadas. Publicação, rollback, canário, piso de guardrails, papel de usuário e orçamentos guardam também o antes e o depois. O conteúdo enviado nunca entra. O owner consulta na página Auditoria, com filtro por ação, período e pessoa, e no histórico da aba Versões de cada agente ([ADR-0041](docs/adr/0041-trilha-de-auditoria.md)).
+
 ![Configuração de um agente com o modo teste ao lado](docs/img/agente.png)
 
 Antes de salvar, a API recusa o que quebraria em produção:

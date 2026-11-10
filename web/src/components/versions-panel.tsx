@@ -3,12 +3,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { AuditLog } from "@/components/audit-log";
 import { CanaryPanel, useCanary } from "@/components/canary-panel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/status-badge";
 import client from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
 import { useEvalCases, useEvalSettings } from "@/lib/api/evals";
+import { useMe } from "@/lib/api/users";
 import { type EvalSettings, runActive } from "@/lib/eval-checks";
 import type { components } from "@/lib/api/schema.d.ts";
 
@@ -26,6 +28,17 @@ interface Props {
   suite?: boolean;
   // liberação gradual (ADR-0040): agente e time
   canary?: boolean;
+}
+
+function OwnerHistory({ configId }: { configId: string }) {
+  const { data: me } = useMe();
+  if (me?.role !== "owner") return null;
+  return (
+    <section aria-label="Histórico de ações" className="flex flex-col gap-1 pt-2">
+      <h3 className="text-foreground text-[13px] font-medium">Histórico de ações</h3>
+      <AuditLog configId={configId} />
+    </section>
+  );
 }
 
 function SuiteStatus({ settings, cases }: { settings: EvalSettings | undefined; cases: number }) {
@@ -172,6 +185,7 @@ export function VersionsPanel({
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
       void queryClient.invalidateQueries({ queryKey: ["eval-settings", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["canary", agentId] });
+      void queryClient.invalidateQueries({ queryKey: ["audit"] });
     },
   });
 
@@ -191,6 +205,7 @@ export function VersionsPanel({
       void queryClient.invalidateQueries({ queryKey: ["config", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
       void queryClient.invalidateQueries({ queryKey: ["canary", agentId] });
+      void queryClient.invalidateQueries({ queryKey: ["audit"] });
     },
   });
 
@@ -333,6 +348,9 @@ export function VersionsPanel({
           })}
         </ul>
       )}
+
+      {/* a trilha é só do owner (ADR-0041) */}
+      {canary && <OwnerHistory configId={agentId} />}
     </div>
   );
 }

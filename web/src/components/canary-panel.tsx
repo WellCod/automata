@@ -114,6 +114,7 @@ export function CanaryPanel({
     void queryClient.invalidateQueries({ queryKey: ["config", configId] });
     void queryClient.invalidateQueries({ queryKey: ["configs"] });
     void queryClient.invalidateQueries({ queryKey: ["eval-settings", configId] });
+    void queryClient.invalidateQueries({ queryKey: ["audit"] });
   }
 
   const start = useMutation({
