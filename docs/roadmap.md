@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 45
+# Roadmap — Fases 4 a 46
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -1560,4 +1560,22 @@ Decisão em [ADR-0040](adr/0040-liberacao-gradual-de-versao.md). Uma versão nov
 - A comparação mostra, separados, os runs, a taxa de erro, o p50, o custo médio e a suíte de cada versão.
 - Promover move a vigente; publicar ou fazer rollback desliga o canário.
 - Com o gate ligado, o canário a partir do rascunho exige a suíte verde, como a publicação.
+
+## Fase 46 — Trilha de auditoria
+
+Decisão em [ADR-0041](adr/0041-trilha-de-auditoria.md). Toda escrita em `/api/v1` e toda decisão de aprovação fica registrada com quem, quando, de onde, o alvo e o resultado, sem o corpo. As ações que mudam produção guardam o antes e o depois. O owner consulta na página Auditoria.
+
+- [x] `docs(adr)`: ADR-0041 e esta seção
+- [ ] `feat(api)`: trilha de auditoria das escritas, com o antes e o depois nas ações de produção
+- [ ] `feat(web)`: página de auditoria e histórico de ações na aba Versões
+- [ ] `test(api)`: evals da trilha de auditoria
+
+**Critério de aceite da fase:**
+
+- Publicar, fazer rollback, ligar e promover canário, mudar o piso e o papel de um usuário aparecem na trilha com o antes e o depois.
+- Uma escrita negada com 403 aparece com o status.
+- Nenhum corpo de requisição, segredo ou prompt entra na tabela.
+- Busca de teste, prévia e linter não entram.
+- A exclusão de um titular troca o id dele na trilha pelo pseudônimo.
+- Só o owner lê a trilha.
 

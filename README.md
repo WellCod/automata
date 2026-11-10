@@ -14,7 +14,7 @@ O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é
 | **Backend** | Python 3.12 · FastAPI · Agno 3.1.8 · PostgreSQL 17 + pgvector · Redis · Alembic |
 | **Frontend** | Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · TanStack Query |
 | **Qualidade** | mypy strict · ruff · ~1.160 testes pytest (testcontainers) · 233 testes Vitest · Playwright · evals |
-| **Decisões** | 40 ADRs com contexto, alternativas descartadas e gatilho de reversão |
+| **Decisões** | 41 ADRs com contexto, alternativas descartadas e gatilho de reversão |
 
 ---
 
@@ -413,6 +413,7 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0038](docs/adr/0038-workflow-e-suite.md) | Roteador, entrada por etapa, histórico no workflow e casos de suíte a partir das conversas |
 | [0039](docs/adr/0039-conectores-e-worker-de-ingestao.md) | Google Drive e Cloud Storage, filtro por nome, webhook da origem e worker de ingestão |
 | [0040](docs/adr/0040-liberacao-gradual-de-versao.md) | Liberação gradual de versão: canário por sessão, comparação e promoção manual (proposto, Fase 45) |
+| [0041](docs/adr/0041-trilha-de-auditoria.md) | Trilha de auditoria: escritas de `/api/v1` e aprovações com quem, alvo e resultado, antes e depois nas ações de produção (proposto, Fase 46) |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 
