@@ -21,6 +21,8 @@ interface Props {
   agentId: string;
   // versão em produção vem do detalhe do agente: depois de um rollback ela não é a publicada mais recente
   currentVersionId?: string | null;
+  // rascunho de verdade do config: versões antigas seguem com status draft depois de publicadas
+  draftVersionId?: string | null;
   hasUnsavedChanges?: boolean;
   // agente e time têm suíte de testes (ADR-0015); workflow ainda não
   suite?: boolean;
@@ -136,6 +138,7 @@ function diffPayload(a: ConfigPayload, b: ConfigPayload): string[] {
 export function VersionsPanel({
   agentId,
   currentVersionId,
+  draftVersionId,
   hasUnsavedChanges = false,
   suite = false,
   canary = false,
@@ -204,7 +207,10 @@ export function VersionsPanel({
     },
   });
 
-  const draft = versions?.find((v) => v.status === "draft");
+  const draft =
+    draftVersionId === undefined
+      ? versions?.find((v) => v.status === "draft")
+      : versions?.find((v) => v.id === draftVersionId);
   const current = versions?.find((v) => v.id === currentVersionId);
   const busy = publishMutation.isPending || rollbackMutation.isPending;
 
@@ -270,6 +276,7 @@ export function VersionsPanel({
           configId={agentId}
           versions={versions}
           currentVersionId={currentVersionId}
+          draftVersionId={draft?.id ?? null}
           draftBlocked={blocked}
         />
       )}
