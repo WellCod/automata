@@ -590,6 +590,7 @@ export default function AgentEditPage() {
             <div className="mx-auto max-w-3xl">
               <VersionsPanel
                 suite
+                canary
                 agentId={id}
                 currentVersionId={data?.current_version?.id}
                 hasUnsavedChanges={isDirty}

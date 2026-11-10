@@ -509,7 +509,14 @@ export default function TeamEditPage() {
                 defaultOpen
               />
             </div>
-            {activePanel === "versoes" && <VersionsPanel agentId={id} suite />}
+            {activePanel === "versoes" && (
+              <VersionsPanel
+                agentId={id}
+                suite
+                canary
+                currentVersionId={data?.current_version?.id}
+              />
+            )}
             {activePanel === "runs" && (
               <RunsPanel
                 agentId={id}

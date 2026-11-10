@@ -110,6 +110,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/configs/{config_id}/canary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Canary */
+        get: operations["get_canary_api_v1_configs__config_id__canary_get"];
+        put?: never;
+        /** Start Canary */
+        post: operations["start_canary_api_v1_configs__config_id__canary_post"];
+        /** Stop */
+        delete: operations["stop_api_v1_configs__config_id__canary_delete"];
+        options?: never;
+        head?: never;
+        /** Change Percent */
+        patch: operations["change_percent_api_v1_configs__config_id__canary_patch"];
+        trace?: never;
+    };
+    "/api/v1/configs/{config_id}/canary/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Promote */
+        post: operations["promote_api_v1_configs__config_id__canary_promote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/caller-budgets": {
         parameters: {
             query?: never;
@@ -2117,6 +2154,29 @@ export interface components {
              */
             updated_at: string;
         };
+        /** CanaryPercent */
+        CanaryPercent: {
+            /** Percent */
+            percent: number;
+        };
+        /** CanaryStart */
+        CanaryStart: {
+            /** Version Id */
+            version_id?: string | null;
+            /** Percent */
+            percent: number;
+        };
+        /** CanaryState */
+        CanaryState: {
+            /** Active */
+            active: boolean;
+            /** Percent */
+            percent: number | null;
+            /** Started At */
+            started_at: string | null;
+            current: components["schemas"]["VersionStats"] | null;
+            canary: components["schemas"]["VersionStats"] | null;
+        };
         /** CapabilityFlags */
         CapabilityFlags: {
             /**
@@ -4096,6 +4156,22 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** SuiteResult */
+        SuiteResult: {
+            /** Status */
+            status: string;
+            /** Total */
+            total: number;
+            /** Passed */
+            passed: number;
+            /** Failed */
+            failed: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** TeamMember */
         TeamMember: {
             /**
@@ -4313,6 +4389,29 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VersionStats */
+        VersionStats: {
+            /**
+             * Version Id
+             * Format: uuid
+             */
+            version_id: string;
+            /** Version Number */
+            version_number: number;
+            /** Runs */
+            runs: number;
+            /** Errors */
+            errors: number;
+            /** Error Rate */
+            error_rate: number;
+            /** P50 Ms */
+            p50_ms: number | null;
+            /** P95 Ms */
+            p95_ms: number | null;
+            /** Avg Cost */
+            avg_cost: number | null;
+            suite: components["schemas"]["SuiteResult"] | null;
         };
         /** WebhookInput */
         WebhookInput: {
@@ -4630,6 +4729,169 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BudgetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_canary_api_v1_configs__config_id__canary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                config_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CanaryState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_canary_api_v1_configs__config_id__canary_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                config_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CanaryStart"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CanaryState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_api_v1_configs__config_id__canary_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                config_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CanaryState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_percent_api_v1_configs__config_id__canary_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                config_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CanaryPercent"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CanaryState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    promote_api_v1_configs__config_id__canary_promote_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                config_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CanaryState"];
                 };
             };
             /** @description Validation Error */

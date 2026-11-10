@@ -1550,7 +1550,7 @@ Decisão em [ADR-0040](adr/0040-liberacao-gradual-de-versao.md). Uma versão nov
 
 - [x] `docs(adr)`: ADR-0040 e esta seção
 - [x] `feat(api)`: canário por sessão com a versão gravada no run, comparação e promoção
-- [ ] `feat(web)`: canário na aba Versões, com a comparação e a promoção
+- [x] `feat(web)`: canário na aba Versões, com a comparação e a promoção
 - [ ] `test(api)`: evals da escolha por sessão, da comparação e da promoção
 
 **Critério de aceite da fase:**
