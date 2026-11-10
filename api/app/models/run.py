@@ -13,6 +13,8 @@ class AgentRun(Base):
     __tablename__ = "agent_run"
     __table_args__ = (
         Index("ix_agent_run_config_created", "agent_config_id", "created_at"),
+        # comparação entre a vigente e o canário (ADR-0040)
+        Index("ix_agent_run_version_created", "version_id", "created_at"),
         # só conversas: lista de execuções e métricas por agente (Fase 44)
         Index(
             "ix_agent_run_config_conversation",
@@ -39,6 +41,8 @@ class AgentRun(Base):
     user_id: Mapped[str] = mapped_column(String(255), nullable=False)
     run_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     session_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # versão que respondeu (ADR-0040); vazia nos runs de antes do canário
+    version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)

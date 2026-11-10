@@ -73,6 +73,23 @@ class ConfigService:
         self._repo.set_draft_version(config, version.id)
         return version
 
+    def publish_canary(self, config_id: UUID, author: str) -> AgentConfigVersion:
+        """Publica o rascunho como versão nova sem mover a vigente (ADR-0040)."""
+        config = self._get_or_raise(config_id)
+        if config.draft_version_id is None:
+            raise ValueError("Nenhum rascunho para publicar")
+        draft = self._repo.get_version(config.draft_version_id)
+        if draft is None:
+            raise ValueError("Rascunho não encontrado")
+        version = self._repo.create_version(
+            config_id=config_id,
+            payload=ConfigPayload.model_validate(draft.payload),
+            author=author,
+            status=ConfigPayloadStatus.published,
+        )
+        self._repo.set_draft_version(config, None)
+        return version
+
     def publish(self, config_id: UUID, author: str) -> AgentConfigVersion:
         """Cria versão publicada a partir do rascunho e move o ponteiro.
 
@@ -98,6 +115,7 @@ class ConfigService:
 
         self._repo.set_current_version(config, published.id)
         self._repo.set_draft_version(config, None)
+        stop_canary(config)
         return published
 
     def rollback(self, config_id: UUID, version_id: UUID) -> AgentConfig:
@@ -116,6 +134,7 @@ class ConfigService:
             raise ValueError("Rollback só é permitido para versão publicada")
 
         self._repo.set_current_version(config, version_id)
+        stop_canary(config)
         return config
 
     def get_detail(self, config_id: UUID) -> tuple[AgentConfig, ConfigPayload | None]:
@@ -365,3 +384,10 @@ class ConfigService:
             if faltando:
                 errors.append(f"tools inexistentes em '{server.slug}': {sorted(faltando)}")
         return errors
+
+
+def stop_canary(config: AgentConfig) -> None:
+    """Publicar ou voltar desliga o canário: não sobra versão velha recebendo tráfego."""
+    config.canary_version_id = None
+    config.canary_percent = None
+    config.canary_started_at = None

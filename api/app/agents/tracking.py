@@ -93,6 +93,7 @@ class RunRecord:
     pending_steps: list[dict[str, Any]] | None = None
     screened_tools: list[dict[str, Any]] | None = None
     stop_reason: str | None = None
+    version_id: UUID | None = None
 
 
 # run do workflow em andamento; etapas (inclusive ramos paralelos, que copiam o contexto)
@@ -129,6 +130,7 @@ def persist(record: RunRecord) -> None:
             pending_steps=record.pending_steps,
             screened_tools=record.screened_tools,
             stop_reason=record.stop_reason,
+            version_id=record.version_id,
         )
         if record.total_tokens:
             UsageRepository(session).record_event(
@@ -179,6 +181,8 @@ class RunTracking:
     """
 
     automata_config_id: UUID | None = None
+    # versão que respondeu (ADR-0040)
+    automata_version_id: UUID | None = None
     automata_model_id: str = ""
     # preenchido pelos guardrails de entrada da factory
     automata_blocks: BlockLog | None = None
@@ -352,6 +356,7 @@ class RunTracking:
         evaluation = current_eval_run.get()
         return RunRecord(
             agent_config_id=self.automata_config_id,
+            version_id=self.automata_version_id,
             # com reserva, o modelo que respondeu (ADR-0027)
             model_id=answered_by(metrics, self.automata_model_id),
             user_id=kwargs.get("user_id")

@@ -83,6 +83,18 @@ class AgentConfig(Base):
     budget_hard_stop: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=false(), default=False
     )
+    # liberação gradual (ADR-0040): versão que recebe uma fração das conversas
+    canary_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "agent_config_version.id", use_alter=True, name="fk_canary_version", ondelete="SET NULL"
+        ),
+        nullable=True,
+    )
+    canary_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    canary_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
