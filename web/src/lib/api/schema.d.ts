@@ -92,6 +92,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Events */
+        get: operations["list_events_api_v1_audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/configs/{config_id}/budget": {
         parameters: {
             query?: never;
@@ -2060,6 +2077,63 @@ export interface components {
             tools: components["schemas"]["PendingTool"][];
             /** Steps */
             steps: components["schemas"]["PendingStep"][];
+        };
+        /** AuditConfig */
+        AuditConfig: {
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+        };
+        /** AuditEventResponse */
+        AuditEventResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Actor */
+            actor: string | null;
+            /** Actor Label */
+            actor_label: string | null;
+            /** Action */
+            action: string;
+            /** Config Id */
+            config_id: string | null;
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            } | null;
+            /** Status Code */
+            status_code: number;
+            /** Ip */
+            ip: string | null;
+            /** Request Id */
+            request_id: string | null;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** AuditPage */
+        AuditPage: {
+            /** Items */
+            items: components["schemas"]["AuditEventResponse"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Configs */
+            configs: {
+                [key: string]: components["schemas"]["AuditConfig"];
+            };
+            /** Versions */
+            versions: {
+                [key: string]: number;
+            };
         };
         /**
          * BlockedCheck
@@ -4663,6 +4737,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApprovalItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_events_api_v1_audit_get: {
+        parameters: {
+            query?: {
+                actor?: string | null;
+                config_id?: string | null;
+                action?: string | null;
+                since?: string | null;
+                until?: string | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditPage"];
                 };
             };
             /** @description Validation Error */
