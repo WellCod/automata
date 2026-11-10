@@ -27,6 +27,7 @@ interface Props {
   configId: string;
   versions: Version[];
   currentVersionId?: string | null;
+  draftVersionId?: string | null;
   // o gate da suíte barra o canário a partir do rascunho, como a publicação
   draftBlocked?: boolean;
 }
@@ -87,10 +88,18 @@ function Comparison({ current, canary }: { current: VersionStats; canary: Versio
   );
 }
 
-export function CanaryPanel({ configId, versions, currentVersionId, draftBlocked = false }: Props) {
+export function CanaryPanel({
+  configId,
+  versions,
+  currentVersionId,
+  draftVersionId,
+  draftBlocked = false,
+}: Props) {
   const queryClient = useQueryClient();
   const { data: state, isError } = useCanary(configId);
-  const draft = versions.find((v) => v.status === "draft");
+  const draft = draftVersionId ? versions.find((v) => v.id === draftVersionId) : undefined;
+  // o rascunho publicado ganha o próximo número, não o dele
+  const next = Math.max(0, ...versions.map((v) => v.version_number)) + 1;
   const others = versions.filter((v) => v.status === "published" && v.id !== currentVersionId);
   const [source, setSource] = useState<string>("");
   const [percent, setPercent] = useState(10);
@@ -270,7 +279,7 @@ export function CanaryPanel({ configId, versions, currentVersionId, draftBlocked
         <label className="text-muted-foreground flex items-center gap-1">
           Versão
           <select value={chosen} onChange={(e) => setSource(e.target.value)} className={selectCls}>
-            {draft && <option value={DRAFT}>Rascunho (vira v{draft.version_number + 1})</option>}
+            {draft && <option value={DRAFT}>Rascunho (vira v{next})</option>}
             {others.map((v) => (
               <option key={v.id} value={v.id}>
                 v{v.version_number}

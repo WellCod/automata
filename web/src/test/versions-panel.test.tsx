@@ -92,6 +92,14 @@ describe("VersionsPanel", () => {
     });
   });
 
+  it("versão antiga com status de rascunho não conta como rascunho do config", async () => {
+    render(<VersionsPanel agentId={AGENT_ID} currentVersionId="v2" draftVersionId={null} />, {
+      wrapper,
+    });
+    await waitFor(() => expect(screen.getByText("v3")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /publicar/i })).not.toBeInTheDocument();
+  });
+
   it("não exibe botão publicar sem rascunho", async () => {
     vi.mocked(client.GET).mockResolvedValue({
       data: [mockVersions[1], mockVersions[2]],
