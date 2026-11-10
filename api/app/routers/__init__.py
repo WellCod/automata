@@ -4,6 +4,7 @@ from app.routers.alerts import router as alerts_router
 from app.routers.approvals import router as approvals_router
 from app.routers.budget import router as budget_router
 from app.routers.caller_budgets import router as caller_budgets_router
+from app.routers.canary import router as canary_router
 from app.routers.configs import router as configs_router
 from app.routers.data_subjects import me_router as my_data_router
 from app.routers.data_subjects import router as data_subjects_router
@@ -37,6 +38,7 @@ PROTECTED_ROUTERS: list[APIRouter] = [
     alerts_router,
     approvals_router,
     budget_router,
+    canary_router,
     caller_budgets_router,
     configs_router,
     data_subjects_router,

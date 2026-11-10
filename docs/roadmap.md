@@ -1549,7 +1549,7 @@ Por valor para quem opera agentes em produção:
 Decisão em [ADR-0040](adr/0040-liberacao-gradual-de-versao.md). Uma versão nova recebe uma fração das conversas, escolhida pela sessão, enquanto a vigente segue com o resto. O painel compara erro, latência, custo e suíte das duas, e quem opera promove ou desliga.
 
 - [x] `docs(adr)`: ADR-0040 e esta seção
-- [ ] `feat(api)`: canário por sessão com a versão gravada no run, comparação e promoção
+- [x] `feat(api)`: canário por sessão com a versão gravada no run, comparação e promoção
 - [ ] `feat(web)`: canário na aba Versões, com a comparação e a promoção
 - [ ] `test(api)`: evals da escolha por sessão, da comparação e da promoção
 

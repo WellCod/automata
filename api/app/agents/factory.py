@@ -20,6 +20,7 @@ from agno.tools.mcp import MCPTools
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.agents.canary import in_canary
 from app.agents.memory import memory_kwargs
 from app.agents.models_map import demo_replay, resolve_model
 from app.agents.run_cost import CostCap
@@ -57,9 +58,12 @@ class ResolvedVersion:
     knowledge_tools: list[Function] = field(default_factory=list)
     # limite do mês com bloqueio ligado (ADR-0021); fora da versão, lido do config
     budget_limit_usd: float | None = None
+    version_id: UUID | None = None
 
 
-def load_version(config_id: UUID, version_id: UUID | None) -> ResolvedVersion:
+def load_version(
+    config_id: UUID, version_id: UUID | None, session_id: str | None = None
+) -> ResolvedVersion:
     """Versão vigente do config, ou a pedida pelo modo teste.
 
     A versão pedida precisa ser do próprio config: sem essa checagem dava para
@@ -72,6 +76,13 @@ def load_version(config_id: UUID, version_id: UUID | None) -> ResolvedVersion:
             raise FactoryValidationError(f"Config {config_id} não encontrada")
 
         vid = version_id or config.current_version_id
+        # liberação gradual (ADR-0040): sem versão pedida, a sessão pode cair no canário
+        if (
+            version_id is None
+            and config.canary_version_id is not None
+            and in_canary(config_id, session_id, config.canary_percent)
+        ):
+            vid = config.canary_version_id
         if vid is None:
             raise FactoryValidationError("Nenhuma versão publicada para este agente")
 
@@ -91,6 +102,7 @@ def load_version(config_id: UUID, version_id: UUID | None) -> ResolvedVersion:
             bases=[b for b, _ in bases],
             knowledge_tools=[knowledge_tool(b, n, config_id) for b, n in bases],
             budget_limit_usd=hard_limit(config),
+            version_id=vid,
         )
 
 
@@ -283,6 +295,7 @@ def agent_from(
     )
     if isinstance(agent, TrackedAgent):
         agent.automata_config_id = config_id
+        agent.automata_version_id = resolved.version_id
         agent.automata_blocks = blocks
         agent.automata_model_id = required_model(payload)
     return agent
@@ -299,7 +312,7 @@ def make_agent_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> AgentFactor
     async def build(ctx: RequestContext) -> Agent:
         version_id = ctx.input.version_id if isinstance(ctx.input, FactoryInput) else None
         # leitura síncrona do banco fora do event loop
-        resolved = await asyncio.to_thread(load_version, config_id, version_id)
+        resolved = await asyncio.to_thread(load_version, config_id, version_id, ctx.session_id)
         return agent_from(config_id, resolved, tracked=True, memory_user=ctx.user_id)
 
     return AgentFactory(
@@ -316,8 +329,11 @@ class ResolvedTeam:
     members: list[tuple[UUID, ResolvedVersion]]
 
 
-def load_team(config_id: UUID, version_id: UUID | None) -> ResolvedTeam:
-    leader = load_version(config_id, version_id)
+def load_team(
+    config_id: UUID, version_id: UUID | None, session_id: str | None = None
+) -> ResolvedTeam:
+    # o líder segue o canário do time; os membros, a vigente deles (ADR-0040)
+    leader = load_version(config_id, version_id, session_id)
     team = leader.payload.team
     if team is None:
         raise FactoryValidationError(f"Config {config_id} não é um time")
@@ -333,7 +349,7 @@ def make_team_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> TeamFactory:
 
     async def build(ctx: RequestContext) -> Team:
         version_id = ctx.input.version_id if isinstance(ctx.input, FactoryInput) else None
-        resolved = await asyncio.to_thread(load_team, config_id, version_id)
+        resolved = await asyncio.to_thread(load_team, config_id, version_id, ctx.session_id)
         return team_from(config_id, resolved, memory_user=ctx.user_id)
 
     return TeamFactory(
@@ -381,6 +397,7 @@ def team_from(
         ),
     )
     team.automata_config_id = config_id
+    team.automata_version_id = leader.version_id
     team.automata_blocks = blocks
     team.automata_model_id = required_model(leader.payload)
     return team
