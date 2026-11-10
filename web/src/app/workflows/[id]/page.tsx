@@ -245,6 +245,7 @@ export default function WorkflowEditPage() {
               <VersionsPanel
                 agentId={id}
                 currentVersionId={data?.current_version?.id}
+                draftVersionId={data ? (data.draft_version?.id ?? null) : undefined}
                 hasUnsavedChanges={isDirty}
                 suite
               />

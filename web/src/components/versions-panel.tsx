@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { CanaryPanel, useCanary } from "@/components/canary-panel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/status-badge";
 import client from "@/lib/api/client";
@@ -18,9 +19,13 @@ interface Props {
   agentId: string;
   // versão em produção vem do detalhe do agente: depois de um rollback ela não é a publicada mais recente
   currentVersionId?: string | null;
+  // rascunho de verdade do config: versões antigas seguem com status draft depois de publicadas
+  draftVersionId?: string | null;
   hasUnsavedChanges?: boolean;
   // agente e time têm suíte de testes (ADR-0015); workflow ainda não
   suite?: boolean;
+  // liberação gradual (ADR-0040): agente e time
+  canary?: boolean;
 }
 
 function SuiteStatus({ settings, cases }: { settings: EvalSettings | undefined; cases: number }) {
@@ -120,14 +125,19 @@ function diffPayload(a: ConfigPayload, b: ConfigPayload): string[] {
 export function VersionsPanel({
   agentId,
   currentVersionId,
+  draftVersionId,
   hasUnsavedChanges = false,
   suite = false,
+  canary = false,
 }: Props) {
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<Pending | null>(null);
   const { data: settings } = useEvalSettings(agentId, suite);
   const { data: cases = [] } = useEvalCases(agentId, suite);
   const blocked = suite && !!settings?.require_passing_evals && !settings.can_publish;
+  const { data: canaryState } = useCanary(agentId, canary);
+  const canaryOn = !!canaryState?.active;
+  const canaryVersionId = canaryState?.canary?.version_id;
 
   const {
     data: versions,
@@ -161,6 +171,7 @@ export function VersionsPanel({
       void queryClient.invalidateQueries({ queryKey: ["config", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
       void queryClient.invalidateQueries({ queryKey: ["eval-settings", agentId] });
+      void queryClient.invalidateQueries({ queryKey: ["canary", agentId] });
     },
   });
 
@@ -179,10 +190,14 @@ export function VersionsPanel({
       void queryClient.invalidateQueries({ queryKey: ["versions", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["config", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
+      void queryClient.invalidateQueries({ queryKey: ["canary", agentId] });
     },
   });
 
-  const draft = versions?.find((v) => v.status === "draft");
+  const draft =
+    draftVersionId === undefined
+      ? versions?.find((v) => v.status === "draft")
+      : versions?.find((v) => v.id === draftVersionId);
   const current = versions?.find((v) => v.id === currentVersionId);
   const busy = publishMutation.isPending || rollbackMutation.isPending;
 
@@ -222,6 +237,11 @@ export function VersionsPanel({
               ? "Publicar o rascunho? A nova versão passa a responder em produção."
               : `Reverter para v${pending.versionNumber}? Ela volta a responder em produção.`}
           </p>
+          {canaryOn && (
+            <p className="text-[11px] text-amber-600 dark:text-amber-400">
+              O canário em andamento é desligado.
+            </p>
+          )}
           {pending.kind === "publish" && hasUnsavedChanges && (
             <p className="text-[11px] text-amber-600 dark:text-amber-400">
               Há alterações não salvas no formulário. Elas não entram na publicação.
@@ -236,6 +256,16 @@ export function VersionsPanel({
             </Button>
           </div>
         </div>
+      )}
+
+      {canary && versions && (
+        <CanaryPanel
+          configId={agentId}
+          versions={versions}
+          currentVersionId={currentVersionId}
+          draftVersionId={draft?.id ?? null}
+          draftBlocked={blocked}
+        />
       )}
 
       {isPending && <p className="text-muted-foreground text-[13px]">Carregando…</p>}
@@ -273,21 +303,26 @@ export function VersionsPanel({
                       {new Date(v.created_at).toLocaleDateString("pt-BR")}
                     </span>
                     {v.id === currentVersionId && <Badge tone="active">Ativa</Badge>}
-                    {v.status === "published" && v.id !== currentVersionId && (
-                      <Button
-                        size="xs"
-                        onClick={() =>
-                          setPending({
-                            kind: "rollback",
-                            versionId: v.id,
-                            versionNumber: v.version_number,
-                          })
-                        }
-                        disabled={busy || pending !== null}
-                      >
-                        Reverter
-                      </Button>
+                    {v.id === canaryVersionId && (
+                      <Badge tone="pending">Canário {canaryState?.percent}%</Badge>
                     )}
+                    {v.status === "published" &&
+                      v.id !== currentVersionId &&
+                      v.id !== canaryVersionId && (
+                        <Button
+                          size="xs"
+                          onClick={() =>
+                            setPending({
+                              kind: "rollback",
+                              versionId: v.id,
+                              versionNumber: v.version_number,
+                            })
+                          }
+                          disabled={busy || pending !== null}
+                        >
+                          Reverter
+                        </Button>
+                      )}
                   </div>
                 </div>
                 {diffs.length > 0 && (
