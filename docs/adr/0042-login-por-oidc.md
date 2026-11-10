@@ -1,6 +1,6 @@
 # ADR-0042 — Login por SSO via OIDC
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-11-10
 
 ## Contexto
