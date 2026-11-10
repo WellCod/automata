@@ -71,7 +71,6 @@ def login(request: Request, body: LoginInput, session: SessionDep) -> TokenRespo
             raise ValueError("login por senha desligado")
         session.commit()
     except ValueError as e:
-        session.rollback()
         logger.warning("login failed", extra={"ip": ip, "email_ref": email_ref})
         raise HTTPException(status_code=401, detail="Credenciais inválidas") from e
     logger.info("login ok", extra={"ip": ip, "user_id": user_id, "role": user_role})
