@@ -1,6 +1,6 @@
 # ADR-0041 — Trilha de auditoria
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-11-10
 
 ## Contexto
