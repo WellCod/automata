@@ -1586,7 +1586,7 @@ Decisão em [ADR-0042](adr/0042-login-por-oidc.md). O painel ganha "Entrar com" 
 - [x] `docs(adr)`: ADR-0042 e esta seção, ADRs 0040 e 0041 aceitos
 - [x] `feat(api)`: login por OIDC com PKCE, conta pelo sujeito do provedor e papel pelo grupo
 - [x] `feat(web)`: botão do provedor no login, retorno do SSO e conta SSO na página de usuários
-- [ ] `test(api)`: evals do login por OIDC com provedor falso
+- [x] `test(api)`: evals do login por OIDC com provedor falso
 
 **Critério de aceite da fase:**
 
