@@ -185,6 +185,7 @@ export function VersionsPanel({
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
       void queryClient.invalidateQueries({ queryKey: ["eval-settings", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["canary", agentId] });
+      void queryClient.invalidateQueries({ queryKey: ["audit"] });
     },
   });
 
@@ -204,6 +205,7 @@ export function VersionsPanel({
       void queryClient.invalidateQueries({ queryKey: ["config", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
       void queryClient.invalidateQueries({ queryKey: ["canary", agentId] });
+      void queryClient.invalidateQueries({ queryKey: ["audit"] });
     },
   });
 
