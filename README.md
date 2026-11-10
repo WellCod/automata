@@ -56,6 +56,8 @@ Uma versão nova também pode sair aos poucos. O **canário** manda uma parte da
 
 O que muda produção fica registrado. A **trilha de auditoria** guarda cada escrita do painel e dos tokens e cada decisão de aprovação: quem fez, quando, de onde, em que agente e com que resultado, inclusive as tentativas recusadas. Publicação, rollback, canário, piso de guardrails, papel de usuário e orçamentos guardam também o antes e o depois. O conteúdo enviado nunca entra. O owner consulta na página Auditoria, com filtro por ação, período e pessoa, e no histórico da aba Versões de cada agente ([ADR-0041](docs/adr/0041-trilha-de-auditoria.md)).
 
+O login pode vir do provedor de identidade da empresa. Com **SSO por OIDC** configurado (Entra ID, Google, Okta, Keycloak ou Clerk), a tela de login mostra "Entrar com" o provedor. A conta é criada no primeiro acesso, o papel vem do grupo e é atualizado a cada login, e o login por senha pode ficar só para o owner de emergência ([ADR-0042](docs/adr/0042-login-por-oidc.md)).
+
 ![Configuração de um agente com o modo teste ao lado](docs/img/agente.png)
 
 Antes de salvar, a API recusa o que quebraria em produção:

@@ -1735,6 +1735,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/oidc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Oidc Info
+         * @description O que a tela de login mostra; público, sem nada do provedor além do rótulo.
+         */
+        get: operations["oidc_info_api_v1_auth_oidc_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/oidc/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Oidc Start */
+        post: operations["oidc_start_api_v1_auth_oidc_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/oidc/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Oidc Callback */
+        post: operations["oidc_callback_api_v1_auth_oidc_callback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3700,6 +3754,27 @@ export interface components {
              */
             retention_days: number;
         };
+        /** OidcCallback */
+        OidcCallback: {
+            /** Code */
+            code: string;
+            /** State */
+            state: string;
+        };
+        /** OidcInfo */
+        OidcInfo: {
+            /** Enabled */
+            enabled: boolean;
+            /** Label */
+            label: string;
+            /** Password Login */
+            password_login: boolean;
+        };
+        /** OidcStart */
+        OidcStart: {
+            /** Url */
+            url: string;
+        };
         /**
          * OutputClassifierRule
          * @description Classificador por modelo na resposta (ADR-0034): uma chamada por resposta.
@@ -4445,6 +4520,11 @@ export interface components {
             created_at: string;
             /** Last Login At */
             last_login_at?: string | null;
+            /**
+             * Sso
+             * @default false
+             */
+            sso: boolean;
         };
         /**
          * UserRole
@@ -8373,6 +8453,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    oidc_info_api_v1_auth_oidc_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OidcInfo"];
+                };
+            };
+        };
+    };
+    oidc_start_api_v1_auth_oidc_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OidcStart"];
+                };
+            };
+        };
+    };
+    oidc_callback_api_v1_auth_oidc_callback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OidcCallback"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
                 };
             };
             /** @description Validation Error */
