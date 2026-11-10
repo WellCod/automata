@@ -3,7 +3,7 @@
 [![CI](https://github.com/WellCod/automata/actions/workflows/ci.yml/badge.svg)](https://github.com/WellCod/automata/actions/workflows/ci.yml)
 [![Publish](https://github.com/WellCod/automata/actions/workflows/publish.yml/badge.svg)](https://github.com/WellCod/automata/actions/workflows/publish.yml)
 
-Plataforma para operar agentes de IA em produção. Com ela, quem não programa cria, versiona, testa e publica agentes, times multi-agente e workflows. Também liga bases de conhecimento (RAG) que acompanham o GitHub, o S3, o SharePoint, o Google Drive e o Cloud Storage, ferramentas via MCP, guardrails com piso da instância e memória do usuário entre conversas. Roda suítes de teste por agente, time e workflow antes de publicar e de forma agendada, pausa o workflow para aprovação humana onde for preciso e acompanha execução, latência e custo de cada um, com orçamento mensal, conciliação com a fatura do provedor e aviso no canal do time ou por e-mail.
+Plataforma para operar agentes de IA em produção. Com ela, quem não programa cria, versiona, testa e publica agentes, times multi-agente e workflows, liberando a versão nova aos poucos para uma parte das conversas. Também liga bases de conhecimento (RAG) que acompanham o GitHub, o S3, o SharePoint, o Google Drive e o Cloud Storage, ferramentas via MCP, guardrails com piso da instância e memória do usuário entre conversas. Roda suítes de teste por agente, time e workflow antes de publicar e de forma agendada, pausa o workflow para aprovação humana onde for preciso e acompanha execução, latência e custo de cada um, com orçamento mensal, conciliação com a fatura do provedor e aviso no canal do time ou por e-mail. Cada mudança que afeta produção fica numa trilha de auditoria, e o login pode vir do SSO da empresa.
 
 O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é a camada de produto em volta: configuração versionada em banco próprio, validação antes de publicar, rastreamento de cada execução, segurança e painel.
 
@@ -13,7 +13,7 @@ O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é
 |---|---|
 | **Backend** | Python 3.12 · FastAPI · Agno 3.1.8 · PostgreSQL 17 + pgvector · Redis · Alembic |
 | **Frontend** | Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · TanStack Query |
-| **Qualidade** | mypy strict · ruff · ~1.160 testes pytest (testcontainers) · 233 testes Vitest · Playwright · evals |
+| **Qualidade** | mypy strict · ruff · ~1.240 testes pytest (testcontainers) · 250 testes Vitest · Playwright · evals |
 | **Decisões** | 42 ADRs com contexto, alternativas descartadas e gatilho de reversão |
 
 ---
@@ -54,7 +54,11 @@ Cada agente é uma configuração versionada: modelo, instruções em seções (
 
 Uma versão nova também pode sair aos poucos. O **canário** manda uma parte das conversas, até 50%, para o rascunho ou outra versão publicada, sem mexer na vigente. A escolha é pela sessão, então a conversa não troca de versão no meio. A aba Versões compara as duas desde o início do canário (conversas, taxa de erro, p50 e p95, custo médio e a última suíte), e a promoção é manual ([ADR-0040](docs/adr/0040-liberacao-gradual-de-versao.md)).
 
+<p align="center"><img src="docs/img/canario.png" alt="Canário em 30% das conversas com a comparação entre a vigente e o canário" width="640"></p>
+
 O que muda produção fica registrado. A **trilha de auditoria** guarda cada escrita do painel e dos tokens e cada decisão de aprovação: quem fez, quando, de onde, em que agente e com que resultado, inclusive as tentativas recusadas. Publicação, rollback, canário, piso de guardrails, papel de usuário e orçamentos guardam também o antes e o depois. O conteúdo enviado nunca entra. O owner consulta na página Auditoria, com filtro por ação, período e pessoa, e no histórico da aba Versões de cada agente ([ADR-0041](docs/adr/0041-trilha-de-auditoria.md)).
+
+![Trilha de auditoria com rollbacks e o canário, com o antes e o depois de cada ação](docs/img/auditoria.png)
 
 O login pode vir do provedor de identidade da empresa. Com **SSO por OIDC** configurado (Entra ID, Google, Okta, Keycloak ou Clerk), a tela de login mostra "Entrar com" o provedor. A conta é criada no primeiro acesso, o papel vem do grupo e é atualizado a cada login, e o login por senha pode ficar só para o owner de emergência ([ADR-0042](docs/adr/0042-login-por-oidc.md)).
 
@@ -209,9 +213,11 @@ flowchart LR
     MCP["Servidores MCP<br/>externos"]
     EMB["Embeddings<br/>Voyage · OpenAI"]
     HOOK["Avisos<br/>webhook · e-mail"]
+    IDP["Provedor de identidade<br/>OIDC (opcional)"]
     IW["Worker de ingestão<br/>(opcional)"]
 
     UI --> BFF --> R & OS
+    R -. "login SSO" .-> IDP
     OS --> F --> T --> PG
     R --> PG
     R --> RD
@@ -323,9 +329,11 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 | **BFF** | Cookie httpOnly e `sameSite=lax`, `secure` em produção. O proxy server-side converte o cookie em `Authorization: Bearer` e limpa a sessão no 401. Nenhum segredo vai para o bundle, e um teste no CI procura chaves no build. |
 | **CSRF** | `Origin` conferido contra `Host` em todo método que não é seguro. |
 | **Revogação** | Logout revoga o `jti`. Mudar papel, desativar ou trocar senha corta na hora as sessões da pessoa. |
+| **SSO** | Login por OIDC com authorization code e PKCE, `state` de uso único preso ao navegador por cookie e `id_token` conferido pelo JWKS do provedor (sem `none` nem HS*). Conta ligada pelo sujeito do provedor; por e-mail, só verificado. Papel pelo grupo, sem rebaixar o último owner, e login por senha opcional só para o owner ([ADR-0042](docs/adr/0042-login-por-oidc.md)). |
+| **Auditoria** | Toda escrita em `/api/v1` e toda decisão de aprovação gravadas com autor, IP, alvo e resultado, inclusive as recusadas, sem o corpo da requisição. Só o owner lê, e a exclusão do titular troca o id dele pelo pseudônimo também ali ([ADR-0041](docs/adr/0041-trilha-de-auditoria.md)). |
 | **Papéis e scopes** | `owner`, `editor`, `viewer`. Toda rota, própria ou do AgentOS, exige scope. |
 | **Rate limit** | Login limitado por e-mail e IP, por e-mail e por IP no Redis, sem deixar ninguém travar a conta de outro. `X-Forwarded-For` só vale vindo de proxy listado em `TRUSTED_PROXIES`, e o painel só repassa o IP do cabeçalho de `CLIENT_IP_HEADER`. Busca de teste na base limitada por usuário. |
-| **Superfície** | Login com e-mail inexistente também roda argon2, para a latência não revelar contas. `/docs` e `/openapi.json` só em desenvolvimento. Fora do login e do health, a única rota pública é o webhook da origem dos conectores, que só sincroniza com a assinatura HMAC do corpo e no máximo uma vez por minuto. |
+| **Superfície** | Login com e-mail inexistente também roda argon2, para a latência não revelar contas. `/docs` e `/openapi.json` só em desenvolvimento. Fora do login (senha e SSO) e do health, a única rota pública é o webhook da origem dos conectores, que só sincroniza com a assinatura HMAC do corpo e no máximo uma vez por minuto. |
 | **Headers** | HSTS, CSP com `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`. |
 | **Saída** | Servidores MCP, webhooks, destinos de aviso e conectores de conhecimento passam pelo mesmo filtro: só https, sem host que resolva para IP interno, conferido no cadastro e a cada chamada, sem seguir redirect. URLs e segredos ficam cifrados com Fernet. A telemetria do Agno fica desligada. |
 | **Integrações** | Token de consumidor com escopo por recurso: roda só os agentes liberados e, se marcado, a suíte de testes deles, sem acesso a configuração. |
@@ -338,9 +346,9 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 
 | Camada | Ferramenta | Cobertura |
 |---|---|---|
-| API | pytest + testcontainers | ~1.160 testes contra Postgres com pgvector real, sem mock de banco. Gate de cobertura de 70%. |
+| API | pytest + testcontainers | ~1.240 testes contra Postgres com pgvector real, sem mock de banco. Gate de cobertura de 70%. |
 | Tipos | mypy strict + plugin pydantic · ruff | Rodam em todo PR. |
-| Web | Vitest + Testing Library | 233 testes de componente e de lógica, inclusive o redutor de eventos do workflow, a suíte de testes e a revisão humana. |
+| Web | Vitest + Testing Library | 250 testes de componente e de lógica, inclusive o redutor de eventos do workflow, a suíte de testes, a revisão humana, o canário e as rotas do SSO. |
 | E2E | Playwright | Login → editar agente → publicar → rollback. |
 | Contrato | openapi-typescript | Os tipos do painel são gerados do OpenAPI da API, nunca escritos à mão. |
 
@@ -364,6 +372,9 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 | Operação | O retry automático só vale para o agente idempotente, e falha antiga não volta no deploy. A conciliação lê centavos da Anthropic e dólares da OpenAI. O estado do e-mail nunca traz a mensagem do servidor, e sem SMTP o destino é recusado sem tentar. | Todo PR |
 | Workflow e suíte | O roteador escolhe pela regra e pela ordem, e sem caminho padrão nada roda. A entrada da etapa monta o texto com as saídas certas, e a checagem olha a etapa pedida ou a resposta final. | Todo PR |
 | Conectores e ingestão | Pasta do Drive com Docs e PDF vira dois documentos e editar o Docs reindexa só ele, o filtro tira da base o que saiu dele, a assinatura do webhook recusa corpo trocado e quatro workers não pegam o mesmo job. | Todo PR |
+| Canário | 120 conversas com canário em 25% caem perto de 25% na versão nova, cada uma numa versão só. O líder do time segue o canário, o modo teste nunca cai nele e publicar no meio devolve tudo à vigente. | Todo PR |
+| Auditoria | Uma bateria de escritas com prompt, cabeçalho de MCP, senha e token emitido não deixa nenhum deles na trilha. Rebaixar usuário guarda o antes e o depois, a aprovação recusada entra e a exclusão do titular troca o id dele pelo pseudônimo. | Todo PR |
+| SSO | Provedor falso com ES256 e papel aninhado no formato do Clerk, troca de chave que busca o JWKS de novo, `id_token` adulterado (outra chave, `aud`, `nonce`, `none`, HS256, vencido) recusado e provedor na rede interna barrado. | Todo PR |
 | Recuperação | O documento certo volta entre os 3 primeiros trechos. A versão literal roda em todo PR com cada estratégia de busca (simples, MMR, recência), e nenhuma pode errar. A semântica, com Voyage, roda à noite, aceita recall@3 de 80% e compara as estratégias (HyDE incluso, com chave de modelo) com a busca simples. | PR e noturna |
 | Confiabilidade | Tool calls com LLM real. | Noturna |
 
@@ -418,7 +429,7 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0039](docs/adr/0039-conectores-e-worker-de-ingestao.md) | Google Drive e Cloud Storage, filtro por nome, webhook da origem e worker de ingestão |
 | [0040](docs/adr/0040-liberacao-gradual-de-versao.md) | Liberação gradual de versão: canário por sessão, comparação e promoção manual (Fase 45) |
 | [0041](docs/adr/0041-trilha-de-auditoria.md) | Trilha de auditoria: escritas de `/api/v1` e aprovações com quem, alvo e resultado, antes e depois nas ações de produção (Fase 46) |
-| [0042](docs/adr/0042-login-por-oidc.md) | Login por SSO via OIDC: um provedor por instância, papel pelo grupo e conta criada no primeiro login (proposto, Fase 47) |
+| [0042](docs/adr/0042-login-por-oidc.md) | Login por SSO via OIDC: um provedor por instância, papel pelo grupo e conta criada no primeiro login (Fase 47) |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 
@@ -487,7 +498,7 @@ api/
     mcp/          cliente MCP, proteção de saída (SSRF)
     routers/      rotas próprias /api/v1
     services/     regras de negócio e validação na escrita
-  alembic/        53 migrations
+  alembic/        56 migrations
   fixtures/       respostas gravadas do modo replay
   tests/          pytest, integração e evals
 web/
@@ -496,7 +507,7 @@ web/
   src/lib/        client gerado do OpenAPI, SSE, progresso do workflow
   e2e/            Playwright
 docs/
-  adr/            40 Architecture Decision Records
+  adr/            42 Architecture Decision Records
   roadmap.md      fases, auditorias e critérios de aceite
 DESIGN.md         sistema visual do painel
 DEMO.md           demo local sem chave de LLM
