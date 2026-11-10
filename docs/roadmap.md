@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 46
+# Roadmap — Fases 4 a 47
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -1579,3 +1579,21 @@ Decisão em [ADR-0041](adr/0041-trilha-de-auditoria.md). Toda escrita em `/api/v
 - A exclusão de um titular troca o id dele na trilha pelo pseudônimo.
 - Só o owner lê a trilha.
 
+## Fase 47 — Login por SSO
+
+Decisão em [ADR-0042](adr/0042-login-por-oidc.md). O painel ganha "Entrar com" o provedor de identidade da empresa, por OIDC genérico (Entra ID, Google, Okta, Keycloak, Clerk). O papel vem do grupo, a conta é criada no primeiro login e o login por senha fica para o owner de emergência.
+
+- [x] `docs(adr)`: ADR-0042 e esta seção, ADRs 0040 e 0041 aceitos
+- [ ] `feat(api)`: login por OIDC com PKCE, conta pelo sujeito do provedor e papel pelo grupo
+- [ ] `feat(web)`: botão do provedor no login, retorno do SSO e conta SSO na página de usuários
+- [ ] `test(api)`: evals do login por OIDC com provedor falso
+
+**Critério de aceite da fase:**
+
+- Com um provedor configurado, o login cria a conta no primeiro acesso, com o papel do grupo, e devolve a sessão de sempre.
+- `id_token` com assinatura de outra chave, `aud` de outro cliente, `nonce` trocado, vencido ou com `alg` `none` é recusado.
+- O `state` vale uma vez e por 10 minutos.
+- E-mail não verificado não liga numa conta existente.
+- Conta desativada não entra pelo SSO.
+- O último owner ativo não é rebaixado pelo grupo.
+- Com `PASSWORD_LOGIN=false`, só o owner entra por senha.

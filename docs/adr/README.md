@@ -65,5 +65,6 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0037](0037-operacao-fila-conciliacao-e-avisos.md) | Operação: painel da fila, retry por agente idempotente, conciliação de custo e aviso por e-mail | Aceito |
 | [0038](0038-workflow-e-suite.md) | Roteador, entrada por etapa, histórico no workflow e casos de suíte a partir das conversas | Aceito |
 | [0039](0039-conectores-e-worker-de-ingestao.md) | Google Drive e Cloud Storage, filtro por nome, webhook da origem e worker de ingestão | Aceito |
-| [0040](0040-liberacao-gradual-de-versao.md) | Liberação gradual de versão | Proposto |
-| [0041](0041-trilha-de-auditoria.md) | Trilha de auditoria | Proposto |
+| [0040](0040-liberacao-gradual-de-versao.md) | Liberação gradual de versão | Aceito |
+| [0041](0041-trilha-de-auditoria.md) | Trilha de auditoria | Aceito |
+| [0042](0042-login-por-oidc.md) | Login por SSO via OIDC | Proposto |
