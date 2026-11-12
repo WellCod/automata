@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
@@ -58,9 +59,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+_REQUEST_ID = re.compile(r"[A-Za-z0-9-]{1,64}")
+
+
 class RequestIDMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: object) -> Response:
-        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        # o cliente pode mandar o próprio id para correlacionar, mas só num formato curto:
+        # ele entra no log e na trilha de auditoria (Fase 49)
+        given = request.headers.get("X-Request-ID", "")
+        request_id = given if _REQUEST_ID.fullmatch(given) else str(uuid.uuid4())
         token = request_id_var.set(request_id)
         try:
             response: Response = await call_next(request)  # type: ignore[operator]

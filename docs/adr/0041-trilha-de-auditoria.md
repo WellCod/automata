@@ -36,6 +36,7 @@ O que existe e serve:
 
 ## Consequências
 
-- Toda escrita ganha um `INSERT` depois da resposta. O volume é o das ações do painel, não o das conversas.
+- Revisão da Fase 49: a trilha passa a cobrir as escritas nativas do AgentOS e a criação de usuário em `/api/v1/auth/users`, registra a escrita que estoura 500, guarda só as palavras de rota quando nenhuma rota casa e, na exclusão do titular, apaga o IP e troca o `subject`. As rotas `/service-accounts` do AgentOS ficam bloqueadas.
+- Toda escrita ganha um `INSERT` antes de a resposta voltar. O volume é o das ações do painel, não o das conversas.
 - O owner vê quem fez o quê, mas não o conteúdo: para o prompt, a versão continua sendo a fonte.
 - Revisitar quando entrar SSO: o `actor` passa a vir do provedor de identidade.
