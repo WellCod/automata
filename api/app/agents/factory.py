@@ -62,9 +62,16 @@ class ResolvedVersion:
 
 
 def load_version(
-    config_id: UUID, version_id: UUID | None, session_id: str | None = None
+    config_id: UUID,
+    version_id: UUID | None,
+    session_id: str | None = None,
+    *,
+    canary: bool = False,
 ) -> ResolvedVersion:
     """Versão vigente do config, ou a pedida pelo modo teste.
+
+    `canary` só vem ligado do agente e do líder de time que atendem a conversa: membro,
+    etapa de workflow e suíte seguem a vigente (ADR-0040, Fase 49).
 
     A versão pedida precisa ser do próprio config: sem essa checagem dava para
     rodar o agente A com prompt e modelo de B, com run e custo contados em A.
@@ -78,7 +85,8 @@ def load_version(
         vid = version_id or config.current_version_id
         # liberação gradual (ADR-0040): sem versão pedida, a sessão pode cair no canário
         if (
-            version_id is None
+            canary
+            and version_id is None
             and config.canary_version_id is not None
             and in_canary(config_id, session_id, config.canary_percent)
         ):
@@ -312,7 +320,9 @@ def make_agent_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> AgentFactor
     async def build(ctx: RequestContext) -> Agent:
         version_id = ctx.input.version_id if isinstance(ctx.input, FactoryInput) else None
         # leitura síncrona do banco fora do event loop
-        resolved = await asyncio.to_thread(load_version, config_id, version_id, ctx.session_id)
+        resolved = await asyncio.to_thread(
+            load_version, config_id, version_id, ctx.session_id, canary=True
+        )
         return agent_from(config_id, resolved, tracked=True, memory_user=ctx.user_id)
 
     return AgentFactory(
@@ -330,10 +340,14 @@ class ResolvedTeam:
 
 
 def load_team(
-    config_id: UUID, version_id: UUID | None, session_id: str | None = None
+    config_id: UUID,
+    version_id: UUID | None,
+    session_id: str | None = None,
+    *,
+    canary: bool = False,
 ) -> ResolvedTeam:
     # o líder segue o canário do time; os membros, a vigente deles (ADR-0040)
-    leader = load_version(config_id, version_id, session_id)
+    leader = load_version(config_id, version_id, session_id, canary=canary)
     team = leader.payload.team
     if team is None:
         raise FactoryValidationError(f"Config {config_id} não é um time")
@@ -349,7 +363,9 @@ def make_team_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> TeamFactory:
 
     async def build(ctx: RequestContext) -> Team:
         version_id = ctx.input.version_id if isinstance(ctx.input, FactoryInput) else None
-        resolved = await asyncio.to_thread(load_team, config_id, version_id, ctx.session_id)
+        resolved = await asyncio.to_thread(
+            load_team, config_id, version_id, ctx.session_id, canary=True
+        )
         return team_from(config_id, resolved, memory_user=ctx.user_id)
 
     return TeamFactory(

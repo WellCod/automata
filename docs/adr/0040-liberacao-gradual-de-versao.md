@@ -41,3 +41,4 @@ Publicar ou fazer rollback com canário ligado desliga o canário, para não sob
 - Durante o canário, duas versões respondem ao mesmo tempo. Os números do agente (desempenho, orçamento) somam as duas; a comparação separa.
 - Conversas antigas, de antes do canário, não têm `version_id` e ficam fora da comparação.
 - O percentual tem teto de 50%: acima disso, é publicar.
+- Revisão da Fase 49: o canário vale só para o agente e o líder que atendem a conversa (membros, etapas e suíte sorteavam a cada run). A conversa nova ganha `session_id` antes da factory, porque o Agno monta o agente antes de gerar a sessão e a primeira mensagem era sorteada à parte. As escritas do canário e a publicação travam a linha do config.

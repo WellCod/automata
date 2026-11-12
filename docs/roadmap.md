@@ -1626,15 +1626,15 @@ Quinta rodada de verificação, sobre o topo da pilha da Fase 48, com foco no qu
 - [x] **Média.** A trilha (ADR-0041) não registra as escritas nativas do AgentOS (aprovar e apagar aprovação, apagar sessão, memórias, agendamentos) nem `POST /api/v1/auth/users`, que cria owner. Rota que não casa (401 antes do roteamento, 404, 405) grava o path cru, com o id do titular em claro, e a exclusão não alcança. Escrita que estoura 500 depois de gravar some da trilha. O `X-Request-ID` do cliente entra sem validação.
 - [x] **Média.** No SSO (ADR-0042), o filtro de domínio e a criação de conta aceitam e-mail não verificado. Num provedor com cadastro aberto, alguém entra como `ceo@empresa.com` e ocupa o e-mail do dono real.
 - [x] **Média.** O cookie que prende o login ao navegador guarda o próprio `state`, que também vai na URL. Quem intercepta `code` e `state` monta o cookie e troca o código pela sessão da vítima, que é o que o PKCE devia impedir.
-- [ ] **Média.** O canário (ADR-0040) vale também para membro de time, etapa de workflow e suíte, sorteado a cada run, contra o ADR. A suíte do time fica instável e os runs das etapas entram na comparação.
-- [ ] **Média.** O Agno monta o agente antes de gerar o `session_id` da conversa nova. A primeira mensagem sem sessão é sorteada à parte, e a conversa troca de versão no segundo turno em até 42% dos casos com o canário em 30%.
+- [x] **Média.** O canário (ADR-0040) vale também para membro de time, etapa de workflow e suíte, sorteado a cada run, contra o ADR. A suíte do time fica instável e os runs das etapas entram na comparação.
+- [x] **Média.** O Agno monta o agente antes de gerar o `session_id` da conversa nova. A primeira mensagem sem sessão é sorteada à parte, e a conversa troca de versão no segundo turno em até 42% dos casos com o canário em 30%.
 - [ ] **Média.** O OTLP (ADR-0043) manda o texto do erro em `status.description` mesmo sem `OTEL_EXPORT_CONTENT`, e o `session.id`, que muitos clientes preenchem com telefone ou e-mail.
 - [ ] **Média.** A importação de CSV roda o banco síncrono dentro do event loop e confere o limite de 50 casos só depois de consultar cada linha. Um arquivo de 512 KB com 100 mil linhas trava a API.
 - [ ] **Baixa.** A exportação de CSV deixa célula começando com `=`, `+`, `-` ou `@` como fórmula do Excel; nome e mensagem podem vir de conversa real. `outras` com JSON muito aninhado e campo acima de 128 KB dão 500.
 - [x] **Baixa.** A exclusão do titular mantém o IP das ações dele na trilha e o `subject` das rotas de orçamento por quem chama.
 - [x] **Baixa.** E-mail com maiúscula cadastrado pelo owner não é achado pelo SSO, que cria outra conta. Conta SSO removida volta no próximo login, e o papel rebaixado no painel volta pelo grupo; o painel não avisa.
 - [x] **Baixa.** `?sso_erro=` mostra qualquer texto na tela de login do domínio oficial. Sem `CLIENT_IP_HEADER`, o limite do SSO vale para todos juntos.
-- [ ] **Baixa.** Dois pedidos simultâneos de canário a partir do rascunho publicam duas versões; promover concorrendo com publicar pode deixar canário sobre a vigente nova.
+- [x] **Baixa.** Dois pedidos simultâneos de canário a partir do rascunho publicam duas versões; promover concorrendo com publicar pode deixar canário sobre a vigente nova.
 
 Risco aceito: o pseudônimo do titular é `sha256` sem chave, o que já vale desde o ADR-0032; trocar a função quebraria a ligação com o que já foi pseudonimizado. A latência de um `INSERT` por escrita fica, e o ADR-0041 passa a dizer que a gravação acontece antes da resposta voltar.
 
@@ -1649,7 +1649,7 @@ Nenhuma tela vaza em 375 px nem devolve 5xx. Os alertas de alvo pequeno são che
 - [x] `docs`: esta seção, ADR-0043 aceito
 - [x] `fix(security)`: SSO com e-mail verificado para criar conta e passar no domínio, segredo do navegador no lugar do state e e-mail sem diferença de caixa
 - [x] `fix(security)`: trilha cobre as escritas do AgentOS e a criação de usuário, sem path cru, e service accounts do AgentOS bloqueadas
-- [ ] `fix(api)`: canário só no agente e no líder da conversa, sessão gerada antes da factory e início e promoção com lock
+- [x] `fix(api)`: canário só no agente e no líder da conversa, sessão gerada antes da factory e início e promoção com lock
 - [ ] `fix(security)`: OTLP sem texto no status e com sessão em hash, CSV sem fórmula, sem 500 e fora do event loop
 
 **Critério de aceite da fase:** cada achado acima com teste que falhava antes da correção.
