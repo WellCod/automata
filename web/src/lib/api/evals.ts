@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import client from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
+import type { components } from "@/lib/api/schema.d.ts";
 import { type EvalCaseInput, type EvalScheduleInput, runActive } from "@/lib/eval-checks";
 
 const path = (configId: string) => ({ params: { path: { config_id: configId } } });
@@ -191,4 +192,33 @@ export function useEvalMutations(configId: string) {
   });
 
   return { saveCase, deleteCase, startRun, updateSettings, saveSchedule, deleteSchedule };
+}
+
+export type CaseImportReport = components["schemas"]["CaseImportReport"];
+
+// casos por CSV (ADR-0043): com dryRun, só o relatório por linha; sem ele, tudo ou nada
+export async function importCases(
+  configId: string,
+  file: File,
+  dryRun: boolean,
+): Promise<CaseImportReport> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await client.POST("/api/v1/configs/{config_id}/eval-cases/import", {
+    params: { path: { config_id: configId }, query: { dry_run: dryRun } },
+    // o tipo gerado espera o objeto do schema; o corpo real é multipart
+    body: form as unknown as never,
+    bodySerializer: (body) => body as unknown as FormData,
+  });
+  if (res.error) {
+    // linha com erro volta 422 com o mesmo relatório da prévia
+    const report = res.error as unknown as Partial<CaseImportReport>;
+    if (Array.isArray(report.rows)) return report as CaseImportReport;
+    throw new Error(apiErrorMessage(res.error, "Falha ao importar a planilha"));
+  }
+  return res.data!;
+}
+
+export function exportCasesUrl(configId: string): string {
+  return `/api/api/v1/configs/${configId}/eval-cases/export`;
 }
