@@ -1,6 +1,6 @@
 # ADR-0043 — Traces por OTLP e casos de teste por CSV
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-11-12
 
 ## Contexto
