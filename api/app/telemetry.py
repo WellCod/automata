@@ -43,6 +43,7 @@ CONTENT_PREFIXES = (
 
 _lock = threading.Lock()
 _attached = False
+_processor: BatchSpanProcessor | None = None
 
 
 def _is_content(key: str) -> bool:
@@ -115,7 +116,7 @@ def _otlp_exporter() -> SpanExporter:
 
 def attach_otlp(settings: Settings, exporter: SpanExporter | None = None) -> bool:
     """Liga a exportação; devolve se o processador entrou agora."""
-    global _attached
+    global _attached, _processor
     if not settings.otel_export_enabled:
         return False
     if not settings.tracing_enabled:
@@ -129,16 +130,24 @@ def attach_otlp(settings: Settings, exporter: SpanExporter | None = None) -> boo
         if _attached:
             return False
         resource = Resource.create({"service.name": settings.otel_service_name})
-        provider.add_span_processor(
-            BatchSpanProcessor(
-                FilteringExporter(
-                    exporter or _otlp_exporter(), resource, settings.otel_export_content
-                )
-            )
+        processor = BatchSpanProcessor(
+            FilteringExporter(exporter or _otlp_exporter(), resource, settings.otel_export_content)
         )
+        provider.add_span_processor(processor)
+        _processor = processor
         _attached = True
     logger.info(
         "exportação OTLP ligada",
         extra={"service": settings.otel_service_name, "content": settings.otel_export_content},
     )
     return True
+
+
+def shutdown_otlp() -> None:
+    """Esvazia e desliga o processador; o provider segue gravando no banco."""
+    global _attached, _processor
+    with _lock:
+        if _processor is not None:
+            _processor.shutdown()  # type: ignore[no-untyped-call]
+        _processor = None
+        _attached = False
