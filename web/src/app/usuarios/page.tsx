@@ -260,6 +260,12 @@ function UserRow({ user, isSelf }: { user: UserAccount; isSelf: boolean }) {
         <div className="flex flex-wrap justify-end gap-2">
           {mode === "remove" ? (
             <>
+              {user.sso && (
+                <p className="text-muted-foreground basis-full text-right text-[11px]">
+                  Conta do SSO: ela volta no próximo login se a pessoa ainda tiver acesso no
+                  provedor. Para bloquear, tire o acesso lá ou mantenha a conta desativada.
+                </p>
+              )}
               <Button size="xs" variant="destructive" onClick={() => remove.mutate()}>
                 Confirmar remoção
               </Button>

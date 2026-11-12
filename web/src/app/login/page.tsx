@@ -32,6 +32,13 @@ function LogoMark() {
   );
 }
 
+const SSO_ERRORS: Record<string, string> = {
+  cancelado: "Login cancelado no provedor.",
+  expirado: "O login expirou ou já foi usado. Tente de novo.",
+  sem_acesso: "Sua conta no provedor não tem acesso ao painel. Fale com quem administra.",
+  indisponivel: "Não foi possível entrar pelo provedor agora. Tente de novo.",
+};
+
 type SsoInfo = { enabled: boolean; label: string; password_login: boolean };
 
 export default function LoginPage() {
@@ -46,7 +53,11 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   // erro do retorno do provedor vem na URL (ADR-0042)
-  const [serverError, setServerError] = useState(useSearchParams().get("sso_erro") ?? "");
+  // erro do retorno do provedor vem como código; texto livre na URL não aparece (Fase 49)
+  const ssoCode = useSearchParams().get("sso_erro");
+  const [serverError, setServerError] = useState(
+    ssoCode ? (SSO_ERRORS[ssoCode] ?? SSO_ERRORS.indisponivel) : "",
+  );
   const { data: sso } = useQuery({
     queryKey: ["sso-info"],
     queryFn: async (): Promise<SsoInfo> => (await fetch("/api/auth/oidc")).json(),
@@ -81,6 +92,7 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
+        <h1 className="sr-only">Entrar no automata</h1>
         <div className="mb-8 flex items-center gap-2">
           <LogoMark />
           <span className="text-foreground text-[13px] font-medium tracking-tight">automata</span>

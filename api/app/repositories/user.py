@@ -12,7 +12,10 @@ class UserRepository:
         self._session = session
 
     def get_by_email(self, email: str) -> User | None:
-        return self._session.scalar(select(User).where(User.email == email))
+        # sem diferença de caixa: o owner cadastra Fulano@, o provedor manda fulano@ (Fase 49)
+        return self._session.scalar(
+            select(User).where(func.lower(User.email) == email.strip().lower())
+        )
 
     def create(self, email: str, hashed_password: str, role: UserRole) -> User:
         user = User(email=email, hashed_password=hashed_password, role=role)

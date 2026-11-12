@@ -126,6 +126,10 @@ class UserService:
                 if user.sso_subject is not None:
                     raise PermissionError("Conta já ligada a outro login do provedor")
             else:
+                # conta nova só com e-mail confirmado: senão o e-mail de outra pessoa fica
+                # ocupado por quem se cadastrou no provedor com ele (Fase 49)
+                if not email_verified:
+                    raise PermissionError("E-mail não verificado no provedor")
                 user = User(email=email, hashed_password=None, role=role)
                 session.add(user)
             user.sso_issuer = issuer

@@ -110,6 +110,7 @@ services:
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
       JWT_PREVIOUS_PUBLIC_KEY: ${JWT_PREVIOUS_PUBLIC_KEY:-}
       CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:-}
+      PUBLIC_URL: ${PUBLIC_URL:-}
     ports:
       - "3000:3000"
     healthcheck:

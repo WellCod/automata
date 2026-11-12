@@ -123,7 +123,11 @@ def _b64(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
 
-def start(session: Session) -> str:
+def browser_hash(browser_key: str) -> str:
+    return hashlib.sha256(browser_key.encode()).hexdigest()
+
+
+def start(session: Session, browser_key: str) -> str:
     """URL do provedor; state, nonce e verificador ficam na tabela por 10 minutos."""
     s = get_settings()
     doc = discovery()
@@ -132,7 +136,14 @@ def start(session: Session) -> str:
     verifier = secrets.token_urlsafe(48)
     now = datetime.now(UTC)
     session.execute(delete(OidcLogin).where(OidcLogin.created_at < now - STATE_TTL))
-    session.add(OidcLogin(state=state, nonce=nonce, code_verifier=verifier))
+    session.add(
+        OidcLogin(
+            state=state,
+            nonce=nonce,
+            code_verifier=verifier,
+            browser_hash=browser_hash(browser_key),
+        )
+    )
     session.commit()
     query = {
         "response_type": "code",
@@ -242,8 +253,11 @@ def verify(token: str, nonce: str) -> Identity:
     )
 
 
-def finish(session: Session, code: str, state: str) -> Identity:
+def finish(session: Session, code: str, state: str, browser_key: str) -> Identity:
     row = _consume(session, state)
+    # code e state vazados não bastam: falta o segredo que só o navegador que começou tem
+    if not hmac.compare_digest(row.browser_hash, browser_hash(browser_key)):
+        raise OidcError("Login expirado ou já usado; tente de novo")
     return verify(_exchange(code, row.code_verifier), row.nonce)
 
 
@@ -288,3 +302,7 @@ def domain_allowed(email: str) -> bool:
     raw = get_settings().oidc_allowed_domains
     domains = {d.strip().lower().lstrip("@") for d in raw.split(",") if d.strip()}
     return not domains or email.rsplit("@", 1)[-1] in domains
+
+
+def domains_configured() -> bool:
+    return bool(get_settings().oidc_allowed_domains.strip())

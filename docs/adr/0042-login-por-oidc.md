@@ -48,4 +48,5 @@ Discovery, token e JWKS saem pelo `guarded_client`; discovery e JWKS ficam em ca
 
 - A instância passa a confiar no provedor para dizer quem é a pessoa e o grupo dela: um grupo mapeado para `owner` dá acesso total.
 - Pessoa que sai da empresa perde o acesso no próximo login, não na hora.
+- Revisão da Fase 49: o login fica preso a um segredo do navegador, gerado pelo BFF e guardado só em cookie httpOnly, com o hash em `oidc_login`; o `state` vai na URL e sozinho não prendia nada. Conta nova e filtro de domínio exigem `email_verified`. Conta removida volta no próximo login enquanto houver acesso no provedor.
 - O login por SSO fica no log estruturado, como o por senha; a trilha de auditoria segue fora de `/api/v1/auth/*` (ADR-0041).

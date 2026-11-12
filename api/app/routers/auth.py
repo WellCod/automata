@@ -137,9 +137,15 @@ class OidcStart(BaseModel):
     url: str
 
 
+class OidcStartInput(BaseModel):
+    # segredo do navegador, gerado pelo BFF e guardado só no cookie httpOnly
+    browser_key: str = Field(min_length=32, max_length=128)
+
+
 class OidcCallback(BaseModel):
     code: str = Field(min_length=1, max_length=4096)
     state: str = Field(min_length=1, max_length=64)
+    browser_key: str = Field(min_length=32, max_length=128)
 
 
 @router.get("/oidc", response_model=OidcInfo)
@@ -150,14 +156,14 @@ def oidc_info() -> OidcInfo:
 
 
 @router.post("/oidc/start", response_model=OidcStart)
-def oidc_start(request: Request, session: SessionDep) -> OidcStart:
+def oidc_start(request: Request, body: OidcStartInput, session: SessionDep) -> OidcStart:
     if not oidc.enabled():
         raise HTTPException(status_code=404, detail="SSO não configurado")
     request.app.state.rate_limiter.check(
         f"oidc:start:{get_client_ip(request)}", limit=_LOGIN_LIMIT_PER_IP
     )
     try:
-        return OidcStart(url=oidc.start(session))
+        return OidcStart(url=oidc.start(session, body.browser_key))
     except oidc.OidcError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
@@ -169,7 +175,7 @@ def oidc_callback(request: Request, body: OidcCallback, session: SessionDep) -> 
     ip = get_client_ip(request)
     request.app.state.rate_limiter.check(f"oidc:callback:{ip}", limit=_LOGIN_LIMIT_PER_IP)
     try:
-        identity = oidc.finish(session, body.code, body.state)
+        identity = oidc.finish(session, body.code, body.state, body.browser_key)
     except oidc.OidcError as e:
         logger.warning("sso failed", extra={"ip": ip, "reason": str(e)})
         raise HTTPException(status_code=401, detail=str(e)) from e
@@ -177,7 +183,11 @@ def oidc_callback(request: Request, body: OidcCallback, session: SessionDep) -> 
     if role is None:
         logger.warning("sso sem papel", extra={"ip": ip})
         raise HTTPException(status_code=403, detail="Seu grupo no provedor não dá acesso ao painel")
-    if identity.email and not oidc.domain_allowed(identity.email):
+    # domínio só vale com e-mail confirmado pelo provedor: num provedor com cadastro
+    # aberto, qualquer um digita ceo@empresa.com (Fase 49)
+    if oidc.domains_configured() and not (
+        identity.email and identity.email_verified and oidc.domain_allowed(identity.email)
+    ):
         raise HTTPException(status_code=403, detail="Domínio de e-mail não autorizado")
     svc = UserService(UserRepository(session))
     try:
