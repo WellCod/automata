@@ -70,8 +70,14 @@ class CanaryState(BaseModel):
     canary: VersionStats | None
 
 
-def _config_or_404(session: Session, config_id: UUID) -> AgentConfig:
-    config = ConfigRepository(session).get_config(config_id)
+def _config_or_404(session: Session, config_id: UUID, lock: bool = False) -> AgentConfig:
+    # escrita trava a linha: dois inícios simultâneos publicariam duas versões, e promover
+    # junto com publicar deixaria canário sobre a vigente nova (Fase 49)
+    config = (
+        session.get(AgentConfig, config_id, with_for_update=True)
+        if lock
+        else ConfigRepository(session).get_config(config_id)
+    )
     if config is None:
         raise HTTPException(status_code=404, detail="Config não encontrada")
     if config.kind not in ("agent", "team"):
@@ -87,6 +93,8 @@ def version_stats(
         AgentRun.agent_config_id == config_id,
         AgentRun.version_id == version.id,
         AgentRun.eval_run_id.is_(None),
+        # run filho (etapa de workflow) não é conversa do agente
+        AgentRun.parent_run_id.is_(None),
     ]
     if since is not None:
         where.append(AgentRun.created_at >= since)
@@ -154,7 +162,7 @@ def get_canary(config_id: UUID, session: SessionDep) -> CanaryState:
 def start_canary(
     config_id: UUID, body: CanaryStart, session: SessionDep, request: Request
 ) -> CanaryState:
-    config = _config_or_404(session, config_id)
+    config = _config_or_404(session, config_id, lock=True)
     if config.canary_version_id is not None:
         raise HTTPException(status_code=409, detail="Já há um canário; promova ou desligue antes")
     if config.current_version_id is None:
@@ -206,7 +214,7 @@ def start_canary(
 def change_percent(
     config_id: UUID, body: CanaryPercent, session: SessionDep, request: Request
 ) -> CanaryState:
-    config = _config_or_404(session, config_id)
+    config = _config_or_404(session, config_id, lock=True)
     if config.canary_version_id is None:
         raise HTTPException(status_code=409, detail="Não há canário ligado")
     note(request, percent_before=config.canary_percent, percent_after=body.percent)
@@ -217,7 +225,7 @@ def change_percent(
 
 @router.post("/promote", response_model=CanaryState, dependencies=_PUBLISH)
 def promote(config_id: UUID, session: SessionDep, request: Request) -> CanaryState:
-    config = _config_or_404(session, config_id)
+    config = _config_or_404(session, config_id, lock=True)
     if config.canary_version_id is None:
         raise HTTPException(status_code=409, detail="Não há canário ligado")
     promoted = config.canary_version_id
@@ -233,7 +241,7 @@ def promote(config_id: UUID, session: SessionDep, request: Request) -> CanarySta
 
 @router.delete("", response_model=CanaryState, dependencies=_PUBLISH)
 def stop(config_id: UUID, session: SessionDep, request: Request) -> CanaryState:
-    config = _config_or_404(session, config_id)
+    config = _config_or_404(session, config_id, lock=True)
     if config.canary_version_id is None:
         raise HTTPException(status_code=409, detail="Não há canário ligado")
     note(request, canary_version=config.canary_version_id, percent=config.canary_percent)

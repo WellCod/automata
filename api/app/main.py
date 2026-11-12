@@ -41,6 +41,7 @@ from app.routers import PROTECTED_ROUTERS
 from app.routers.auth import router as auth_router
 from app.routers.connector_webhook import router as connector_webhook_router
 from app.routers.health import router as health_router
+from app.session_id import SessionIdMiddleware
 from app.settings import get_settings
 from app.telemetry import attach_otlp
 
@@ -235,6 +236,8 @@ def create_app(
     # as rotas protegidas rodam no app do AgentOS e limitam a busca na base com o mesmo
     protected.state.rate_limiter = outer.state.rate_limiter
     outer.add_middleware(SyncPublishedAgentsMiddleware, published=published)
+    # conversa nova ganha sessão antes da factory: o canário escolhe pela sessão (Fase 49)
+    outer.add_middleware(SessionIdMiddleware)
     if enable_auth:
         outer.add_middleware(RevocationMiddleware, revoked=revoked)
     # dentro do RequestID, para a trilha levar o mesmo request_id do log (ADR-0041)

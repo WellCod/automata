@@ -192,7 +192,8 @@ def publish_draft(
     config_id: UUID, session: SessionDep, request: Request
 ) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
-    config = repo.get_config(config_id)
+    # trava a linha: publicar e mexer no canário ao mesmo tempo não se atropelam (Fase 49)
+    config = session.get(AgentConfig, config_id, with_for_update=True)
     before = config.current_version_id if config is not None else None
     if config is not None and config.require_passing_evals:
         verdict = draft_verdict(session, config)
@@ -227,7 +228,7 @@ def rollback(
     config_id: UUID, body: RollbackInput, session: SessionDep, request: Request
 ) -> AgentConfigVersionSummary:
     repo = ConfigRepository(session)
-    found = repo.get_config(config_id)
+    found = session.get(AgentConfig, config_id, with_for_update=True)
     before = found.current_version_id if found is not None else None
     service = ConfigService(repo, McpServerRepository(session), KnowledgeBaseRepository(session))
     try:

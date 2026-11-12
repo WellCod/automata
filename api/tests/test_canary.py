@@ -218,3 +218,76 @@ def test_versao_pedida_vence_o_canario(client: TestClient) -> None:
     for i in range(20):
         resolved = load_version(uuid.UUID(agent), uuid.UUID(v1), f"s{i}")
         assert str(resolved.version_id) == v1
+
+
+def test_conversa_sem_sessao_fica_na_versao_do_primeiro_turno(client: TestClient) -> None:
+    from app.agents.canary import in_canary
+
+    agent = _agent(client, "canário sem sessão")
+    current = _current(client, agent)
+    _draft(client, agent, "v2")
+    canary = client.post(f"/api/v1/configs/{agent}/canary", json={"percent": 50}).json()
+    canary_id = canary["canary"]["version_id"]
+
+    for _ in range(16):
+        resp = client.post(f"/agents/{agent}/runs", data={"message": "oi", "stream": "false"})
+        resp.raise_for_status()
+        session = resp.json()["session_id"]
+        # o primeiro turno já caiu na versão da sessão que o middleware gerou
+        expected = canary_id if in_canary(uuid.UUID(agent), session, 50) else current
+        _run(client, agent, session)
+        assert _run_versions(agent)[session] == {expected}
+
+
+def test_membro_etapa_e_suite_ficam_na_vigente(client: TestClient) -> None:
+    from app.agents.factory import load_team, load_version
+
+    agent = _agent(client, "canário membro")
+    current = _current(client, agent)
+    _draft(client, agent, "v2")
+    client.post(f"/api/v1/configs/{agent}/canary", json={"percent": 50}).raise_for_status()
+    for i in range(20):
+        # sem `canary=True` (membro, etapa, suíte), nunca sorteia
+        assert str(load_version(uuid.UUID(agent), None, f"s{i}").version_id) == current
+        assert str(load_version(uuid.UUID(agent), None).version_id) == current
+
+    team = client.post(
+        "/api/v1/configs", json={"name": "time canário", "description": "x", "kind": "team"}
+    ).json()["id"]
+    client.put(
+        f"/api/v1/configs/{team}/draft",
+        json={
+            "name": "t",
+            "description": "x",
+            "payload": {
+                "model_id": "claude-haiku-4-5",
+                "team": {"mode": "coordinate", "members": [{"agent_id": agent}]},
+            },
+        },
+    ).raise_for_status()
+    client.post(f"/api/v1/configs/{team}/publish").raise_for_status()
+    for i in range(20):
+        resolved = load_team(uuid.UUID(team), None, f"s{i}", canary=True)
+        ((_, member),) = resolved.members
+        assert str(member.version_id) == current
+
+
+def test_comparacao_ignora_run_filho(client: TestClient) -> None:
+    from app.agents.tracking import RunRecord, persist
+
+    agent = _agent(client, "canário filho")
+    _draft(client, agent, "v2")
+    canary = client.post(f"/api/v1/configs/{agent}/canary", json={"percent": 10}).json()
+    persist(
+        RunRecord(
+            agent_config_id=uuid.UUID(agent),
+            model_id="claude-haiku-4-5",
+            user_id="u",
+            run_id=f"{agent}-filho",
+            status="success",
+            duration_ms=10,
+            parent_run_id="workflow-run",
+            version_id=uuid.UUID(canary["canary"]["version_id"]),
+        )
+    )
+    assert client.get(f"/api/v1/configs/{agent}/canary").json()["canary"]["runs"] == 0
