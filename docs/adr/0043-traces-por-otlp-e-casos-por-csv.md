@@ -27,13 +27,14 @@ Duas lacunas para quem opera a plataforma junto com o resto da empresa.
 |---|---|
 | `nome`, `mensagem` | nome e entrada do caso (obrigatórios) |
 | `contexto` | turnos anteriores, um por linha da célula |
-| `contem`, `nao_contem`, `comeca_com` | checagem de texto; vários valores separados por `;` |
-| `tools` | tools que precisam ser chamadas, separadas por `;` |
+| `contem`, `nao_contem`, `comeca_com` | checagem de texto; vários valores separados por `|` |
+| `tools` | tools que precisam ser chamadas, separadas por `|` |
 | `criterio`, `nota_minima` | juiz; com nota, modo numérico |
 | `bloqueio` | `sim` ou a regra esperada |
-| `etapas` | etapas do workflow que precisam rodar, separadas por `;` |
+| `etapas` | etapas do workflow que precisam rodar, separadas por `|` |
+| `outras` | checagens sem coluna própria, em JSON (a exportação usa para não perder nada) |
 
-Cada linha passa pela mesma validação do formulário (`EvalCaseInput` e a checagem por tipo de config). A importação é tudo ou nada: com `dry_run=true` devolve o relatório por linha sem gravar; sem ele, grava só se nenhuma linha tiver erro, respeitando o máximo de 50 casos e o nome único. O painel mostra a prévia e só então confirma.
+O separador de colunas é `,` ou `;`, detectado no cabeçalho, porque o Excel em português salva com `;`; por isso as listas dentro da célula usam `|`. O arquivo pode vir em UTF-8 ou Windows-1252. Cada linha passa pela mesma validação do formulário (`EvalCaseInput` e a checagem por tipo de config). A importação é tudo ou nada: com `dry_run=true` devolve o relatório por linha sem gravar; sem ele, grava só se nenhuma linha tiver erro, respeitando o máximo de 50 casos e o nome único. O painel mostra a prévia e só então confirma.
 
 ## Alternativas descartadas
 
