@@ -1,45 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { API_URL, STATE_COOKIE, forwardHeaders, publicUrl } from "@/lib/bff/oidc";
+import { API_URL, BROWSER_COOKIE, type SsoError, forwardHeaders, publicUrl } from "@/lib/bff/oidc";
 
-function back(req: NextRequest, message: string) {
+function back(req: NextRequest, code: SsoError) {
   const url = publicUrl(req, "/login");
-  url.searchParams.set("sso_erro", message);
+  // código, não texto: a tela de login mostra só as mensagens dela (Fase 49)
+  url.searchParams.set("sso_erro", code);
   const res = NextResponse.redirect(url);
-  res.cookies.delete({ name: STATE_COOKIE, path: "/api/auth/oidc" });
+  res.cookies.delete({ name: BROWSER_COOKIE, path: "/api/auth/oidc" });
   return res;
 }
 
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   // o provedor devolve error quando a pessoa cancela ou não tem acesso ao app
-  if (params.get("error")) return back(req, "Login cancelado no provedor");
+  if (params.get("error")) return back(req, "cancelado");
   const code = params.get("code");
   const state = params.get("state");
-  const expected = req.cookies.get(STATE_COOKIE)?.value;
-  if (!code || !state || !expected || state !== expected) {
-    return back(req, "Login expirado; tente de novo");
-  }
+  const browserKey = req.cookies.get(BROWSER_COOKIE)?.value;
+  if (!code || !state || !browserKey) return back(req, "expirado");
 
-  let data: { access_token?: string; detail?: unknown };
-  let ok = false;
+  let data: { access_token?: string };
+  let status = 0;
   try {
     const upstream = await fetch(`${API_URL}/api/v1/auth/oidc/callback`, {
       method: "POST",
       headers: forwardHeaders(req),
-      body: JSON.stringify({ code, state }),
+      body: JSON.stringify({ code, state, browser_key: browserKey }),
     });
-    ok = upstream.ok;
+    status = upstream.status;
     data = (await upstream.json()) as typeof data;
   } catch {
-    return back(req, "Não foi possível falar com a API");
+    return back(req, "indisponivel");
   }
-  if (!ok || !data.access_token) {
-    return back(req, typeof data.detail === "string" ? data.detail : "Login recusado");
-  }
+  if (status === 403) return back(req, "sem_acesso");
+  if (status === 401) return back(req, "expirado");
+  if (status !== 200 || !data.access_token) return back(req, "indisponivel");
 
   const res = NextResponse.redirect(publicUrl(req, "/"));
-  res.cookies.delete({ name: STATE_COOKIE, path: "/api/auth/oidc" });
+  res.cookies.delete({ name: BROWSER_COOKIE, path: "/api/auth/oidc" });
   res.cookies.set("automata_token", data.access_token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

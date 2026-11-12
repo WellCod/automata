@@ -54,6 +54,12 @@ def _password_complexity(v: str) -> str:
 
 class CreateUserInput(BaseModel):
     email: EmailStr
+
+    @field_validator("email")
+    @classmethod
+    def email_minusculo(cls, v: str) -> str:
+        return v.lower()
+
     password: str = Field(min_length=12)
     role: UserRole = UserRole.viewer
 

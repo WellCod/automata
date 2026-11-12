@@ -28,6 +28,10 @@ from testcontainers.postgres import PostgresContainer
 from alembic import command
 from app.settings import get_settings
 
+# segredo do navegador que o BFF gera e guarda no cookie (Fase 49)
+KEY = "segredo-do-navegador-" + "x" * 24
+START = {"browser_key": KEY}
+
 ISSUER = "https://clerk.empresa.example.com"
 CLIENT = "painel"
 
@@ -155,13 +159,16 @@ def client(idp: EcIdp) -> Generator[TestClient, None, None]:
 
 
 def _login(client: TestClient, idp: EcIdp, **claims: Any) -> httpx.Response:
-    started = client.post("/api/v1/auth/oidc/start")
+    started = client.post("/api/v1/auth/oidc/start", json=START)
     if started.status_code != 200:
         return started
     query = parse_qs(urlsplit(started.json()["url"]).query)
     idp.nonce = query["nonce"][0]
     idp.claims = claims
-    return client.post("/api/v1/auth/oidc/callback", json={"code": "x", "state": query["state"][0]})
+    return client.post(
+        "/api/v1/auth/oidc/callback",
+        json={"code": "x", "state": query["state"][0], "browser_key": KEY},
+    )
 
 
 def _person(role: str | None = "dev") -> dict[str, Any]:
@@ -208,7 +215,7 @@ def test_discovery_com_outro_issuer_e_jwks_fora_do_ar(client: TestClient, idp: E
 
     idp.issuer_in_discovery = "https://atacante.example.com"
     oidc.reset_cache()
-    resp = client.post("/api/v1/auth/oidc/start")
+    resp = client.post("/api/v1/auth/oidc/start", json=START)
     assert resp.status_code == 502
     assert "issuer" in resp.json()["detail"]
 
@@ -231,7 +238,7 @@ def test_provedor_na_rede_interna_e_barrado(db: None, monkeypatch: pytest.Monkey
     try:
         app = create_app(auto_provision_dbs=True, enable_auth=True, enable_mcp_server=False)
         with TestClient(app) as c:
-            resp = c.post("/api/v1/auth/oidc/start")
+            resp = c.post("/api/v1/auth/oidc/start", json=START)
         assert resp.status_code == 502
     finally:
         monkeypatch.setenv("OIDC_ISSUER", ISSUER)

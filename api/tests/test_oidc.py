@@ -20,6 +20,10 @@ from testcontainers.postgres import PostgresContainer
 from alembic import command
 from app.settings import get_settings
 
+# segredo do navegador que o BFF gera e guarda no cookie (Fase 49)
+KEY = "segredo-do-navegador-" + "x" * 24
+START = {"browser_key": KEY}
+
 ISSUER = "https://idp.example.com"
 CLIENT = "automata-painel"
 
@@ -150,14 +154,15 @@ def client(idp: FakeIdp) -> Generator[TestClient, None, None]:
 
 
 def _login(client: TestClient, idp: FakeIdp, **claims: Any) -> httpx.Response:
-    started = client.post("/api/v1/auth/oidc/start")
+    started = client.post("/api/v1/auth/oidc/start", json=START)
     assert started.status_code == 200, started.text
     query = parse_qs(urlsplit(started.json()["url"]).query)
     assert query["code_challenge_method"] == ["S256"]
     idp.nonce = query["nonce"][0]
     idp.claims = claims
     return client.post(
-        "/api/v1/auth/oidc/callback", json={"code": "c-1", "state": query["state"][0]}
+        "/api/v1/auth/oidc/callback",
+        json={"code": "c-1", "state": query["state"][0], "browser_key": KEY},
     )
 
 
@@ -197,16 +202,17 @@ def test_primeiro_login_cria_conta_com_papel_do_grupo(client: TestClient, idp: F
 
 
 def test_state_vale_uma_vez(client: TestClient, idp: FakeIdp) -> None:
-    started = client.post("/api/v1/auth/oidc/start").json()
+    started = client.post("/api/v1/auth/oidc/start", json=START).json()
     query = parse_qs(urlsplit(started["url"]).query)
     idp.nonce = query["nonce"][0]
     idp.claims = {"sub": f"s-{_uid()}", "email": f"{_uid()}@empresa.com", "email_verified": True}
-    body = {"code": "c", "state": query["state"][0]}
+    body = {"code": "c", "state": query["state"][0], "browser_key": KEY}
     assert client.post("/api/v1/auth/oidc/callback", json=body).status_code == 200
     assert client.post("/api/v1/auth/oidc/callback", json=body).status_code == 401
     assert (
         client.post(
-            "/api/v1/auth/oidc/callback", json={"code": "c", "state": "inventado"}
+            "/api/v1/auth/oidc/callback",
+            json={"code": "c", "state": "inventado", "browser_key": KEY},
         ).status_code
         == 401
     )
@@ -233,11 +239,14 @@ def test_id_token_adulterado_e_recusado(client: TestClient, idp: FakeIdp, falha:
         claims["exp"] = int(time.time()) - 3600
     elif falha == "iss":
         claims["iss"] = "https://outro.example.com"
-    started = client.post("/api/v1/auth/oidc/start").json()
+    started = client.post("/api/v1/auth/oidc/start", json=START).json()
     query = parse_qs(urlsplit(started["url"]).query)
     idp.nonce = "nonce-trocado" if falha == "nonce" else query["nonce"][0]
     idp.claims = claims
-    resp = client.post("/api/v1/auth/oidc/callback", json={"code": "c", "state": query["state"][0]})
+    resp = client.post(
+        "/api/v1/auth/oidc/callback",
+        json={"code": "c", "state": query["state"][0], "browser_key": KEY},
+    )
     assert resp.status_code == 401, resp.text
 
 
@@ -363,3 +372,43 @@ def test_login_por_senha_desligado_e_conta_sso_sem_senha(
     finally:
         monkeypatch.delenv("PASSWORD_LOGIN")
         get_settings.cache_clear()
+
+
+def test_code_e_state_vazados_sem_o_segredo_do_navegador(client: TestClient, idp: FakeIdp) -> None:
+    started = client.post("/api/v1/auth/oidc/start", json=START).json()
+    query = parse_qs(urlsplit(started["url"]).query)
+    idp.nonce = query["nonce"][0]
+    idp.claims = {"sub": f"s-{_uid()}", "email": f"{_uid()}@empresa.com", "email_verified": True}
+    stolen = {"code": "c", "state": query["state"][0], "browser_key": "outro-" + "y" * 40}
+    assert client.post("/api/v1/auth/oidc/callback", json=stolen).status_code == 401
+    # o state foi consumido: nem o dono consegue reaproveitar
+    real = {**stolen, "browser_key": KEY}
+    assert client.post("/api/v1/auth/oidc/callback", json=real).status_code == 401
+
+
+def test_conta_nova_e_dominio_so_com_email_verificado(
+    client: TestClient, idp: FakeIdp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    nova = _login(
+        client, idp, sub=f"s-{_uid()}", email=f"{_uid()}@empresa.com", email_verified=False
+    )
+    assert nova.status_code == 403
+    monkeypatch.setenv("OIDC_ALLOWED_DOMAINS", "empresa.com")
+    get_settings.cache_clear()
+    try:
+        ceo = _login(client, idp, sub=f"s-{_uid()}", email="ceo@empresa.com", email_verified=False)
+        assert ceo.status_code == 403
+        assert ceo.json()["detail"] == "Domínio de e-mail não autorizado"
+    finally:
+        monkeypatch.delenv("OIDC_ALLOWED_DOMAINS")
+        get_settings.cache_clear()
+
+
+def test_email_com_maiuscula_cadastrado_pelo_owner_e_ligado(
+    client: TestClient, idp: FakeIdp
+) -> None:
+    u = _uid()
+    user_id = _local_user(client, f"Fulano.{u}@Empresa.com")
+    resp = _login(client, idp, sub=f"s-{u}", email=f"fulano.{u}@empresa.com", email_verified=True)
+    assert resp.status_code == 200, resp.text
+    assert _me(client, resp.json()["access_token"])["id"] == user_id
