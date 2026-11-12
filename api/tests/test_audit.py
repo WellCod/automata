@@ -40,6 +40,15 @@ SECRET = "segredo-do-prompt-7781"
         ("POST", "/agents/a/runs/r/continue", True),
         ("POST", "/workflows/w/runs/r/continue", True),
         ("POST", "/agents/a/runs", False),
+        ("POST", "/teams/t/runs/", False),
+        # Fase 49: criar usuário e as escritas nativas do AgentOS entram
+        ("POST", "/api/v1/auth/users", True),
+        ("POST", "/api/v1/auth/oidc/callback", False),
+        ("POST", "/approvals/a/resolve", True),
+        ("DELETE", "/sessions/s1", True),
+        ("PATCH", "/memories/m1", True),
+        ("POST", "/agents/a/runs/r/cancel", True),
+        ("POST", "/mcp", False),
     ],
 )
 def test_o_que_entra_na_trilha(method: str, path: str, expected: bool) -> None:
@@ -284,11 +293,25 @@ def test_retencao_e_exclusao_do_titular(client: TestClient) -> None:
         request_id="r1",
         detail=None,
     )
+    record(
+        actor="owner",
+        action="PUT /api/v1/caller-budgets/{subject}",
+        params={"subject": "pessoa-1"},
+        status_code=200,
+        ip="10.0.0.2",
+        request_id="r2",
+        detail=None,
+    )
     with Session(get_engine()) as session:
-        assert forget_subject(session, "pessoa-1", "anon-1") == 2
+        assert forget_subject(session, "pessoa-1", "anon-1") == 3
         session.commit()
         row = session.scalars(select(AuditEvent).where(AuditEvent.actor == "anon-1")).one()
         assert row.params == {"user_id": "anon-1"}
+        # o IP das ações do titular sai; o de quem agiu sobre ele fica
+        assert row.ip is None
+        budget = session.scalars(select(AuditEvent).where(AuditEvent.request_id == "r2")).one()
+        assert budget.params == {"subject": "anon-1"}
+        assert budget.ip == "10.0.0.2"
 
         row.created_at = datetime.now(UTC) - timedelta(days=400)
         session.commit()
@@ -296,3 +319,66 @@ def test_retencao_e_exclusao_do_titular(client: TestClient) -> None:
         assert (
             session.scalars(select(AuditEvent).where(AuditEvent.actor == "anon-1")).first() is None
         )
+
+
+def test_service_accounts_do_agentos_bloqueadas(client: TestClient) -> None:
+    owner = _h("owner", OWNER)
+    for method, path in (("GET", "/service-accounts"), ("POST", "/service-accounts")):
+        resp = client.request(
+            method, path, json={"name": "x", "scopes": ["agent_os:admin"]}, headers=owner
+        )
+        assert resp.status_code == 404, (method, resp.text)
+
+
+def test_rota_sem_casar_nao_grava_path_cru(client: TestClient) -> None:
+    owner = _h("owner", OWNER)
+    client.post("/api/v1/nao-existe/cpf-12345678900/erase", headers=owner)
+    from app.db import get_engine
+
+    with Session(get_engine()) as session:
+        dump = session.execute(text("SELECT string_agg(audit_event::text, '|') FROM audit_event"))
+        text_dump = dump.scalar() or ""
+    assert "12345678900" not in text_dump
+    assert "POST /api/v1/*/*/erase" in text_dump
+
+
+def test_request_id_do_cliente_so_no_formato_curto(client: TestClient) -> None:
+    owner = _h("owner", OWNER)
+    agent = _agent(client, "request id")
+    good = client.post(
+        f"/api/v1/configs/{agent}/publish", headers={**owner, "X-Request-ID": "corr-123"}
+    )
+    assert good.headers["X-Request-ID"] == "corr-123"
+    forged = client.post(
+        f"/api/v1/configs/{agent}/publish",
+        headers={**owner, "X-Request-ID": 'x" injetado; DROP'},
+    )
+    assert forged.headers["X-Request-ID"] != 'x" injetado; DROP'
+    assert len(forged.headers["X-Request-ID"]) == 36
+
+
+def test_escrita_que_estoura_500_entra_na_trilha(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.routers.canary as canary_router
+
+    owner = _h("owner", OWNER)
+    agent = _agent(client, "estoura")
+    client.post(f"/api/v1/configs/{agent}/publish", headers=owner).raise_for_status()
+    client.put(
+        f"/api/v1/configs/{agent}/draft",
+        json={"name": "estoura", "description": "x", "payload": {"model_id": "gpt-4o"}},
+        headers=owner,
+    ).raise_for_status()
+
+    # o canário é gravado e a montagem da resposta estoura depois
+    def boom(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("falhou depois de gravar")
+
+    monkeypatch.setattr(canary_router, "_state", boom)
+    loose = TestClient(client.app, raise_server_exceptions=False)
+    resp = loose.post(f"/api/v1/configs/{agent}/canary", json={"percent": 5}, headers=owner)
+    assert resp.status_code == 500
+    last = [e for e in _events(agent) if str(e["action"]).endswith("/canary")][-1]
+    assert last["status"] == 500
+    assert last["actor"] == "owner"
