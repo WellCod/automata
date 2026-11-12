@@ -1,17 +1,29 @@
 """Casos de teste e execução da suíte por agente e time (ADR-0015)."""
 
+import re
 from dataclasses import asdict
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.authz import Scope, require_resource_scope, require_scopes
 from app.db import SessionDep, get_db
-from app.evals import webhook
+from app.evals import csv_cases, webhook
 from app.evals.compare import compare, suite_states
 from app.evals.gate import draft_verdict, latest_run
 from app.evals.runner import execute
@@ -238,6 +250,96 @@ def suggest_cases(
         if len(found) >= limit:
             break
     return found
+
+
+class CaseImportRow(BaseModel):
+    line: int
+    name: str
+    errors: list[str]
+
+
+class CaseImportReport(BaseModel):
+    created: int
+    dry_run: bool
+    rows: list[CaseImportRow]
+
+
+@router.get("/export", response_class=Response)
+def export_cases(config_id: UUID, session: SessionDep) -> Response:
+    """Suíte em CSV (ADR-0043), no formato que a importação lê."""
+    config = _config_or_404(session, config_id)
+    body = csv_cases.dump(EvalCaseRepository(session).list_by_config(config_id))
+    filename = re.sub(r"[^A-Za-z0-9_-]+", "-", config.name).strip("-") or "suite"
+    return Response(
+        content=body.encode("utf-8-sig"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="casos-{filename}.csv"'},
+    )
+
+
+@router.post("/import", response_model=CaseImportReport, dependencies=_WRITE)
+async def import_cases(
+    config_id: UUID,
+    request: Request,
+    session: SessionDep,
+    file: UploadFile,
+    dry_run: bool = Query(default=False),
+) -> CaseImportReport | JSONResponse:
+    """Tudo ou nada: com qualquer linha errada nada é gravado (ADR-0043)."""
+    config = _config_or_404(session, config_id)
+    raw = await file.read(csv_cases.MAX_BYTES + 1)
+    try:
+        rows = csv_cases.parse(raw)
+    except csv_cases.CsvError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not rows:
+        raise HTTPException(status_code=422, detail="Nenhum caso no arquivo")
+    history, names = _workflow_shape(session, config)
+    repo = EvalCaseRepository(session)
+    seen: set[str] = set()
+    for row in rows:
+        if row.case is not None:
+            problem = kind_problem(config.kind, row.case, history, names)
+            if problem is not None:
+                row.errors.append(problem)
+        key = row.name.casefold()
+        if row.name and key in seen:
+            row.errors.append("nome repetido no arquivo")
+        elif row.name and repo.name_taken(config_id, row.name):
+            row.errors.append("já existe um caso com esse nome na suíte")
+        seen.add(key)
+    room = MAX_CASES - repo.count(config_id)
+    report = CaseImportReport(
+        created=0,
+        dry_run=dry_run,
+        rows=[CaseImportRow(line=r.line, name=r.name, errors=r.errors) for r in rows],
+    )
+    if len(rows) > room:
+        raise HTTPException(
+            status_code=422,
+            detail=f"A suíte comporta mais {max(room, 0)} casos; o arquivo tem {len(rows)}",
+        )
+    if dry_run:
+        return report
+    if any(r.errors for r in rows):
+        return JSONResponse(status_code=422, content=report.model_dump())
+    actor = _actor(request)
+    for row in rows:
+        assert row.case is not None
+        repo.add(
+            EvalCase(
+                agent_config_id=config_id,
+                name=row.case.name,
+                input=row.case.input,
+                context=row.case.context,
+                checks=[c.model_dump() for c in row.case.checks],
+                position=repo.next_position(config_id),
+                updated_by=actor,
+            )
+        )
+    session.commit()
+    report.created = len(rows)
+    return report
 
 
 @router.post("", response_model=EvalCaseResponse, status_code=201, dependencies=_WRITE)

@@ -510,6 +510,12 @@ Salvar usa o `POST` de casos com `source_run_id` (migration 0027), que fica no c
 
 O limite de uma checagem de tools e uma de juiz por caso vem do `Case` do runner de suíte do Agno, que tem um campo para cada. São até 50 casos por config. Run de workflow ainda não vira caso pela sugestão (422). Viewer lê (`evals:read`); editor cria, edita e apaga (`evals:write`).
 
+### Casos por CSV
+
+ADR-0043, `app/evals/csv_cases.py`. `GET /api/v1/configs/{id}/eval-cases/export` devolve a suíte em CSV com `;` e BOM, para abrir direto no Excel em português. `POST .../eval-cases/import` recebe o arquivo (multipart `file`, até 512 KB) e lê o mesmo formato, com `,` ou `;` detectado no cabeçalho e UTF-8 ou Windows-1252. Colunas, com acento e caixa ignorados: `nome`, `mensagem` (obrigatórias), `contexto` (um turno por linha da célula), `contem`, `nao_contem` e `comeca_com` (vários valores separados por `|`), `tools`, `criterio` e `nota_minima` (com nota, juiz numérico), `bloqueio` (`sim` ou a regra) e `etapas`. Checagem sem coluna própria (texto numa etapa, tools exclusivas, segundo juiz, schema) sai em `outras`, em JSON, e volta igual.
+
+Cada linha passa pelo `EvalCaseInput` e pelo `kind_problem` do formulário, além de nome único no arquivo e na suíte. Com `dry_run=true` a resposta é o relatório por linha (`line`, `name`, `errors`) sem gravar. Sem ele, qualquer erro devolve 422 com o mesmo relatório e nada é gravado; o arquivo que passaria do máximo de 50 casos é recusado inteiro. Coluna desconhecida, coluna obrigatória faltando, arquivo vazio ou grande demais dão 422 antes de olhar as linhas.
+
 ### Execução da suíte
 
 `POST /api/v1/configs/{id}/eval-runs` com `version_id` opcional cria um `eval_run` (migration 0020) e responde 202. Sem `version_id`, testa o rascunho, se houver; senão, a vigente. A versão precisa ser da própria config. Uma execução por config por vez (409), e a suíte precisa ter ao menos um caso.
