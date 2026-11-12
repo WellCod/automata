@@ -35,6 +35,10 @@ COLUMNS = (
 REQUIRED = ("nome", "mensagem")
 _TEXT_COLUMNS = {"contem": "contains", "nao_contem": "not_contains", "comeca_com": "starts_with"}
 _YES = {"sim", "s", "x", "true", "1", "yes"}
+# célula que o Excel leria como fórmula; a exportação põe um apóstrofo na frente e a
+# importação tira (Fase 49): nome e mensagem podem vir de conversa real
+_FORMULA = ("=", "+", "-", "@", "\t", "\r")
+MAX_OTHER = 4000
 _CHECKS = TypeAdapter(list[EvalCheck])
 
 
@@ -106,10 +110,15 @@ def _checks(cells: dict[str, str]) -> tuple[list[Any], list[str]]:
     if steps:
         checks.append({"type": "steps", "steps": steps})
     other = cells.get("outras", "").strip()
-    if other:
+    if len(other) > MAX_OTHER:
+        errors.append(f"outras: mais de {MAX_OTHER} caracteres")
+    elif other:
         try:
-            checks.extend(json.loads(other))
-        except (json.JSONDecodeError, TypeError):
+            parsed = json.loads(other)
+            if not isinstance(parsed, list):
+                raise TypeError
+            checks.extend(parsed)
+        except (json.JSONDecodeError, TypeError, RecursionError):
             errors.append("outras: JSON inválido")
     return checks, errors
 
@@ -131,29 +140,49 @@ def parse(raw: bytes) -> list[Row]:
     if missing:
         raise CsvError(f"Faltam as colunas: {', '.join(missing)}")
     rows: list[Row] = []
-    for values in reader:
-        line = reader.line_num
-        if not any(v.strip() for v in values):
-            continue
-        cells = {n: (values[i] if i < len(values) else "") for i, n in enumerate(names) if n}
-        row = Row(line=line, name=cells.get("nome", "").strip())
-        checks, errors = _checks(cells)
-        row.errors.extend(errors)
-        context = [t.strip() for t in cells.get("contexto", "").splitlines() if t.strip()]
-        try:
-            parsed_checks = _CHECKS.validate_python(checks)
-            row.case = EvalCaseInput(
-                name=row.name,
-                input=cells.get("mensagem", "").strip(),
-                context=context,
-                checks=parsed_checks,
-            )
-        except ValidationError as exc:
-            row.errors.extend(_error_text(exc))
-        if row.errors:
-            row.case = None
-        rows.append(row)
+    try:
+        for values in reader:
+            rows.extend(_row(reader.line_num, values, names))
+    except csv.Error as exc:
+        # campo acima do limite do módulo csv, aspas sem fechar
+        raise CsvError(f"Linha {reader.line_num}: {exc}") from exc
     return rows
+
+
+def _quoted(value: str) -> bool:
+    return value.startswith("'") and value[1:2] in (*_FORMULA, "'")
+
+
+def _unescape(value: str) -> str:
+    return value[1:] if _quoted(value) else value
+
+
+def _escape(value: str) -> str:
+    # também o texto que já começa com apóstrofo, para a ida e volta não perder nada
+    return f"'{value}" if value.startswith(_FORMULA) or _quoted(value) else value
+
+
+def _row(line: int, values: list[str], names: list[str]) -> list[Row]:
+    if not any(v.strip() for v in values):
+        return []
+    cells = {n: _unescape(values[i] if i < len(values) else "") for i, n in enumerate(names) if n}
+    row = Row(line=line, name=cells.get("nome", "").strip())
+    checks, errors = _checks(cells)
+    row.errors.extend(errors)
+    context = [t.strip() for t in cells.get("contexto", "").splitlines() if t.strip()]
+    try:
+        parsed_checks = _CHECKS.validate_python(checks)
+        row.case = EvalCaseInput(
+            name=row.name,
+            input=cells.get("mensagem", "").strip(),
+            context=context,
+            checks=parsed_checks,
+        )
+    except ValidationError as exc:
+        row.errors.extend(_error_text(exc))
+    if row.errors:
+        row.case = None
+    return [row]
 
 
 def _cells(checks: list[dict[str, Any]]) -> dict[str, str]:
@@ -196,5 +225,5 @@ def dump(cases: list[Any]) -> str:
         cells["nome"] = case.name
         cells["mensagem"] = case.input
         cells["contexto"] = "\n".join(case.context or [])
-        writer.writerow([cells[c] for c in COLUMNS])
+        writer.writerow([_escape(cells[c]) for c in COLUMNS])
     return buf.getvalue()

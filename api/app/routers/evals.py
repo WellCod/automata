@@ -278,24 +278,36 @@ def export_cases(config_id: UUID, session: SessionDep) -> Response:
 
 
 @router.post("/import", response_model=CaseImportReport, dependencies=_WRITE)
-async def import_cases(
+def import_cases(
     config_id: UUID,
     request: Request,
     session: SessionDep,
     file: UploadFile,
     dry_run: bool = Query(default=False),
 ) -> CaseImportReport | JSONResponse:
-    """Tudo ou nada: com qualquer linha errada nada é gravado (ADR-0043)."""
+    """Tudo ou nada: com qualquer linha errada nada é gravado (ADR-0043).
+
+    Síncrona: o banco é síncrono e rodava no event loop, travando a API num arquivo
+    grande (Fase 49). O FastAPI leva a rota para o threadpool."""
     config = _config_or_404(session, config_id)
-    raw = await file.read(csv_cases.MAX_BYTES + 1)
+    raw = file.file.read(csv_cases.MAX_BYTES + 1)
     try:
         rows = csv_cases.parse(raw)
     except csv_cases.CsvError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not rows:
         raise HTTPException(status_code=422, detail="Nenhum caso no arquivo")
-    history, names = _workflow_shape(session, config)
     repo = EvalCaseRepository(session)
+    existing = repo.list_by_config(config_id)
+    # o limite antes de olhar cada linha: 100 mil linhas não viram 100 mil consultas
+    room = MAX_CASES - len(existing)
+    if len(rows) > room:
+        raise HTTPException(
+            status_code=422,
+            detail=f"A suíte comporta mais {max(room, 0)} casos; o arquivo tem {len(rows)}",
+        )
+    history, names = _workflow_shape(session, config)
+    taken = {c.name.casefold() for c in existing}
     seen: set[str] = set()
     for row in rows:
         if row.case is not None:
@@ -305,20 +317,14 @@ async def import_cases(
         key = row.name.casefold()
         if row.name and key in seen:
             row.errors.append("nome repetido no arquivo")
-        elif row.name and repo.name_taken(config_id, row.name):
+        elif row.name and key in taken:
             row.errors.append("já existe um caso com esse nome na suíte")
         seen.add(key)
-    room = MAX_CASES - repo.count(config_id)
     report = CaseImportReport(
         created=0,
         dry_run=dry_run,
         rows=[CaseImportRow(line=r.line, name=r.name, errors=r.errors) for r in rows],
     )
-    if len(rows) > room:
-        raise HTTPException(
-            status_code=422,
-            detail=f"A suíte comporta mais {max(room, 0)} casos; o arquivo tem {len(rows)}",
-        )
     if dry_run:
         return report
     if any(r.errors for r in rows):
