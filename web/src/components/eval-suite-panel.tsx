@@ -31,6 +31,7 @@ import {
   TRIGGER_LABEL,
 } from "@/lib/eval-checks";
 import { blockLabel } from "@/lib/guardrail-labels";
+import { useEvalCsv } from "@/components/eval-csv";
 import { Button } from "@/components/ui/button";
 import { Badge, type BadgeTone } from "@/components/ui/status-badge";
 
@@ -393,6 +394,7 @@ export function EvalSuitePanel({
   onFromRunDone,
 }: Props) {
   const { data: cases = [], isPending: loadingCases } = useEvalCases(configId);
+  const csv = useEvalCsv({ configId, hasCases: cases.length > 0 });
   const { data: runs = [] } = useEvalRuns(configId);
   const { data: settings } = useEvalSettings(configId);
   const { data: judgeModels = [] } = useJudgeModels();
@@ -462,7 +464,8 @@ export function EvalSuitePanel({
             Casos de teste <span className="text-muted-foreground">({cases.length})</span>
           </h3>
           {editing === null && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
+              {csv.actions}
               {kind !== "workflow" && !batch && (
                 <Button size="sm" variant="muted" onClick={() => setBatch(true)}>
                   Sugerir das conversas
@@ -479,6 +482,7 @@ export function EvalSuitePanel({
           Cada caso é uma mensagem e o que precisa ser verdade na resposta. Os casos não fazem parte
           da versão: editar o rascunho não muda o teste.
         </p>
+        {csv.panel}
         {batch && (
           <BatchSuggestions
             configId={configId}

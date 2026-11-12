@@ -619,6 +619,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/configs/{config_id}/eval-cases/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Cases
+         * @description Suíte em CSV (ADR-0043), no formato que a importação lê.
+         */
+        get: operations["export_cases_api_v1_configs__config_id__eval_cases_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/configs/{config_id}/eval-cases/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Cases
+         * @description Tudo ou nada: com qualquer linha errada nada é gravado (ADR-0043).
+         */
+        post: operations["import_cases_api_v1_configs__config_id__eval_cases_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/configs/{config_id}/eval-cases/{case_id}": {
         parameters: {
             query?: never;
@@ -2202,6 +2242,11 @@ export interface components {
             /** Rule */
             rule?: ("pii_detected" | "prompt_injection" | "off_topic" | "input_too_long" | "moderation" | "classifier" | "output_not_allowed" | "output_classifier") | null;
         };
+        /** Body_import_cases_api_v1_configs__config_id__eval_cases_import_post */
+        Body_import_cases_api_v1_configs__config_id__eval_cases_import_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_file_api_v1_knowledge_bases__base_id__contents_file_post */
         Body_upload_file_api_v1_knowledge_bases__base_id__contents_file_post: {
             /** File */
@@ -2338,6 +2383,24 @@ export interface components {
              * @enum {string}
              */
             change: "regression" | "fix" | "same" | "new" | "removed";
+        };
+        /** CaseImportReport */
+        CaseImportReport: {
+            /** Created */
+            created: number;
+            /** Dry Run */
+            dry_run: boolean;
+            /** Rows */
+            rows: components["schemas"]["CaseImportRow"][];
+        };
+        /** CaseImportRow */
+        CaseImportRow: {
+            /** Line */
+            line: number;
+            /** Name */
+            name: string;
+            /** Errors */
+            errors: string[];
         };
         /** ChunkPreview */
         ChunkPreview: {
@@ -5975,6 +6038,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvalCaseSuggestion"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_cases_api_v1_configs__config_id__eval_cases_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                config_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_cases_api_v1_configs__config_id__eval_cases_import_post: {
+        parameters: {
+            query?: {
+                dry_run?: boolean;
+            };
+            header?: never;
+            path: {
+                config_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_cases_api_v1_configs__config_id__eval_cases_import_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseImportReport"];
                 };
             };
             /** @description Validation Error */
