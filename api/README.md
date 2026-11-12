@@ -437,6 +437,8 @@ Com `TRACING_ENABLED=true` (padrão), o AgentOS grava em banco, via OpenTelemetr
 - O trace traz entrada e saída da conversa, então segue a regra do Agno: só o dono do run ou owner. Run sem trace (tracing desligado ou anterior a ele) dá 404.
 - A rota é própria porque as `/traces` do Agno ficam fora do OpenAPI que gera os tipos do painel.
 
+**Traces por OTLP** (ADR-0043, `app/telemetry.py`): com `OTEL_EXPORT_ENABLED=true`, os mesmos spans também saem por OTLP/HTTP para o endpoint de `OTEL_EXPORTER_OTLP_ENDPOINT`, com os cabeçalhos de `OTEL_EXPORTER_OTLP_HEADERS` (as variáveis padrão do OpenTelemetry, que Datadog, Grafana e Honeycomb documentam). Um `BatchSpanProcessor` entra no `TracerProvider` que o AgentOS cria no construtor, uma vez por processo. O span sai com `service.name` de `OTEL_SERVICE_NAME` (`automata-api`). Sem `OTEL_EXPORT_CONTENT=true`, o `FilteringExporter` tira `input.value`, `output.value`, mensagens e prompts do modelo, parâmetros e argumentos de tool, documentos da busca, `metadata` e `user.id`, e deixa da exceção só o tipo; ficam nome, duração, status, modelo, tokens, `session.id` e os ids do Agno. Sem `TRACING_ENABLED`, não há spans e a API avisa no log. O endpoint é do ambiente, então não passa pelo `guarded_client`.
+
 ## Workflows (ADR-0014)
 
 Workflow é um config com `kind: "workflow"`, criado com `POST /api/v1/configs` e `"kind": "workflow"`. Tem rascunho, publicação, rollback e versões como agente e time. O payload não tem modelo (`model_id` fica `null`; o serviço recusa modelo em workflow e exige em agente e time). A estrutura vai na seção `workflow.steps`, uma árvore de nós com `type`:

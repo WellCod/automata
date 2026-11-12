@@ -1603,7 +1603,7 @@ Decisão em [ADR-0042](adr/0042-login-por-oidc.md). O painel ganha "Entrar com" 
 Decisão em [ADR-0043](adr/0043-traces-por-otlp-e-casos-por-csv.md). Os spans de cada execução também saem por OTLP para a ferramenta de observabilidade da empresa, sem o texto da conversa por padrão. A suíte de testes importa e exporta casos por CSV.
 
 - [x] `docs(adr)`: ADR-0043 e esta seção
-- [ ] `feat(api)`: exportação dos traces por OTLP sem o conteúdo da conversa por padrão
+- [x] `feat(api)`: exportação dos traces por OTLP sem o conteúdo da conversa por padrão
 - [ ] `feat(api)`: importação e exportação dos casos da suíte por CSV
 - [ ] `feat(web)`: importação por CSV com prévia e exportação na aba de testes
 - [ ] `test(api)`: evals da exportação por OTLP e do CSV
