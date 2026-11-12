@@ -41,6 +41,7 @@ from app.routers.auth import router as auth_router
 from app.routers.connector_webhook import router as connector_webhook_router
 from app.routers.health import router as health_router
 from app.settings import get_settings
+from app.telemetry import attach_otlp
 
 logger = logging.getLogger(__name__)
 
@@ -215,6 +216,8 @@ def create_app(
         telemetry=False,
         queue=background_queue(settings),
     ).get_app()
+    # o AgentOS acabou de montar o provider global; o OTLP entra como segundo destino
+    attach_otlp(settings)
 
     # auth_router fica fora do middleware do Agno: /login precisa ser público
     # (não tem como exigir JWT para obter JWT). O /users tem proteção própria

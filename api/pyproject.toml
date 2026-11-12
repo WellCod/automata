@@ -24,6 +24,7 @@ dependencies = [
     # já vinha pelo agno; declarado porque a saída estruturada valida schema e resposta
     "jsonschema>=4.26",
     "cohere>=5.15",
+    "opentelemetry-exporter-otlp-proto-http==1.44.0",
 ]
 
 [dependency-groups]

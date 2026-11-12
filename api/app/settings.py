@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     password_login: bool = True
     # Spans de agente, time, modelo e tool gravados no banco (árvore de execução)
     tracing_enabled: bool = True
+    # traces por OTLP (ADR-0043); endpoint e cabeçalhos pelas variáveis OTEL_EXPORTER_OTLP_*
+    otel_export_enabled: bool = False
+    # true manda o texto da conversa e o id do usuário final ao fornecedor
+    otel_export_content: bool = False
+    otel_service_name: str = "automata-api"
     # Laço que roda as suítes agendadas (ADR-0016); no modo demo fica desligado de qualquer jeito
     eval_scheduler_enabled: bool = True
     # runs com background=true na fila durável do Agno, no Postgres (ADR-0020);
