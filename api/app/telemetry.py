@@ -6,6 +6,7 @@ entra mais um processador, uma vez por processo. Sem `OTEL_EXPORT_CONTENT`, o sp
 sem o texto da conversa e sem o id do usuário final.
 """
 
+import hashlib
 import logging
 import threading
 from collections.abc import Mapping, Sequence
@@ -15,6 +16,7 @@ from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import Event, ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter, SpanExportResult
+from opentelemetry.trace import Status
 
 from app.settings import Settings
 
@@ -51,7 +53,12 @@ def _is_content(key: str) -> bool:
 
 
 def _without_content(attributes: Mapping[str, Any] | None) -> dict[str, Any]:
-    return {k: v for k, v in (attributes or {}).items() if not _is_content(k)}
+    kept = {k: v for k, v in (attributes or {}).items() if not _is_content(k)}
+    # muita integração usa telefone ou e-mail como sessão: sai em hash, que ainda junta os
+    # spans da mesma conversa no fornecedor (Fase 49)
+    if isinstance(kept.get("session.id"), str):
+        kept["session.id"] = hashlib.sha256(kept["session.id"].encode()).hexdigest()[:16]
+    return kept
 
 
 def _events_without_content(events: Sequence[Event]) -> list[Event]:
@@ -91,7 +98,8 @@ class FilteringExporter(SpanExporter):
             else _events_without_content(span.events),
             links=span.links,
             kind=span.kind,
-            status=span.status,
+            # o instrumentador põe str(exceção) na descrição, com o texto que falhou
+            status=span.status if self._include_content else Status(span.status.status_code),
             start_time=span.start_time,
             end_time=span.end_time,
             instrumentation_scope=span.instrumentation_scope,

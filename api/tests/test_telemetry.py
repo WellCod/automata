@@ -7,6 +7,7 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import StatusCode
 
 from app import telemetry
 from app.settings import Settings
@@ -40,10 +41,16 @@ def _export(include_content: bool) -> dict[str, object]:
             raise ValueError("falhou com o CPF 123.456.789-09")
         except ValueError as exc:
             span.record_exception(exc)
+            # como o instrumentador do Agno faz
+            span.set_status(StatusCode.ERROR, str(exc))
     (finished,) = sink.get_finished_spans()
     assert finished.resource.attributes["service.name"] == "automata-teste"
     events = [dict(e.attributes or {}) for e in finished.events]
-    return {"attrs": dict(finished.attributes or {}), "events": events}
+    return {
+        "attrs": dict(finished.attributes or {}),
+        "events": events,
+        "status": (finished.status.status_code, finished.status.description),
+    }
 
 
 def test_sem_conteudo_por_padrao() -> None:
@@ -52,13 +59,15 @@ def test_sem_conteudo_por_padrao() -> None:
     assert isinstance(attrs, dict)
     assert attrs["llm.model_name"] == "claude-haiku-4-5"
     assert attrs["llm.token_count.prompt"] == 120
-    assert attrs["session.id"] == "s-1"
+    # sessão em hash: junta a conversa sem mandar o telefone ou e-mail que vier nela
+    assert attrs["session.id"] != "s-1" and len(attrs["session.id"]) == 16
     assert attrs["agno.run.id"] == "r-1"
     for key in ATTRS:
         if key.startswith(("input.", "output.", "llm.input", "llm.output", "tool.", "user.")):
             assert key not in attrs, key
     assert "123.456.789-09" not in repr(got)
     assert got["events"] == [{"exception.type": "ValueError"}]
+    assert got["status"] == (StatusCode.ERROR, None)
 
 
 def test_conteudo_liberado() -> None:
@@ -67,6 +76,8 @@ def test_conteudo_liberado() -> None:
     assert isinstance(attrs, dict)
     assert attrs["input.value"] == "meu CPF é 123.456.789-09"
     assert attrs["user.id"] == "cliente-77"
+    assert attrs["session.id"] == "s-1"
+    assert got["status"][1] == "falhou com o CPF 123.456.789-09"
 
 
 @pytest.fixture

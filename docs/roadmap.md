@@ -1628,9 +1628,9 @@ Quinta rodada de verificação, sobre o topo da pilha da Fase 48, com foco no qu
 - [x] **Média.** O cookie que prende o login ao navegador guarda o próprio `state`, que também vai na URL. Quem intercepta `code` e `state` monta o cookie e troca o código pela sessão da vítima, que é o que o PKCE devia impedir.
 - [x] **Média.** O canário (ADR-0040) vale também para membro de time, etapa de workflow e suíte, sorteado a cada run, contra o ADR. A suíte do time fica instável e os runs das etapas entram na comparação.
 - [x] **Média.** O Agno monta o agente antes de gerar o `session_id` da conversa nova. A primeira mensagem sem sessão é sorteada à parte, e a conversa troca de versão no segundo turno em até 42% dos casos com o canário em 30%.
-- [ ] **Média.** O OTLP (ADR-0043) manda o texto do erro em `status.description` mesmo sem `OTEL_EXPORT_CONTENT`, e o `session.id`, que muitos clientes preenchem com telefone ou e-mail.
-- [ ] **Média.** A importação de CSV roda o banco síncrono dentro do event loop e confere o limite de 50 casos só depois de consultar cada linha. Um arquivo de 512 KB com 100 mil linhas trava a API.
-- [ ] **Baixa.** A exportação de CSV deixa célula começando com `=`, `+`, `-` ou `@` como fórmula do Excel; nome e mensagem podem vir de conversa real. `outras` com JSON muito aninhado e campo acima de 128 KB dão 500.
+- [x] **Média.** O OTLP (ADR-0043) manda o texto do erro em `status.description` mesmo sem `OTEL_EXPORT_CONTENT`, e o `session.id`, que muitos clientes preenchem com telefone ou e-mail.
+- [x] **Média.** A importação de CSV roda o banco síncrono dentro do event loop e confere o limite de 50 casos só depois de consultar cada linha. Um arquivo de 512 KB com 100 mil linhas trava a API.
+- [x] **Baixa.** A exportação de CSV deixa célula começando com `=`, `+`, `-` ou `@` como fórmula do Excel; nome e mensagem podem vir de conversa real. `outras` com JSON muito aninhado e campo acima de 128 KB dão 500.
 - [x] **Baixa.** A exclusão do titular mantém o IP das ações dele na trilha e o `subject` das rotas de orçamento por quem chama.
 - [x] **Baixa.** E-mail com maiúscula cadastrado pelo owner não é achado pelo SSO, que cria outra conta. Conta SSO removida volta no próximo login, e o papel rebaixado no painel volta pelo grupo; o painel não avisa.
 - [x] **Baixa.** `?sso_erro=` mostra qualquer texto na tela de login do domínio oficial. Sem `CLIENT_IP_HEADER`, o limite do SSO vale para todos juntos.
@@ -1650,6 +1650,6 @@ Nenhuma tela vaza em 375 px nem devolve 5xx. Os alertas de alvo pequeno são che
 - [x] `fix(security)`: SSO com e-mail verificado para criar conta e passar no domínio, segredo do navegador no lugar do state e e-mail sem diferença de caixa
 - [x] `fix(security)`: trilha cobre as escritas do AgentOS e a criação de usuário, sem path cru, e service accounts do AgentOS bloqueadas
 - [x] `fix(api)`: canário só no agente e no líder da conversa, sessão gerada antes da factory e início e promoção com lock
-- [ ] `fix(security)`: OTLP sem texto no status e com sessão em hash, CSV sem fórmula, sem 500 e fora do event loop
+- [x] `fix(security)`: OTLP sem texto no status e com sessão em hash, CSV sem fórmula, sem 500 e fora do event loop
 
 **Critério de aceite da fase:** cada achado acima com teste que falhava antes da correção.

