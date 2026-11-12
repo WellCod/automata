@@ -14,7 +14,7 @@ O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é
 | **Backend** | Python 3.12 · FastAPI · Agno 3.1.8 · PostgreSQL 17 + pgvector · Redis · Alembic |
 | **Frontend** | Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · TanStack Query |
 | **Qualidade** | mypy strict · ruff · ~1.240 testes pytest (testcontainers) · 250 testes Vitest · Playwright · evals |
-| **Decisões** | 42 ADRs com contexto, alternativas descartadas e gatilho de reversão |
+| **Decisões** | 43 ADRs com contexto, alternativas descartadas e gatilho de reversão |
 
 ---
 
@@ -430,6 +430,7 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0040](docs/adr/0040-liberacao-gradual-de-versao.md) | Liberação gradual de versão: canário por sessão, comparação e promoção manual (Fase 45) |
 | [0041](docs/adr/0041-trilha-de-auditoria.md) | Trilha de auditoria: escritas de `/api/v1` e aprovações com quem, alvo e resultado, antes e depois nas ações de produção (Fase 46) |
 | [0042](docs/adr/0042-login-por-oidc.md) | Login por SSO via OIDC: um provedor por instância, papel pelo grupo e conta criada no primeiro login (Fase 47) |
+| [0043](docs/adr/0043-traces-por-otlp-e-casos-por-csv.md) | Traces por OTLP sem o conteúdo da conversa por padrão e casos de teste por CSV (proposto, Fase 48) |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 
@@ -507,7 +508,7 @@ web/
   src/lib/        client gerado do OpenAPI, SSE, progresso do workflow
   e2e/            Playwright
 docs/
-  adr/            42 Architecture Decision Records
+  adr/            43 Architecture Decision Records
   roadmap.md      fases, auditorias e critérios de aceite
 DESIGN.md         sistema visual do painel
 DEMO.md           demo local sem chave de LLM

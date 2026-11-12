@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 47
+# Roadmap — Fases 4 a 48
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -1597,3 +1597,21 @@ Decisão em [ADR-0042](adr/0042-login-por-oidc.md). O painel ganha "Entrar com" 
 - Conta desativada não entra pelo SSO.
 - O último owner ativo não é rebaixado pelo grupo.
 - Com `PASSWORD_LOGIN=false`, só o owner entra por senha.
+
+## Fase 48 — Traces por OTLP e casos por CSV
+
+Decisão em [ADR-0043](adr/0043-traces-por-otlp-e-casos-por-csv.md). Os spans de cada execução também saem por OTLP para a ferramenta de observabilidade da empresa, sem o texto da conversa por padrão. A suíte de testes importa e exporta casos por CSV.
+
+- [x] `docs(adr)`: ADR-0043 e esta seção
+- [ ] `feat(api)`: exportação dos traces por OTLP sem o conteúdo da conversa por padrão
+- [ ] `feat(api)`: importação e exportação dos casos da suíte por CSV
+- [ ] `feat(web)`: importação por CSV com prévia e exportação na aba de testes
+- [ ] `test(api)`: evals da exportação por OTLP e do CSV
+
+**Critério de aceite da fase:**
+
+- Com `OTEL_EXPORT_ENABLED=true`, um run chega ao endpoint OTLP com `service.name`, modelo, tokens e duração, e sem `input.value` nem mensagens do modelo.
+- Com `OTEL_EXPORT_CONTENT=true`, o conteúdo chega.
+- Desligado, nada sai e o banco continua recebendo os spans.
+- Um CSV exportado volta igual pela importação.
+- Uma linha inválida devolve o número da linha e o motivo, e nada é gravado.
