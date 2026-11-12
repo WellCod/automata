@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 48
+# Roadmap — Fases 4 a 49
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -1615,3 +1615,41 @@ Decisão em [ADR-0043](adr/0043-traces-por-otlp-e-casos-por-csv.md). Os spans de
 - Desligado, nada sai e o banco continua recebendo os spans.
 - Um CSV exportado volta igual pela importação.
 - Uma linha inválida devolve o número da linha e o motivo, e nada é gravado.
+
+## Fase 49 — Auditoria 2026-11-12
+
+Quinta rodada de verificação, sobre o topo da pilha da Fase 48, com foco no que entrou nas Fases 45 a 48: canário, trilha de auditoria, SSO, OTLP e CSV. A segurança teve duas revisões independentes, uma do SSO e das rotas do BFF e outra da trilha, do canário, do CSV e do OTLP. Os achados foram conferidos no código; o de domínio sem verificação, o texto do erro no OTLP, a fórmula no CSV e o 500 do parser foram reproduzidos. A UI foi conferida em 88 telas, inclusive Auditoria, aba Versões com canário e login.
+
+### Segurança
+
+- [ ] **Média.** O AgentOS 3.1.8 monta `/service-accounts`, que cunha um token `agno_pat_` com os scopes de quem pede, inclusive `agent_os:admin`, e sem validade. O middleware do AgentOS aceita esse token. Fica fora das integrações, da rotação de chaves e da trilha.
+- [ ] **Média.** A trilha (ADR-0041) não registra as escritas nativas do AgentOS (aprovar e apagar aprovação, apagar sessão, memórias, agendamentos) nem `POST /api/v1/auth/users`, que cria owner. Rota que não casa (401 antes do roteamento, 404, 405) grava o path cru, com o id do titular em claro, e a exclusão não alcança. Escrita que estoura 500 depois de gravar some da trilha. O `X-Request-ID` do cliente entra sem validação.
+- [ ] **Média.** No SSO (ADR-0042), o filtro de domínio e a criação de conta aceitam e-mail não verificado. Num provedor com cadastro aberto, alguém entra como `ceo@empresa.com` e ocupa o e-mail do dono real.
+- [ ] **Média.** O cookie que prende o login ao navegador guarda o próprio `state`, que também vai na URL. Quem intercepta `code` e `state` monta o cookie e troca o código pela sessão da vítima, que é o que o PKCE devia impedir.
+- [ ] **Média.** O canário (ADR-0040) vale também para membro de time, etapa de workflow e suíte, sorteado a cada run, contra o ADR. A suíte do time fica instável e os runs das etapas entram na comparação.
+- [ ] **Média.** O Agno monta o agente antes de gerar o `session_id` da conversa nova. A primeira mensagem sem sessão é sorteada à parte, e a conversa troca de versão no segundo turno em até 42% dos casos com o canário em 30%.
+- [ ] **Média.** O OTLP (ADR-0043) manda o texto do erro em `status.description` mesmo sem `OTEL_EXPORT_CONTENT`, e o `session.id`, que muitos clientes preenchem com telefone ou e-mail.
+- [ ] **Média.** A importação de CSV roda o banco síncrono dentro do event loop e confere o limite de 50 casos só depois de consultar cada linha. Um arquivo de 512 KB com 100 mil linhas trava a API.
+- [ ] **Baixa.** A exportação de CSV deixa célula começando com `=`, `+`, `-` ou `@` como fórmula do Excel; nome e mensagem podem vir de conversa real. `outras` com JSON muito aninhado e campo acima de 128 KB dão 500.
+- [ ] **Baixa.** A exclusão do titular mantém o IP das ações dele na trilha e o `subject` das rotas de orçamento por quem chama.
+- [ ] **Baixa.** E-mail com maiúscula cadastrado pelo owner não é achado pelo SSO, que cria outra conta. Conta SSO removida volta no próximo login, e o papel rebaixado no painel volta pelo grupo; o painel não avisa.
+- [ ] **Baixa.** `?sso_erro=` mostra qualquer texto na tela de login do domínio oficial. Sem `CLIENT_IP_HEADER`, o limite do SSO vale para todos juntos.
+- [ ] **Baixa.** Dois pedidos simultâneos de canário a partir do rascunho publicam duas versões; promover concorrendo com publicar pode deixar canário sobre a vigente nova.
+
+Risco aceito: o pseudônimo do titular é `sha256` sem chave, o que já vale desde o ADR-0032; trocar a função quebraria a ligação com o que já foi pseudonimizado. A latência de um `INSERT` por escrita fica, e o ADR-0041 passa a dizer que a gravação acontece antes da resposta voltar.
+
+### UI e UX
+
+Nenhuma tela vaza em 375 px nem devolve 5xx. Os alertas de alvo pequeno são checkboxes com rótulo clicável e links dentro do texto, que o WCAG isenta.
+
+- [ ] **Baixa.** A tela de login não tem `h1`.
+
+### PRs
+
+- [x] `docs`: esta seção, ADR-0043 aceito
+- [ ] `fix(security)`: SSO com e-mail verificado para criar conta e passar no domínio, segredo do navegador no lugar do state e e-mail sem diferença de caixa
+- [ ] `fix(security)`: trilha cobre as escritas do AgentOS e a criação de usuário, sem path cru, e service accounts do AgentOS bloqueadas
+- [ ] `fix(api)`: canário só no agente e no líder da conversa, sessão gerada antes da factory e início e promoção com lock
+- [ ] `fix(security)`: OTLP sem texto no status e com sessão em hash, CSV sem fórmula, sem 500 e fora do event loop
+
+**Critério de aceite da fase:** cada achado acima com teste que falhava antes da correção.
