@@ -74,11 +74,50 @@ def _split(value: str) -> list[str]:
     return [v.strip() for v in value.split(LIST_SEP) if v.strip()]
 
 
+# nomes das colunas e dos campos das checagens, para a mensagem falar a língua da planilha
+_FIELDS = {
+    "name": "nome",
+    "input": "mensagem",
+    "context": "contexto",
+    "checks": "checagens",
+    "criteria": "criterio",
+    "threshold": "nota_minima",
+    "tools": "tools",
+    "steps": "etapas",
+    "rule": "bloqueio",
+    "value": "valor",
+}
+
+
+def _message(err: Any) -> str:
+    kind = err.get("type", "")
+    ctx = err.get("ctx") or {}
+    if kind == "string_too_short":
+        low = ctx.get("min_length", 1)
+        return "não pode ficar vazio" if low == 1 else f"precisa de ao menos {low} caracteres"
+    if kind == "string_too_long":
+        return f"passa de {ctx.get('max_length')} caracteres"
+    if kind == "too_short":
+        return "precisa de ao menos uma checagem" if err["loc"][:1] == ("checks",) else "vazio"
+    if kind == "too_long":
+        return f"no máximo {ctx.get('max_length')}"
+    if kind in ("literal_error", "enum"):
+        expected = str(ctx.get("expected", "um valor da lista")).replace(" or ", " ou ")
+        return f"valor não aceito (use {expected})"
+    if kind in ("greater_than_equal", "less_than_equal"):
+        return "fora da faixa aceita"
+    return str(err.get("msg", "inválido"))
+
+
 def _error_text(exc: ValidationError) -> list[str]:
     out = []
     for err in exc.errors():
-        where = ".".join(str(p) for p in err["loc"] if not isinstance(p, int))
-        out.append(f"{where}: {err['msg']}" if where else str(err["msg"]))
+        parts = [str(p) for p in err["loc"] if not isinstance(p, int)]
+        # discriminador da checagem (text, judge...) não é nome de coluna
+        named = [_FIELDS[p] for p in parts if p in _FIELDS]
+        where = named[-1] if named else ""
+        text = _message(err)
+        out.append(f"{where}: {text}" if where else text)
     return out
 
 

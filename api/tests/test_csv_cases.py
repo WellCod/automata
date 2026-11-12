@@ -49,8 +49,8 @@ def test_linha_errada_diz_a_linha_e_o_motivo() -> None:
     )
     rows = csv_cases.parse(raw)
     assert rows[0].errors == []
-    assert rows[1].line == 3 and any("checks" in e for e in rows[1].errors)
-    assert rows[2].line == 4 and any("name" in e for e in rows[2].errors)
+    assert rows[1].line == 3 and any("checagens" in e for e in rows[1].errors)
+    assert rows[2].line == 4 and rows[2].errors == ["nome: não pode ficar vazio"]
     assert rows[3].errors == ["nota_minima sem criterio"]
 
 
