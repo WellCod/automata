@@ -456,3 +456,34 @@ def test_titular_exporta_e_apaga_as_conversas(client: TestClient) -> None:
     counts = erase(subject)
     assert counts["channel_conversations"] == 1
     assert inventory(subject)["channel_messages"] == 0
+
+
+def test_resposta_que_chega_depois_da_passagem_nao_sai(
+    client: TestClient, fake: FakeProviders, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from app.channels import service
+    from app.db import get_engine
+    from app.models.channel import ChannelMessage
+
+    class Slow:
+        tools: list[Any] = []
+
+        async def arun(self, *args: Any, session_id: str, **kwargs: Any) -> Any:
+            # enquanto o agente pensa, outra mensagem passa a conversa para uma pessoa
+            service.handoff(uuid.UUID(session_id), "pedido do cliente")
+            return SimpleNamespace(content="Seu pedido sai amanhã.", is_paused=False, run_id="r1")
+
+    monkeypatch.setattr(service, "_responder", lambda *a: Slow())
+    agent = _agent(client, "resposta atrasada")
+    channel = _channel(client, "whatsapp", agent, WA)
+    _wa_post(client, channel, _wa_body("5511121210000", "meu pedido?"))
+    assert all(s[1]["text"]["body"] != "Seu pedido sai amanhã." for s in fake.sent)
+    with Session(get_engine()) as session:
+        late = session.scalars(
+            select(ChannelMessage).where(
+                ChannelMessage.channel_id == uuid.UUID(channel), ChannelMessage.author == "agent"
+            )
+        ).one()
+    assert late.status == "ignored" and late.text == "Seu pedido sai amanhã."

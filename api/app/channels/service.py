@@ -28,6 +28,7 @@ ONLY_TEXT = "Por enquanto eu só entendo mensagens de texto."
 REASON_KEYWORD = "pedido do cliente"
 REASON_PAUSED = "confirmação de tool pendente"
 HANDOFF_TOOL = "transferir_para_atendente"
+LATE_REPLY = "não enviada: a conversa passou para um atendente antes da resposta"
 FAILED = "Não consegui responder agora. Tente de novo em instantes."
 # mensagens por minuto de uma pessoa num canal: um número não queima o orçamento do agente
 PER_SENDER_LIMIT = 20
@@ -178,6 +179,12 @@ def deliver(
     return True, None
 
 
+def _status(conversation_id: UUID) -> str | None:
+    with Session(get_engine()) as session:
+        conv = session.get(ChannelConversation, conversation_id)
+        return conv.status if conv is not None else None
+
+
 def handoff(conversation_id: UUID, reason: str, assigned_to: str | None = None) -> bool:
     """Passa a conversa para uma pessoa; False quando ela já estava com uma."""
     with Session(get_engine()) as session:
@@ -272,9 +279,23 @@ async def answer(
     paused = bool(getattr(run, "is_paused", False))
     run_id = getattr(run, "run_id", None)
     if content and not paused:
-        await asyncio.to_thread(
-            deliver, channel, saved.conversation_id, reply, content, "agent", run_id
-        )
+        # outra mensagem pode ter passado a conversa para uma pessoa enquanto o agente
+        # pensava: a resposta fica registrada para o atendente, mas não sai
+        if await asyncio.to_thread(_status, saved.conversation_id) != "bot":
+            await asyncio.to_thread(
+                record_outbound,
+                channel.id,
+                saved.conversation_id,
+                "agent",
+                content,
+                status="ignored",
+                error=LATE_REPLY,
+                run_id=run_id,
+            )
+        else:
+            await asyncio.to_thread(
+                deliver, channel, saved.conversation_id, reply, content, "agent", run_id
+            )
     # run pausado esperando confirmação de tool não tem como seguir pelo canal
     reason = asked[0] if asked else (REASON_PAUSED if paused else None)
     if reason is not None and await asyncio.to_thread(handoff, saved.conversation_id, reason):
