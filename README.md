@@ -13,7 +13,7 @@ O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é
 |---|---|
 | **Backend** | Python 3.12 · FastAPI · Agno 3.1.8 · PostgreSQL 17 + pgvector · Redis · Alembic |
 | **Frontend** | Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · TanStack Query |
-| **Qualidade** | mypy strict · ruff · ~1.240 testes pytest (testcontainers) · 250 testes Vitest · Playwright · evals |
+| **Qualidade** | mypy strict · ruff · ~1.280 testes pytest (testcontainers) · 257 testes Vitest · Playwright · evals |
 | **Decisões** | 43 ADRs com contexto, alternativas descartadas e gatilho de reversão |
 
 ---
@@ -172,7 +172,7 @@ O caminho inverso também existe: os próprios agentes e times ficam expostos vi
 
 ### Analytics e rastreamento
 
-Conversas, taxa de falha, bloqueios, latência p50 e p95, tokens e custo, com gráficos diários e uso por agente. Cada execução abre como **árvore**, com time, agentes, chamadas de modelo e tools, e mostra duração, entrada, saída e erro de cada nó.
+Conversas, taxa de falha, bloqueios, latência p50 e p95, tokens e custo, com gráficos diários e uso por agente. Cada execução abre como **árvore**, com time, agentes, chamadas de modelo e tools, e mostra duração, entrada, saída e erro de cada nó. Os mesmos traces também podem sair por **OpenTelemetry (OTLP)** para o Datadog, o Grafana ou o Honeycomb da empresa, sem o texto da conversa por padrão e com a sessão em hash ([ADR-0043](docs/adr/0043-traces-por-otlp-e-casos-por-csv.md)).
 
 O custo sai da tabela de preços de cada modelo quando o provedor só informa tokens, que é o caso da Anthropic e da OpenAI. Cada agente pode ter um **orçamento mensal**, com aviso num percentual e, se ligado, bloqueio dos runs seguintes quando estoura, sem chamar o modelo. Os **destinos de aviso** da instância recebem orçamento perto do limite ou estourado, pico de erro, mudança de estado das suítes agendadas, pedido de titular falho ou perto do prazo, run em background que falhou e diferença de custo. O destino é um webhook assinado com HMAC, pronto para Slack, Teams ou Discord, ou e-mail pelo SMTP da instância.
 
@@ -330,6 +330,7 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 | **CSRF** | `Origin` conferido contra `Host` em todo método que não é seguro. |
 | **Revogação** | Logout revoga o `jti`. Mudar papel, desativar ou trocar senha corta na hora as sessões da pessoa. |
 | **SSO** | Login por OIDC com authorization code e PKCE, `state` de uso único preso ao navegador por cookie e `id_token` conferido pelo JWKS do provedor (sem `none` nem HS*). Conta ligada pelo sujeito do provedor; por e-mail, só verificado. Papel pelo grupo, sem rebaixar o último owner, e login por senha opcional só para o owner ([ADR-0042](docs/adr/0042-login-por-oidc.md)). |
+| **Traces OTLP** | Desligado por padrão. Ligado, o span sai sem texto da conversa, prompt, argumentos de tool, id do usuário final nem a mensagem do erro, e com a sessão em hash; o conteúdo só sai com `OTEL_EXPORT_CONTENT=true` ([ADR-0043](docs/adr/0043-traces-por-otlp-e-casos-por-csv.md)). |
 | **Auditoria** | Toda escrita em `/api/v1` e toda decisão de aprovação gravadas com autor, IP, alvo e resultado, inclusive as recusadas, sem o corpo da requisição. Só o owner lê, e a exclusão do titular troca o id dele pelo pseudônimo também ali ([ADR-0041](docs/adr/0041-trilha-de-auditoria.md)). |
 | **Papéis e scopes** | `owner`, `editor`, `viewer`. Toda rota, própria ou do AgentOS, exige scope. |
 | **Rate limit** | Login limitado por e-mail e IP, por e-mail e por IP no Redis, sem deixar ninguém travar a conta de outro. `X-Forwarded-For` só vale vindo de proxy listado em `TRUSTED_PROXIES`, e o painel só repassa o IP do cabeçalho de `CLIENT_IP_HEADER`. Busca de teste na base limitada por usuário. |
@@ -346,9 +347,9 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 
 | Camada | Ferramenta | Cobertura |
 |---|---|---|
-| API | pytest + testcontainers | ~1.240 testes contra Postgres com pgvector real, sem mock de banco. Gate de cobertura de 70%. |
+| API | pytest + testcontainers | ~1.280 testes contra Postgres com pgvector real, sem mock de banco. Gate de cobertura de 70%. |
 | Tipos | mypy strict + plugin pydantic · ruff | Rodam em todo PR. |
-| Web | Vitest + Testing Library | 250 testes de componente e de lógica, inclusive o redutor de eventos do workflow, a suíte de testes, a revisão humana, o canário e as rotas do SSO. |
+| Web | Vitest + Testing Library | 257 testes de componente e de lógica, inclusive o redutor de eventos do workflow, a suíte de testes, a revisão humana, o canário e as rotas do SSO. |
 | E2E | Playwright | Login → editar agente → publicar → rollback. |
 | Contrato | openapi-typescript | Os tipos do painel são gerados do OpenAPI da API, nunca escritos à mão. |
 
@@ -500,7 +501,7 @@ api/
     mcp/          cliente MCP, proteção de saída (SSRF)
     routers/      rotas próprias /api/v1
     services/     regras de negócio e validação na escrita
-  alembic/        56 migrations
+  alembic/        57 migrations
   fixtures/       respostas gravadas do modo replay
   tests/          pytest, integração e evals
 web/
