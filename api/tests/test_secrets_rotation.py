@@ -129,6 +129,7 @@ def test_comando_recifra_tudo_e_e_idempotente(db_url: str, monkeypatch: pytest.M
         "alert_destination": 1,
         "knowledge_connector": 0,
         "knowledge_connector_webhook": 0,
+        "channel": 0,
     }
 
     # sem a anterior, tudo abre só com a atual
