@@ -28,7 +28,7 @@ ONLY_TEXT = "Por enquanto eu só entendo mensagens de texto."
 REASON_KEYWORD = "pedido do cliente"
 REASON_PAUSED = "confirmação de tool pendente"
 HANDOFF_TOOL = "transferir_para_atendente"
-LATE_REPLY = "não enviada: a conversa passou para um atendente antes da resposta"
+LATE_REPLY = "a conversa passou para um atendente antes da resposta"
 FAILED = "Não consegui responder agora. Tente de novo em instantes."
 # mensagens por minuto de uma pessoa num canal: um número não queima o orçamento do agente
 PER_SENDER_LIMIT = 20
