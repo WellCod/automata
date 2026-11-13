@@ -52,6 +52,10 @@ export async function proxy(req: NextRequest) {
   if (pathname.startsWith("/login") || pathname.startsWith("/api/auth/")) {
     return NextResponse.next();
   }
+  // webhook dos canais (ADR-0044): quem chama é o provedor, e a API confere a assinatura
+  if (pathname.startsWith("/hooks/channels/")) {
+    return NextResponse.next();
+  }
 
   const token = req.cookies.get("automata_token")?.value;
 

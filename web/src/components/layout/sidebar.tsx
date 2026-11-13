@@ -12,11 +12,13 @@ import {
   KeyRound,
   LayoutGrid,
   ListOrdered,
+  MessagesSquare,
   LockKeyhole,
   LogOut,
   Plug,
   ShieldCheck,
   ShieldHalf,
+  Smartphone,
   UserCog,
   UserSearch,
   Users,
@@ -44,6 +46,15 @@ const navItems = [
   { group: "Construir", href: "/mcp", label: "Servidores MCP", icon: Plug, exact: true },
   { group: "Acompanhar", href: "/analytics", label: "Analytics", icon: BarChart3, exact: true },
   { group: "Acompanhar", href: "/aprovacoes", label: "Aprovações", icon: ShieldCheck, exact: true },
+  // quem atende: owner e editor (conversations:handle, ADR-0044)
+  {
+    group: "Acompanhar",
+    href: "/conversas",
+    label: "Conversas",
+    icon: MessagesSquare,
+    exact: true,
+    hideForViewer: true,
+  },
   {
     group: "Acompanhar",
     href: "/alertas",
@@ -57,6 +68,14 @@ const navItems = [
     href: "/fila",
     label: "Fila",
     icon: ListOrdered,
+    exact: true,
+    ownerOnly: true,
+  },
+  {
+    group: "Administração",
+    href: "/canais",
+    label: "Canais",
+    icon: Smartphone,
     exact: true,
     ownerOnly: true,
   },
@@ -129,7 +148,11 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
   const { data: pending } = usePendingApprovals();
   const { data: me } = useMe();
   // a API recusa quem não é owner; o item só some para não levar a uma página vazia
-  const visible = navItems.filter((item) => !item.ownerOnly || me?.role === "owner");
+  const visible = navItems.filter(
+    (item) =>
+      (!item.ownerOnly || me?.role === "owner") &&
+      (!("hideForViewer" in item) || me?.role !== "viewer"),
+  );
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });

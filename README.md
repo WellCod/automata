@@ -170,6 +170,12 @@ Catálogo de servidores MCP externos, com credenciais cifradas e teste de conex�
 
 O caminho inverso também existe: os próprios agentes e times ficam expostos via **MCP server mode** para Claude Desktop, Cursor e outros sistemas, com tokens de integração limitados aos agentes escolhidos e revogáveis na hora. Por REST, um sistema pode pedir o run em **background**: o pedido entra numa fila durável no Postgres e sobrevive a deploy e a crash. A página **Fila** mostra ao owner o que está esperando, rodando e falhou, e devolve à fila o job que falhou.
 
+### WhatsApp, Slack e atendente humano
+
+Um agente ou time publicado atende no **WhatsApp** (Cloud API da Meta) e no **Slack**. O owner cadastra o canal na página Canais, com a credencial cifrada, e configura no provedor o webhook que o painel mostra. Cada pessoa vira uma conversa com histórico, memória e canário próprios, e passa pelos mesmos guardrails e orçamento do agente. A mensagem reenviada pelo provedor não roda o agente duas vezes.
+
+Quando o cliente pede uma pessoa ("quero falar com um atendente"), quando o agente decide transferir ou quando o run para esperando uma aprovação, a conversa passa para a fila da página **Conversas**. Ali o atendente assume, responde pelo próprio canal com o nome gravado e devolve ao agente quando terminar. As conversas entram nos pedidos do titular pelo número ([ADR-0044](docs/adr/0044-canais-de-conversa-e-atendente.md)).
+
 ### Analytics e rastreamento
 
 Conversas, taxa de falha, bloqueios, latência p50 e p95, tokens e custo, com gráficos diários e uso por agente. Cada execução abre como **árvore**, com time, agentes, chamadas de modelo e tools, e mostra duração, entrada, saída e erro de cada nó. Os mesmos traces também podem sair por **OpenTelemetry (OTLP)** para o Datadog, o Grafana ou o Honeycomb da empresa, sem o texto da conversa por padrão e com a sessão em hash ([ADR-0043](docs/adr/0043-traces-por-otlp-e-casos-por-csv.md)).

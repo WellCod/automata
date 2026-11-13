@@ -164,6 +164,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Channels */
+        get: operations["list_channels_api_v1_channels_get"];
+        put?: never;
+        /** Create Channel */
+        post: operations["create_channel_api_v1_channels_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/channels/{channel_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Channel */
+        put: operations["update_channel_api_v1_channels__channel_id__put"];
+        post?: never;
+        /** Delete Channel */
+        delete: operations["delete_channel_api_v1_channels__channel_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/channels/{channel_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Channel
+         * @description Confere a credencial no provedor sem mandar mensagem a ninguém.
+         */
+        post: operations["test_channel_api_v1_channels__channel_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/caller-budgets": {
         parameters: {
             query?: never;
@@ -333,6 +389,111 @@ export interface paths {
         /** Save Draft */
         put: operations["save_draft_api_v1_configs__config_id__draft_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Conversations */
+        get: operations["list_conversations_api_v1_conversations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Conversation */
+        get: operations["get_conversation_api_v1_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/take": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take */
+        post: operations["take_api_v1_conversations__conversation_id__take_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Release
+         * @description Devolve ao agente: a próxima mensagem do cliente é respondida por ele.
+         */
+        post: operations["release_api_v1_conversations__conversation_id__release_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close */
+        post: operations["close_api_v1_conversations__conversation_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{conversation_id}/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reply */
+        post: operations["reply_api_v1_conversations__conversation_id__reply_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -651,6 +812,9 @@ export interface paths {
         /**
          * Import Cases
          * @description Tudo ou nada: com qualquer linha errada nada é gravado (ADR-0043).
+         *
+         *     Síncrona: o banco é síncrono e rodava no event loop, travando a API num arquivo
+         *     grande (Fase 49). O FastAPI leva a rota para o threadpool.
          */
         post: operations["import_cases_api_v1_configs__config_id__eval_cases_import_post"];
         delete?: never;
@@ -2402,6 +2566,107 @@ export interface components {
             /** Errors */
             errors: string[];
         };
+        /** ChannelInput */
+        ChannelInput: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "whatsapp" | "slack";
+            /** Name */
+            name: string;
+            /**
+             * Config Id
+             * Format: uuid
+             */
+            config_id: string;
+            /** Credentials */
+            credentials: {
+                [key: string]: string;
+            };
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Handoff Enabled
+             * @default true
+             */
+            handoff_enabled: boolean;
+            /** Handoff Keywords */
+            handoff_keywords?: string[];
+            /**
+             * Handoff Message
+             * @default Vou te passar para uma pessoa da equipe. Um momento.
+             */
+            handoff_message: string;
+        };
+        /** ChannelResponse */
+        ChannelResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /**
+             * Config Id
+             * Format: uuid
+             */
+            config_id: string;
+            /** Config Name */
+            config_name: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Handoff Enabled */
+            handoff_enabled: boolean;
+            /** Handoff Keywords */
+            handoff_keywords: string[];
+            /** Handoff Message */
+            handoff_message: string;
+            /** Webhook Path */
+            webhook_path: string;
+            /** Credential Fields */
+            credential_fields: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ChannelTest */
+        ChannelTest: {
+            /** Ok */
+            ok: boolean;
+            /** Detail */
+            detail: string;
+        };
+        /** ChannelUpdate */
+        ChannelUpdate: {
+            /** Name */
+            name: string;
+            /**
+             * Config Id
+             * Format: uuid
+             */
+            config_id: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Handoff Enabled */
+            handoff_enabled: boolean;
+            /** Handoff Keywords */
+            handoff_keywords: string[];
+            /** Handoff Message */
+            handoff_message: string;
+            /** Credentials */
+            credentials?: {
+                [key: string]: string;
+            } | null;
+        };
         /** ChunkPreview */
         ChunkPreview: {
             /** Chunks */
@@ -2637,6 +2902,42 @@ export interface components {
             /** Refresh Every Hours */
             refresh_every_hours?: number | null;
         };
+        /** ConversationDetail */
+        ConversationDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Channel Id
+             * Format: uuid
+             */
+            channel_id: string;
+            /** Channel Name */
+            channel_name: string;
+            /** Channel Kind */
+            channel_kind: string;
+            /** User Id */
+            user_id: string;
+            /** Status */
+            status: string;
+            /** Assigned To */
+            assigned_to: string | null;
+            /** Assigned Label */
+            assigned_label: string | null;
+            /** Handoff Reason */
+            handoff_reason: string | null;
+            /** Last Message */
+            last_message: string | null;
+            /**
+             * Last Message At
+             * Format: date-time
+             */
+            last_message_at: string;
+            /** Messages */
+            messages: components["schemas"]["MessageResponse"][];
+        };
         /**
          * ConversationSettings
          * @description Conversa longa (ADR-0019): turnos antigos viram resumo acima de um limite de tokens.
@@ -2666,6 +2967,40 @@ export interface components {
             search_history: boolean;
             /** Summary Model */
             summary_model?: string | null;
+        };
+        /** ConversationSummary */
+        ConversationSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Channel Id
+             * Format: uuid
+             */
+            channel_id: string;
+            /** Channel Name */
+            channel_name: string;
+            /** Channel Kind */
+            channel_kind: string;
+            /** User Id */
+            user_id: string;
+            /** Status */
+            status: string;
+            /** Assigned To */
+            assigned_to: string | null;
+            /** Assigned Label */
+            assigned_label: string | null;
+            /** Handoff Reason */
+            handoff_reason: string | null;
+            /** Last Message */
+            last_message: string | null;
+            /**
+             * Last Message At
+             * Format: date-time
+             */
+            last_message_at: string;
         };
         /** CreateConfigInput */
         CreateConfigInput: {
@@ -3817,12 +4152,39 @@ export interface components {
              */
             retention_days: number;
         };
+        /** MessageResponse */
+        MessageResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Direction */
+            direction: string;
+            /** Author */
+            author: string;
+            /** Author Label */
+            author_label: string | null;
+            /** Text */
+            text: string;
+            /** Status */
+            status: string;
+            /** Error */
+            error: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** OidcCallback */
         OidcCallback: {
             /** Code */
             code: string;
             /** State */
             state: string;
+            /** Browser Key */
+            browser_key: string;
         };
         /** OidcInfo */
         OidcInfo: {
@@ -3837,6 +4199,11 @@ export interface components {
         OidcStart: {
             /** Url */
             url: string;
+        };
+        /** OidcStartInput */
+        OidcStartInput: {
+            /** Browser Key */
+            browser_key: string;
         };
         /**
          * OutputClassifierRule
@@ -4009,6 +4376,11 @@ export interface components {
              * Format: date-time
              */
             fetched_at: string;
+        };
+        /** ReplyInput */
+        ReplyInput: {
+            /** Text */
+            text: string;
         };
         /** ReprocessResult */
         ReprocessResult: {
@@ -5159,6 +5531,154 @@ export interface operations {
             };
         };
     };
+    list_channels_api_v1_channels_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelResponse"][];
+                };
+            };
+        };
+    };
+    create_channel_api_v1_channels_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_channel_api_v1_channels__channel_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_channel_api_v1_channels__channel_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_channel_api_v1_channels__channel_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelTest"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_budgets_api_v1_caller_budgets_get: {
         parameters: {
             query?: never;
@@ -5526,6 +6046,198 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentConfigVersionSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_conversations_api_v1_conversations_get: {
+        parameters: {
+            query?: {
+                status?: ("bot" | "human" | "closed") | null;
+                channel_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_conversation_api_v1_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    take_api_v1_conversations__conversation_id__take_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    release_api_v1_conversations__conversation_id__release_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_api_v1_conversations__conversation_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reply_api_v1_conversations__conversation_id__reply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplyInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
                 };
             };
             /** @description Validation Error */
@@ -8622,7 +9334,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OidcStartInput"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -8631,6 +9347,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OidcStart"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

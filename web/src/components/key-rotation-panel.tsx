@@ -13,6 +13,7 @@ export const SECRET_TABLES: Record<string, string> = {
   alert_destination: "Destinos de alerta",
   knowledge_connector: "Conectores de conhecimento",
   knowledge_connector_webhook: "Webhook dos conectores",
+  channel: "Canais (WhatsApp e Slack)",
 };
 
 export function useKeyRotation() {
