@@ -1,6 +1,6 @@
 """Recifra com a chave atual os segredos que ainda estão na anterior (ADR-0026).
 
-Passa pelas quatro tabelas numa transação só. Valor que nenhuma chave decifra
+Passa por todas as tabelas com segredo numa transação só. Valor que nenhuma chave decifra
 interrompe tudo antes de gravar, com a tabela e o id. Rodar de novo não muda nada.
 
 Uso: python -m app.rotate_secrets
@@ -16,6 +16,7 @@ from sqlalchemy.orm import InstrumentedAttribute, Session
 from app.db import get_engine
 from app.logging_config import configure_logging
 from app.models.alert import AlertDestination
+from app.models.channel import Channel
 from app.models.eval import EvalSchedule
 from app.models.knowledge_connector import KnowledgeConnector
 from app.models.mcp_server import McpServer
@@ -31,6 +32,8 @@ ENCRYPTED: dict[str, InstrumentedAttribute[Any]] = {
     "alert_destination": AlertDestination.webhook_encrypted,
     "knowledge_connector": KnowledgeConnector.secret_encrypted,
     "knowledge_connector_webhook": KnowledgeConnector.webhook_secret_encrypted,
+    # credencial do WhatsApp e do Slack (ADR-0044)
+    "channel": Channel.credentials_encrypted,
 }
 
 
