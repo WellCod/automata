@@ -35,6 +35,8 @@ _SKIP_PREFIXES = (
     "/api/v1/linter",
     # servidor MCP: cada chamada de tool é um POST, já registrado como run
     "/mcp",
+    # mensagem que chega por canal (ADR-0044): já fica em channel_message
+    "/hooks/",
 )
 # conversa não é ação de administração: já está em agent_run, com quem chamou
 _RUN = re.compile(r"^/(agents|teams|workflows)/[^/]+/runs/?$")

@@ -1659,7 +1659,7 @@ Nenhuma tela vaza em 375 px nem devolve 5xx. Os alertas de alvo pequeno são che
 Decisão em [ADR-0044](adr/0044-canais-de-conversa-e-atendente.md). Um agente ou time responde no WhatsApp (Cloud API) e no Slack, com a credencial cadastrada pelo painel, e a conversa passa para uma pessoa quando o cliente pede, quando o agente transfere ou quando o run pausa. O atendente responde pela página Conversas.
 
 - [x] `docs(adr)`: ADR-0044 e esta seção
-- [ ] `feat(api)`: canais whatsapp e slack com credencial cifrada, webhook assinado e resposta do agente
+- [x] `feat(api)`: canais whatsapp e slack com credencial cifrada, webhook assinado e resposta do agente
 - [ ] `feat(api)`: conversas dos canais com passagem para atendente e dados do titular
 - [ ] `feat(web)`: páginas de canais e de conversas com resposta do atendente
 - [ ] `test(api)`: evals dos canais com whatsapp e slack falsos
