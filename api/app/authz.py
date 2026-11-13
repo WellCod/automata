@@ -49,6 +49,8 @@ class Scope:
     QUEUE_ADMIN = "queue:admin"
     # trilha de auditoria (ADR-0041): só owner
     AUDIT_READ = "audit:read"
+    # canais de conversa (ADR-0044): a credencial fala pela empresa, só owner
+    CHANNELS_ADMIN = "channels:admin"
 
 
 def require_resource_scope(resource: str, action: str) -> Callable[[Request], None]:

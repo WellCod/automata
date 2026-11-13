@@ -1,6 +1,7 @@
 from app.models.alert import AlertDestination, AlertSent
 from app.models.audit import AuditEvent
 from app.models.caller_budget import CallerBudget
+from app.models.channel import Channel, ChannelConversation, ChannelMessage
 from app.models.config import AgentConfig, AgentConfigVersion, Base
 from app.models.data_subject import DataSubjectRequest
 from app.models.embedding_usage import EmbeddingUsage
@@ -24,6 +25,9 @@ __all__ = [
     "AlertDestination",
     "AlertSent",
     "CallerBudget",
+    "Channel",
+    "ChannelConversation",
+    "ChannelMessage",
     "AgentConfig",
     "AgentConfigVersion",
     "AgentRun",

@@ -39,6 +39,7 @@ from app.proxy import is_https
 from app.rate_limit import make_rate_limiter
 from app.routers import PROTECTED_ROUTERS
 from app.routers.auth import router as auth_router
+from app.routers.channel_hooks import router as channel_hooks_router
 from app.routers.connector_webhook import router as connector_webhook_router
 from app.routers.health import router as health_router
 from app.session_id import SessionIdMiddleware
@@ -248,6 +249,8 @@ def create_app(
     outer.include_router(health_router)
     # webhook da origem dos conectores (ADR-0039): público, protegido pela assinatura
     outer.include_router(connector_webhook_router)
+    # webhook dos canais de conversa (ADR-0044): público, protegido pela assinatura
+    outer.include_router(channel_hooks_router)
     outer.mount("/", protected)
     return outer
 
