@@ -87,6 +87,9 @@ def inventory(user_id: str) -> dict[str, int]:
         counts["usage_events"] = int(
             session.scalar(select(func.count()).where(UsageEvent.user_id == user_id)) or 0
         )
+        from app.channels import subject as channel_subject
+
+        counts["channel_messages"] = channel_subject.count(session, user_id)
     return counts
 
 
@@ -144,6 +147,10 @@ def build_export(user_id: str) -> dict[str, Any]:
                 .order_by(UsageEvent.period)
             )
         ]
+        from app.channels import subject as channel_subject
+
+        # conversas do WhatsApp e do Slack (ADR-0044)
+        data["channel_conversations"] = channel_subject.export(session, user_id)
     return data
 
 
@@ -316,6 +323,9 @@ def erase(user_id: str) -> dict[str, int]:
         from app.audit import forget_subject
 
         counts["audit_events"] = forget_subject(session, user_id, alias)
+        from app.channels import subject as channel_subject
+
+        counts["channel_conversations"] = channel_subject.erase(session, user_id)
         # o orçamento é configuração do owner: fica, com o pseudônimo no lugar do id. Apagar
         # deixava quem estourou o próprio orçamento pedir a exclusão e voltar a gastar (Fase 43)
         if session.get(CallerBudget, alias) is not None:

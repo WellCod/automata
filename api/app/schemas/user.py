@@ -34,6 +34,7 @@ ROLE_SCOPES: dict[UserRole, list[str]] = {
         Scope.KNOWLEDGE_WRITE,
         Scope.EVALS_WRITE,
         Scope.EVALS_RUN,
+        Scope.CONVERSATIONS_HANDLE,
     ],
     UserRole.viewer: _VIEWER_SCOPES,
 }

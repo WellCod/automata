@@ -329,3 +329,161 @@ def test_canal_desligado_responde_404(client: TestClient) -> None:
             )
         )
     assert count == 0
+
+
+def _conversation(channel: str) -> dict[str, Any]:
+    from app.db import get_engine
+    from app.models.channel import ChannelConversation
+
+    with Session(get_engine()) as session:
+        conv = session.scalars(
+            select(ChannelConversation).where(ChannelConversation.channel_id == uuid.UUID(channel))
+        ).one()
+        return {"id": str(conv.id), "status": conv.status, "reason": conv.handoff_reason}
+
+
+def test_palavra_do_cliente_passa_para_atendente(client: TestClient, fake: FakeProviders) -> None:
+    agent = _agent(client, "palavra")
+    channel = _channel(client, "whatsapp", agent, WA)
+    _wa_post(client, channel, _wa_body("5511555550000", "Quero falar com um ATENDENTE, por favor"))
+    assert _runs(agent) == []
+    assert fake.sent[-1][1]["text"]["body"].startswith("Vou te passar para uma pessoa")
+    conv = _conversation(channel)
+    assert conv["status"] == "human" and conv["reason"] == "pedido do cliente"
+
+    # com a pessoa atendendo, o agente não responde
+    sent = len(fake.sent)
+    _wa_post(client, channel, _wa_body("5511555550000", "alô?"))
+    assert _runs(agent) == [] and len(fake.sent) == sent
+
+
+def test_agente_transfere_pela_tool(
+    client: TestClient, fake: FakeProviders, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.agents.factory as factory
+    from tests.fake_models import ToolCallingModel, tool_args
+
+    model = ToolCallingModel(
+        id="claude-haiku-4-5",
+        tool_name="transferir_para_atendente",
+        tool_args=tool_args(motivo="reembolso acima do limite"),
+    )
+    monkeypatch.setattr(factory, "resolve_model", lambda *a, **k: model)
+    agent = _agent(client, "tool de passagem")
+    channel = _channel(client, "whatsapp", agent, WA)
+    _wa_post(client, channel, _wa_body("5511444440000", "Quero meu dinheiro de volta"))
+    conv = _conversation(channel)
+    assert conv["status"] == "human" and conv["reason"] == "reembolso acima do limite"
+    bodies = [s[1]["text"]["body"] for s in fake.sent]
+    assert bodies[-1].startswith("Vou te passar para uma pessoa")
+
+
+def test_run_pausado_passa_para_atendente(
+    client: TestClient, fake: FakeProviders, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from app.channels import service
+
+    class Paused:
+        tools: list[Any] = []
+
+        async def arun(self, *args: Any, **kwargs: Any) -> Any:
+            return SimpleNamespace(content="", is_paused=True, run_id="r-pausado")
+
+    monkeypatch.setattr(service, "_responder", lambda *a: Paused())
+    agent = _agent(client, "pausado")
+    channel = _channel(client, "whatsapp", agent, WA)
+    _wa_post(client, channel, _wa_body("5511333330000", "Cancela meu pedido"))
+    conv = _conversation(channel)
+    assert conv["status"] == "human" and conv["reason"] == "confirmação de tool pendente"
+
+
+def test_atendente_assume_responde_devolve_e_encerra(
+    client: TestClient, fake: FakeProviders
+) -> None:
+    agent = _agent(client, "atendente")
+    channel = _channel(client, "whatsapp", agent, WA)
+    _wa_post(client, channel, _wa_body("5511222220000", "oi"))
+    conv = _conversation(channel)["id"]
+
+    early = client.post(f"/api/v1/conversations/{conv}/reply", json={"text": "Olá!"})
+    assert early.status_code == 409
+    taken = client.post(f"/api/v1/conversations/{conv}/take").json()
+    assert taken["status"] == "human"
+    listed = client.get("/api/v1/conversations", params={"status": "human"}).json()
+    assert conv in [c["id"] for c in listed]
+
+    replied = client.post(
+        f"/api/v1/conversations/{conv}/reply", json={"text": "Sou a Ana, posso ajudar?"}
+    )
+    assert replied.status_code == 200, replied.text
+    assert fake.sent[-1][1] == {
+        "messaging_product": "whatsapp",
+        "to": "5511222220000",
+        "type": "text",
+        "text": {"body": "Sou a Ana, posso ajudar?"},
+    }
+    last = replied.json()["messages"][-1]
+    assert last["author"].startswith("attendant:") and last["status"] == "sent"
+
+    runs = len(_runs(agent))
+    client.post(f"/api/v1/conversations/{conv}/release").raise_for_status()
+    _wa_post(client, channel, _wa_body("5511222220000", "e o prazo?"))
+    assert len(_runs(agent)) == runs + 1
+
+    client.post(f"/api/v1/conversations/{conv}/close").raise_for_status()
+    _wa_post(client, channel, _wa_body("5511222220000", "voltei"))
+    assert _conversation(channel)["status"] == "bot"
+
+    fake.fail_status = 400
+    client.post(f"/api/v1/conversations/{conv}/take").raise_for_status()
+    refused = client.post(f"/api/v1/conversations/{conv}/reply", json={"text": "fora da janela"})
+    assert refused.status_code == 502
+    assert "24 horas" in refused.json()["detail"]
+
+
+def test_titular_exporta_e_apaga_as_conversas(client: TestClient) -> None:
+    from app.data_subjects import build_export, erase, inventory
+
+    agent = _agent(client, "titular canal")
+    channel = _channel(client, "whatsapp", agent, WA)
+    _wa_post(client, channel, _wa_body("5511111110000", "meu CPF é 123.456.789-09"))
+    subject = "whatsapp:5511111110000"
+    assert inventory(subject)["channel_messages"] >= 2
+    exported = build_export(subject)["channel_conversations"]
+    assert exported and exported[0]["messages"][0]["direction"] == "in"
+    counts = erase(subject)
+    assert counts["channel_conversations"] == 1
+    assert inventory(subject)["channel_messages"] == 0
+
+
+def test_resposta_que_chega_depois_da_passagem_nao_sai(
+    client: TestClient, fake: FakeProviders, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from app.channels import service
+    from app.db import get_engine
+    from app.models.channel import ChannelMessage
+
+    class Slow:
+        tools: list[Any] = []
+
+        async def arun(self, *args: Any, session_id: str, **kwargs: Any) -> Any:
+            # enquanto o agente pensa, outra mensagem passa a conversa para uma pessoa
+            service.handoff(uuid.UUID(session_id), "pedido do cliente")
+            return SimpleNamespace(content="Seu pedido sai amanhã.", is_paused=False, run_id="r1")
+
+    monkeypatch.setattr(service, "_responder", lambda *a: Slow())
+    agent = _agent(client, "resposta atrasada")
+    channel = _channel(client, "whatsapp", agent, WA)
+    _wa_post(client, channel, _wa_body("5511121210000", "meu pedido?"))
+    assert all(s[1]["text"]["body"] != "Seu pedido sai amanhã." for s in fake.sent)
+    with Session(get_engine()) as session:
+        late = session.scalars(
+            select(ChannelMessage).where(
+                ChannelMessage.channel_id == uuid.UUID(channel), ChannelMessage.author == "agent"
+            )
+        ).one()
+    assert late.status == "ignored" and late.text == "Seu pedido sai amanhã."
