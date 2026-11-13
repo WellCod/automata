@@ -1662,7 +1662,7 @@ Decisão em [ADR-0044](adr/0044-canais-de-conversa-e-atendente.md). Um agente ou
 - [x] `feat(api)`: canais whatsapp e slack com credencial cifrada, webhook assinado e resposta do agente
 - [x] `feat(api)`: conversas dos canais com passagem para atendente e dados do titular
 - [x] `feat(web)`: páginas de canais e de conversas com resposta do atendente
-- [ ] `test(api)`: evals dos canais com whatsapp e slack falsos
+- [x] `test(api)`: evals dos canais com whatsapp e slack falsos
 
 **Critério de aceite da fase:**
 
