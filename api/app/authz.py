@@ -51,6 +51,8 @@ class Scope:
     AUDIT_READ = "audit:read"
     # canais de conversa (ADR-0044): a credencial fala pela empresa, só owner
     CHANNELS_ADMIN = "channels:admin"
+    # quem atende as conversas passadas pelo agente (ADR-0044): owner e editor
+    CONVERSATIONS_HANDLE = "conversations:handle"
 
 
 def require_resource_scope(resource: str, action: str) -> Callable[[Request], None]:

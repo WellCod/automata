@@ -25,6 +25,9 @@ from app.secrets import decrypt_json
 logger = logging.getLogger(__name__)
 
 ONLY_TEXT = "Por enquanto eu só entendo mensagens de texto."
+REASON_KEYWORD = "pedido do cliente"
+REASON_PAUSED = "confirmação de tool pendente"
+HANDOFF_TOOL = "transferir_para_atendente"
 FAILED = "Não consegui responder agora. Tente de novo em instantes."
 # mensagens por minuto de uma pessoa num canal: um número não queima o orçamento do agente
 PER_SENDER_LIMIT = 20
@@ -141,17 +144,83 @@ def _mark(message_id: UUID, status: str, error: str | None = None) -> None:
 
 
 def deliver(
-    channel: Channel, conversation_id: UUID, reply_to: dict[str, str], text: str, author: str
+    channel: Channel,
+    conversation_id: UUID,
+    reply_to: dict[str, str],
+    text: str,
+    author: str,
+    run_id: str | None = None,
 ) -> tuple[bool, str | None]:
     """Manda pelo provedor e grava a mensagem de saída, enviada ou com o motivo da falha."""
     creds = decrypt_json(channel.credentials_encrypted)
     try:
         external = providers.send(channel.kind, creds, reply_to, text)
     except providers.SendError as exc:
-        record_outbound(channel.id, conversation_id, author, text, status="failed", error=str(exc))
+        record_outbound(
+            channel.id,
+            conversation_id,
+            author,
+            text,
+            status="failed",
+            error=str(exc),
+            run_id=run_id,
+        )
         return False, str(exc)
-    record_outbound(channel.id, conversation_id, author, text, status="sent", external_id=external)
+    record_outbound(
+        channel.id,
+        conversation_id,
+        author,
+        text,
+        status="sent",
+        external_id=external,
+        run_id=run_id,
+    )
     return True, None
+
+
+def handoff(conversation_id: UUID, reason: str, assigned_to: str | None = None) -> bool:
+    """Passa a conversa para uma pessoa; False quando ela já estava com uma."""
+    with Session(get_engine()) as session:
+        conv = session.get(ChannelConversation, conversation_id, with_for_update=True)
+        if conv is None or conv.status == "human":
+            return False
+        conv.status = "human"
+        conv.handoff_reason = reason[:255]
+        conv.assigned_to = assigned_to
+        session.commit()
+        return True
+
+
+def wants_human(channel: Channel, text: str) -> bool:
+    """Palavra do canal na mensagem, sem diferença de caixa e acento."""
+    if not channel.handoff_enabled or not channel.handoff_keywords:
+        return False
+    words = set(_fold(text).split())
+    for keyword in channel.handoff_keywords:
+        folded = _fold(keyword)
+        if (" " in folded and folded in _fold(text)) or folded in words:
+            return True
+    return False
+
+
+def _fold(text: str) -> str:
+    import unicodedata
+
+    plain = unicodedata.normalize("NFKD", text.lower())
+    plain = "".join(c for c in plain if not unicodedata.combining(c))
+    return "".join(c if c.isalnum() or c.isspace() else " " for c in plain)
+
+
+def _handoff_tool(asked: list[str]) -> Any:
+    def transferir_para_atendente(motivo: str) -> str:
+        """Passa a conversa para uma pessoa da equipe. Use quando o cliente pedir para
+        falar com alguém, quando você não puder resolver ou quando o assunto pedir uma
+        pessoa. `motivo` é uma frase curta com o porquê.
+        """
+        asked.append(motivo.strip() or "transferido pelo agente")
+        return "Conversa transferida. Avise o cliente que uma pessoa da equipe vai responder."
+
+    return transferir_para_atendente
 
 
 def _responder(config: AgentConfig, session_id: str, user_id: str) -> Any:
@@ -185,8 +254,12 @@ async def answer(
     channel: Channel, config: AgentConfig, saved: Saved, text: str, reply: dict[str, str]
 ) -> None:
     session_id = str(saved.conversation_id)
+    asked: list[str] = []
     try:
         target = await asyncio.to_thread(_responder, config, session_id, saved.user_id)
+        if channel.handoff_enabled:
+            # a tool só existe no run do canal, onde há para quem passar (ADR-0044)
+            target.tools = [*(target.tools or []), _handoff_tool(asked)]
         run = await target.arun(text, session_id=session_id, user_id=saved.user_id, stream=False)
     except Exception as exc:
         logger.warning(
@@ -196,9 +269,18 @@ async def answer(
         await asyncio.to_thread(deliver, channel, saved.conversation_id, reply, FAILED, "system")
         return
     content = _text(run).strip()
-    if not content:
-        return
-    await asyncio.to_thread(deliver, channel, saved.conversation_id, reply, content, "agent")
+    paused = bool(getattr(run, "is_paused", False))
+    run_id = getattr(run, "run_id", None)
+    if content and not paused:
+        await asyncio.to_thread(
+            deliver, channel, saved.conversation_id, reply, content, "agent", run_id
+        )
+    # run pausado esperando confirmação de tool não tem como seguir pelo canal
+    reason = asked[0] if asked else (REASON_PAUSED if paused else None)
+    if reason is not None and await asyncio.to_thread(handoff, saved.conversation_id, reason):
+        await asyncio.to_thread(
+            deliver, channel, saved.conversation_id, reply, channel.handoff_message, "system"
+        )
 
 
 def _load(channel_id: UUID) -> tuple[Channel, AgentConfig] | None:
@@ -238,5 +320,16 @@ async def handle(channel_id: UUID, messages: list[providers.Inbound], limiter: A
             continue
         if saved.status != "bot":
             # com uma pessoa atendendo, a mensagem só espera na fila de conversas
+            continue
+        if wants_human(channel, msg.text):
+            if await asyncio.to_thread(handoff, saved.conversation_id, REASON_KEYWORD):
+                await asyncio.to_thread(
+                    deliver,
+                    channel,
+                    saved.conversation_id,
+                    msg.reply_to,
+                    channel.handoff_message,
+                    "system",
+                )
             continue
         await answer(channel, config, saved, msg.text, msg.reply_to)
