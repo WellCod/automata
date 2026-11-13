@@ -81,7 +81,7 @@ function Conversation({ conversation }: { conversation: ConversationDetail }) {
               {who(m.author, m.author_label)} · {when(m.created_at)}
             </span>
             <span className="text-foreground whitespace-pre-wrap">{m.text || "(sem texto)"}</span>
-            {m.status === "failed" && (
+            {(m.status === "failed" || m.status === "ignored") && m.error && (
               <span className="text-destructive text-[11px]">Não enviada: {m.error}</span>
             )}
           </li>
