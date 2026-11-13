@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 49
+# Roadmap — Fases 4 a 50
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -1653,3 +1653,21 @@ Nenhuma tela vaza em 375 px nem devolve 5xx. Os alertas de alvo pequeno são che
 - [x] `fix(security)`: OTLP sem texto no status e com sessão em hash, CSV sem fórmula, sem 500 e fora do event loop
 
 **Critério de aceite da fase:** cada achado acima com teste que falhava antes da correção.
+
+## Fase 50 — Canais de conversa e atendente
+
+Decisão em [ADR-0044](adr/0044-canais-de-conversa-e-atendente.md). Um agente ou time responde no WhatsApp (Cloud API) e no Slack, com a credencial cadastrada pelo painel, e a conversa passa para uma pessoa quando o cliente pede, quando o agente transfere ou quando o run pausa. O atendente responde pela página Conversas.
+
+- [x] `docs(adr)`: ADR-0044 e esta seção
+- [ ] `feat(api)`: canais whatsapp e slack com credencial cifrada, webhook assinado e resposta do agente
+- [ ] `feat(api)`: conversas dos canais com passagem para atendente e dados do titular
+- [ ] `feat(web)`: páginas de canais e de conversas com resposta do atendente
+- [ ] `test(api)`: evals dos canais com whatsapp e slack falsos
+
+**Critério de aceite da fase:**
+
+- Uma mensagem de texto no WhatsApp com assinatura válida vira run do agente na sessão da conversa e a resposta sai pela Graph API; assinatura errada dá 401 e nada roda.
+- A mesma mensagem reenviada pelo provedor não roda o agente de novo.
+- "Quero falar com um atendente" passa a conversa para humano; o agente para de responder e a mensagem aparece em Conversas.
+- O atendente responde pelo painel e a resposta sai pelo canal com o autor gravado; devolver ao agente volta a conversa ao bot.
+- O titular de `whatsapp:<número>` exporta e apaga as mensagens do canal.
