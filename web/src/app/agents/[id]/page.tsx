@@ -614,7 +614,12 @@ export default function AgentEditPage() {
             <h2 className="text-foreground text-[11px] font-medium">Testar</h2>
           </div>
           <div className="p-4">
-            <TestPanel agentId={id} draftVersionId={data?.draft_version?.id} defaultOpen />
+            <TestPanel
+              agentId={id}
+              draftVersionId={data?.draft_version?.id}
+              hasCurrentVersion={Boolean(data?.current_version)}
+              defaultOpen
+            />
           </div>
         </aside>
       </div>

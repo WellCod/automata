@@ -239,7 +239,11 @@ export default function WorkflowEditPage() {
           <div className="p-4" role="tabpanel">
             {/* o teste fica montado: trocar de aba não apaga o progresso */}
             <div hidden={activePanel !== "teste"}>
-              <WorkflowTestPanel workflowId={id} draftVersionId={data?.draft_version?.id} />
+              <WorkflowTestPanel
+                workflowId={id}
+                draftVersionId={data?.draft_version?.id}
+                hasCurrentVersion={Boolean(data?.current_version)}
+              />
             </div>
             {activePanel === "versoes" && (
               <VersionsPanel

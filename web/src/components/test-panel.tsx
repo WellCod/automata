@@ -5,6 +5,7 @@ import { type KnowledgeSource, mergeSources, sourcesFromTool } from "@/lib/knowl
 import { blockLabel, CHECK_ERROR_TYPES } from "@/lib/guardrail-labels";
 import { readSse } from "@/lib/sse";
 import { Button } from "@/components/ui/button";
+import { failureText } from "@/lib/run-failure";
 
 interface ChatMessage {
   id: number;
@@ -34,6 +35,8 @@ interface PausedRun {
 interface Props {
   agentId: string;
   draftVersionId?: string;
+  // sem versão publicada, o modo teste roda o rascunho (Fase 51)
+  hasCurrentVersion?: boolean;
   defaultOpen?: boolean;
   // time usa as rotas /teams e eventos TeamRun*; membros aparecem no rastro
   kind?: "agent" | "team";
@@ -66,6 +69,7 @@ function describeTool(tool: ToolEventData | undefined, names: Record<string, str
 export function TestPanel({
   agentId,
   draftVersionId,
+  hasCurrentVersion = true,
   defaultOpen = false,
   kind = "agent",
   memberNames = {},
@@ -75,6 +79,7 @@ export function TestPanel({
   const [trace, setTrace] = useState<TraceStep[]>([]);
   const [open, setOpen] = useState(defaultOpen);
   const [useDraft, setUseDraft] = useState(false);
+  const runsDraft = Boolean(draftVersionId) && (useDraft || !hasCurrentVersion);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
@@ -116,7 +121,7 @@ export function TestPanel({
   }
 
   async function consume(res: Response) {
-    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok || !res.body) throw new Error(await failureText(res));
     for await (const { event, data } of readSse(res.body)) {
       if (typeof data.session_id === "string" && (kind !== "team" || !data.agent_id)) {
         sessionIdRef.current = data.session_id;
@@ -171,8 +176,8 @@ export function TestPanel({
     setError(null);
     try {
       await consume(await request());
-    } catch {
-      setError("Erro ao executar agente.");
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : "Erro ao executar agente.");
     } finally {
       setIsRunning(false);
     }
@@ -193,7 +198,7 @@ export function TestPanel({
     form.append("message", text);
     form.append("stream", "true");
     if (sessionIdRef.current) form.append("session_id", sessionIdRef.current);
-    if (useDraft && draftVersionId) {
+    if (runsDraft) {
       form.append("factory_input", JSON.stringify({ version_id: draftVersionId }));
     }
     await run(() => fetch(`/api/${base}/${agentId}/runs`, { method: "POST", body: form }));
@@ -231,7 +236,7 @@ export function TestPanel({
 
       {open && (
         <div className="flex flex-col gap-3">
-          {draftVersionId && (
+          {draftVersionId && hasCurrentVersion && (
             <label className="text-muted-foreground flex items-center gap-2 text-[13px]">
               <input
                 type="checkbox"
@@ -241,6 +246,13 @@ export function TestPanel({
               />
               Testar rascunho
             </label>
+          )}
+          {!hasCurrentVersion && (
+            <p className="text-muted-foreground text-[13px]">
+              {draftVersionId
+                ? "Sem versão publicada: o teste usa o rascunho salvo."
+                : "Salve um rascunho para testar."}
+            </p>
           )}
 
           <div

@@ -13,7 +13,7 @@ from time import monotonic
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.db import get_engine
@@ -23,10 +23,17 @@ logger = logging.getLogger(__name__)
 
 
 def published_configs() -> list[tuple[UUID, str]]:
-    """(id, kind) dos configs com versão vigente."""
+    """(id, kind) dos configs com versão vigente ou rascunho.
+
+    Com só rascunho, o modo teste roda pela versão pedida (`configs:write`); sem versão
+    pedida a factory recusa com 400 (Fase 51).
+    """
     with Session(get_engine()) as session:
         stmt = select(AgentConfig.id, AgentConfig.kind).where(
-            AgentConfig.current_version_id.is_not(None)
+            or_(
+                AgentConfig.current_version_id.is_not(None),
+                AgentConfig.draft_version_id.is_not(None),
+            )
         )
         return [(row.id, row.kind) for row in session.execute(stmt)]
 
