@@ -1,0 +1,30 @@
+# Atualizações semanais com aviso de segurança (Fase 51, SEC-02). O CI barra dependência
+# de produção com aviso alto (pnpm audit) ou conhecido (pip-audit).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      painel:
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: uv
+    directory: /api
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      api:
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+  - package-ecosystem: docker
+    directories: [/api, /web]
+    schedule:
+      interval: monthly
