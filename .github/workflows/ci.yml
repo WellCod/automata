@@ -160,8 +160,6 @@ jobs:
         run: |
           priv=$(openssl genrsa 2048 2>/dev/null)
           pub=$(printf '%s\n' "$priv" | openssl rsa -pubout 2>/dev/null)
-          # PEM numa linha com \n literal, como o scripts/bootstrap.sh
-          inline() { printf '%s' "$1" | awk 'NF {sub(/\r/, ""); printf "%s\\n", $0}'; }
           pw=$(openssl rand -hex 16)
           {
             echo "AUTOMATA_VERSION=ci"
@@ -169,8 +167,9 @@ jobs:
             echo "POSTGRES_USER=automata"
             echo "POSTGRES_PASSWORD=$pw"
             echo "DATABASE_URL=postgresql+psycopg://automata:$pw@db:5432/automata"
-            echo "JWT_PRIVATE_KEY=$(inline "$priv")"
-            echo "JWT_PUBLIC_KEY=$(inline "$pub")"
+            # PEM entre aspas duplas, com as quebras de linha: o compose lê assim
+            printf 'JWT_PRIVATE_KEY="%s"\n' "$priv"
+            printf 'JWT_PUBLIC_KEY="%s"\n' "$pub"
             echo "MCP_SECRETS_KEY=$(openssl rand -base64 32 | tr '+/' '-_')"
             echo "DEMO_REPLAY=true"
           } > .env
