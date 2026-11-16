@@ -238,6 +238,8 @@ As rotas que mudam produção preenchem `detail` com `note(request, ...)`: publi
 
 `GET /api/v1/audit` filtra por `actor`, `config_id`, `action` (trecho), `since` e `until`, do mais novo para o mais antigo, com até 100 por página e `next_cursor`. Cada item traz `actor_label`, com o e-mail do usuário ou o nome do token. A retenção é de `AUDIT_RETENTION_DAYS` dias (365), apagada pelo poller de avisos uma vez por dia em cada processo.
 
+**Retenção de conversas** (ADR-0045, `app/retention.py`). Com `CONVERSATION_RETENTION_DAYS` acima de zero (padrão 0, desligada), a mesma rodada diária apaga as sessões do Agno paradas há mais que o prazo, com runs, transcrições, compactações, aprovações e resultados de tool guardados, na ordem do `delete_session`; os traces mais velhos que o prazo, com os spans; e as mensagens de canal, junto com a conversa que ficou vazia. `agent_run` e `usage_event` ficam para métricas e custo, com `retencao-expirada` no lugar do id de quem falou e sem erro, pendências, revisões, retiradas e detalhe de bloqueio. Memórias seguem a retenção própria do agente (ADR-0025).
+
 ### Chaves
 
 A chave privada (`JWT_PRIVATE_KEY`) existe só no processo da API, que emite os tokens. O painel recebe apenas `JWT_PUBLIC_KEY` para verificar o cookie no proxy (ADR-0005). Os testes geram um par em memória.

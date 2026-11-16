@@ -205,6 +205,7 @@ def poll_once(now: datetime | None = None) -> None:
     from app.evals.runner import check_stale_runs
     from app.job_queue import check_jobs
     from app.reconciliation import check_divergence
+    from app.retention import check_retention
 
     checks = (
         # prazo da revisão humana vencido (Fase 44); não manda aviso, só cancela o run
@@ -217,6 +218,7 @@ def poll_once(now: datetime | None = None) -> None:
         check_jobs,
         check_divergence,
         purge_daily,
+        check_retention,
     )
     for check in checks:
         try:
