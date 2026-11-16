@@ -120,7 +120,7 @@ describe("TestPanel", () => {
     render(<TestPanel agentId="abc-123" draftVersionId="draft-uuid" hasCurrentVersion={false} />);
     await userEvent.click(screen.getByRole("button", { name: /abrir chat/i }));
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-    expect(screen.getByText(/o teste usa o rascunho salvo/)).toBeInTheDocument();
+    expect(screen.getByText(/o teste roda o último rascunho/)).toBeInTheDocument();
     await userEvent.type(screen.getByPlaceholderText(/Digite uma mensagem/i), "Oi");
     await userEvent.click(screen.getByRole("button", { name: /enviar/i }));
 
