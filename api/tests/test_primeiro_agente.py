@@ -54,3 +54,51 @@ def test_modelo_sem_chave_do_provedor(client: TestClient, monkeypatch: pytest.Mo
     assert available["claude-haiku-4-5"] is True
     assert available["gpt-4o"] is False
     assert os.environ.get("OPENAI_API_KEY") is None
+
+
+def test_modelo_extra_pelo_ambiente(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.agents.extra_models import _parse
+    from app.agents.models_map import resolve_model
+    from app.pricing import prices
+
+    _parse.cache_clear()
+    monkeypatch.setenv(
+        "EXTRA_MODELS",
+        '[{"id": "azure-gpt-4o", "provider": "openai", "model": "gpt-4o",'
+        ' "base_url": "https://empresa.openai.azure.com/openai/v1",'
+        ' "api_key_env": "AZURE_OPENAI_KEY", "vision": true,'
+        ' "input_price": 2.5, "output_price": 10}]',
+    )
+    monkeypatch.setenv("AZURE_OPENAI_KEY", "az-teste")
+    caps = client.get("/api/v1/models/capabilities").json()
+    assert caps["azure-gpt-4o"]["vision"] is True
+    assert client.get("/api/v1/models/availability").json()["azure-gpt-4o"] is True
+    model = resolve_model("azure-gpt-4o")
+    assert model.id == "gpt-4o" and str(model.base_url).startswith("https://empresa")  # type: ignore[attr-defined]
+    assert prices()["azure-gpt-4o"].input == 2.5
+    # o rascunho aceita o modelo extra
+    config_id = client.post("/api/v1/configs", json={"name": "azure", "description": "x"}).json()[
+        "id"
+    ]
+    draft = client.put(
+        f"/api/v1/configs/{config_id}/draft",
+        json={"name": "azure", "description": "x", "payload": {"model_id": "azure-gpt-4o"}},
+    )
+    assert draft.status_code == 201, draft.text
+    monkeypatch.setenv("EXTRA_MODELS", "isto não é json")
+    assert "azure-gpt-4o" not in client.get("/api/v1/models/capabilities").json()
+
+
+def test_marca_e_moeda_da_instancia(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.settings import get_settings
+
+    monkeypatch.setenv("APP_NAME", "Agentes Cliente")
+    monkeypatch.setenv("APP_LOGO_URL", "https://cdn.exemplo.com/logo.png")
+    monkeypatch.setenv("BRL_PER_USD", "5.4")
+    get_settings.cache_clear()
+    try:
+        info = client.get("/api/v1/auth/instance").json()
+        # logo de outro domínio a CSP do painel bloquearia: fica o padrão
+        assert info == {"app_name": "Agentes Cliente", "app_logo": None, "brl_per_usd": 5.4}
+    finally:
+        get_settings.cache_clear()

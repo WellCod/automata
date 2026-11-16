@@ -27,12 +27,25 @@ _CAPABILITIES: dict[str, ModelCapabilities] = {
 }
 
 
-def get_capabilities(model_id: str) -> ModelCapabilities:
-    caps = _CAPABILITIES.get(model_id)
-    if caps is None:
-        raise ValueError(
-            f"model_id '{model_id}' não suportado. Suportados: {sorted(_CAPABILITIES)}"
+def _all() -> dict[str, ModelCapabilities]:
+    from app.agents.extra_models import extra_models
+
+    extras = {
+        m.id: ModelCapabilities(
+            extended_thinking=m.extended_thinking,
+            structured_output=m.structured_output,
+            vision=m.vision,
         )
+        for m in extra_models().values()
+    }
+    return {**_CAPABILITIES, **extras}
+
+
+def get_capabilities(model_id: str) -> ModelCapabilities:
+    known = _all()
+    caps = known.get(model_id)
+    if caps is None:
+        raise ValueError(f"model_id '{model_id}' não suportado. Suportados: {sorted(known)}")
     return caps
 
 
@@ -50,4 +63,4 @@ def validate_capabilities(model_id: str, requested: CapabilityFlags) -> list[str
 
 
 def all_capabilities() -> dict[str, ModelCapabilities]:
-    return dict(_CAPABILITIES)
+    return _all()

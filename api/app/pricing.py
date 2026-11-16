@@ -67,7 +67,14 @@ def _raw_overrides() -> str:
 
 
 def prices() -> dict[str, ModelPrice]:
-    return {**_PRICES, **_overrides(_raw_overrides())}
+    from app.agents.extra_models import extra_models
+
+    extras = {
+        m.id: ModelPrice(input=m.input_price, output=m.output_price)
+        for m in extra_models().values()
+        if m.input_price is not None and m.output_price is not None
+    }
+    return {**_PRICES, **extras, **_overrides(_raw_overrides())}
 
 
 def estimate_cost(model_id: str | None, input_tokens: int, output_tokens: int) -> float | None:

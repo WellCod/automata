@@ -31,6 +31,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { usePendingApprovals } from "@/lib/api/approvals";
 import { useMe } from "@/lib/api/users";
 import { ThemeToggle } from "./theme";
+import { useInstance } from "@/lib/instance";
 
 // em grupos: 14 itens numa lista só não se liam (Fase 44)
 const navItems = [
@@ -131,6 +132,13 @@ const navItems = [
 
 export const SIDEBAR_ID = "menu-lateral";
 
+// marca da instância (COM-12): o logo vem em data URI, que a CSP aceita
+export function BrandMark({ logo }: { logo: string | null }) {
+  if (!logo) return <LogoMark />;
+  // eslint-disable-next-line @next/next/no-img-element -- data URI, sem otimização do next/image
+  return <img src={logo} alt="" className="h-[18px] w-[18px] rounded-sm object-contain" />;
+}
+
 export function LogoMark() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -148,6 +156,7 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
   const router = useRouter();
   const { data: pending } = usePendingApprovals();
   const { data: me } = useMe();
+  const instance = useInstance();
   // a API recusa quem não é owner; o item só some para não levar a uma página vazia
   const visible = navItems.filter(
     (item) =>
@@ -170,8 +179,10 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
       )}
     >
       <div className="border-sidebar-border flex h-11 items-center gap-2 border-b px-3">
-        <LogoMark />
-        <span className="text-foreground text-[13px] font-medium tracking-tight">automata</span>
+        <BrandMark logo={instance.app_logo} />
+        <span className="text-foreground text-[13px] font-medium tracking-tight">
+          {instance.app_name}
+        </span>
         {onClose && (
           <button
             type="button"
