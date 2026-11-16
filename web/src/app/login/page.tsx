@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -78,7 +79,15 @@ function LoginForm() {
       });
 
       if (!res.ok) {
-        setServerError("Credenciais inválidas");
+        // 429 é limite de tentativas, não senha errada (UX-09)
+        setServerError(
+          res.status === 429 ? "Muitas tentativas. Aguarde um minuto." : "Credenciais inválidas",
+        );
+        return;
+      }
+      const body = (await res.json().catch(() => ({}))) as { must_change_password?: boolean };
+      if (body.must_change_password) {
+        router.push("/trocar-senha?obrigatoria=1");
         return;
       }
 
@@ -157,6 +166,14 @@ function LoginForm() {
           >
             {form.formState.isSubmitting ? "Entrando…" : "Entrar"}
           </Button>
+          {sso?.password_login !== false && (
+            <Link
+              href="/esqueci-senha"
+              className="text-muted-foreground hover:text-foreground text-center text-[12px]"
+            >
+              Esqueci minha senha
+            </Link>
+          )}
         </form>
       </div>
     </div>

@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete
 from sqlalchemy.dialects.postgresql import insert
 
-from app import oidc
+from app import mailer, oidc
 from app.auth import decode_token, issue_token
 from app.db import SessionDep
 from app.integrations import bearer_token
@@ -19,7 +19,9 @@ from app.repositories.user import UserRepository
 from app.schemas.user import (
     ROLE_SCOPES,
     CreateUserInput,
+    ForgotPasswordInput,
     LoginInput,
+    ResetWithTokenInput,
     TokenResponse,
     UserResponse,
 )
@@ -69,6 +71,7 @@ def login(request: Request, body: LoginInput, session: SessionDep) -> TokenRespo
         user = svc.authenticate(body.email, body.password)
         user_id = str(user.id)
         user_role = user.role
+        must_change = user.must_change_password
         # sem login por senha, só o owner de emergência entra assim (ADR-0042)
         if not get_settings().password_login and user_role != UserRole.owner:
             raise ValueError("login por senha desligado")
@@ -77,7 +80,74 @@ def login(request: Request, body: LoginInput, session: SessionDep) -> TokenRespo
         logger.warning("login failed", extra={"ip": ip, "email_ref": email_ref})
         raise HTTPException(status_code=401, detail="Credenciais inválidas") from e
     logger.info("login ok", extra={"ip": ip, "user_id": user_id, "role": user_role})
+    if must_change:
+        # senha provisória: o token não tem scope, só serve para /me e /me/password
+        return TokenResponse(
+            access_token=issue_token(user_id, [], extra={"must_change_password": True}),
+            must_change_password=True,
+        )
     return TokenResponse(access_token=issue_token(user_id, ROLE_SCOPES[user_role]))
+
+
+_RESET_SUBJECT = "Redefinição de senha do Automata"
+_BAD_LINK = "Link inválido ou vencido. Peça outro."
+
+
+@router.post("/password/forgot", status_code=202)
+def forgot_password(request: Request, body: ForgotPasswordInput, session: SessionDep) -> Response:
+    """Manda o link de redefinição. Responde igual exista ou não a conta."""
+    ip = known_client_ip(request)
+    limiter = request.app.state.rate_limiter
+    email = body.email.lower()
+    if ip is not None:
+        limiter.check(f"password-forgot:ip:{ip}", limit=_LOGIN_LIMIT_PER_IP)
+    limiter.check(f"password-forgot:email:{email}", limit=3)
+    settings = get_settings()
+    if not settings.password_login or not mailer.configured() or not settings.public_url:
+        logger.warning("recuperação de senha sem SMTP, PUBLIC_URL ou login por senha")
+        return Response(status_code=202)
+    found = UserService(UserRepository(session)).request_reset(email, datetime.now(UTC))
+    session.commit()
+    if found is not None:
+        user, token = found
+        link = f"{settings.public_url.rstrip('/')}/redefinir-senha?token={token}"
+        status = mailer.send(
+            [user.email],
+            _RESET_SUBJECT,
+            "Alguém pediu para redefinir a senha desta conta no Automata.\n\n"
+            f"Para escolher uma senha nova, abra o link em até 30 minutos:\n{link}\n\n"
+            "Se não foi você, ignore este e-mail: a senha atual continua valendo.",
+        )
+        logger.info("link de senha", extra={"user_id": str(user.id), "status": status})
+    return Response(status_code=202)
+
+
+@router.post("/password/reset", response_model=TokenResponse)
+def reset_password_with_token(
+    request: Request, body: ResetWithTokenInput, session: SessionDep
+) -> TokenResponse:
+    ip = known_client_ip(request)
+    if ip is not None:
+        request.app.state.rate_limiter.check(f"password-reset:ip:{ip}", limit=_LOGIN_LIMIT_PER_IP)
+    try:
+        user, cut = UserService(UserRepository(session)).reset_with_token(
+            body.token, body.new_password, datetime.now(UTC)
+        )
+    except (ValueError, LookupError) as exc:
+        session.rollback()
+        raise HTTPException(status_code=400, detail=_BAD_LINK) from exc
+    cut = cut.replace(microsecond=0)
+    user.tokens_valid_after = cut
+    user_id, role = str(user.id), user.role
+    session.commit()
+    revoked = getattr(request.app.state, "revoked_tokens", None)
+    if revoked is not None:
+        revoked.cut_now(user_id, cut.timestamp())
+    logger.info("senha redefinida pelo link", extra={"user_id": user_id})
+    if not get_settings().password_login and role != UserRole.owner:
+        # sem login por senha, só o owner entra assim (ADR-0042)
+        raise HTTPException(status_code=403, detail="Login por senha desligado")
+    return TokenResponse(access_token=issue_token(user_id, ROLE_SCOPES[role]))
 
 
 @router.post("/logout", status_code=204)
@@ -116,7 +186,9 @@ def create_user(
 ) -> UserResponse:
     svc = UserService(UserRepository(session))
     try:
-        user = svc.create_user(email=body.email, password=body.password, role=body.role)
+        user = svc.create_user(
+            email=body.email, password=body.password, role=body.role, must_change=True
+        )
         result = UserResponse(
             id=user.id,
             email=user.email,

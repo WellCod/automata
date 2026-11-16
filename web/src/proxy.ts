@@ -1,4 +1,4 @@
-import { errors, importSPKI, jwtVerify } from "jose";
+import { errors, importSPKI, type JWTPayload, jwtVerify } from "jose";
 import { NextRequest, NextResponse } from "next/server";
 
 const ALG = "RS256";
@@ -30,18 +30,22 @@ async function getPublicKeys() {
 }
 
 // Só assinatura inválida passa para a próxima chave; vencido falha na chave certa
-export async function verifyToken(token: string): Promise<void> {
+export async function verifyToken(token: string): Promise<JWTPayload> {
   const keys = await getPublicKeys();
   for (const [i, key] of keys.entries()) {
     try {
-      await jwtVerify(token, key, { audience: AUDIENCE });
-      return;
+      const { payload } = await jwtVerify(token, key, { audience: AUDIENCE });
+      return payload;
     } catch (err) {
       const last = i === keys.length - 1;
       if (last || !(err instanceof errors.JWSSignatureVerificationFailed)) throw err;
     }
   }
+  throw new Error("nenhuma chave pública");
 }
+
+// páginas abertas sem sessão: login e recuperação de senha (ADR-0045)
+const PUBLIC_PAGES = ["/login", "/esqueci-senha", "/redefinir-senha"];
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -49,7 +53,7 @@ export async function proxy(req: NextRequest) {
   const csrfError = csrfCheck(req);
   if (csrfError) return csrfError;
 
-  if (pathname.startsWith("/login") || pathname.startsWith("/api/auth/")) {
+  if (PUBLIC_PAGES.some((p) => pathname.startsWith(p)) || pathname.startsWith("/api/auth/")) {
     return NextResponse.next();
   }
   // webhook dos canais (ADR-0044): quem chama é o provedor, e a API confere a assinatura
@@ -63,12 +67,22 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
+  let claims: JWTPayload;
   try {
-    await verifyToken(token);
+    claims = await verifyToken(token);
   } catch {
     const res = NextResponse.redirect(new URL("/login", req.url));
     res.cookies.delete("automata_token");
     return res;
+  }
+
+  // senha provisória: o token não tem scope e só serve para a troca
+  if (
+    claims.must_change_password === true &&
+    !pathname.startsWith("/trocar-senha") &&
+    !pathname.startsWith("/api/")
+  ) {
+    return NextResponse.redirect(new URL("/trocar-senha?obrigatoria=1", req.url));
   }
 
   return NextResponse.next();

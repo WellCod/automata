@@ -226,6 +226,11 @@ Página **Usuários** do painel, só para owner, sobre `/api/v1/users`:
 - Mudar papel, desativar ou redefinir senha grava `user_account.tokens_valid_after` e encerra na hora as sessões abertas: o `RevocationMiddleware` recusa token do usuário com `iat` anterior ao corte (cache de 30 s nos outros workers). O corte vale até o fim do segundo da mudança, porque `iat` é em segundos inteiros.
 - A instância precisa de ao menos um owner ativo: rebaixar ou desativar o último dá 409.
 - Remover exige usuário desativado (o corte de sessão acontece na desativação) e não vale para a própria conta.
+
+**Senha do próprio usuário** (ADR-0045, migration 0059):
+- Conta criada ou senha redefinida pelo owner (`/api/v1/users` e `/api/v1/auth/users`) fica com `must_change_password`. O login responde `must_change_password: true` com um token sem scope e com a claim `must_change_password`, que só abre `/api/v1/me` e `POST /api/v1/me/password`; o proxy do painel manda qualquer página para `/trocar-senha`.
+- `POST /api/v1/me/password` pede `current_password` e `new_password` (mesma regra de complexidade), recusa senha igual à atual e conta do SSO (409), corta as outras sessões e devolve o token novo. Até 5 por minuto por usuário.
+- Recuperação: `POST /api/v1/auth/password/forgot` responde 202 exista ou não a conta e, para conta ativa com senha, manda por e-mail (`mailer.py`) o link `PUBLIC_URL/redefinir-senha?token=...`, válido por 30 minutos e de uso único; pedir outro derruba o anterior. Só o hash do token fica em `password_reset`. Sem SMTP, sem `PUBLIC_URL` ou com `PASSWORD_LOGIN=false`, nada é enviado. `POST /api/v1/auth/password/reset` troca a senha, corta as sessões e devolve o token. Limites: 20 por minuto por IP e 3 por e-mail.
 - `last_login_at` é gravado a cada login.
 
 ### Trilha de auditoria

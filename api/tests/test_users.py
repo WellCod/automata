@@ -158,12 +158,36 @@ def test_papeis_usam_apenas_scopes_validos_do_agno() -> None:
 # --- endpoints ---
 
 
+def _sem_troca_obrigatoria(email: str) -> None:
+    """Conta criada pelo owner nasce com senha provisória (ADR-0045); a troca tem teste
+    próprio em test_senha_do_usuario.py, aqui só atrapalharia."""
+    from sqlalchemy import update
+    from sqlalchemy.orm import Session
+
+    from app.db import get_engine
+    from app.models.user import User
+
+    with Session(get_engine()) as session:
+        session.execute(
+            update(User).where(User.email == email.lower()).values(must_change_password=False)
+        )
+        session.commit()
+
+
 def test_login_sucesso(client: TestClient) -> None:
     client.post(
         "/api/v1/auth/users",
         json={"email": "login_endpoint@example.com", "password": "Senha12345678", "role": "editor"},
         headers={"Authorization": f"Bearer {_admin_token()}"},
     )
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"email": "login_endpoint@example.com", "password": "Senha12345678"},
+    )
+    assert resp.status_code == 200
+    # conta criada pelo owner: o primeiro login só serve para trocar a senha (ADR-0045)
+    assert resp.json()["must_change_password"] is True
+    _sem_troca_obrigatoria("login_endpoint@example.com")
     resp = client.post(
         "/api/v1/auth/login",
         json={"email": "login_endpoint@example.com", "password": "Senha12345678"},

@@ -29,15 +29,15 @@ describe("verificação do cookie durante a rotação da chave", () => {
   it("sem a anterior, token da chave velha é recusado", async () => {
     vi.stubEnv("JWT_PUBLIC_KEY", await exportSPKI(newPair.publicKey));
     vi.stubEnv("JWT_PREVIOUS_PUBLIC_KEY", "");
-    await expect(verifyToken(await sign(newPair))).resolves.toBeUndefined();
+    await expect(verifyToken(await sign(newPair))).resolves.toMatchObject({ sub: "u1" });
     await expect(verifyToken(await sign(oldPair))).rejects.toThrow();
   });
 
   it("com a anterior, aceita as duas e mantém o vencido como vencido", async () => {
     vi.stubEnv("JWT_PUBLIC_KEY", await exportSPKI(newPair.publicKey));
     vi.stubEnv("JWT_PREVIOUS_PUBLIC_KEY", await exportSPKI(oldPair.publicKey));
-    await expect(verifyToken(await sign(oldPair))).resolves.toBeUndefined();
-    await expect(verifyToken(await sign(newPair))).resolves.toBeUndefined();
+    await expect(verifyToken(await sign(oldPair))).resolves.toMatchObject({ sub: "u1" });
+    await expect(verifyToken(await sign(newPair))).resolves.toMatchObject({ sub: "u1" });
     await expect(verifyToken(await sign(oldPair, "-1m"))).rejects.toMatchObject({
       code: "ERR_JWT_EXPIRED",
     });

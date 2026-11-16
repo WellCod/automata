@@ -5,9 +5,12 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LogoMark, Sidebar, SIDEBAR_ID } from "./sidebar";
 
+const BARE_PAGES = ["/login", "/trocar-senha", "/esqueci-senha", "/redefinir-senha"];
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const withSidebar = pathname !== "/login";
+  // login, senha provisória e recuperação abrem sem a barra lateral
+  const withSidebar = !BARE_PAGES.includes(pathname);
   // abaixo de md a barra lateral vira gaveta, aberta pelo botão da barra de topo
   const [open, setOpen] = useState(false);
   const [openedAt, setOpenedAt] = useState(pathname);

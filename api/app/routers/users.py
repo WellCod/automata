@@ -7,14 +7,18 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from app.audit import note
+from app.auth import issue_token
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.models.user import User
 from app.repositories.user import UserRepository
 from app.schemas.user import (
+    ROLE_SCOPES,
+    ChangePasswordInput,
     CreateUserInput,
     MeResponse,
     ResetPasswordInput,
+    TokenResponse,
     UpdateUserInput,
     UserResponse,
 )
@@ -66,6 +70,37 @@ def me(request: Request, session: SessionDep) -> MeResponse:
     return MeResponse(id=str(user.id), email=user.email, role=user.role)
 
 
+@me_router.post("/password", response_model=TokenResponse)
+def change_own_password(
+    body: ChangePasswordInput, session: SessionDep, request: Request
+) -> TokenResponse:
+    """Troca pela própria pessoa. Corta as outras sessões e devolve o token novo."""
+    sub = _actor(request) or ""
+    try:
+        user_id = UUID(sub)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="Só usuário do painel troca senha") from exc
+    request.app.state.rate_limiter.check(f"password-change:{sub}", limit=5)
+    try:
+        user, cut = UserService(UserRepository(session)).change_own_password(
+            user_id, body.current_password, body.new_password
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=403, detail="Só usuário do painel troca senha") from exc
+    except ConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    # o corte vale até o fim do segundo; o token novo sai no mesmo segundo
+    cut = cut.replace(microsecond=0)
+    user.tokens_valid_after = cut
+    role = user.role
+    session.commit()
+    _cut(request, user, cut)
+    logger.info("senha trocada pelo usuário", extra={"user_id": sub})
+    return TokenResponse(access_token=issue_token(sub, ROLE_SCOPES[role]))
+
+
 @router.get("", response_model=list[UserResponse])
 def list_users(session: SessionDep) -> list[UserResponse]:
     return [to_response(u) for u in UserRepository(session).list_all()]
@@ -75,7 +110,7 @@ def list_users(session: SessionDep) -> list[UserResponse]:
 def create_user(body: CreateUserInput, session: SessionDep, request: Request) -> UserResponse:
     try:
         user = UserService(UserRepository(session)).create_user(
-            email=body.email, password=body.password, role=body.role
+            email=body.email, password=body.password, role=body.role, must_change=True
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
