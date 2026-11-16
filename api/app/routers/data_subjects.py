@@ -21,6 +21,7 @@ from app.authz import Scope
 from app.data_subjects import (
     due_date,
     inventory,
+    new_erase_request,
     purge_expired,
     run_erase,
     run_export,
@@ -30,7 +31,7 @@ from app.db import SessionDep
 from app.models.data_subject import DataSubjectRequest
 from app.models.user import User
 
-Source = Literal["panel", "integration", "self"]
+Source = Literal["panel", "integration", "self", "channel"]
 
 
 def _scopes(request: Request) -> tuple[list[str], str | None]:
@@ -161,30 +162,10 @@ def create_export(
 def create_erase(
     session: Session, user_id: str, actor: str, source: Source, background: BackgroundTasks
 ) -> DataSubjectRequest:
-    row = DataSubjectRequest(
-        kind="erase",
-        subject=None,
-        subject_hash=subject_hash(user_id),
-        status="pending",
-        requested_by=actor,
-        source=source,
-        due_at=due_date(),
-    )
-    session.add(row)
     # exportação do mesmo titular também perde o arquivo e o id em claro
-    for pending in session.scalars(
-        select(DataSubjectRequest).where(
-            DataSubjectRequest.kind == "export",
-            DataSubjectRequest.subject_hash == row.subject_hash,
-        )
-    ):
-        pending.result = None
-        pending.subject = None
-        pending.expires_at = None
-        if pending.status == "done":
-            pending.status = "expired"
-    session.commit()
-    session.refresh(row)
+    request_id = new_erase_request(session, user_id, actor, source)
+    row = session.get(DataSubjectRequest, request_id)
+    assert row is not None
     # o id em claro só existe no argumento do background
     background.add_task(run_erase, row.id, user_id)
     return row

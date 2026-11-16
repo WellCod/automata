@@ -92,6 +92,7 @@ def _channel(client: TestClient, kind: str, config_id: str, creds: dict[str, str
             "name": f"{kind} {uuid.uuid4().hex[:4]}",
             "config_id": config_id,
             "credentials": creds,
+            "welcome_message": "",
         },
     )
     assert resp.status_code == 201, resp.text
