@@ -151,6 +151,36 @@ services:
           cpus: "0.5"
           memory: 384M
 
+  # dump diário cifrado para um bucket fora da VM (OPS-01): `--profile backup` com
+  # BACKUP_BUCKET e BACKUP_PASSPHRASE no .env. Restauração em docs/restauracao.md
+  backup:
+    build: ./deploy/backup
+    profiles: [backup]
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      BACKUP_BUCKET: ${BACKUP_BUCKET:-}
+      BACKUP_ENDPOINT_URL: ${BACKUP_ENDPOINT_URL:-}
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}
+      BACKUP_KEEP_DAILY: ${BACKUP_KEEP_DAILY:-7}
+      BACKUP_KEEP_WEEKLY: ${BACKUP_KEEP_WEEKLY:-4}
+      BACKUP_HOUR: ${BACKUP_HOUR:-3}
+      AWS_ACCESS_KEY_ID: ${BACKUP_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${BACKUP_SECRET_ACCESS_KEY:-}
+      AWS_DEFAULT_REGION: ${BACKUP_REGION:-us-east-1}
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
   # TLS automático na frente do painel (Let's Encrypt): `--profile tls` com DOMAIN no .env
   caddy:
     image: caddy:2.10-alpine
