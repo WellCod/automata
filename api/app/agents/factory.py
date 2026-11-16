@@ -17,7 +17,7 @@ from agno.team import Team, TeamMode
 from agno.team.factory import TeamFactory
 from agno.tools.function import Function
 from agno.tools.mcp import MCPTools
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.agents.canary import in_canary
@@ -47,6 +47,11 @@ from app.secrets import SecretsKeyMissing
 
 class FactoryInput(BaseModel):
     version_id: UUID | None = None
+    # usuário final do sistema integrado (ADR-0045, LLM-02): separa a memória de cada
+    # pessoa atrás de um mesmo token de integração. Ignorado para usuário do painel
+    end_user: str | None = Field(
+        default=None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.@:+-]+$"
+    )
 
 
 # rascunho e versão revertida contornam o gate da suíte, o canário e o rollback (SEC-04)
@@ -339,14 +344,19 @@ def agent_from(
 
 
 def memory_owner(ctx: RequestContext) -> str | None:
-    """Dono da memória do run: ninguém quando quem chama é um token de integração.
+    """Dono da memória do run.
 
-    O `sub` do token é `integration:<id>` e o Agno o força como `user_id`: todos os
-    usuários finais de um site dividiriam a mesma memória (ADR-0045, LLM-02).
+    O `sub` do token de integração é `integration:<id>` e o Agno o força como `user_id`:
+    todos os usuários finais de um site dividiriam a mesma memória (ADR-0045, LLM-02). Sem
+    `factory_input.end_user`, chamada de integração fica sem memória; com ele, a memória é
+    de `integration:<id>:<end_user>`.
     """
     user_id = ctx.user_id
-    if user_id is None or user_id.startswith("integration:"):
+    if user_id is None:
         return None
+    if user_id.startswith("integration:"):
+        end_user = ctx.input.end_user if isinstance(ctx.input, FactoryInput) else None
+        return f"{user_id}:{end_user}" if end_user else None
     return user_id
 
 
