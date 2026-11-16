@@ -27,7 +27,11 @@ def test_health_db_unreachable() -> None:
     assert response.json()["status"] == "degraded"
 
 
-def test_health_db_ok() -> None:
+def test_health_db_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.alerts as alerts
+
+    # outro teste da sessão pode ter rodado o poller neste processo
+    monkeypatch.setattr(alerts, "_last_cycle", None)
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         os.environ["DATABASE_URL"] = url
