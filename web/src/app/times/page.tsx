@@ -11,6 +11,7 @@ import { useSuiteStatus } from "@/lib/api/evals";
 import { SuiteBadge } from "@/components/suite-badge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/status-badge";
+import { useCan } from "@/lib/api/users";
 
 const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none";
@@ -92,6 +93,7 @@ function NewTeamForm({ onCancel }: { onCancel: () => void }) {
 
 export default function TeamsPage() {
   const [showNew, setShowNew] = useState(false);
+  const canWrite = useCan("configs:write");
   const { data: suites } = useSuiteStatus();
   const { data, isPending, isError } = useQuery({
     queryKey: ["configs", "teams"],
@@ -113,10 +115,12 @@ export default function TeamsPage() {
             Um líder que delega a agentes especialistas.
           </p>
         </div>
-        <Button onClick={() => setShowNew(true)} variant="accent">
-          <Plus className="h-3.5 w-3.5" aria-hidden />
-          Novo time
-        </Button>
+        {canWrite && (
+          <Button onClick={() => setShowNew(true)} variant="accent">
+            <Plus className="h-3.5 w-3.5" aria-hidden />
+            Novo time
+          </Button>
+        )}
       </div>
 
       {showNew && (

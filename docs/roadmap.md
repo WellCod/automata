@@ -1722,7 +1722,7 @@ As Fases 51 a 54 seguem os horizontes da auditoria: 51 fecha os bloqueadores peq
 ## Fase 54 — Produto e comercial
 
 - [x] `feat(web)`: estado vazio com exemplos, modelos sem chave desabilitados, erro de validação visível e tools e parar no modo teste (UX-02, UX-03, UX-04, UX-05, UX-09)
-- [ ] `feat`: ações do painel conforme o papel e viewer sem conteúdo de conversa nem telefone (UX-06, COM-09, SEC-10)
+- [x] `feat`: ações do painel conforme o papel e viewer sem conteúdo de conversa nem telefone (UX-06, COM-09, SEC-10)
 - [ ] `feat`: execuções com paginação e filtro, consumo em csv e limites de plano por variável de ambiente (UX-07, COM-06)
 - [ ] `feat(api)`: login e leituras sensíveis na trilha e exportação da trilha em csv (COM-07)
 - [ ] `feat`: modelos extras por variável de ambiente, custo em reais e marca da instância (ARQ-02, UX-08, COM-12)

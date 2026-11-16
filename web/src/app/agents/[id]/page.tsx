@@ -73,6 +73,7 @@ import client from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
 import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes";
 import type { components } from "@/lib/api/schema.d.ts";
+import { useCan } from "@/lib/api/users";
 
 type AgentConfigDetail = components["schemas"]["AgentConfigDetail"];
 
@@ -196,6 +197,9 @@ export default function AgentEditPage() {
   const [caseFromRun, setCaseFromRun] = useState<string | null>(null);
   // recusa da API abre as seções avançadas, onde ficam as regras que ela valida
   const [apiRejected, setApiRejected] = useState(false);
+  // viewer não vê salvar nem o chat de teste, que a API recusaria (UX-06)
+  const canWrite = useCan("configs:write");
+  const canRun = useCan("agents:run");
   const queryClient = useQueryClient();
 
   const {
@@ -385,9 +389,13 @@ export default function AgentEditPage() {
               Alterações não salvas
             </span>
           )}
-          <Button type="submit" form="agent-form" variant="strong" disabled={mutation.isPending}>
-            {mutation.isPending ? "Salvando…" : "Salvar rascunho"}
-          </Button>
+          {canWrite ? (
+            <Button type="submit" form="agent-form" variant="strong" disabled={mutation.isPending}>
+              {mutation.isPending ? "Salvando…" : "Salvar rascunho"}
+            </Button>
+          ) : (
+            <span className="text-muted-foreground text-[11px]">Somente leitura</span>
+          )}
         </div>
       </header>
 
@@ -624,12 +632,14 @@ export default function AgentEditPage() {
             <h2 className="text-foreground text-[11px] font-medium">Testar</h2>
           </div>
           <div className="p-4">
-            <TestPanel
-              agentId={id}
-              draftVersionId={data?.draft_version?.id}
-              hasCurrentVersion={Boolean(data?.current_version)}
-              defaultOpen
-            />
+            {canRun && (
+              <TestPanel
+                agentId={id}
+                draftVersionId={data?.draft_version?.id}
+                hasCurrentVersion={Boolean(data?.current_version)}
+                defaultOpen
+              />
+            )}
           </div>
         </aside>
       </div>

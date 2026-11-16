@@ -4386,6 +4386,11 @@ export interface components {
       /** Email */
       email: string | null;
       role: components["schemas"]["UserRole"] | null;
+      /**
+       * Scopes
+       * @default []
+       */
+      scopes: string[];
     };
     /** MemoryItem */
     MemoryItem: {

@@ -51,6 +51,7 @@ import client from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/lib/api/users";
 
 const MODES = [
   {
@@ -142,6 +143,8 @@ const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors focus:border-accent focus:outline-none";
 
 export default function TeamEditPage() {
+  const canWrite = useCan("configs:write");
+  const canRun = useCan("teams:run");
   const { id } = useParams<{ id: string }>();
   const { data: floor } = useGuardrailFloor(id);
   const fieldId = useId();
@@ -299,9 +302,13 @@ export default function TeamEditPage() {
           {save.isSuccess && !form.formState.isDirty && (
             <span className="text-accent text-[11px]">Salvo</span>
           )}
-          <Button type="submit" form="team-form" disabled={save.isPending} variant="strong">
-            {save.isPending ? "Salvando…" : "Salvar rascunho"}
-          </Button>
+          {canWrite ? (
+            <Button type="submit" form="team-form" disabled={save.isPending} variant="strong">
+              {save.isPending ? "Salvando…" : "Salvar rascunho"}
+            </Button>
+          ) : (
+            <span className="text-muted-foreground text-[11px]">Somente leitura</span>
+          )}
         </div>
       </header>
 
@@ -505,14 +512,16 @@ export default function TeamEditPage() {
           <div className="p-4" role="tabpanel">
             {/* o teste fica montado: trocar de aba não apaga a conversa */}
             <div hidden={activePanel !== "teste"}>
-              <TestPanel
-                agentId={id}
-                kind="team"
-                memberNames={memberNames}
-                draftVersionId={data?.draft_version?.id}
-                hasCurrentVersion={Boolean(data?.current_version)}
-                defaultOpen
-              />
+              {canRun && (
+                <TestPanel
+                  agentId={id}
+                  kind="team"
+                  memberNames={memberNames}
+                  draftVersionId={data?.draft_version?.id}
+                  hasCurrentVersion={Boolean(data?.current_version)}
+                  defaultOpen
+                />
+              )}
             </div>
             {activePanel === "versoes" && (
               <VersionsPanel
