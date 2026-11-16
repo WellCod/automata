@@ -52,18 +52,16 @@ provision() {
   : "${DOMAIN:?defina DOMAIN, o endereço do painel}"
   : "${OWNER_EMAIL:?defina OWNER_EMAIL, o primeiro owner}"
   command -v openssl >/dev/null || die "openssl não encontrado"
-  local priv pub inline_priv inline_pub db_pass
+  local priv pub db_pass
   priv="$(openssl genrsa 2048 2>/dev/null)"
   pub="$(printf '%s\n' "$priv" | openssl rsa -pubout 2>/dev/null)"
-  inline_priv="$(printf '%s' "$priv" | awk 'NF {sub(/\r/, ""); printf "%s\\n", $0}')"
-  inline_pub="$(printf '%s' "$pub" | awk 'NF {sub(/\r/, ""); printf "%s\\n", $0}')"
   db_pass="$(openssl rand -hex 16)"
-  cp .env.example .env
+  # o PEM vai entre aspas duplas, com as quebras de linha: é assim que o compose lê
+  grep -vE '^JWT_(PRIVATE|PUBLIC)_KEY=' .env.example >.env
+  printf 'JWT_PRIVATE_KEY="%s"\nJWT_PUBLIC_KEY="%s"\n' "$priv" "$pub" >>.env
   set_var AUTOMATA_VERSION "${AUTOMATA_VERSION:-latest}"
   set_var POSTGRES_PASSWORD "$db_pass"
   set_var DATABASE_URL "postgresql+psycopg://automata:${db_pass}@db:5432/automata"
-  set_var JWT_PRIVATE_KEY "$inline_priv"
-  set_var JWT_PUBLIC_KEY "$inline_pub"
   set_var MCP_SECRETS_KEY "$(openssl rand -base64 32 | tr '+/' '-_')"
   set_var BACKUP_PASSPHRASE "$(openssl rand -base64 32)"
   set_var DOMAIN "$DOMAIN"
