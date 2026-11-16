@@ -24,8 +24,26 @@ from app.settings import get_settings
 _KEY = Fernet.generate_key().decode()
 
 
+_REAL_DNS = socket.getaddrinfo
+
+
+def _is_db_host(host: str) -> bool:
+    import ipaddress
+
+    if host == "localhost":
+        return True
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return True
+
+
 def _fake_dns(ip: str) -> Any:
+    # a conexão nova do banco (localhost ou IP do container) resolve de verdade
     def resolve(host: str, *args: Any, **kwargs: Any) -> list[Any]:
+        if _is_db_host(str(host)):
+            return _REAL_DNS(host, *args, **kwargs)
         return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, 443))]
 
     return resolve
