@@ -26,6 +26,7 @@ from app.agents.factory import (
     agent_from,
     load_team,
     load_version,
+    requested_version,
     team_from,
 )
 from app.agents.tracking import RunTracking, TrackedWorkflow
@@ -311,7 +312,7 @@ def build_nodes(nodes: list[WorkflowNode], resolved: ResolvedWorkflow) -> list[A
 
 def make_workflow_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> WorkflowFactory:
     async def build(ctx: RequestContext) -> TrackedWorkflow:
-        version_id = ctx.input.version_id if isinstance(ctx.input, FactoryInput) else None
+        version_id = requested_version(ctx)
         resolved = await asyncio.to_thread(load_workflow, config_id, version_id)
         workflow = TrackedWorkflow(
             id=str(config_id),

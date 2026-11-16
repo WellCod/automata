@@ -9,7 +9,7 @@ from agno.agent.factory import AgentFactory
 from agno.compaction.compaction import Compaction
 from agno.compression.manager import CompressionManager
 from agno.db.base import AsyncBaseDb, BaseDb
-from agno.factory.utils import FactoryValidationError, RequestContext
+from agno.factory.utils import FactoryPermissionError, FactoryValidationError, RequestContext
 from agno.guardrails.base import BaseGuardrail
 from agno.models.base import Model
 from agno.models.fallback import FallbackConfig
@@ -46,6 +46,21 @@ from app.secrets import SecretsKeyMissing
 
 class FactoryInput(BaseModel):
     version_id: UUID | None = None
+
+
+# rascunho e versão revertida contornam o gate da suíte, o canário e o rollback (SEC-04)
+_VERSION_SCOPES = frozenset({"configs:write", "agent_os:admin"})
+
+
+def requested_version(ctx: RequestContext) -> UUID | None:
+    """`factory_input.version_id`, só para quem edita configs."""
+    version_id = ctx.input.version_id if isinstance(ctx.input, FactoryInput) else None
+    if version_id is None:
+        return None
+    # sem claims o AgentOS roda sem auth, o que só acontece nos testes
+    if ctx.trusted.claims and not (ctx.trusted.scopes & _VERSION_SCOPES):
+        raise FactoryPermissionError("Rodar uma versão específica exige configs:write")
+    return version_id
 
 
 @dataclass
@@ -318,7 +333,7 @@ def make_agent_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> AgentFactor
     """
 
     async def build(ctx: RequestContext) -> Agent:
-        version_id = ctx.input.version_id if isinstance(ctx.input, FactoryInput) else None
+        version_id = requested_version(ctx)
         # leitura síncrona do banco fora do event loop
         resolved = await asyncio.to_thread(
             load_version, config_id, version_id, ctx.session_id, canary=True
@@ -362,7 +377,7 @@ def make_team_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> TeamFactory:
     """
 
     async def build(ctx: RequestContext) -> Team:
-        version_id = ctx.input.version_id if isinstance(ctx.input, FactoryInput) else None
+        version_id = requested_version(ctx)
         resolved = await asyncio.to_thread(
             load_team, config_id, version_id, ctx.session_id, canary=True
         )

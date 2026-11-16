@@ -263,7 +263,7 @@ E-mail inexistente ou usuário inativo também passa pelo argon2, contra um hash
 
 ### Logout
 
-Todo token emitido leva um `jti`. `POST /api/v1/auth/logout` (com o bearer da sessão) grava o `jti` em `revoked_token` até o token expirar, e o `RevocationMiddleware` passa a recusá-lo com 401, nas rotas próprias e nas do AgentOS. Os outros tokens do mesmo usuário continuam válidos. O BFF chama essa rota em `/api/auth/logout` e apaga o cookie mesmo se a API não responder. Token emitido antes do `jti` existir recebe 204 sem ser revogado e expira sozinho em até 1 h. Linhas expiradas saem da tabela a cada logout.
+Todo token emitido leva um `jti`. `POST /api/v1/auth/logout` (com o bearer da sessão) grava o `jti` em `revoked_token` até o token expirar, e o `RevocationMiddleware` passa a recusá-lo com 401, nas rotas próprias e nas do AgentOS, com ou sem o prefixo `Bearer` (o middleware JWT do Agno aceita o token cru). Conexão WebSocket é fechada no handshake (`app/websocket_guard.py`): o `/workflows/ws` do AgentOS ficaria fora da revogação e da trilha, e o painel não usa. Os outros tokens do mesmo usuário continuam válidos. O BFF chama essa rota em `/api/auth/logout` e apaga o cookie mesmo se a API não responder. Token emitido antes do `jti` existir recebe 204 sem ser revogado e expira sozinho em até 1 h. Linhas expiradas saem da tabela a cada logout.
 
 ### HSTS
 
