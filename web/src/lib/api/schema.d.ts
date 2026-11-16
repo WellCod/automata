@@ -1500,6 +1500,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/models/availability": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Availability
+     * @description Modelo com a chave do provedor no ambiente (UX-03): sem ela o run falha na hora.
+     */
+    get: operations["list_availability_api_v1_models_availability_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/linter": {
     parameters: {
       query?: never;
@@ -1749,6 +1769,40 @@ export interface paths {
     get: operations["list_runs_api_v1_configs__config_id__runs_get"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/templates": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Templates */
+    get: operations["list_templates_api_v1_templates_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/templates/{key}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Create From Template */
+    post: operations["create_from_template_api_v1_templates__key__post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2247,6 +2301,17 @@ export interface components {
        * Format: date-time
        */
       created_at: string;
+    };
+    /** AgentTemplate */
+    AgentTemplate: {
+      /** Key */
+      key: string;
+      /** Name */
+      name: string;
+      /** Description */
+      description: string;
+      /** Model Id */
+      model_id: string;
     };
     /** AlertChannels */
     AlertChannels: {
@@ -3184,6 +3249,14 @@ export interface components {
       password: string;
       /** @default viewer */
       role: components["schemas"]["UserRole"];
+    };
+    /** CreatedFromTemplate */
+    CreatedFromTemplate: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
     };
     /** CrossEncoderInfo */
     CrossEncoderInfo: {
@@ -8587,6 +8660,28 @@ export interface operations {
       };
     };
   };
+  list_availability_api_v1_models_availability_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: boolean;
+          };
+        };
+      };
+    };
+  };
   run_linter_api_v1_linter_post: {
     parameters: {
       query?: never;
@@ -9145,6 +9240,57 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["RunsPage"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_templates_api_v1_templates_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AgentTemplate"][];
+        };
+      };
+    };
+  };
+  create_from_template_api_v1_templates__key__post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CreatedFromTemplate"];
         };
       };
       /** @description Validation Error */

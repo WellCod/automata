@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { AgentCard } from "@/components/agent-card";
+import { FirstAgent } from "@/components/first-agent";
 import { useSuiteStatus } from "@/lib/api/evals";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
@@ -64,6 +65,7 @@ function NewAgentInline({ onCancel }: { onCancel: () => void }) {
         ref={inputRef}
         autoFocus
         placeholder="Nome do agente"
+        aria-label="Nome do agente"
         className="text-foreground placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[13px] focus:outline-none"
         disabled={mutation.isPending}
       />
@@ -163,12 +165,12 @@ export default function AgentsPage() {
         <div className="border-destructive/30 bg-destructive/10 text-destructive rounded border py-8 text-center text-[13px]">
           Erro ao carregar agentes.
         </div>
+      ) : data.items.length === 0 && !q && !status && page === 1 ? (
+        <FirstAgent onNew={() => setShowNew(true)} />
       ) : data.items.length === 0 ? (
         <div className="border-border rounded border py-16 text-center">
           <p className="text-foreground text-[13px] font-medium">Nenhum agente encontrado</p>
-          <p className="text-muted-foreground mt-1 text-[13px]">
-            {q || status ? "Tente outros filtros" : 'Clique em "Novo agente" para começar'}
-          </p>
+          <p className="text-muted-foreground mt-1 text-[13px]">Tente outros filtros</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">

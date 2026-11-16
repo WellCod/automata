@@ -30,6 +30,7 @@ from app.routers.memories import router as memories_router
 from app.routers.metrics import router as metrics_router
 from app.routers.models import router as models_router
 from app.routers.runs import router as runs_router
+from app.routers.templates import router as templates_router
 from app.routers.traces import router as traces_router
 from app.routers.usage import router as usage_router
 from app.routers.users import me_router
@@ -68,6 +69,7 @@ PROTECTED_ROUTERS: list[APIRouter] = [
     my_memories_router,
     metrics_router,
     runs_router,
+    templates_router,
     traces_router,
     usage_router,
     users_router,

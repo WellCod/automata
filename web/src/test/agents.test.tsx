@@ -1,10 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AgentsPage from "@/app/page";
 
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/lib/api/client", () => ({
-  default: { GET: vi.fn() },
+  default: { GET: vi.fn(), POST: vi.fn() },
 }));
 
 import client from "@/lib/api/client";
@@ -97,12 +100,32 @@ describe("AgentsPage", () => {
     });
   });
 
-  it("exibe estado vazio quando não há agentes", async () => {
+  it("instância vazia mostra os passos e cria a partir de exemplo (UX-02)", async () => {
+    vi.mocked(client.GET).mockImplementation((async (path: string) =>
+      path === "/api/v1/templates"
+        ? {
+            data: [
+              {
+                key: "atendimento-ao-cliente",
+                name: "Atendimento ao Cliente",
+                description: "Resolução de dúvidas",
+                model_id: "claude-haiku-4-5",
+              },
+            ],
+          }
+        : { data: { items: [], total: 0, page: 1, page_size: 12 } }) as never);
+    vi.mocked(client.POST).mockResolvedValue({ data: { id: "novo" } } as never);
     render(<AgentsPage />, { wrapper });
 
-    await waitFor(() => {
-      expect(screen.getByText("Nenhum agente encontrado")).toBeInTheDocument();
-    });
+    expect(await screen.findByText("Seu primeiro agente")).toBeInTheDocument();
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Criar a partir de Atendimento ao Cliente" }),
+    );
+    await waitFor(() =>
+      expect(client.POST).toHaveBeenCalledWith("/api/v1/templates/{key}", {
+        params: { path: { key: "atendimento-ao-cliente" } },
+      }),
+    );
   });
 
   it("exibe mensagem de erro quando a API falha", async () => {

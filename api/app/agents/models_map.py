@@ -70,5 +70,10 @@ def resolve_model(model_id: str, capabilities: CapabilityFlags | None = None) ->
     )
 
 
+def provider_of(model_id: str) -> str:
+    """ "anthropic" ou "openai", pela classe do modelo na matriz."""
+    return "anthropic" if _SUPPORTED.get(model_id) is Claude else "openai"
+
+
 def supported_models() -> list[str]:
     return sorted(_SUPPORTED)

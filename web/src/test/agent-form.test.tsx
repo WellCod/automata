@@ -140,10 +140,10 @@ describe("AgentEditPage", () => {
     expect(client.PUT).toHaveBeenCalledOnce();
   });
 
-  it("exibe erro quando a API de salvar falha", async () => {
+  it("exibe a recusa da API ao salvar (UX-04)", async () => {
     vi.mocked(client.PUT).mockResolvedValue({
       data: undefined,
-      error: { detail: "erro" },
+      error: { detail: "exame de tool sem termos nem classificador não examina nada" },
     } as never);
 
     render(<AgentEditPage />, { wrapper });
@@ -154,7 +154,9 @@ describe("AgentEditPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /salvar rascunho/i }));
 
     await waitFor(() => {
-      expect(screen.getAllByText("Erro ao salvar rascunho")[0]).toBeInTheDocument();
+      expect(
+        screen.getAllByText("exame de tool sem termos nem classificador não examina nada")[0],
+      ).toBeInTheDocument();
     });
   });
 

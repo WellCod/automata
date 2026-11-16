@@ -41,6 +41,17 @@ export function ModelSelector({ value, capabilities, onChange, error }: Props) {
     },
   });
 
+  // provedor sem chave no ambiente: o run falharia na hora (UX-03)
+  const { data: available } = useQuery({
+    queryKey: ["models:availability"],
+    queryFn: async () => {
+      const res = await client.GET("/api/v1/models/availability");
+      if (res.error) return {} as Record<string, boolean>;
+      return res.data as Record<string, boolean>;
+    },
+  });
+  const ready = (id: string) => available?.[id] !== false;
+
   const supported: CapabilityFlags | null = (value && models?.[value]) || null;
 
   const handleModelChange = (newModelId: string) => {
@@ -71,11 +82,17 @@ export function ModelSelector({ value, capabilities, onChange, error }: Props) {
         >
           <option value="">{isPending ? "Carregando modelos…" : "Selecione um modelo"}</option>
           {Object.keys(models ?? {}).map((id) => (
-            <option key={id} value={id}>
-              {id}
+            <option key={id} value={id} disabled={!ready(id) && id !== value}>
+              {ready(id) ? id : `${id} (sem chave do provedor)`}
             </option>
           ))}
         </select>
+        {value && !ready(value) && (
+          <p className="text-[11px] text-amber-700 dark:text-amber-400">
+            Este modelo não tem a chave do provedor configurada na instância: o agente não vai
+            responder. Escolha outro ou peça a chave a quem administra.
+          </p>
+        )}
         {error && <p className="text-destructive text-[11px]">{error}</p>}
       </div>
 
