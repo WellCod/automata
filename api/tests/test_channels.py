@@ -658,13 +658,14 @@ def test_mensagem_sem_resposta_no_deploy_e_retomada(
 
     agent = _agent(client, "deploy")
     channel = _channel(client, "whatsapp", agent, WA)
-    _wa_post(client, channel, _wa_body("5511777770000", "primeira")).raise_for_status()
+    _wa_post(client, channel, _wa_body("5511777779999", "primeira")).raise_for_status()
     fake.sent.clear()
     # como se o processo tivesse caído entre o 200 ao provedor e a resposta (OPS-07)
     with Session(get_engine()) as session:
         conv = session.scalars(
             select(ChannelConversation).where(
-                ChannelConversation.user_id == "whatsapp:5511777770000"
+                ChannelConversation.user_id == "whatsapp:5511777779999",
+                ChannelConversation.channel_id == uuid.UUID(channel),
             )
         ).one()
         stuck = ChannelMessage(
@@ -675,7 +676,7 @@ def test_mensagem_sem_resposta_no_deploy_e_retomada(
             author="customer",
             text="ficou sem resposta",
             status="received",
-            meta={"reply_to": {"to": "5511777770000"}, "sender": "whatsapp:5511777770000"},
+            meta={"reply_to": {"to": "5511777779999"}, "sender": "whatsapp:5511777779999"},
             created_at=datetime.now(UTC) - timedelta(minutes=5),
         )
         old = ChannelMessage(
@@ -693,10 +694,15 @@ def test_mensagem_sem_resposta_no_deploy_e_retomada(
         session.commit()
         stuck_id, old_id = stuck.id, old.id
 
-    assert asyncio.run(retry_stuck()) == 1
-    assert fake.sent[-1][1]["text"]["body"] == REPLY
+    # outras conversas do módulo podem ter mensagem parada também: conta a desta
+    assert asyncio.run(retry_stuck()) >= 1
+    assert ("5511777779999", REPLY) in [
+        (s[1].get("to"), s[1].get("text", {}).get("body")) for s in fake.sent
+    ]
+    sent = len(fake.sent)
     # a segunda rodada não responde de novo
-    assert asyncio.run(retry_stuck()) == 0
+    asyncio.run(retry_stuck())
+    assert all(s[1].get("to") != "5511777779999" for s in fake.sent[sent:])
     with Session(get_engine()) as session:
         assert session.get(ChannelMessage, stuck_id).status == "answered"  # type: ignore[union-attr]
         assert session.get(ChannelMessage, old_id).status == "failed"  # type: ignore[union-attr]
