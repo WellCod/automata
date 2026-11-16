@@ -55,7 +55,9 @@ def main() -> None:
             extra={"db": ahead, "image_head": head},
         )
         sys.exit(1)
-    with get_engine().connect() as lock:
+    # autocommit: transação aberta nesta conexão travaria o CREATE INDEX CONCURRENTLY da
+    # 0052, que espera todas as transações em curso terminarem (achado do smoke do compose)
+    with get_engine().connect().execution_options(isolation_level="AUTOCOMMIT") as lock:
         lock.execute(text("SELECT pg_advisory_lock(:k)"), {"k": _LOCK_KEY})
         try:
             command.upgrade(config, "head")
