@@ -40,9 +40,18 @@ class UserService:
         """`must_change` na conta criada pelo owner: a senha que ele escolheu é provisória."""
         if self._repo.get_by_email(email) is not None:
             raise ValueError("Email já cadastrado")
+        self._check_seats()
         user = self._repo.create(email=email, hashed_password=_ph.hash(password), role=role)
         user.must_change_password = must_change
         return user
+
+    def _check_seats(self) -> None:
+        from app.settings import get_settings
+
+        limit = get_settings().plan_max_users
+        if limit and self._repo.count() >= limit:
+            # limite do plano contratado (COM-06)
+            raise ValueError(f"o plano permite {limit} usuários")
 
     def _get(self, user_id: UUID) -> User:
         user = self._repo.get(user_id)
@@ -202,6 +211,11 @@ class UserService:
                 # ocupado por quem se cadastrou no provedor com ele (Fase 49)
                 if not email_verified:
                     raise PermissionError("E-mail não verificado no provedor")
+                try:
+                    self._check_seats()
+                except ValueError as exc:
+                    # o login por SSO responde 403 com o motivo
+                    raise PermissionError(str(exc)) from exc
                 user = User(email=email, hashed_password=None, role=role)
                 session.add(user)
             user.sso_issuer = issuer

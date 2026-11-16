@@ -190,7 +190,17 @@ export default function AnalyticsPage() {
     <div className="w-full px-6 py-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-foreground text-[18px] font-semibold">Analytics</h1>
-        <PeriodSelector filter={filter} onChange={setFilter} />
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodSelector filter={filter} onChange={setFilter} />
+          {/* consumo do mês corrente para o financeiro (COM-06); a rota do BFF baixa o CSV */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- download pela rota do BFF, não navegação */}
+          <a
+            href="/api/api/v1/usage/export"
+            className="border-border text-muted-foreground hover:text-foreground inline-flex h-7 items-center rounded border px-3 text-[12px]"
+          >
+            Exportar consumo do mês (CSV)
+          </a>
+        </div>
       </div>
 
       {summaryPending ? (

@@ -137,6 +137,8 @@ Na revisão humana do workflow, quem aprova pode **editar a saída** da etapa, c
 
 Regras de entrada e saída versionadas junto com o agente. O bloqueio acontece antes da chamada ao modelo, então não gasta token.
 
+O consumo do mês sai em CSV no Analytics, e a aba Execuções filtra por status e período.
+
 Numa instância vazia, a lista de agentes mostra os três passos até a primeira resposta e agentes de exemplo para começar (atendimento, suporte, análise financeira); o seletor de modelo desabilita o que não tem a chave do provedor configurada, e o modo teste mostra as tools chamadas e tem botão de parar.
 
 Agente e time novos já nascem com defesa: limite de 20 mil caracteres na mensagem, exame do resultado de tool por termos e no máximo 15 chamadas de tool por execução ([ADR-0045](docs/adr/0045-prontidao-para-o-primeiro-cliente.md)). Os já publicados não mudam.

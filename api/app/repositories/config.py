@@ -11,6 +11,9 @@ class ConfigRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    def count_configs(self) -> int:
+        return int(self._session.scalar(select(func.count()).select_from(AgentConfig)) or 0)
+
     def get_config(self, config_id: UUID) -> AgentConfig | None:
         return self._session.get(AgentConfig, config_id)
 

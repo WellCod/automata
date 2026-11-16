@@ -163,12 +163,33 @@ function RunItem({
   );
 }
 
+const PAGE_SIZE = 25;
+type RunStatus = "" | "success" | "error" | "blocked" | "paused" | "cancelled";
+const FILTER_LABEL: Record<Exclude<RunStatus, "">, string> = {
+  success: "Sucesso",
+  error: "Erro",
+  blocked: "Bloqueadas",
+  paused: "Aguardando aprovação",
+  cancelled: "Canceladas",
+};
+const PERIODS = { "": "Todo o período", "1": "Último dia", "7": "7 dias", "30": "30 dias" };
+
 export function RunsPanel({ agentId, onMakeCase }: Props) {
+  // filtro e páginas: com milhares de execuções a lista era só o fim (UX-07)
+  const [status, setStatus] = useState<RunStatus>("");
+  const [days, setDays] = useState<keyof typeof PERIODS>("");
+  const [page, setPage] = useState(1);
   const { data, isPending, isError } = useQuery({
-    queryKey: ["runs", agentId],
+    queryKey: ["runs", agentId, status, days, page],
     queryFn: async () => {
+      const since = days
+        ? new Date(Date.now() - Number(days) * 86_400_000).toISOString()
+        : undefined;
       const res = await client.GET("/api/v1/configs/{config_id}/runs", {
-        params: { path: { config_id: agentId } },
+        params: {
+          path: { config_id: agentId },
+          query: { page, page_size: PAGE_SIZE, status: status || undefined, since },
+        },
       });
       if (res.error) throw new Error("Falha ao carregar execuções");
       return res.data!;
@@ -176,14 +197,59 @@ export function RunsPanel({ agentId, onMakeCase }: Props) {
     refetchInterval: 5_000,
   });
 
+  const filters = (
+    <div className="flex flex-wrap gap-2">
+      <select
+        aria-label="Filtrar por status"
+        value={status}
+        onChange={(e) => {
+          setStatus(e.target.value as RunStatus);
+          setPage(1);
+        }}
+        className="border-border text-foreground rounded border bg-[var(--input)] px-2 py-1 text-[12px]"
+      >
+        <option value="">Todos os status</option>
+        {Object.entries(FILTER_LABEL).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+      <select
+        aria-label="Filtrar por período"
+        value={days}
+        onChange={(e) => {
+          setDays(e.target.value as keyof typeof PERIODS);
+          setPage(1);
+        }}
+        className="border-border text-foreground rounded border bg-[var(--input)] px-2 py-1 text-[12px]"
+      >
+        {Object.entries(PERIODS).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+
   if (isPending) return <p className="text-muted-foreground text-[13px]">Carregando…</p>;
   if (isError) return <p className="text-destructive text-[13px]">Falha ao carregar execuções.</p>;
 
   if (data.items.length === 0)
-    return <p className="text-muted-foreground text-[13px]">Nenhuma execução registrada.</p>;
+    return (
+      <div className="flex flex-col gap-3">
+        {filters}
+        <p className="text-muted-foreground text-[13px]">
+          {status || days ? "Nenhuma execução com esse filtro." : "Nenhuma execução registrada."}
+        </p>
+      </div>
+    );
 
+  const pages = Math.max(1, Math.ceil(data.total / PAGE_SIZE));
   return (
     <div className="flex flex-col gap-3">
+      {filters}
       <p className="text-muted-foreground text-[11px]">
         {data.total} execução{data.total !== 1 ? "ões" : ""} · atualiza a cada 5s
       </p>
@@ -192,6 +258,29 @@ export function RunsPanel({ agentId, onMakeCase }: Props) {
           <RunItem key={run.id} run={run} onMakeCase={onMakeCase} />
         ))}
       </ul>
+      {pages > 1 && (
+        <div className="text-muted-foreground flex items-center justify-end gap-2 text-[12px]">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="hover:text-foreground disabled:opacity-40"
+          >
+            Anterior
+          </button>
+          <span>
+            {page} de {pages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(pages, p + 1))}
+            disabled={page >= pages}
+            className="hover:text-foreground disabled:opacity-40"
+          >
+            Próxima
+          </button>
+        </div>
+      )}
     </div>
   );
 }
