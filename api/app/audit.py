@@ -7,6 +7,7 @@ As rotas que mudam produção põem o antes e o depois com `note`.
 
 import logging
 import re
+import time
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID
@@ -49,10 +50,26 @@ _SUBJECT_ROUTE = "/data-subjects/{user_id}"
 
 DEFAULT_RETENTION_DAYS = 365
 
+# leituras de dado pessoal: a auditoria do cliente pergunta quem viu a conversa (COM-07)
+_SENSITIVE_READ = re.compile(
+    r"^(/api/v1/data-subjects(/.*)?|/api/v1/me/data/.+|/api/v1/memories(/.*)?"
+    r"|/memories(/.*)?|/api/v1/traces/.+|/traces/.+|/api/v1/conversations/[^/]+"
+    r"|/sessions/[^/]+(/runs)?|/api/v1/audit/export)$"
+)
+# o painel consulta a mesma conversa a cada 5 s: uma linha por pessoa, rota e janela
+READ_DEDUPE_S = 600.0
+
+
+def sensitive_read(method: str, path: str) -> bool:
+    return method == "GET" and bool(_SENSITIVE_READ.match(path))
+
 
 def should_audit(method: str, path: str) -> bool:
     """Toda escrita, inclusive as rotas nativas do AgentOS (aprovações, sessões,
-    memórias, agendamentos), menos conversa, login e o que só lê (Fase 49)."""
+    memórias, agendamentos), menos conversa, login e o que só lê (Fase 49). Das leituras,
+    só as de dado pessoal (COM-07)."""
+    if sensitive_read(method, path):
+        return True
     if method not in WRITE_METHODS:
         return False
     if _CONTINUE.match(path):
@@ -156,6 +173,24 @@ def masked_path(app: Any, path: str) -> str:
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: Any) -> None:
+        super().__init__(app)
+        self._seen: dict[tuple[str, str], float] = {}
+
+    def _repeated_read(self, request: Request, path: str) -> bool:
+        if not sensitive_read(request.method, path):
+            return False
+        actor = str(getattr(request.state, "user_id", None) or "")
+        now = time.monotonic()
+        key = (actor, path)
+        last = self._seen.get(key)
+        if last is not None and now - last < READ_DEDUPE_S:
+            return True
+        if len(self._seen) > 10_000:
+            self._seen.clear()
+        self._seen[key] = now
+        return False
+
     async def dispatch(self, request: Request, call_next: object) -> Response:
         path = request.url.path
         if path.startswith(BLOCKED_PREFIXES):
@@ -167,7 +202,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             if should_audit(request.method, path):
                 await self._record(request, 500, path)
             raise
-        if should_audit(request.method, path):
+        if should_audit(request.method, path) and not self._repeated_read(request, path):
             await self._record(request, response.status_code, path)
         return response
 

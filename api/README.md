@@ -248,6 +248,8 @@ As rotas `/service-accounts` do AgentOS respondem 404: elas cunham token `agno_p
 
 As rotas que mudam produção preenchem `detail` com `note(request, ...)`: publicação e rollback (`current_before`, `current_after`), canário (versão, percentual e promoção), piso da instância, papel e situação do usuário, orçamento do config e de quem chama (`before`, `after`).
 
+Desde a Fase 54 (COM-07) entram também o login, com o resultado e por onde (`via` senha ou sso, e o `email_ref` da tentativa recusada), e as leituras de dado pessoal: titulares, memórias, traces, sessões e conversas do canal. A mesma leitura pela mesma pessoa e rota grava uma linha a cada 10 minutos. `GET /api/v1/audit/export` devolve a trilha filtrada em CSV, até 50 mil linhas.
+
 `GET /api/v1/audit` filtra por `actor`, `config_id`, `action` (trecho), `since` e `until`, do mais novo para o mais antigo, com até 100 por página e `next_cursor`. Cada item traz `actor_label`, com o e-mail do usuário ou o nome do token. A retenção é de `AUDIT_RETENTION_DAYS` dias (365), apagada pelo poller de avisos uma vez por dia em cada processo.
 
 **Retenção de conversas** (ADR-0045, `app/retention.py`). Com `CONVERSATION_RETENTION_DAYS` acima de zero (padrão 0, desligada), a mesma rodada diária apaga as sessões do Agno paradas há mais que o prazo, com runs, transcrições, compactações, aprovações e resultados de tool guardados, na ordem do `delete_session`; os traces mais velhos que o prazo, com os spans; e as mensagens de canal, junto com a conversa que ficou vazia. `agent_run` e `usage_event` ficam para métricas e custo, com `retencao-expirada` no lugar do id de quem falou e sem erro, pendências, revisões, retiradas e detalhe de bloqueio. Memórias seguem a retenção própria do agente (ADR-0025).

@@ -52,6 +52,27 @@ def _require_admin(authorization: str = Header(...)) -> None:
         raise HTTPException(status_code=403, detail="Permissão insuficiente")
 
 
+def _audit_login(
+    request: Request, user_id: str | None, status: int, detail: dict[str, str]
+) -> None:
+    """Login entra na trilha pela rota, porque o middleware não sabe quem é antes (COM-07)."""
+    from app.audit import record
+    from app.logging_config import request_id_var
+
+    try:
+        record(
+            actor=user_id,
+            action="POST /api/v1/auth/login",
+            params={},
+            status_code=status,
+            ip=known_client_ip(request),
+            request_id=request_id_var.get(None),
+            detail=detail,
+        )
+    except Exception as exc:
+        logger.error("falha ao gravar login na trilha", extra={"error": str(exc)})
+
+
 @router.post("/login", response_model=TokenResponse)
 def login(request: Request, body: LoginInput, session: SessionDep) -> TokenResponse:
     ip = known_client_ip(request)
@@ -78,8 +99,10 @@ def login(request: Request, body: LoginInput, session: SessionDep) -> TokenRespo
         session.commit()
     except ValueError as e:
         logger.warning("login failed", extra={"ip": ip, "email_ref": email_ref})
+        _audit_login(request, None, 401, {"email_ref": email_ref, "via": "senha"})
         raise HTTPException(status_code=401, detail="Credenciais inválidas") from e
     logger.info("login ok", extra={"ip": ip, "user_id": user_id, "role": user_role})
+    _audit_login(request, user_id, 200, {"via": "senha"})
     if must_change:
         # senha provisória: o token não tem scope, só serve para /me e /me/password
         return TokenResponse(
@@ -288,4 +311,5 @@ def oidc_callback(request: Request, body: OidcCallback, session: SessionDep) -> 
     if cut is not None and revoked is not None:
         revoked.cut_now(user_id, cut.timestamp())
     logger.info("sso ok", extra={"ip": ip, "user_id": user_id, "role": user_role})
+    _audit_login(request, user_id, 200, {"via": "sso"})
     return TokenResponse(access_token=issue_token(user_id, ROLE_SCOPES[user_role]))

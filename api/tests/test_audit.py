@@ -49,6 +49,14 @@ SECRET = "segredo-do-prompt-7781"
         ("PATCH", "/memories/m1", True),
         ("POST", "/agents/a/runs/r/cancel", True),
         ("POST", "/mcp", False),
+        # Fase 54: leituras de dado pessoal entram, as de configuração não (COM-07)
+        ("GET", "/api/v1/data-subjects/x/inventory", True),
+        ("GET", "/api/v1/conversations/c1", True),
+        ("GET", "/api/v1/conversations", False),
+        ("GET", "/sessions/s1", True),
+        ("GET", "/api/v1/memories", True),
+        ("GET", "/api/v1/audit", False),
+        ("GET", "/api/v1/audit/export", True),
     ],
 )
 def test_o_que_entra_na_trilha(method: str, path: str, expected: bool) -> None:
@@ -382,3 +390,24 @@ def test_escrita_que_estoura_500_entra_na_trilha(
     last = [e for e in _events(agent) if str(e["action"]).endswith("/canary")][-1]
     assert last["status"] == 500
     assert last["actor"] == "owner"
+
+
+def test_leitura_sensivel_e_login_na_trilha_com_exportacao(client: TestClient) -> None:
+    owner = _h("owner", OWNER)
+    for _ in range(2):
+        client.get("/api/v1/memories", headers=owner)
+    reads = [e for e in _events() if e["action"] == "GET /api/v1/memories"]
+    # a mesma leitura repetida na janela vira uma linha só
+    assert len(reads) == 1 and reads[0]["actor"] == "owner"
+
+    client.post("/api/v1/auth/login", json={"email": "ninguem@x.com", "password": "Errada123456"})
+    logins = [e for e in _events() if e["action"] == "POST /api/v1/auth/login"]
+    assert logins and logins[-1]["status"] == 401 and logins[-1]["actor"] is None
+    assert logins[-1]["detail"]["via"] == "senha"  # type: ignore[index]
+
+    resp = client.get("/api/v1/audit/export", headers=owner)
+    assert resp.status_code == 200 and resp.headers["content-type"].startswith("text/csv")
+    text = resp.content.decode("utf-8-sig")
+    assert text.startswith("quando;quem;acao") and "POST /api/v1/auth/login" in text
+    assert "ninguem@x.com" not in text
+    assert client.get("/api/v1/audit/export", headers=_h("v", _viewer())).status_code == 403
