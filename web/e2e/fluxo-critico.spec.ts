@@ -137,7 +137,8 @@ test.describe("Lista de agentes", () => {
       return route.continue();
     });
     await page.goto("/");
-    await expect(page.getByText(/nenhum agente/i)).toBeVisible();
+    // instância vazia mostra os passos do primeiro agente (UX-02)
+    await expect(page.getByText("Seu primeiro agente")).toBeVisible();
   });
 });
 
@@ -202,6 +203,7 @@ test.describe("Formulário de edição", () => {
 
     await page.goto(`/agents/${AGENT_ID}`);
     await page.getByRole("button", { name: /salvar rascunho/i }).click();
-    await expect(page.getByText("Erro ao salvar rascunho")).toBeVisible();
+    // a mensagem da API aparece no lugar do texto genérico (UX-04)
+    await expect(page.getByText("erro interno")).toBeVisible();
   });
 });
