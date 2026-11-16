@@ -250,7 +250,7 @@ export function TestPanel({
           {!hasCurrentVersion && (
             <p className="text-muted-foreground text-[13px]">
               {draftVersionId
-                ? "Sem versão publicada: o teste usa o rascunho salvo."
+                ? "Sem versão publicada: o teste roda o último rascunho."
                 : "Salve um rascunho para testar."}
             </p>
           )}
