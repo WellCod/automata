@@ -69,4 +69,5 @@ A última seção é a que importa mais. Decisão sem critério de reversão é 
 | [0041](0041-trilha-de-auditoria.md) | Trilha de auditoria | Aceito |
 | [0042](0042-login-por-oidc.md) | Login por SSO via OIDC | Aceito |
 | [0043](0043-traces-por-otlp-e-casos-por-csv.md) | Traces por OTLP e casos de teste por CSV | Aceito |
-| [0044](0044-canais-de-conversa-e-atendente.md) | Canais de conversa e passagem para atendente | Proposto |
+| [0044](0044-canais-de-conversa-e-atendente.md) | Canais de conversa e passagem para atendente | Aceito |
+| [0045](0045-prontidao-para-o-primeiro-cliente.md) | Prontidão para o primeiro cliente: padrões seguros, retenção, senha, backup e aviso no canal | Proposto |
