@@ -32,6 +32,7 @@ import { usePendingApprovals } from "@/lib/api/approvals";
 import { useMe } from "@/lib/api/users";
 import { ThemeToggle } from "./theme";
 import { useInstance } from "@/lib/instance";
+import { useQuery } from "@tanstack/react-query";
 
 // em grupos: 14 itens numa lista só não se liam (Fase 44)
 const navItems = [
@@ -157,6 +158,14 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
   const { data: pending } = usePendingApprovals();
   const { data: me } = useMe();
   const instance = useInstance();
+  // versão da imagem em produção (OPS-04); "dev" no build local
+  const { data: health } = useQuery({
+    queryKey: ["health"],
+    queryFn: async () =>
+      (await fetch("/api/health")).json() as Promise<{ panel?: { version?: string } }>,
+    staleTime: 10 * 60_000,
+  });
+  const version = health?.panel?.version ?? "";
   // a API recusa quem não é owner; o item só some para não levar a uma página vazia
   const visible = navItems.filter(
     (item) =>
@@ -269,9 +278,9 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
       <div className="border-sidebar-border flex items-center justify-between border-t px-3 py-2">
         <span
           className="text-muted-foreground min-w-0 truncate text-[11px]"
-          title={me?.email ?? ""}
+          title={[me?.email, version && `versão ${version}`].filter(Boolean).join(" · ")}
         >
-          {me?.email ?? "v0.1"}
+          {me?.email ?? version}
         </span>
         <div className="flex items-center gap-1">
           <ThemeToggle />

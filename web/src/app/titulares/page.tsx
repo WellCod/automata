@@ -11,8 +11,11 @@ export default function DataSubjectsPage() {
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-6 py-6">
         <p className="text-muted-foreground text-[13px]">
           Pedidos da LGPD sobre uma pessoa: o que a instância guarda dela, uma cópia de tudo e a
-          exclusão. O titular é o id do usuário no run: o e-mail de quem usa o painel ou o id que o
-          sistema integrado manda. Só owners veem esta página.
+          exclusão. O titular é o id do usuário no run: o e-mail de quem usa o painel,{" "}
+          <code>whatsapp:&lt;número&gt;</code> ou <code>slack:&lt;id&gt;</code> nos canais e{" "}
+          <code>integration:&lt;token&gt;:&lt;usuário&gt;</code> no sistema integrado. A mesma
+          pessoa pode ter mais de um: faça o pedido para cada id dela (COM-10). Só owners veem esta
+          página.
         </p>
         <DataSubjectsPanel />
       </main>

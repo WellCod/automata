@@ -105,3 +105,9 @@ Quando a página Chaves mostrar zero segredos na chave anterior, remova `MCP_SEC
 ## Senha do owner
 
 Senha não é chave e não entra nesta troca. Para uma senha que vazou, entre como owner, troque a senha em **Usuários** e confira os outros owners. A troca de senha corta na hora as sessões abertas da pessoa.
+
+## Chave do provedor de modelo
+
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `VOYAGE_API_KEY`, `COHERE_API_KEY` e as chaves de `EXTRA_MODELS` são uma por instância e lidas no boot (LLM-13). Para trocar: gere a chave nova no console do provedor, ponha no `.env`, rode `docker compose up -d api ingest-worker` e revogue a velha no console depois que o `/api/health` voltar `ok`. Os runs em andamento no reinício falham e a mensagem de canal parada é retomada pelo poller.
+
+Configure no console de cada provedor um teto de gasto mensal e um alerta: o orçamento do Automata barra por agente, usuário e token, mas uma chave vazada fora da instância só o provedor segura.
