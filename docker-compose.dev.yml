@@ -2,6 +2,8 @@
 # Não usar quando ENABLE_MCP_SERVER=true: --reload mata conexões MCP durante o ciclo de vida.
 services:
   api:
+    # imagem local: sem isso o compose puxaria a publicada no GHCR
+    image: automata-api:dev
     restart: "no"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
@@ -17,6 +19,7 @@ services:
 
   # Painel em container só com --profile docker-web; o normal é `pnpm --filter web dev` no host.
   web:
+    image: automata-web:dev
     profiles: [docker-web]
     build:
       context: .

@@ -36,4 +36,8 @@ USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+# versão publicada (tag) e revisão do git, mostradas no /health (OPS-04)
+ARG AUTOMATA_VERSION=dev
+ARG AUTOMATA_REVISION=
+ENV AUTOMATA_VERSION=$AUTOMATA_VERSION AUTOMATA_REVISION=$AUTOMATA_REVISION
 CMD ["node", "web/server.js"]

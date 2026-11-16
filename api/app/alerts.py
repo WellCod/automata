@@ -8,6 +8,7 @@ evento e janela, e é ela que impede duas réplicas de mandar o mesmo aviso.
 """
 
 import logging
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -195,6 +196,14 @@ def check_errors(session: Session, now: datetime) -> list[UUID]:
     return sent
 
 
+_last_cycle: float | None = None
+
+
+def last_cycle_age(now_monotonic: float) -> float | None:
+    """Segundos desde a última rodada do poller neste processo; None se nunca rodou."""
+    return None if _last_cycle is None else now_monotonic - _last_cycle
+
+
 def poll_once(now: datetime | None = None) -> None:
     """Uma rodada do poller: orçamento e pico de erro. Nunca levanta."""
     moment = now or datetime.now(UTC)
@@ -228,3 +237,5 @@ def poll_once(now: datetime | None = None) -> None:
             logger.warning(
                 "falha na checagem de avisos", extra={"check": check.__name__, "error": str(exc)}
             )
+    global _last_cycle
+    _last_cycle = time.monotonic()

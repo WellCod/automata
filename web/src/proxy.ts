@@ -53,7 +53,12 @@ export async function proxy(req: NextRequest) {
   const csrfError = csrfCheck(req);
   if (csrfError) return csrfError;
 
-  if (PUBLIC_PAGES.some((p) => pathname.startsWith(p)) || pathname.startsWith("/api/auth/")) {
+  if (
+    PUBLIC_PAGES.some((p) => pathname.startsWith(p)) ||
+    pathname.startsWith("/api/auth/") ||
+    // monitor externo da instância (OPS-05)
+    pathname === "/api/health"
+  ) {
     return NextResponse.next();
   }
   // webhook dos canais (ADR-0044): quem chama é o provedor, e a API confere a assinatura

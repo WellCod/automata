@@ -18,8 +18,7 @@ migrate:
     cd api && uv run alembic upgrade head
 
 gen-api:
-    cd api && uv run python scripts/gen_openapi.py
-    cd web && pnpm openapi-ts
+    node web/scripts/gen-api.mjs
 
 seed set="minimal":
     docker exec \

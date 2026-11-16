@@ -24,6 +24,10 @@ COPY entrypoint.sh entrypoint.sh
 RUN python3 -c "p=open('entrypoint.sh','rb');c=p.read();p.close();c=c.lstrip(b'\xef\xbb\xbf').replace(b'\r\n',b'\n').replace(b'\r',b'\n');p=open('entrypoint.sh','wb');p.write(c);p.close()" && chmod +x entrypoint.sh
 
 ENV PATH="/app/.venv/bin:$PATH"
+# versão publicada (tag) e revisão do git, mostradas no /health (OPS-04)
+ARG AUTOMATA_VERSION=dev
+ARG AUTOMATA_REVISION=
+ENV AUTOMATA_VERSION=$AUTOMATA_VERSION AUTOMATA_REVISION=$AUTOMATA_REVISION
 
 USER app
 

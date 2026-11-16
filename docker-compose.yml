@@ -47,6 +47,9 @@ services:
           memory: 128M
 
   api:
+    # imagem publicada da versão em AUTOMATA_VERSION (docs/atualizacao.md); sem a tag no
+    # registro, o compose monta a partir do código
+    image: ghcr.io/wellcod/automata-api:${AUTOMATA_VERSION:-latest}
     build: ./api
     restart: unless-stopped
     logging: *logging
@@ -120,6 +123,7 @@ services:
         condition: service_healthy
 
   web:
+    image: ghcr.io/wellcod/automata-web:${AUTOMATA_VERSION:-latest}
     build:
       context: .
       dockerfile: web/Dockerfile

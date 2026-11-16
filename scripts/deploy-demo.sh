@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Deploy Automata → Railway (API + DB + Redis) + Vercel (painel)
-# Uso: bash scripts/deploy.sh
+# Demo pública, não instância de cliente: Railway (API + DB + Redis) + Vercel (painel), com
+# DEMO_REPLAY e execuções falsas. Instância de cliente: scripts/instance.sh (docs/atualizacao.md)
+# Uso: bash scripts/deploy-demo.sh
 set -euo pipefail
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BOLD='\033[1m'; NC='\033[0m'
