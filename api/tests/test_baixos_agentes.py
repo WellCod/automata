@@ -1,7 +1,6 @@
 """Achados baixos de agentes da auditoria de 2026-11-16 (LLM-09, LLM-10, LLM-11)."""
 
 import asyncio
-import logging
 from types import SimpleNamespace
 from typing import Any
 
@@ -10,7 +9,9 @@ import pytest
 from app.mcp.client import McpUnavailable, connect_strict
 
 
-def test_erro_do_mcp_nao_volta_com_o_host_interno(caplog: pytest.LogCaptureFixture) -> None:
+def test_erro_do_mcp_nao_volta_com_o_host_interno(monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.mcp.client as mcp_client
+
     class Broken:
         initialized = False
 
@@ -20,11 +21,16 @@ def test_erro_do_mcp_nao_volta_com_o_host_interno(caplog: pytest.LogCaptureFixtu
         async def close(self) -> None:
             return None
 
-    with caplog.at_level(logging.WARNING), pytest.raises(McpUnavailable) as exc:
+    logged: list[dict[str, Any]] = []
+    # o log do app pode não propagar para o caplog: captura direto no logger do módulo
+    monkeypatch.setattr(
+        mcp_client.logger, "warning", lambda msg, extra=None: logged.append(extra or {})
+    )
+    with pytest.raises(McpUnavailable) as exc:
         asyncio.run(connect_strict(Broken(), "crm"))  # type: ignore[arg-type]
     assert "10.0.3.7" not in str(exc.value)
     # o detalhe fica no log, como campo extra
-    assert any("10.0.3.7" in str(getattr(r, "error", "")) for r in caplog.records)
+    assert any("10.0.3.7" in str(e.get("error", "")) for e in logged)
 
 
 def test_membro_do_time_grava_bloqueio_no_registro_do_lider(
