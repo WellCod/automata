@@ -66,3 +66,17 @@ def test_imagem_velha_nao_migra_banco_novo(db: str) -> None:
     with get_engine().begin() as conn:
         conn.execute(text("DELETE FROM alembic_version"))
     command.stamp(Config("alembic.ini"), "head")
+
+
+def test_migracao_do_boot_com_lock_passa_pelo_indice_concorrente(db: str) -> None:
+    """A 0052 cria índice com CONCURRENTLY: com o lock numa transação aberta, travava."""
+    import threading
+
+    from app import migrate
+
+    command.downgrade(Config("alembic.ini"), "0051")
+    done = threading.Event()
+    worker = threading.Thread(target=lambda: (migrate.main(), done.set()), daemon=True)
+    worker.start()
+    assert done.wait(120), "migração do boot travou"
+    assert _version() is not None and _version() >= "0052"
