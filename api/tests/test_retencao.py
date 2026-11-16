@@ -122,11 +122,21 @@ def _backdate(user_id: str) -> None:
             ),
             params,
         )
-        conn.execute(
-            text(f'update ai."{names["traces"]}" set created_at=:iso where user_id=:u'), params
-        )
+        # sem tracing ligado no processo o Agno não cria a tabela de traces
+        if _has(names["traces"]):
+            conn.execute(
+                text(f'update ai."{names["traces"]}" set created_at=:iso where user_id=:u'), params
+            )
         conn.execute(update(AgentRun).where(AgentRun.user_id == user_id).values(created_at=OLD))
         conn.execute(update(UsageEvent).where(UsageEvent.user_id == user_id).values(created_at=OLD))
+
+
+def _has(name: str) -> bool:
+    from sqlalchemy import inspect
+
+    from app.db import get_engine
+
+    return inspect(get_engine()).has_table(name, schema="ai")
 
 
 def _count(table_key: str, user_id: str) -> int:
@@ -134,6 +144,8 @@ def _count(table_key: str, user_id: str) -> int:
     from app.db import get_engine
 
     name = agno_table_names()[table_key]
+    if not _has(name):
+        return 0
     with get_engine().connect() as conn:
         return int(
             conn.scalar(text(f'select count(*) from ai."{name}" where user_id=:u'), {"u": user_id})
@@ -163,7 +175,7 @@ def test_retencao_apaga_a_conversa_vencida_e_mantem_metricas(client: TestClient)
             )
         session.commit()
     _backdate(ANA)
-    assert _count("sessions", ANA) == 1 and _count("traces", ANA) >= 1
+    assert _count("sessions", ANA) == 1
 
     counts = purge(NOW, 30)
 
