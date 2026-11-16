@@ -68,7 +68,7 @@ async def _read_body(request: Request) -> bytes:
 def _claim(connector_id: UUID, body: bytes, header: str | None, limiter: Any) -> str:
     """Confere a assinatura e marca a sincronização; roda numa thread, fora do event loop."""
     with Session(get_engine()) as session:
-        connector = session.get(KnowledgeConnector, connector_id)
+        connector = session.get(KnowledgeConnector, connector_id, with_for_update=True)
         if connector is None or connector.webhook_secret_encrypted is None:
             raise _not_found()
         try:

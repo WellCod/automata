@@ -1709,7 +1709,7 @@ As Fases 51 a 54 seguem os horizontes da auditoria: 51 fecha os bloqueadores peq
 
 ## Fase 53 — Operação e segurança dos agentes
 
-- [ ] `fix(api)`: redis fora não derruba o login, trabalho aceito e preso é retomado e conector e versão sem corrida (OPS-06, OPS-07, OPS-11, OPS-12)
+- [x] `fix(api)`: redis fora não derruba o login, trabalho aceito e preso é retomado e conector e versão sem corrida (OPS-06, OPS-07, OPS-11, OPS-12)
 - [ ] `fix(api)`: ingestão no worker por padrão, teto no conteúdo descomprimido e um pool só para o banco do agno (OPS-08, SEC-06, OPS-09)
 - [ ] `fix(security)`: continue confere a tool pendente e argumentos de tool passam pela máscara e pelos termos bloqueados (LLM-03, LLM-06)
 - [ ] `feat(api)`: limite por chamador nas rotas de run e orçamento padrão em token de integração e canal (LLM-05)

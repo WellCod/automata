@@ -1,9 +1,13 @@
+import logging
 import time
 from collections import defaultdict
 from threading import Lock
 
 from fastapi import HTTPException
 from redis import Redis
+from redis.exceptions import RedisError
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryRateLimiter:
@@ -37,8 +41,17 @@ class RedisRateLimiter:
         )
         self._limit = limit
         self._window = window
+        # Redis fora não derruba login nem webhook: o limite vale por processo até voltar
+        self._fallback = MemoryRateLimiter(limit=limit, window=window)
 
     def check(self, key: str, limit: int | None = None) -> None:
+        try:
+            self._check(key, limit)
+        except RedisError as exc:
+            logger.warning("redis fora: limite em memória", extra={"error": type(exc).__name__})
+            self._fallback.check(key, limit)
+
+    def _check(self, key: str, limit: int | None) -> None:
         limit = limit or self._limit
         pipe = self._client.pipeline()
         pipe.incr(key)

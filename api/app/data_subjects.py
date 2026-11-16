@@ -390,6 +390,8 @@ def run_erase(request_id: UUID, user_id: str) -> None:
 
 
 DATA_SUBJECT_FAILED = "data_subject.failed"
+# exportação e exclusão terminam em minutos; parado há mais que isso, o processo caiu
+STALE_REQUEST = timedelta(hours=1)
 DATA_SUBJECT_DUE = "data_subject.due"
 # o aviso de vencimento sai com essa folga antes do prazo
 DUE_NOTICE = timedelta(days=2)
@@ -416,6 +418,17 @@ def check_requests(session: Session, now: datetime) -> list[tuple[UUID, str]]:
     from app.alerts import broadcast, destinations_for
 
     sent: list[tuple[UUID, str]] = []
+    # pedido que roda em background e parou no meio de um deploy (OPS-07): vira falha, e
+    # o aviso de falha abaixo pede para refazer
+    session.execute(
+        update(DataSubjectRequest)
+        .where(
+            DataSubjectRequest.status.in_(["pending", "running"]),
+            DataSubjectRequest.created_at < now - STALE_REQUEST,
+        )
+        .values(status="failed", error="interrompido antes de terminar", finished_at=now)
+    )
+    session.commit()
     if destinations_for(session, DATA_SUBJECT_FAILED):
         failed = session.scalars(
             select(DataSubjectRequest).where(

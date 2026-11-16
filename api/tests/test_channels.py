@@ -642,3 +642,61 @@ def test_aviso_de_tool_com_confirmacao_no_canal() -> None:
     config = SimpleNamespace(current_version_id=uuid4())
     out = _with_warnings(response, session, config)  # type: ignore[arg-type]
     assert out.warnings and "confirmação humana" in out.warnings[0]
+
+
+def test_mensagem_sem_resposta_no_deploy_e_retomada(
+    client: TestClient, fake: FakeProviders
+) -> None:
+    import asyncio
+    from datetime import timedelta
+
+    from sqlalchemy import select
+
+    from app.channels.service import retry_stuck
+    from app.db import get_engine
+    from app.models.channel import ChannelConversation, ChannelMessage
+
+    agent = _agent(client, "deploy")
+    channel = _channel(client, "whatsapp", agent, WA)
+    _wa_post(client, channel, _wa_body("5511777770000", "primeira")).raise_for_status()
+    fake.sent.clear()
+    # como se o processo tivesse caído entre o 200 ao provedor e a resposta (OPS-07)
+    with Session(get_engine()) as session:
+        conv = session.scalars(
+            select(ChannelConversation).where(
+                ChannelConversation.user_id == "whatsapp:5511777770000"
+            )
+        ).one()
+        stuck = ChannelMessage(
+            channel_id=conv.channel_id,
+            conversation_id=conv.id,
+            external_id="wamid.preso",
+            direction="in",
+            author="customer",
+            text="ficou sem resposta",
+            status="received",
+            meta={"reply_to": {"to": "5511777770000"}, "sender": "whatsapp:5511777770000"},
+            created_at=datetime.now(UTC) - timedelta(minutes=5),
+        )
+        old = ChannelMessage(
+            channel_id=conv.channel_id,
+            conversation_id=conv.id,
+            external_id="wamid.velho",
+            direction="in",
+            author="customer",
+            text="de ontem",
+            status="received",
+            meta={},
+            created_at=datetime.now(UTC) - timedelta(hours=3),
+        )
+        session.add_all([stuck, old])
+        session.commit()
+        stuck_id, old_id = stuck.id, old.id
+
+    assert asyncio.run(retry_stuck()) == 1
+    assert fake.sent[-1][1]["text"]["body"] == REPLY
+    # a segunda rodada não responde de novo
+    assert asyncio.run(retry_stuck()) == 0
+    with Session(get_engine()) as session:
+        assert session.get(ChannelMessage, stuck_id).status == "answered"  # type: ignore[union-attr]
+        assert session.get(ChannelMessage, old_id).status == "failed"  # type: ignore[union-attr]
