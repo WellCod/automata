@@ -81,6 +81,10 @@ class HashEmbedder(Embedder):
         return self.get_embedding(text), None
 
 
+# uma busca na base ou um lote da ingestão; sem isso o SDK esperava 600 s (OPS-03)
+EMBEDDER_TIMEOUT_SECONDS = 30.0
+
+
 def build_embedder(
     embedder: str, model: str, dimensions: int, input_type: InputType = "document"
 ) -> Embedder:
@@ -95,11 +99,17 @@ def build_embedder(
             dimensions=dimensions,
             api_key=get_settings().voyage_api_key,
             request_params={"input_type": input_type},
+            timeout=EMBEDDER_TIMEOUT_SECONDS,
+            max_retries=1,
         )
     if embedder == "openai":
         from agno.knowledge.embedder.openai import OpenAIEmbedder
 
-        return OpenAIEmbedder(id=model, dimensions=dimensions)
+        return OpenAIEmbedder(
+            id=model,
+            dimensions=dimensions,
+            client_params={"timeout": EMBEDDER_TIMEOUT_SECONDS, "max_retries": 1},
+        )
     raise ValueError(f"embedder desconhecido: {embedder}")
 
 

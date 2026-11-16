@@ -19,6 +19,12 @@ _SUPPORTED: dict[str, type[Model]] = {
 
 _THINKING_BUDGET_TOKENS = 4096
 
+# Os SDKs esperam 600 s com 2 novas tentativas: um provedor que aceita a conexão e não
+# responde segurava cada run, mensagem de canal e caso de suíte por até 30 min (OPS-03).
+# Com 120 s e uma nova tentativa, o pior caso fica em 4 min e o erro aparece
+PROVIDER_TIMEOUT_SECONDS = 120.0
+PROVIDER_SDK_RETRIES = 1
+
 
 def demo_replay() -> bool:
     """Modo demo: respostas gravadas no lugar do provedor (ADR-0008)."""
@@ -50,8 +56,18 @@ def resolve_model(model_id: str, capabilities: CapabilityFlags | None = None) ->
         return Claude(
             id=model_id,
             thinking={"type": "enabled", "budget_tokens": _THINKING_BUDGET_TOKENS},
+            timeout=PROVIDER_TIMEOUT_SECONDS,
+            client_params={"max_retries": PROVIDER_SDK_RETRIES},
         )
-    return cls(id=model_id)
+    if cls is Claude:
+        return Claude(
+            id=model_id,
+            timeout=PROVIDER_TIMEOUT_SECONDS,
+            client_params={"max_retries": PROVIDER_SDK_RETRIES},
+        )
+    return OpenAIChat(
+        id=model_id, timeout=PROVIDER_TIMEOUT_SECONDS, max_retries=PROVIDER_SDK_RETRIES
+    )
 
 
 def supported_models() -> list[str]:

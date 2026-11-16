@@ -47,8 +47,11 @@ def cross_encode(
     reranker: Reranker
     if settings.provider == "cohere":
         from agno.knowledge.reranker.cohere import CohereReranker
+        from cohere import Client as CohereClient
 
-        reranker = CohereReranker(model=settings.model, api_key=os.environ.get("COHERE_API_KEY"))
+        # o cliente da Cohere espera 300 s por padrão (OPS-03)
+        client = CohereClient(api_key=os.environ.get("COHERE_API_KEY"), timeout=30)
+        reranker = CohereReranker(model=settings.model, cohere_client=client)
     else:
         from agno.knowledge.reranker.aws_bedrock import AwsBedrockReranker
 
