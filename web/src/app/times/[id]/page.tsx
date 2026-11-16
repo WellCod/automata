@@ -19,6 +19,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import {
   DEFAULT_GUARDRAILS,
+  SAFE_NEW_GUARDRAILS,
   type Guardrails,
   GuardrailsEditor,
   withDefaults,
@@ -37,6 +38,7 @@ import { MetricsPanel } from "@/components/metrics-panel";
 import { ModelSelector } from "@/components/model-selector";
 import {
   DEFAULT_RUN,
+  SAFE_NEW_RUN,
   type RunControls,
   RunControlsEditor,
   withRunDefaults,
@@ -191,6 +193,8 @@ export default function TeamEditPage() {
   useEffect(() => {
     if (!data) return;
     const p = data.payload;
+    // nunca salvo: o formulário abre com as defesas do ADR-0045 ligadas
+    const fresh = !data.current_version && !data.draft_version;
     reset({
       name: data.name,
       description: data.description,
@@ -212,8 +216,8 @@ export default function TeamEditPage() {
         base_id: k.base_id,
         max_results: k.max_results ?? 5,
       })),
-      guardrails: withDefaults(p?.guardrails),
-      run: withRunDefaults(p?.run),
+      guardrails: fresh ? SAFE_NEW_GUARDRAILS : withDefaults(p?.guardrails),
+      run: fresh ? SAFE_NEW_RUN : withRunDefaults(p?.run),
       memory: withMemoryDefaults(p?.memory),
       team: {
         mode: p?.team?.mode ?? "coordinate",

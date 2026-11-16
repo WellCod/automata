@@ -137,6 +137,8 @@ Na revisão humana do workflow, quem aprova pode **editar a saída** da etapa, c
 
 Regras de entrada e saída versionadas junto com o agente. O bloqueio acontece antes da chamada ao modelo, então não gasta token.
 
+Agente e time novos já nascem com defesa: limite de 20 mil caracteres na mensagem, exame do resultado de tool por termos e no máximo 15 chamadas de tool por execução ([ADR-0045](docs/adr/0045-prontidao-para-o-primeiro-cliente.md)). Os já publicados não mudam.
+
 - **Dados pessoais:** CPF e CNPJ com dígito verificador e cartão com Luhn, para que número de pedido não seja confundido com documento. Também e-mail e telefone. Cada tipo pode ser mascarado ou bloqueado. Até 10 padrões próprios por agente cobrem matrícula, contrato ou protocolo. Cada padrão tem prefixo e faixa de dígitos, sem regex livre, e vale na entrada, na memória e na resposta.
 - **Injeção de prompt:** detectada em português e inglês, sem diferenciar acento.
 - **Outras regras:** tópicos proibidos, tamanho máximo e moderação opcional da OpenAI.

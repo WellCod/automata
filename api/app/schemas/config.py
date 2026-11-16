@@ -294,6 +294,22 @@ class TeamSettings(BaseModel):
         return self
 
 
+# Padrões do primeiro rascunho de agente e time (ADR-0045). O schema segue com tudo
+# desligado para que versão já publicada não mude de comportamento.
+SAFE_TOOL_CALL_LIMIT = 15
+SAFE_MAX_INPUT_CHARS = 20_000
+
+
+def safe_guardrails() -> "GuardrailSettings":
+    return GuardrailSettings(
+        max_input_chars=SAFE_MAX_INPUT_CHARS, tool_results=ToolResultScreening()
+    )
+
+
+def safe_run() -> "RunControls":
+    return RunControls(tool_call_limit=SAFE_TOOL_CALL_LIMIT)
+
+
 class ConfigPayload(BaseModel):
     """Payload JSONB de uma versão de configuração.
 
@@ -323,6 +339,16 @@ class ConfigPayload(BaseModel):
     team: TeamSettings | None = None
     # Em workflow: árvore de etapas (ADR-0014); modelo e instruções não se aplicam
     workflow: WorkflowSettings | None = None
+
+    def with_safe_defaults(self) -> "ConfigPayload":
+        """Guardrails e controle do run do ADR-0045 onde quem salvou não mandou a seção."""
+        sent = self.model_fields_set
+        updates: dict[str, Any] = {}
+        if "guardrails" not in sent:
+            updates["guardrails"] = safe_guardrails()
+        if "run" not in sent:
+            updates["run"] = safe_run()
+        return self.model_copy(update=updates)
 
     @model_validator(mode="before")
     @classmethod

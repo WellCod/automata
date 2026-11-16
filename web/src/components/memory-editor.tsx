@@ -40,7 +40,8 @@ export function MemoryEditor({
       <p className="text-muted-foreground text-[12px]">
         No fim de cada conversa, o modelo do {team ? "líder" : "agente"} guarda fatos que o usuário
         contou. Só este {who} lê o que guardou, e só para o mesmo usuário. Documento, cartão e
-        e-mail saem mascarados, e conversa sem usuário identificado não gera memória.
+        e-mail saem mascarados, e conversa sem usuário identificado não gera memória. Chamada por
+        token de integração também não gera: o token é um só para todos os usuários finais.
       </p>
       {value.enabled && (
         <div className="flex flex-col gap-2">

@@ -63,6 +63,10 @@ class ConfigService:
         self, config_id: UUID, payload: ConfigPayload, author: str
     ) -> AgentConfigVersion:
         config = self._get_or_raise(config_id)
+        first = config.current_version_id is None and config.draft_version_id is None
+        if first and config.kind in (ConfigKind.agent, ConfigKind.team):
+            # agente novo não nasce sem defesa (ADR-0045, LLM-01)
+            payload = payload.with_safe_defaults()
         self._validate(config, payload)
         version = self._repo.create_version(
             config_id=config_id,
