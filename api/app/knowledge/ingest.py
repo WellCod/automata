@@ -8,6 +8,7 @@ marca como falha o que estiver parado há mais de STALE_AFTER.
 import hashlib
 import io
 import logging
+import zipfile
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -63,6 +64,25 @@ def _html_to_text(data: bytes) -> str:
     return "\n".join(line.strip() for line in soup.get_text("\n").splitlines() if line.strip())
 
 
+# docx, xlsx e pptx são zip: 20 MB comprimidos podem virar gigabytes ao abrir (SEC-06)
+ZIP_FORMATS = {"docx", "xlsx", "pptx", "odt", "ods", "odp", "epub"}
+MAX_UNZIPPED_BYTES = 200 * 1024 * 1024
+MAX_ZIP_ENTRIES = 10_000
+
+
+def _check_unzipped(data: bytes) -> None:
+    """Soma o tamanho declarado de cada arquivo do zip antes do leitor abrir em memória."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            entries = archive.infolist()
+    except zipfile.BadZipFile as exc:
+        raise IngestError("arquivo corrompido ou que não é do formato indicado") from exc
+    if len(entries) > MAX_ZIP_ENTRIES:
+        raise IngestError("arquivo com partes demais")
+    if sum(e.file_size for e in entries) > MAX_UNZIPPED_BYTES:
+        raise IngestError("arquivo grande demais depois de descomprimido (máximo 200 MB)")
+
+
 def read_documents(
     name: str,
     extension: str,
@@ -72,6 +92,8 @@ def read_documents(
 ) -> list[Document]:
     if extension == "html":
         extension, data = "txt", _html_to_text(data).encode()
+    if extension in ZIP_FORMATS:
+        _check_unzipped(data)
     stream = io.BytesIO(data)
     stream.name = f"{name}.{extension}"
     docs = _reader(extension, chunk_size, chunking or ChunkingSettings()).read(stream, name=name)

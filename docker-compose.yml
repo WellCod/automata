@@ -86,8 +86,9 @@ services:
       SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
       KNOWLEDGE_DEFAULT_EMBEDDER: ${KNOWLEDGE_DEFAULT_EMBEDDER:-voyage}
       KNOWLEDGE_MAX_UPLOAD_MB: ${KNOWLEDGE_MAX_UPLOAD_MB:-20}
-      # true: a API só enfileira a ingestão e o ingest-worker processa (ADR-0039)
-      INGEST_WORKER: ${INGEST_WORKER:-false}
+      # a API só enfileira a ingestão e o ingest-worker processa (ADR-0039): o leitor de
+      # documento grande não divide os 512 MB com os runs (OPS-08)
+      INGEST_WORKER: ${INGEST_WORKER:-true}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-20}
     healthcheck:
@@ -108,11 +109,10 @@ services:
           cpus: "1.0"
           memory: 512M  # embedder e leitores de documento do RAG (ADR-0012)
 
-  # worker de ingestão separado (ADR-0039): sobe com --profile worker e INGEST_WORKER=true
+  # worker de ingestão separado (ADR-0039), ligado por padrão em produção (OPS-08)
   ingest-worker:
     extends:
       service: api
-    profiles: [worker]
     # a API já migrou no boot dela; o worker não roda o entrypoint
     entrypoint: ["python", "-m", "app.knowledge.worker"]
     command: []
@@ -121,6 +121,12 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          # leitor de PDF e docx em memória, com o teto do conteúdo descomprimido (SEC-06)
+          memory: 768M
 
   web:
     image: ghcr.io/wellcod/automata-web:${AUTOMATA_VERSION:-latest}

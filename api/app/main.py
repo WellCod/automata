@@ -29,6 +29,7 @@ from app.agents.workflow_factory import make_workflow_factory
 from app.audit import AuditMiddleware
 from app.auth import verification_keys
 from app.background import background_queue
+from app.db import get_engine
 from app.evals.runner import fail_stale as fail_stale_evals
 from app.evals.scheduler import run_forever as run_scheduled_evals
 from app.integrations import RevocationMiddleware, RevokedTokens
@@ -164,7 +165,8 @@ def create_app(
 ) -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
-    db = PostgresDb(db_url=settings.database_url)
+    # o engine da API: um pool só para o Automata e o Agno, dentro do DB_POOL_SIZE (OPS-09)
+    db = PostgresDb(db_engine=get_engine())
 
     # Fora de dev o schema e as páginas de docs não são servidos; o export do
     # OpenAPI para o painel usa app.openapi() direto (scripts/export_openapi.py)
