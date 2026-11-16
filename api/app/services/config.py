@@ -110,6 +110,15 @@ class ConfigService:
             raise ValueError("Rascunho não encontrado")
 
         payload = ConfigPayload.model_validate(draft.payload)
+        if config.kind != ConfigKind.workflow and self._needs_confirmation(payload):
+            # etapa de workflow sem versão fixa passaria a rodar esta versão (LLM-11)
+            workflows = self._workflows_following(config_id)
+            if workflows:
+                raise ValueError(
+                    "este agente tem tool com confirmação humana, que não roda em workflow, e é"
+                    f" etapa sem versão fixa de: {', '.join(workflows)}. Fixe a versão da etapa"
+                    " ou tire a confirmação"
+                )
         published = self._repo.create_version(
             config_id=config_id,
             payload=payload,
@@ -307,6 +316,25 @@ class ConfigService:
                     "que não é suportada em workflow"
                 )
         return errors
+
+    def _workflows_following(self, config_id: UUID) -> list[str]:
+        """Workflows publicados com etapa que segue a versão vigente deste config."""
+        names: list[str] = []
+        configs, _ = self._repo.list_configs(page_size=1000, kind=ConfigKind.workflow)
+        for workflow in configs:
+            if workflow.current_version_id is None:
+                continue
+            version = self._repo.get_version(workflow.current_version_id)
+            if version is None:
+                continue
+            settings = ConfigPayload.model_validate(version.payload).workflow
+            if settings is None:
+                continue
+            for step in step_nodes(settings.steps):
+                if (step.agent_id or step.team_id) == config_id and step.version_id is None:
+                    names.append(workflow.name)
+                    break
+        return names
 
     def _needs_confirmation(self, payload: ConfigPayload) -> bool:
         if any(b.require_confirmation for b in payload.mcp_servers):

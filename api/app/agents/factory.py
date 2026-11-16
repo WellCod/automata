@@ -301,11 +301,15 @@ def agent_from(
     *,
     tracked: bool,
     memory_user: str | None = None,
+    blocks: BlockLog | None = None,
 ) -> Agent:
-    """`memory_user` liga a memória do usuário (ADR-0025); sem ele, o agente não lembra."""
+    """`memory_user` liga a memória do usuário (ADR-0025); sem ele, o agente não lembra.
+
+    `blocks` é o registro do run: o membro de time grava os bloqueios no do líder (LLM-09).
+    """
     payload = resolved.payload
     cls = TrackedAgent if tracked else Agent
-    blocks = BlockLog()
+    blocks = blocks if blocks is not None else BlockLog()
     agent = cls(
         id=str(config_id),
         name=resolved.name,
@@ -445,7 +449,7 @@ def team_from(
         tools=[*leader.mcp_tools, *leader.knowledge_tools],
         pre_hooks=pre_hooks_for(config_id, leader, blocks, budget=True),
         post_hooks=_post_hooks(output_guardrail(leader.payload.guardrails, blocks, config_id)),
-        members=[agent_from(mid, m, tracked=False) for mid, m in resolved.members],
+        members=[agent_from(mid, m, tracked=False, blocks=blocks) for mid, m in resolved.members],
         mode=TeamMode(settings.mode),
         max_iterations=settings.max_iterations,
         share_member_interactions=settings.share_member_interactions,
