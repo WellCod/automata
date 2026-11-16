@@ -8,10 +8,17 @@
 #
 # JWT_PRIVATE_KEY vai SOMENTE para a API, que emite os tokens.
 # O container web recebe só JWT_PUBLIC_KEY, usada pelo proxy para verificá-los.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   db:
     image: pgvector/pgvector:pg17
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -32,6 +39,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    logging: *logging
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -47,6 +55,10 @@ services:
     image: ghcr.io/wellcod/automata-api:latest
     container_name: automata-demo-api
     restart: unless-stopped
+    logging: *logging
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: ${DATABASE_URL}
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
@@ -95,6 +107,7 @@ services:
     image: ghcr.io/wellcod/automata-web:latest
     container_name: automata-demo-web
     restart: unless-stopped
+    logging: *logging
     environment:
       AUTOMATA_API_URL: ${AUTOMATA_API_URL:-http://api:8000}
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}

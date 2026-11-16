@@ -14,7 +14,7 @@ from app.db import SessionDep
 from app.integrations import bearer_token
 from app.models.revoked_token import RevokedToken
 from app.models.user import UserRole
-from app.proxy import get_client_ip
+from app.proxy import known_client_ip
 from app.repositories.user import UserRepository
 from app.schemas.user import (
     ROLE_SCOPES,
@@ -52,15 +52,17 @@ def _require_admin(authorization: str = Header(...)) -> None:
 
 @router.post("/login", response_model=TokenResponse)
 def login(request: Request, body: LoginInput, session: SessionDep) -> TokenResponse:
-    ip = get_client_ip(request)
+    ip = known_client_ip(request)
     email_ref = _email_ref(body.email)
-    logger.info("login attempt", extra={"ip": ip, "email_ref": email_ref})
+    logger.info("login attempt", extra={"ip": ip or "desconhecido", "email_ref": email_ref})
     # Por e-mail contra força bruta distribuída; por IP, com folga para vários
-    # usuários atrás do mesmo NAT, contra varredura de contas
+    # usuários atrás do mesmo NAT, contra varredura de contas. Sem o IP real, o
+    # balde por IP seria um só para todos e fica de fora
     limiter = request.app.state.rate_limiter
-    limiter.check(f"login:ip:{ip}", limit=_LOGIN_LIMIT_PER_IP)
     email = body.email.lower()
-    limiter.check(f"login:email:{email}:{ip}")
+    if ip is not None:
+        limiter.check(f"login:ip:{ip}", limit=_LOGIN_LIMIT_PER_IP)
+        limiter.check(f"login:email:{email}:{ip}")
     limiter.check(f"login:email:{email}", limit=_LOGIN_LIMIT_PER_EMAIL)
     svc = UserService(UserRepository(session))
     try:
@@ -160,9 +162,9 @@ def oidc_info() -> OidcInfo:
 def oidc_start(request: Request, body: OidcStartInput, session: SessionDep) -> OidcStart:
     if not oidc.enabled():
         raise HTTPException(status_code=404, detail="SSO não configurado")
-    request.app.state.rate_limiter.check(
-        f"oidc:start:{get_client_ip(request)}", limit=_LOGIN_LIMIT_PER_IP
-    )
+    ip = known_client_ip(request)
+    if ip is not None:
+        request.app.state.rate_limiter.check(f"oidc:start:{ip}", limit=_LOGIN_LIMIT_PER_IP)
     try:
         return OidcStart(url=oidc.start(session, body.browser_key))
     except oidc.OidcError as e:
@@ -173,8 +175,9 @@ def oidc_start(request: Request, body: OidcStartInput, session: SessionDep) -> O
 def oidc_callback(request: Request, body: OidcCallback, session: SessionDep) -> TokenResponse:
     if not oidc.enabled():
         raise HTTPException(status_code=404, detail="SSO não configurado")
-    ip = get_client_ip(request)
-    request.app.state.rate_limiter.check(f"oidc:callback:{ip}", limit=_LOGIN_LIMIT_PER_IP)
+    ip = known_client_ip(request)
+    if ip is not None:
+        request.app.state.rate_limiter.check(f"oidc:callback:{ip}", limit=_LOGIN_LIMIT_PER_IP)
     try:
         identity = oidc.finish(session, body.code, body.state, body.browser_key)
     except oidc.OidcError as e:

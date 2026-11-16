@@ -7,11 +7,13 @@ services:
     environment:
       APP_ENV: development
       DEMO_REPLAY: ${DEMO_REPLAY:-false}
+      # com a 8000 publicada, a rede privada não é só do compose: X-Forwarded-For não vale
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
     volumes:
       - ./api:/app
       - /app/.venv
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
 
   # Painel em container só com --profile docker-web; o normal é `pnpm --filter web dev` no host.
   web:
