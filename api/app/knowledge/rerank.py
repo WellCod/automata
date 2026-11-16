@@ -6,6 +6,7 @@ e devolve a lista original, e a busca cobraria por uma ordem que não aconteceu.
 """
 
 import os
+from typing import TYPE_CHECKING
 
 from agno.knowledge.document import Document
 from agno.knowledge.reranker.base import Reranker
@@ -15,6 +16,9 @@ from agno.knowledge.utils import STORE_RECENCY_METADATA_KEY
 
 from app.models.knowledge_base import KnowledgeBase
 from app.schemas.knowledge_base import CrossEncoderSettings, RetrievalSettings
+
+if TYPE_CHECKING:
+    from agno.knowledge.reranker.cohere import CohereReranker
 
 # dólares por busca, de até 100 candidatos (tabela pública dos provedores em 2026-11)
 CROSS_ENCODER_PRICES: dict[str, float] = {
@@ -38,6 +42,27 @@ def cross_encoder_id(settings: CrossEncoderSettings) -> str:
     return f"{settings.provider}:{settings.model}"
 
 
+# o cliente da Cohere espera 300 s por padrão (OPS-03)
+COHERE_TIMEOUT_SECONDS = 30.0
+
+
+def _timed_cohere(model: str) -> "CohereReranker":
+    from agno.knowledge.reranker.cohere import CohereReranker
+    from cohere import Client as CohereClient
+
+    class TimedCohereReranker(CohereReranker):
+        # cliente criado só na chamada, como no Agno: sem chave o erro sai na busca
+        @property
+        def client(self) -> CohereClient:
+            if self.cohere_client is None:
+                self.cohere_client = CohereClient(
+                    api_key=self.api_key, timeout=COHERE_TIMEOUT_SECONDS
+                )
+            return self.cohere_client
+
+    return TimedCohereReranker(model=model, api_key=os.environ.get("COHERE_API_KEY"))
+
+
 def cross_encode(
     settings: CrossEncoderSettings, query: str, docs: list[Document]
 ) -> list[Document]:
@@ -46,12 +71,7 @@ def cross_encode(
         return docs
     reranker: Reranker
     if settings.provider == "cohere":
-        from agno.knowledge.reranker.cohere import CohereReranker
-        from cohere import Client as CohereClient
-
-        # o cliente da Cohere espera 300 s por padrão (OPS-03)
-        client = CohereClient(api_key=os.environ.get("COHERE_API_KEY"), timeout=30)
-        reranker = CohereReranker(model=settings.model, cohere_client=client)
+        reranker = _timed_cohere(settings.model)
     else:
         from agno.knowledge.reranker.aws_bedrock import AwsBedrockReranker
 
