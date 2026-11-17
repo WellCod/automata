@@ -507,6 +507,8 @@ O `.env` inteiro chega à API (`env_file`), então SSO, OTLP, preços e retenç�
 
 A versão das imagens vem de `AUTOMATA_VERSION` (tag publicada no GHCR); atualizar e voltar estão em [`docs/atualizacao.md`](docs/atualizacao.md), e `scripts/instance.sh` faz `provision`, `upgrade`, `backup` e `status` sem perguntas, para rodar por SSH. O painel expõe `/api/health` com a versão, a migration, o Redis e a idade da última rodada do poller, para um monitor externo.
 
+Para quem opera o painel: [guia de uso](docs/guia-de-uso.md). Para quem integra: [rotas da integração](docs/api-integracao.md), congeladas por teste. Minutas de DPA, sub-operadores, incidentes e uso aceitável, para revisão jurídica, em [`docs/legal/`](docs/legal/README.md).
+
 O perfil `backup` faz um dump diário cifrado do banco para um bucket S3 compatível fora da máquina, com 7 diários e 4 semanais. A restauração foi testada e está em [`docs/restauracao.md`](docs/restauracao.md), junto com as três chaves que o operador guarda fora da VM.
 
 ### Testes

@@ -157,8 +157,11 @@ export function SubjectActions({
       {confirming && (
         <div className="border-destructive/40 flex flex-col gap-2 rounded border px-4 py-3">
           <p className="text-foreground text-[13px]">
-            Apaga as conversas, memórias, aprovações e traces desta pessoa. No consumo e nos runs
-            registrados, o id vira um pseudônimo. Não tem volta e não alcança backups.
+            Apaga as conversas, memórias, aprovações, traces e mensagens de canal desta pessoa. No
+            consumo e nos runs registrados, o id vira um pseudônimo. Não tem volta. Não alcança:
+            documentos das bases de conhecimento, logs do servidor, backups (saem no prazo de
+            retenção deles), e-mails e mensagens já entregues e o que os provedores de modelo
+            guardam.
           </p>
           <label htmlFor={`${id}-confirm`} className="text-muted-foreground text-[12px]">
             Digite {userId} para confirmar

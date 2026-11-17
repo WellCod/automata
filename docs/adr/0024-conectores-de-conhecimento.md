@@ -80,6 +80,10 @@ Só entram as extensões que a ingestão lê, até 500 arquivos e o tamanho máx
 - Uma dependência nova (`boto3`) na imagem da API.
 - Migrations novas: `knowledge_connector` e as colunas de origem e reindexação em `knowledge_content`.
 
+## Risco aceito (auditoria de 2026-11-16, SEC-08)
+
+O conector S3 com `endpoint_url` próprio (MinIO e compatíveis) sai pelo boto3, fora do cliente HTTP que confere o IP a cada conexão: a URL é conferida no cadastro e a cada sincronização, mas não o IP de cada conexão do boto3. Fica aceito como o MCP (ADR-0010): só o owner cadastra conector, e o S3 sem chave no conector é recusado para não mandar a credencial da máquina a um endpoint de fora.
+
 ## O que me faria reverter
 
 - O Agno passar a expor o download dos conteúdos remotos separado da gravação. Nesse caso, os downloaders próprios saem e ficam os dele.
