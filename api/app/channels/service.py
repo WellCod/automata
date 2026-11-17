@@ -29,6 +29,7 @@ REASON_KEYWORD = "pedido do cliente"
 REASON_PAUSED = "confirmação de tool pendente"
 HANDOFF_TOOL = "transferir_para_atendente"
 LATE_REPLY = "a conversa passou para um atendente antes da resposta"
+EXIT_MESSAGE = "Conversa encerrada. Os seus dados deste atendimento serão apagados."
 FAILED = "Não consegui responder agora. Tente de novo em instantes."
 # mensagens por minuto de uma pessoa num canal: um número não queima o orçamento do agente
 PER_SENDER_LIMIT = 20
@@ -40,6 +41,8 @@ class Saved:
     user_id: str
     status: str
     message_id: UUID
+    # o aviso de primeiro contato ainda não saiu nesta conversa
+    first: bool = False
 
 
 def _save_inbound(channel_id: UUID, kind: str, msg: providers.Inbound) -> Saved | None:
@@ -83,7 +86,8 @@ def _save_inbound(channel_id: UUID, kind: str, msg: providers.Inbound) -> Saved 
                 author="customer",
                 text=msg.text or "",
                 status="received",
-                meta={"reply_to": msg.reply_to},
+                # em thread do Slack quem fala pode não ser quem abriu a conversa (LLM-04)
+                meta={"reply_to": msg.reply_to, "sender": providers.user_id(kind, msg.sender)},
             )
             .on_conflict_do_nothing(
                 index_elements=["channel_id", "external_id"],
@@ -99,9 +103,13 @@ def _save_inbound(channel_id: UUID, kind: str, msg: providers.Inbound) -> Saved 
             conv.status = "bot"
             conv.assigned_to = None
             conv.handoff_reason = None
-        conv.last_message_at = datetime.now(UTC)
+        now = datetime.now(UTC)
+        conv.last_message_at = now
+        first = conv.welcomed_at is None
+        if first:
+            conv.welcomed_at = now
         session.commit()
-        return Saved(conv.id, conv.user_id, conv.status, inserted)
+        return Saved(conv.id, conv.user_id, conv.status, inserted, first)
 
 
 def record_outbound(
@@ -198,6 +206,26 @@ def handoff(conversation_id: UUID, reason: str, assigned_to: str | None = None) 
         return True
 
 
+def wants_out(channel: Channel, text: str) -> bool:
+    """Mensagem que é só a palavra de saída: "sair" no meio de uma frase não encerra."""
+    folded = " ".join(_fold(text).split())
+    return any(folded == " ".join(_fold(k).split()) for k in channel.exit_keywords or [])
+
+
+def _close_and_erase(channel_id: UUID, conversation_id: UUID, user_id: str) -> None:
+    """Encerra a conversa e apaga o titular, como um pedido de exclusão de origem canal."""
+    from app.data_subjects import new_erase_request, run_erase
+
+    with Session(get_engine()) as session:
+        conv = session.get(ChannelConversation, conversation_id)
+        if conv is not None:
+            conv.status = "closed"
+            conv.assigned_to = None
+        session.commit()
+        request_id = new_erase_request(session, user_id, f"channel:{channel_id}", "channel")
+    run_erase(request_id, user_id)
+
+
 def wants_human(channel: Channel, text: str) -> bool:
     """Palavra do canal na mensagem, sem diferença de caixa e acento."""
     if not channel.handoff_enabled or not channel.handoff_keywords:
@@ -258,16 +286,23 @@ def _text(run: Any) -> str:
 
 
 async def answer(
-    channel: Channel, config: AgentConfig, saved: Saved, text: str, reply: dict[str, str]
+    channel: Channel,
+    config: AgentConfig,
+    saved: Saved,
+    text: str,
+    reply: dict[str, str],
+    sender: str | None = None,
 ) -> None:
     session_id = str(saved.conversation_id)
+    # quem mandou esta mensagem: na thread do Slack não é sempre quem abriu (LLM-04)
+    user_id = sender or saved.user_id
     asked: list[str] = []
     try:
-        target = await asyncio.to_thread(_responder, config, session_id, saved.user_id)
+        target = await asyncio.to_thread(_responder, config, session_id, user_id)
         if channel.handoff_enabled:
             # a tool só existe no run do canal, onde há para quem passar (ADR-0044)
             target.tools = [*(target.tools or []), _handoff_tool(asked)]
-        run = await target.arun(text, session_id=session_id, user_id=saved.user_id, stream=False)
+        run = await target.arun(text, session_id=session_id, user_id=user_id, stream=False)
     except Exception as exc:
         logger.warning(
             "canal: agente falhou", extra={"channel_id": str(channel.id), "error": str(exc)}
@@ -339,9 +374,27 @@ async def handle(channel_id: UUID, messages: list[providers.Inbound], limiter: A
                 deliver, channel, saved.conversation_id, msg.reply_to, ONLY_TEXT, "system"
             )
             continue
+        if wants_out(channel, msg.text):
+            # a saída vale também com uma pessoa atendendo (ADR-0045)
+            await asyncio.to_thread(_mark, saved.message_id, "answered")
+            await asyncio.to_thread(
+                deliver, channel, saved.conversation_id, msg.reply_to, EXIT_MESSAGE, "system"
+            )
+            sender = providers.user_id(channel.kind, msg.sender)
+            await asyncio.to_thread(_close_and_erase, channel.id, saved.conversation_id, sender)
+            continue
         if saved.status != "bot":
             # com uma pessoa atendendo, a mensagem só espera na fila de conversas
             continue
+        if saved.first and channel.welcome_message.strip():
+            await asyncio.to_thread(
+                deliver,
+                channel,
+                saved.conversation_id,
+                msg.reply_to,
+                channel.welcome_message.strip(),
+                "system",
+            )
         if wants_human(channel, msg.text):
             if await asyncio.to_thread(handoff, saved.conversation_id, REASON_KEYWORD):
                 await asyncio.to_thread(
@@ -353,4 +406,11 @@ async def handle(channel_id: UUID, messages: list[providers.Inbound], limiter: A
                     "system",
                 )
             continue
-        await answer(channel, config, saved, msg.text, msg.reply_to)
+        await answer(
+            channel,
+            config,
+            saved,
+            msg.text,
+            msg.reply_to,
+            sender=providers.user_id(channel.kind, msg.sender),
+        )

@@ -70,7 +70,7 @@ async def verify(channel_id: UUID, request: Request) -> Response:
     params = request.query_params
     token = params.get("hub.verify_token", "")
     if params.get("hub.mode") != "subscribe" or not hmac.compare_digest(
-        token, found[1]["verify_token"]
+        token.encode("utf-8", "replace"), found[1]["verify_token"].encode()
     ):
         raise HTTPException(status_code=403, detail="Token de verificação não confere")
     return PlainTextResponse(params.get("hub.challenge", ""))

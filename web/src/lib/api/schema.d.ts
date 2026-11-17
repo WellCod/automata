@@ -2728,6 +2728,13 @@ export interface components {
        * @default Vou te passar para uma pessoa da equipe. Um momento.
        */
       handoff_message: string;
+      /**
+       * Welcome Message
+       * @default Olá! Você está falando com um assistente automático, com inteligência artificial. As mensagens desta conversa são guardadas para o atendimento. Para falar com uma pessoa, peça um atendente. Para encerrar e apagar seus dados, envie SAIR.
+       */
+      welcome_message: string;
+      /** Exit Keywords */
+      exit_keywords?: string[];
     };
     /** ChannelResponse */
     ChannelResponse: {
@@ -2755,6 +2762,15 @@ export interface components {
       handoff_keywords: string[];
       /** Handoff Message */
       handoff_message: string;
+      /** Welcome Message */
+      welcome_message: string;
+      /** Exit Keywords */
+      exit_keywords: string[];
+      /**
+       * Warnings
+       * @default []
+       */
+      warnings: string[];
       /** Webhook Path */
       webhook_path: string;
       /** Credential Fields */
@@ -2789,6 +2805,13 @@ export interface components {
       handoff_keywords: string[];
       /** Handoff Message */
       handoff_message: string;
+      /**
+       * Welcome Message
+       * @default Olá! Você está falando com um assistente automático, com inteligência artificial. As mensagens desta conversa são guardadas para o atendimento. Para falar com uma pessoa, peça um atendente. Para encerrar e apagar seus dados, envie SAIR.
+       */
+      welcome_message: string;
+      /** Exit Keywords */
+      exit_keywords?: string[];
       /** Credentials */
       credentials?: {
         [key: string]: string;

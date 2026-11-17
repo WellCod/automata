@@ -7,6 +7,7 @@ import os
 import time
 import uuid
 from collections.abc import Generator
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -48,7 +49,8 @@ class FakeProviders:
             )
         if "graph.facebook.com" in str(request.url):
             return httpx.Response(200, json={"messages": [{"id": f"wamid.{uuid.uuid4().hex}"}]})
-        return httpx.Response(200, json={"ok": True, "ts": "1700000000.000200"})
+        # ts único por envio, como o Slack: o id externo da mensagem é único no canal
+        return httpx.Response(200, json={"ok": True, "ts": f"1700000000.{len(self.sent):06d}"})
 
 
 @pytest.fixture(scope="module")
@@ -112,7 +114,14 @@ def _agent(client: TestClient, name: str, publish: bool = True) -> str:
 def _channel(client: TestClient, kind: str, config_id: str, creds: dict[str, str]) -> str:
     resp = client.post(
         "/api/v1/channels",
-        json={"kind": kind, "name": f"canal {kind}", "config_id": config_id, "credentials": creds},
+        json={
+            "kind": kind,
+            "name": f"canal {kind}",
+            "config_id": config_id,
+            "credentials": creds,
+            # o aviso de primeiro contato tem teste próprio (test_canais_aviso_e_saida.py)
+            "welcome_message": "",
+        },
     )
     assert resp.status_code == 201, resp.text
     return str(resp.json()["id"])
@@ -487,3 +496,149 @@ def test_resposta_que_chega_depois_da_passagem_nao_sai(
             )
         ).one()
     assert late.status == "ignored" and late.text == "Seu pedido sai amanhã."
+
+
+# --- Fase 52: aviso, saída, remetente e assinatura (ADR-0045) -------------------------
+
+
+def _with_welcome(client: TestClient, channel: str, agent: str) -> None:
+    from app.models.channel import DEFAULT_EXIT_KEYWORDS, DEFAULT_WELCOME_MESSAGE
+
+    client.put(
+        f"/api/v1/channels/{channel}",
+        json={
+            "name": "com aviso",
+            "config_id": agent,
+            "enabled": True,
+            "handoff_enabled": True,
+            "handoff_keywords": ["atendente"],
+            "handoff_message": "Já te passo.",
+            "welcome_message": DEFAULT_WELCOME_MESSAGE,
+            "exit_keywords": DEFAULT_EXIT_KEYWORDS,
+        },
+    ).raise_for_status()
+
+
+def test_primeira_mensagem_recebe_o_aviso_uma_vez(client: TestClient, fake: FakeProviders) -> None:
+    from app.models.channel import DEFAULT_WELCOME_MESSAGE
+
+    agent = _agent(client, "aviso")
+    channel = _channel(client, "whatsapp", agent, WA)
+    _with_welcome(client, channel, agent)
+
+    _wa_post(client, channel, _wa_body("5511333330000", "oi")).raise_for_status()
+    bodies = [s[1]["text"]["body"] for s in fake.sent]
+    assert bodies == [DEFAULT_WELCOME_MESSAGE, REPLY]
+
+    _wa_post(client, channel, _wa_body("5511333330000", "e o prazo?")).raise_for_status()
+    assert [s[1]["text"]["body"] for s in fake.sent][2:] == [REPLY]
+
+
+def test_palavra_de_saida_encerra_e_apaga(client: TestClient, fake: FakeProviders) -> None:
+    from sqlalchemy import select
+
+    from app.channels.service import EXIT_MESSAGE
+    from app.data_subjects import subject_hash
+    from app.db import get_engine
+    from app.models.channel import ChannelConversation
+    from app.models.data_subject import DataSubjectRequest
+
+    agent = _agent(client, "saída")
+    channel = _channel(client, "whatsapp", agent, WA)
+    _with_welcome(client, channel, agent)
+    sender = "5511444440000"
+
+    # "sair" numa frase é conversa, não pedido de saída
+    _wa_post(client, channel, _wa_body(sender, "quero sair do plano")).raise_for_status()
+    assert fake.sent[-1][1]["text"]["body"] == REPLY
+
+    _wa_post(client, channel, _wa_body(sender, "SAIR!")).raise_for_status()
+    assert fake.sent[-1][1]["text"]["body"] == EXIT_MESSAGE
+    with Session(get_engine()) as session:
+        left = session.scalars(
+            select(ChannelConversation).where(ChannelConversation.user_id == f"whatsapp:{sender}")
+        ).all()
+        assert left == []
+        request = session.scalars(
+            select(DataSubjectRequest).where(
+                DataSubjectRequest.subject_hash == subject_hash(f"whatsapp:{sender}")
+            )
+        ).one()
+        assert (request.kind, request.source, request.status) == ("erase", "channel", "done")
+        assert request.subject is None
+
+
+def test_thread_do_slack_roda_como_quem_mandou(client: TestClient, fake: FakeProviders) -> None:
+    agent = _agent(client, "thread")
+    channel = _channel(client, "slack", agent, SLACK)
+
+    def event(event_id: str, user: str) -> dict[str, Any]:
+        return {
+            "type": "event_callback",
+            "event_id": event_id,
+            "event": {
+                "type": "message",
+                "user": user,
+                "text": "e agora?",
+                "channel": "C9",
+                "ts": f"1700000001.{event_id[-1]}",
+                "thread_ts": "1700000001.000001",
+            },
+        }
+
+    _slack_post(client, channel, event("EvT1", "U_ANA")).raise_for_status()
+    _slack_post(client, channel, event("EvT2", "U_BIA")).raise_for_status()
+    runs = _runs(agent)
+    # mesma conversa (sessão da thread), cada run com quem falou (LLM-04)
+    assert len({s for s, _ in runs}) == 1
+    assert sorted(u for _, u in runs) == ["slack:U_ANA", "slack:U_BIA"]
+
+
+def test_assinatura_fora_do_ascii_e_recusada_sem_500(client: TestClient) -> None:
+    channel = _channel(client, "whatsapp", _agent(client, "assinatura"), WA)
+    resp = client.post(
+        f"/hooks/channels/{channel}",
+        content=_wa_body("5511000000000", "oi"),
+        headers={
+            "x-hub-signature-256": "sha256=ação".encode(),
+            "content-type": "application/json",
+        },
+    )
+    assert resp.status_code == 401
+    verify = client.get(
+        f"/hooks/channels/{channel}",
+        params={"hub.mode": "subscribe", "hub.verify_token": "não", "hub.challenge": "1"},
+    )
+    assert verify.status_code == 403
+
+
+def test_aviso_de_tool_com_confirmacao_no_canal() -> None:
+    from types import SimpleNamespace
+    from uuid import uuid4
+
+    from app.routers.channels import ChannelResponse, _with_warnings
+
+    payload = {
+        "model_id": "gpt-4o",
+        "mcp_servers": [{"server_id": str(uuid4()), "require_confirmation": ["enviar"]}],
+    }
+    session = SimpleNamespace(get=lambda model, key: SimpleNamespace(payload=payload))
+    response = ChannelResponse(
+        id=uuid4(),
+        kind="whatsapp",
+        name="x",
+        config_id=uuid4(),
+        config_name="x",
+        enabled=True,
+        handoff_enabled=True,
+        handoff_keywords=[],
+        handoff_message="x",
+        welcome_message="",
+        exit_keywords=[],
+        webhook_path="/x",
+        credential_fields=[],
+        created_at=datetime.now(UTC),
+    )
+    config = SimpleNamespace(current_version_id=uuid4())
+    out = _with_warnings(response, session, config)  # type: ignore[arg-type]
+    assert out.warnings and "confirmação humana" in out.warnings[0]

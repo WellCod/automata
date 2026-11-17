@@ -174,7 +174,7 @@ O caminho inverso também existe: os próprios agentes e times ficam expostos vi
 
 ### WhatsApp, Slack e atendente humano
 
-Um agente ou time publicado atende no **WhatsApp** (Cloud API da Meta) e no **Slack**. O owner cadastra o canal na página Canais, com a credencial cifrada, e configura no provedor o webhook que o painel mostra. Cada pessoa vira uma conversa com histórico, memória e canário próprios, e passa pelos mesmos guardrails e orçamento do agente. A mensagem reenviada pelo provedor não roda o agente duas vezes.
+Um agente ou time publicado atende no **WhatsApp** (Cloud API da Meta) e no **Slack**. O owner cadastra o canal na página Canais, com a credencial cifrada, e configura no provedor o webhook que o painel mostra. Cada pessoa vira uma conversa com histórico, memória e canário próprios, e passa pelos mesmos guardrails e orçamento do agente. A mensagem reenviada pelo provedor não roda o agente duas vezes. A primeira resposta de cada conversa vem depois de um aviso de que é um assistente automático e de como os dados são tratados, e quem manda "sair" encerra a conversa e tem os dados apagados ([ADR-0045](docs/adr/0045-prontidao-para-o-primeiro-cliente.md)).
 
 Quando o cliente pede uma pessoa ("quero falar com um atendente"), quando o agente decide transferir ou quando o run para esperando uma aprovação, a conversa passa para a fila da página **Conversas**. Ali o atendente assume, responde pelo próprio canal com o nome gravado e devolve ao agente quando terminar. As conversas entram nos pedidos do titular pelo número ([ADR-0044](docs/adr/0044-canais-de-conversa-e-atendente.md)).
 

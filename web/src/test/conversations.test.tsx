@@ -8,7 +8,7 @@ import ConversationsPage from "@/app/conversas/page";
 vi.mock("@/lib/api/client", () => ({
   default: { GET: vi.fn(), POST: vi.fn(), PUT: vi.fn(), DELETE: vi.fn() },
 }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }));
 
 import client from "@/lib/api/client";
 
@@ -120,6 +120,9 @@ describe("Canais", () => {
           name: "Slack interno",
           config_id: "a1",
           credentials: { bot_token: "xoxb-1", signing_secret: "s3" },
+          // aviso ao titular e saída já vêm preenchidos (ADR-0045)
+          welcome_message: expect.stringContaining("assistente automático"),
+          exit_keywords: ["sair", "apagar meus dados"],
         }),
       }),
     );

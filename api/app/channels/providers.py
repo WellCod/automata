@@ -50,7 +50,8 @@ def _http() -> httpx.Client:
 
 def _hmac_ok(secret: str, message: bytes, expected: str) -> bool:
     digest = hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(digest, expected)
+    # em bytes: str fora do ASCII levanta TypeError no compare_digest e virava 500 (SEC-09)
+    return hmac.compare_digest(digest.encode(), expected.encode("utf-8", "replace"))
 
 
 # --- WhatsApp -----------------------------------------------------------------

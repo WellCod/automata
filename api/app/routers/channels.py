@@ -13,7 +13,13 @@ from sqlalchemy import select
 from app.authz import Scope, require_scopes
 from app.channels import providers
 from app.db import SessionDep
-from app.models.channel import DEFAULT_HANDOFF_KEYWORDS, DEFAULT_HANDOFF_MESSAGE, Channel
+from app.models.channel import (
+    DEFAULT_EXIT_KEYWORDS,
+    DEFAULT_HANDOFF_KEYWORDS,
+    DEFAULT_HANDOFF_MESSAGE,
+    DEFAULT_WELCOME_MESSAGE,
+    Channel,
+)
 from app.models.config import AgentConfig
 from app.secrets import SecretsKeyMissing, decrypt_json, encrypt_json
 
@@ -46,8 +52,12 @@ class ChannelInput(BaseModel):
         default_factory=lambda: list(DEFAULT_HANDOFF_KEYWORDS), max_length=10
     )
     handoff_message: str = Field(default=DEFAULT_HANDOFF_MESSAGE, min_length=1, max_length=500)
+    welcome_message: str = Field(default=DEFAULT_WELCOME_MESSAGE, max_length=1000)
+    exit_keywords: list[str] = Field(
+        default_factory=lambda: list(DEFAULT_EXIT_KEYWORDS), max_length=10
+    )
 
-    _kw = field_validator("handoff_keywords")(_keywords)
+    _kw = field_validator("handoff_keywords", "exit_keywords")(_keywords)
 
 
 class ChannelUpdate(BaseModel):
@@ -57,10 +67,14 @@ class ChannelUpdate(BaseModel):
     handoff_enabled: bool
     handoff_keywords: list[str] = Field(max_length=10)
     handoff_message: str = Field(min_length=1, max_length=500)
+    welcome_message: str = Field(default=DEFAULT_WELCOME_MESSAGE, max_length=1000)
+    exit_keywords: list[str] = Field(
+        default_factory=lambda: list(DEFAULT_EXIT_KEYWORDS), max_length=10
+    )
     # vazio mantém a credencial atual; preenchido troca os campos enviados
     credentials: dict[str, str] | None = None
 
-    _kw = field_validator("handoff_keywords")(_keywords)
+    _kw = field_validator("handoff_keywords", "exit_keywords")(_keywords)
 
 
 class ChannelResponse(BaseModel):
@@ -73,6 +87,10 @@ class ChannelResponse(BaseModel):
     handoff_enabled: bool
     handoff_keywords: list[str]
     handoff_message: str
+    welcome_message: str
+    exit_keywords: list[str]
+    # avisos sobre o agente ligado (ex.: tool com confirmação, que no canal vira atendente)
+    warnings: list[str] = []
     # caminho que o provedor chama; a credencial nunca volta
     webhook_path: str
     credential_fields: list[str]
@@ -95,6 +113,8 @@ def _response(channel: Channel, config_name: str | None) -> ChannelResponse:
         handoff_enabled=channel.handoff_enabled,
         handoff_keywords=list(channel.handoff_keywords),
         handoff_message=channel.handoff_message,
+        welcome_message=channel.welcome_message,
+        exit_keywords=list(channel.exit_keywords),
         webhook_path=f"/hooks/channels/{channel.id}",
         credential_fields=sorted(decrypt_json(channel.credentials_encrypted)),
         created_at=channel.created_at,
@@ -126,6 +146,25 @@ def _config_or_422(session: SessionDep, config_id: UUID) -> AgentConfig:
     if config.current_version_id is None:
         raise HTTPException(status_code=422, detail="Publique o agente antes de ligar um canal")
     return config
+
+
+def _with_warnings(
+    response: ChannelResponse, session: SessionDep, config: AgentConfig
+) -> ChannelResponse:
+    """Tool com confirmação humana pausa o run, e no canal não há quem aprove (LLM-12)."""
+    from app.models.config import AgentConfigVersion
+    from app.schemas.config import ConfigPayload
+
+    version = session.get(AgentConfigVersion, config.current_version_id)
+    if version is None:
+        return response
+    payload = ConfigPayload.model_validate(version.payload)
+    if any(b.require_confirmation for b in payload.mcp_servers):
+        response.warnings.append(
+            "O agente tem tool com confirmação humana. No canal o run pausa e a conversa"
+            " passa para um atendente; a tool só roda depois da aprovação na página Aprovações."
+        )
+    return response
 
 
 def _channel_or_404(session: SessionDep, channel_id: UUID) -> Channel:
@@ -162,12 +201,14 @@ def create_channel(body: ChannelInput, request: Request, session: SessionDep) ->
         handoff_enabled=body.handoff_enabled,
         handoff_keywords=body.handoff_keywords,
         handoff_message=body.handoff_message,
+        welcome_message=body.welcome_message.strip(),
+        exit_keywords=body.exit_keywords,
         created_by=_actor(request),
     )
     session.add(channel)
     session.commit()
     session.refresh(channel)
-    return _response(channel, config.name)
+    return _with_warnings(_response(channel, config.name), session, config)
 
 
 @router.put("/{channel_id}", response_model=ChannelResponse)
@@ -183,9 +224,11 @@ def update_channel(channel_id: UUID, body: ChannelUpdate, session: SessionDep) -
     channel.handoff_enabled = body.handoff_enabled
     channel.handoff_keywords = body.handoff_keywords
     channel.handoff_message = body.handoff_message
+    channel.welcome_message = body.welcome_message.strip()
+    channel.exit_keywords = body.exit_keywords
     session.commit()
     session.refresh(channel)
-    return _response(channel, config.name)
+    return _with_warnings(_response(channel, config.name), session, config)
 
 
 @router.delete("/{channel_id}", status_code=204)

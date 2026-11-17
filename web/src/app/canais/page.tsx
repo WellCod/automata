@@ -24,6 +24,18 @@ type ChannelKind = "whatsapp" | "slack";
 const labelCls = "text-foreground flex flex-col gap-1 text-[12px] font-medium";
 
 // agentes e times publicados: o canal responde com a versão vigente (ou o canário)
+const DEFAULT_WELCOME =
+  "Olá! Você está falando com um assistente automático, com inteligência artificial. " +
+  "As mensagens desta conversa são guardadas para o atendimento. Para falar com uma " +
+  "pessoa, peça um atendente. Para encerrar e apagar seus dados, envie SAIR.";
+
+function words(value: string): string[] {
+  return value
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
+}
+
 function useResponders() {
   return useQuery({
     queryKey: ["configs", "responders"],
@@ -66,6 +78,11 @@ function ChannelForm({ channel, onDone }: FormProps) {
   const [message, setMessage] = useState(
     channel?.handoff_message ?? "Vou te passar para uma pessoa da equipe. Um momento.",
   );
+  // aviso ao titular e saída com exclusão (ADR-0045)
+  const [welcome, setWelcome] = useState(channel?.welcome_message ?? DEFAULT_WELCOME);
+  const [exitWords, setExitWords] = useState(
+    (channel?.exit_keywords ?? ["sair", "apagar meus dados"]).join(", "),
+  );
 
   function submit() {
     const handoffKeywords = keywords
@@ -79,6 +96,8 @@ function ChannelForm({ channel, onDone }: FormProps) {
       handoff_enabled: handoff,
       handoff_keywords: handoffKeywords,
       handoff_message: message,
+      welcome_message: welcome,
+      exit_keywords: words(exitWords),
     };
     const args =
       channel === null
@@ -92,8 +111,9 @@ function ChannelForm({ channel, onDone }: FormProps) {
             },
           } as const);
     save.mutate(args, {
-      onSuccess: () => {
+      onSuccess: (saved) => {
         toast.success(channel ? "Canal salvo" : "Canal criado");
+        for (const warning of saved.warnings ?? []) toast.warning(warning);
         onDone();
       },
     });
@@ -201,6 +221,35 @@ function ChannelForm({ channel, onDone }: FormProps) {
         )}
       </fieldset>
 
+      <fieldset className="flex flex-col gap-2">
+        <legend className="text-foreground text-[13px] font-medium">Aviso e saída</legend>
+        <label className={labelCls}>
+          Mensagem de primeiro contato
+          <textarea
+            className={`${inputCls} min-h-20`}
+            value={welcome}
+            maxLength={1000}
+            onChange={(e) => setWelcome(e.target.value)}
+          />
+          <span className="text-muted-foreground text-[11px]">
+            Sai uma vez por conversa, antes da primeira resposta. Diga que é um assistente
+            automático e como os dados são tratados. Vazio não avisa.
+          </span>
+        </label>
+        <label className={labelCls}>
+          Palavras de saída, separadas por vírgula
+          <input
+            className={inputCls}
+            value={exitWords}
+            onChange={(e) => setExitWords(e.target.value)}
+          />
+          <span className="text-muted-foreground text-[11px]">
+            Mensagem que é só uma delas encerra a conversa e apaga os dados da pessoa, como um
+            pedido de exclusão.
+          </span>
+        </label>
+      </fieldset>
+
       {save.error && <p className="text-destructive text-[12px]">{save.error.message}</p>}
       <div className="flex justify-end gap-2">
         <Button size="sm" type="button" onClick={onDone}>
@@ -252,6 +301,8 @@ function ChannelRow({ channel, onEdit }: { channel: Channel; onEdit: () => void 
         handoff_enabled: channel.handoff_enabled,
         handoff_keywords: channel.handoff_keywords,
         handoff_message: channel.handoff_message,
+        welcome_message: channel.welcome_message,
+        exit_keywords: channel.exit_keywords,
         credentials: null,
       },
     });

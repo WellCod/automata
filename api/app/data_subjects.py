@@ -344,6 +344,36 @@ def erase(user_id: str) -> dict[str, int]:
     return counts
 
 
+def new_erase_request(session: Session, user_id: str, actor: str, source: str) -> UUID:
+    """Grava o pedido de exclusão sem o id em claro e derruba as exportações do titular.
+
+    Quem chama roda `run_erase(id, user_id)` em seguida, com o id só no argumento.
+    """
+    row = DataSubjectRequest(
+        kind="erase",
+        subject=None,
+        subject_hash=subject_hash(user_id),
+        status="pending",
+        requested_by=actor,
+        source=source,
+        due_at=due_date(),
+    )
+    session.add(row)
+    for pending in session.scalars(
+        select(DataSubjectRequest).where(
+            DataSubjectRequest.kind == "export",
+            DataSubjectRequest.subject_hash == row.subject_hash,
+        )
+    ):
+        pending.result = None
+        pending.subject = None
+        pending.expires_at = None
+        if pending.status == "done":
+            pending.status = "expired"
+    session.commit()
+    return row.id
+
+
 def run_erase(request_id: UUID, user_id: str) -> None:
     """Background: o id em claro só existe nesta chamada, nunca no pedido gravado."""
     _finish(request_id, status="running")

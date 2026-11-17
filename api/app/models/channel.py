@@ -10,6 +10,13 @@ from app.models.config import Base
 
 DEFAULT_HANDOFF_KEYWORDS = ["atendente", "humano"]
 DEFAULT_HANDOFF_MESSAGE = "Vou te passar para uma pessoa da equipe. Um momento."
+# aviso ao titular antes da primeira resposta e saída com exclusão (ADR-0045)
+DEFAULT_WELCOME_MESSAGE = (
+    "Olá! Você está falando com um assistente automático, com inteligência artificial. "
+    "As mensagens desta conversa são guardadas para o atendimento. Para falar com uma "
+    "pessoa, peça um atendente. Para encerrar e apagar seus dados, envie SAIR."
+)
+DEFAULT_EXIT_KEYWORDS = ["sair", "apagar meus dados"]
 
 
 class Channel(Base):
@@ -34,6 +41,13 @@ class Channel(Base):
     )
     handoff_message: Mapped[str] = mapped_column(
         String(500), nullable=False, default=DEFAULT_HANDOFF_MESSAGE
+    )
+    # vazio não avisa: a responsabilidade pela transparência fica com quem configurou
+    welcome_message: Mapped[str] = mapped_column(
+        String(1000), nullable=False, default=DEFAULT_WELCOME_MESSAGE
+    )
+    exit_keywords: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, default=lambda: list(DEFAULT_EXIT_KEYWORDS)
     )
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -66,6 +80,8 @@ class ChannelConversation(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="bot")
     assigned_to: Mapped[str | None] = mapped_column(String(255), nullable=True)
     handoff_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # quando o aviso de primeiro contato saiu
+    welcomed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_message_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
