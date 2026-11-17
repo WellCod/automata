@@ -212,9 +212,13 @@ class S3Source:
             # a assinatura dela para um endpoint que não é da AWS
             if not self._secret.get("access_key_id"):
                 raise SourceError("S3 com endpoint próprio precisa de access key no conector")
+        from botocore.config import Config
+
         kwargs: dict[str, Any] = {
             "region_name": self.settings.region or None,
             "endpoint_url": self.settings.endpoint_url or None,
+            # prazo explícito e poucas tentativas: a sincronização segura o executor (OPS-03)
+            "config": Config(connect_timeout=10, read_timeout=60, retries={"max_attempts": 2}),
         }
         if self._secret.get("access_key_id"):
             kwargs["aws_access_key_id"] = self._secret["access_key_id"]
