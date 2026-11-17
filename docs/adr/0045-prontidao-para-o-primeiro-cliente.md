@@ -1,6 +1,6 @@
 # ADR-0045 — Prontidão para o primeiro cliente
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito (Fases 51 a 54 na `main` em 2026-11-17)
 **Data:** 2026-11-16
 
 ## Contexto
