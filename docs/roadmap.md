@@ -1,4 +1,4 @@
-# Roadmap — Fases 4 a 50
+# Roadmap — Fases 4 a 54
 
 As Fases 4 a 7 vêm da auditoria técnica e de segurança de 2026-08-12: vulnerabilidades críticas primeiro, depois estabilidade, observabilidade e qualidade. Da Fase 8 em diante, cada fase tem ADR próprio.
 
@@ -1671,3 +1671,61 @@ Decisão em [ADR-0044](adr/0044-canais-de-conversa-e-atendente.md). Um agente ou
 - "Quero falar com um atendente" passa a conversa para humano; o agente para de responder e a mensagem aparece em Conversas.
 - O atendente responde pelo painel e a resposta sai pelo canal com o autor gravado; devolver ao agente volta a conversa ao bot.
 - O titular de `whatsapp:<número>` exporta e apaga as mensagens do canal.
+
+## Fase 51 — Auditoria 2026-11-16
+
+Auditoria estática de prontidão comercial sobre a `main` em `c56a38d`: segurança da aplicação e dos agentes, operação, arquitetura, UI e o que um cliente B2B pede antes de assinar. 64 achados: 3 críticos, 13 altos, 31 médios e 17 baixos. Nenhum deixa um anônimo ler ou alterar dados; os críticos são de venda e operação. Os achados foram conferidos no código antes de entrar aqui. Decisões dos padrões novos no [ADR-0045](adr/0045-prontidao-para-o-primeiro-cliente.md).
+
+As Fases 51 a 54 seguem os horizontes da auditoria: 51 fecha os bloqueadores pequenos, 52 a prontidão da instância, 53 operação e segurança dos agentes, 54 produto e comercial.
+
+### Fora do código
+
+- [ ] **Crítico (COM-02).** Confirmar a titularidade do código e fechar o [ADR-0007](adr/0007-licenciamento.md); redigir a licença comercial. Depende de advogado
+- [ ] **Crítico (COM-01).** Kit de LGPD: DPA, sub-operadores, transferência internacional, incidente e encarregado. A Fase 54 entrega minutas em `docs/legal/`; a versão final depende de revisão jurídica
+- [ ] **Médio (COM-11).** Política de uso aceitável anexa ao contrato (minuta na Fase 54)
+- [ ] **Alto (SEC-03).** As três caixas da Fase 11: trocar o par JWT e a senha do owner, ou apagar os ambientes antigos do Railway e do Vercel
+
+### PRs da Fase 51
+
+- [ ] `docs`: esta seção, ADR-0045 e ADR-0044 aceito
+- [ ] `fix(security)`: token sem prefixo também revogado, websocket de workflows fechado, versão só para quem escreve config e login fora do proxy (SEC-01, SEC-04, SEC-07)
+- [ ] `fix(api)`: rascunho roda no modo teste antes da primeira publicação (UX-01)
+- [ ] `fix(infra)`: api com o .env inteiro, proxies confiáveis da rede do compose, painel só em 127.0.0.1 e rotação de log (OPS-02, SEC-05, SEC-12, OPS-05 em parte)
+- [ ] `fix(api)`: timeout de provedor, embedder e s3 e uma tentativa extra por padrão (OPS-03, LLM-07)
+- [ ] `fix(api)`: agente novo com defesas ligadas, resultado de tool delimitado e memória fora de token de integração (LLM-01, LLM-02 em parte)
+- [ ] `chore(deps)`: next, pyjwt, pypdf e urllib3 atualizados, dependabot, auditoria de dependências e actions por sha (SEC-02, SEC-11)
+
+**Critério de aceite:** cada achado com teste que falhava antes; o compose de produção sobe com `OIDC_ISSUER` preenchido e mostra o botão de SSO; agente criado e só salvo responde no modo teste.
+
+## Fase 52 — Prontidão da instância
+
+- [ ] `feat(infra)`: backup diário do banco para bucket externo e restauração documentada e testada (OPS-01)
+- [ ] `feat(api)`: retenção de conversas, runs, traces e mensagens de canal por instância (COM-03, LLM-08)
+- [ ] `feat`: troca e recuperação de senha pelo próprio usuário e troca obrigatória no primeiro acesso (COM-04)
+- [ ] `feat`: aviso de primeiro contato e palavra de saída nos canais, remetente certo no slack e assinatura fora do ascii (COM-05, LLM-04, LLM-12, SEC-09)
+- [ ] `feat(infra)`: imagem por tag, versão e migration no health, health do painel, lock na migração e guia de atualização (OPS-04, OPS-05, OPS-10)
+
+**Critério de aceite:** restauração de um dump real num banco vazio com o painel funcionando; conversa mais velha que o prazo some com a sessão do Agno; usuário troca a própria senha e o owner não a conhece mais; a primeira mensagem do WhatsApp recebe o aviso antes da resposta.
+
+## Fase 53 — Operação e segurança dos agentes
+
+- [ ] `fix(api)`: redis fora não derruba o login, trabalho aceito e preso é retomado e conector e versão sem corrida (OPS-06, OPS-07, OPS-11, OPS-12)
+- [ ] `fix(api)`: ingestão no worker por padrão, teto no conteúdo descomprimido e um pool só para o banco do agno (OPS-08, SEC-06, OPS-09)
+- [ ] `fix(security)`: continue confere a tool pendente e argumentos de tool passam pela máscara e pelos termos bloqueados (LLM-03, LLM-06)
+- [ ] `feat(api)`: limite por chamador nas rotas de run e orçamento padrão em token de integração e canal (LLM-05)
+- [ ] `feat(api)`: usuário final identificado pelo integrador no token de integração (LLM-02)
+- [ ] `fix(api)`: bloqueio de membro registrado, erro de provedor sem detalhe interno e checagem da tool com confirmação ao publicar etapa (LLM-09, LLM-10, LLM-11)
+- [ ] `test(api)`: contrato dos internos do agno, httpx fixado, varredura de scope por rota e smoke do compose no ci (ARQ-01, ARQ-03, ARQ-04, OPS-10)
+
+**Critério de aceite:** com o Redis parado o login responde; aprovar uma tool com argumentos trocados dá 409; um token de integração passa do limite por minuto e recebe 429.
+
+## Fase 54 — Produto e comercial
+
+- [ ] `feat(web)`: estado vazio com exemplos, modelos sem chave desabilitados, erro de validação visível e tools e parar no modo teste (UX-02, UX-03, UX-04, UX-05, UX-09)
+- [ ] `feat`: ações do painel conforme o papel e viewer sem conteúdo de conversa nem telefone (UX-06, COM-09, SEC-10)
+- [ ] `feat`: execuções com paginação e filtro, consumo em csv e limites de plano por variável de ambiente (UX-07, COM-06)
+- [ ] `feat(api)`: login e leituras sensíveis na trilha e exportação da trilha em csv (COM-07)
+- [ ] `feat`: modelos extras por variável de ambiente, custo em reais e marca da instância (ARQ-02, UX-08, COM-12)
+- [ ] `docs`: guia de uso, referência das rotas de integração, versão no rodapé, limites da exclusão do titular e minutas jurídicas (COM-08, ARQ-05, COM-10, COM-01, COM-11, LLM-13, SEC-08, ARQ-06)
+
+**Critério de aceite:** viewer não vê botão que a API recusa; o financeiro baixa o consumo do mês em CSV; um modelo novo da OpenAI entra pelo `.env` sem release.

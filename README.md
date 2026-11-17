@@ -440,7 +440,8 @@ Cada decisão relevante está em [`docs/adr/`](docs/adr/), com contexto, alterna
 | [0041](docs/adr/0041-trilha-de-auditoria.md) | Trilha de auditoria: escritas de `/api/v1` e aprovações com quem, alvo e resultado, antes e depois nas ações de produção (Fase 46) |
 | [0042](docs/adr/0042-login-por-oidc.md) | Login por SSO via OIDC: um provedor por instância, papel pelo grupo e conta criada no primeiro login (Fase 47) |
 | [0043](docs/adr/0043-traces-por-otlp-e-casos-por-csv.md) | Traces por OTLP sem o conteúdo da conversa por padrão e casos de teste por CSV (Fase 48) |
-| [0044](docs/adr/0044-canais-de-conversa-e-atendente.md) | Canais de conversa (WhatsApp e Slack) e passagem para atendente humano (proposto, Fase 50) |
+| [0044](docs/adr/0044-canais-de-conversa-e-atendente.md) | Canais de conversa (WhatsApp e Slack) e passagem para atendente humano (Fase 50) |
+| [0045](docs/adr/0045-prontidao-para-o-primeiro-cliente.md) | Prontidão para o primeiro cliente: padrões seguros, retenção, senha própria, backup e aviso no canal (proposto, Fases 51 a 54) |
 
 O histórico de fases, com os problemas encontrados em auditoria e o critério de aceite de cada uma, está em [`docs/roadmap.md`](docs/roadmap.md).
 

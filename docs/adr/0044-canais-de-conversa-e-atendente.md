@@ -1,6 +1,6 @@
 # ADR-0044 — Canais de conversa e passagem para atendente
 
-**Status:** Proposto — o merge do PR é o aceite
+**Status:** Aceito
 **Data:** 2026-11-13
 
 ## Contexto
