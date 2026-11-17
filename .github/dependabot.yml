@@ -12,6 +12,7 @@ updates:
         patterns: ["*"]
         update-types: [minor, patch]
     ignore:
+      # o openapi-typescript, que gera os tipos do client, pede o typescript 5
       - dependency-name: typescript
         update-types: [version-update:semver-major]
       # os plugins do eslint-config-next ainda pedem o eslint 9
@@ -26,12 +27,6 @@ updates:
       api:
         patterns: ["*"]
         update-types: [minor, patch]
-    ignore:
-      # versão maior dos SDKs dos provedores só junto com o Agno, que é quem os usa
-      - dependency-name: anthropic
-        update-types: [version-update:semver-major]
-      - dependency-name: openai
-        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
     schedule:
