@@ -493,10 +493,12 @@ A porta 8000 só é publicada pelo override de dev. Em produção, a API fica na
 
 ```bash
 cp .env.example .env                       # preencha, com DOMAIN e PUBLIC_URL
-docker compose --profile tls up -d --build # API, painel, banco, Redis e Caddy com TLS
+docker compose --profile tls --profile backup up -d --build # com Caddy (TLS) e backup diário
 ```
 
 O `.env` inteiro chega à API (`env_file`), então SSO, OTLP, preços e retenção valem sem mexer no compose. O painel é publicado só em `127.0.0.1:3000`; o perfil `tls` sobe um Caddy nas portas 80 e 443 com certificado do Let's Encrypt para o `DOMAIN` ([`deploy/Caddyfile`](deploy/Caddyfile)). Com outro proxy, aponte-o para `127.0.0.1:3000` e mantenha `CLIENT_IP_HEADER=x-forwarded-for`. O log de cada serviço fica limitado a 5 arquivos de 10 MB.
+
+O perfil `backup` faz um dump diário cifrado do banco para um bucket S3 compatível fora da máquina, com 7 diários e 4 semanais. A restauração foi testada e está em [`docs/restauracao.md`](docs/restauracao.md), junto com as três chaves que o operador guarda fora da VM.
 
 ### Testes
 
