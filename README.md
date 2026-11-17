@@ -339,7 +339,7 @@ Os casos viram `Case`s do runner de suíte do próprio Agno (`agno.eval.suite`),
 | **Traces OTLP** | Desligado por padrão. Ligado, o span sai sem texto da conversa, prompt, argumentos de tool, id do usuário final nem a mensagem do erro, e com a sessão em hash; o conteúdo só sai com `OTEL_EXPORT_CONTENT=true` ([ADR-0043](docs/adr/0043-traces-por-otlp-e-casos-por-csv.md)). |
 | **Auditoria** | Toda escrita em `/api/v1` e toda decisão de aprovação gravadas com autor, IP, alvo e resultado, inclusive as recusadas, sem o corpo da requisição. Só o owner lê, e a exclusão do titular troca o id dele pelo pseudônimo também ali ([ADR-0041](docs/adr/0041-trilha-de-auditoria.md)). |
 | **Papéis e scopes** | `owner`, `editor`, `viewer`. Toda rota, própria ou do AgentOS, exige scope. |
-| **Rate limit** | Login limitado por e-mail e IP, por e-mail e por IP no Redis, sem deixar ninguém travar a conta de outro. `X-Forwarded-For` só vale vindo de proxy listado em `TRUSTED_PROXIES`, e o painel só repassa o IP do cabeçalho de `CLIENT_IP_HEADER`. Busca de teste na base limitada por usuário. |
+| **Rate limit** | Login limitado por e-mail e IP, por e-mail e por IP no Redis, sem deixar ninguém travar a conta de outro. `X-Forwarded-For` só vale vindo de proxy listado em `TRUSTED_PROXIES` (no compose, a rede privada, porque a API não tem porta publicada), e o painel só repassa o IP do cabeçalho de `CLIENT_IP_HEADER`. Sem o IP real, o limite por IP fica de fora em vez de virar um só para todos. Busca de teste na base limitada por usuário. |
 | **Superfície** | Login com e-mail inexistente também roda argon2, para a latência não revelar contas. `/docs` e `/openapi.json` só em desenvolvimento. Fora do login (senha e SSO) e do health, a única rota pública é o webhook da origem dos conectores, que só sincroniza com a assinatura HMAC do corpo e no máximo uma vez por minuto. |
 | **Headers** | HSTS, CSP com `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`. |
 | **Saída** | Servidores MCP, webhooks, destinos de aviso e conectores de conhecimento passam pelo mesmo filtro: só https, sem host que resolva para IP interno, conferido no cadastro e a cada chamada, sem seguir redirect. URLs e segredos ficam cifrados com Fernet. A telemetria do Agno fica desligada. |
@@ -486,6 +486,15 @@ pnpm --filter web dev                                                 # painel e
 ```
 
 A porta 8000 só é publicada pelo override de dev. Em produção, a API fica na rede do compose e o painel fala com ela por `http://api:8000`. Depois de um `git pull` que mexa em `api/uv.lock`, recrie a API com `--build -V`. Sem o `-V`, o volume anônimo do venv mantém as dependências antigas.
+
+### Em produção
+
+```bash
+cp .env.example .env                       # preencha, com DOMAIN e PUBLIC_URL
+docker compose --profile tls up -d --build # API, painel, banco, Redis e Caddy com TLS
+```
+
+O `.env` inteiro chega à API (`env_file`), então SSO, OTLP, preços e retenção valem sem mexer no compose. O painel é publicado só em `127.0.0.1:3000`; o perfil `tls` sobe um Caddy nas portas 80 e 443 com certificado do Let's Encrypt para o `DOMAIN` ([`deploy/Caddyfile`](deploy/Caddyfile)). Com outro proxy, aponte-o para `127.0.0.1:3000` e mantenha `CLIENT_IP_HEADER=x-forwarded-for`. O log de cada serviço fica limitado a 5 arquivos de 10 MB.
 
 ### Testes
 

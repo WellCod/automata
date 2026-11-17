@@ -27,7 +27,14 @@ def login_app(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     """Só a rota de login, com o IP vindo de um header e a senha sempre errada."""
     import app.routers.auth as auth
 
-    monkeypatch.setattr(auth, "get_client_ip", lambda request: request.headers["x-test-ip"])
+    # "proxy": só o IP do painel é conhecido (sem CLIENT_IP_HEADER)
+    monkeypatch.setattr(
+        auth,
+        "known_client_ip",
+        lambda request: (
+            None if request.headers["x-test-ip"] == "proxy" else request.headers["x-test-ip"]
+        ),
+    )
 
     class _Wrong:
         def __init__(self, *args: Any) -> None:
@@ -116,3 +123,12 @@ def test_s3_com_endpoint_proprio_exige_chave(monkeypatch: pytest.MonkeyPatch) ->
         S3Source(settings, {})._client()
     client = S3Source(settings, {"access_key_id": "k", "secret_access_key": "s"})._client()
     assert client.meta.endpoint_url == "http://minio.interno:9000"
+
+
+def test_sem_ip_real_o_limite_por_ip_nao_vira_global(login_app: TestClient) -> None:
+    # antes: todo login pelo painel caía no balde do IP do container (SEC-05)
+    codes = [_try(login_app, "proxy", f"pessoa{i}@empresa.com") for i in range(25)]
+    assert codes == [401] * 25
+    # o limite por e-mail continua
+    assert [_try(login_app, "proxy", "alvo@empresa.com") for _ in range(30)] == [401] * 30
+    assert _try(login_app, "proxy", "alvo@empresa.com") == 429

@@ -1,0 +1,8 @@
+# TLS na frente do painel (perfil `tls` do docker-compose.yml). O certificado sai do
+# Let's Encrypt para o DOMAIN do .env; as portas 80 e 443 precisam estar abertas.
+{$DOMAIN} {
+	encode zstd gzip
+	# o Caddy acrescenta o IP de quem conectou ao X-Forwarded-For, e o painel lê o
+	# último hop (CLIENT_IP_HEADER=x-forwarded-for)
+	reverse_proxy web:3000
+}

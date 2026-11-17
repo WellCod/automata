@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.db import get_engine
 from app.knowledge.jobs import submit
 from app.models.knowledge_connector import KnowledgeConnector
-from app.proxy import get_client_ip
+from app.proxy import known_client_ip
 from app.secrets import SecretsKeyMissing, decrypt_json
 
 logger = logging.getLogger(__name__)
@@ -93,11 +93,10 @@ async def receive(
     connector_id: UUID, request: Request, background: BackgroundTasks
 ) -> dict[str, str]:
     limiter = getattr(request.app.state, "rate_limiter", None)
-    if limiter is not None:
+    ip = known_client_ip(request)
+    if limiter is not None and ip is not None:
         # antes de tocar no banco: rota pública, sem token
-        await asyncio.to_thread(
-            limiter.check, f"connector-webhook-ip:{get_client_ip(request)}", PER_IP_MINUTE
-        )
+        await asyncio.to_thread(limiter.check, f"connector-webhook-ip:{ip}", PER_IP_MINUTE)
     body = await _read_body(request)
     header = request.headers.get("x-hub-signature-256") or request.headers.get(
         "x-automata-signature"

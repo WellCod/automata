@@ -47,6 +47,17 @@ def get_client_ip(request: Request) -> str:
     return peer
 
 
+def known_client_ip(request: Request) -> str | None:
+    """IP do cliente, ou None quando só se sabe o do proxy.
+
+    Atrás de proxy confiável que não repassa o IP (painel sem CLIENT_IP_HEADER), todo
+    mundo chega com o IP do container do painel: limitar por ele trava todos juntos
+    (Fase 51, SEC-05). Quem chama pula o limite por IP e fica com os outros.
+    """
+    ip = get_client_ip(request)
+    return None if is_trusted(ip, trusted_networks()) else ip
+
+
 def is_https(request: Request) -> bool:
     """Se o cliente chegou por HTTPS, inclusive com TLS terminado num proxy confiável."""
     if request.url.scheme == "https":

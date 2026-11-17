@@ -5,7 +5,7 @@ from collections.abc import Generator
 import pytest
 from starlette.requests import Request
 
-from app.proxy import get_client_ip
+from app.proxy import get_client_ip, known_client_ip
 from app.settings import get_settings
 
 
@@ -47,3 +47,10 @@ def test_sem_proxies_configurados_ignora_header(monkeypatch: pytest.MonkeyPatch)
 
 def test_hop_invalido_nao_e_confiavel() -> None:
     assert get_client_ip(_request("10.0.0.2", "lixo")) == "lixo"
+
+
+def test_ip_conhecido_so_quando_nao_e_o_proprio_proxy() -> None:
+    # painel confiável sem repassar o IP: só se sabe o do container
+    assert known_client_ip(_request("10.0.0.2")) is None
+    assert known_client_ip(_request("10.0.0.2", "198.51.100.7")) == "198.51.100.7"
+    assert known_client_ip(_request("203.0.113.9")) == "203.0.113.9"

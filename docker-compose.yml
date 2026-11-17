@@ -1,9 +1,19 @@
 # Produção: imagem de build, sem código montado. A API só é alcançável pela rede
-# do compose (o painel fala com ela por http://api:8000); para expor, use proxy.
+# do compose (o painel fala com ela por http://api:8000). O painel fica em 127.0.0.1;
+# para expor com TLS, suba o perfil `tls` (Caddy) ou ponha um proxy próprio na frente.
+
+# log do Docker com teto: sem isso o json-file cresce até encher o disco do Postgres
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   db:
     image: pgvector/pgvector:pg17
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -24,6 +34,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    logging: *logging
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -38,13 +49,21 @@ services:
   api:
     build: ./api
     restart: unless-stopped
+    logging: *logging
+    # o .env inteiro chega à API (SSO, OTLP, preços, retenção...); as chaves abaixo
+    # têm precedência e fixam o que muda no container (Fase 51, OPS-02)
+    env_file:
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: ${DATABASE_URL}
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
       JWT_PREVIOUS_PUBLIC_KEY: ${JWT_PREVIOUS_PUBLIC_KEY:-}
       REDIS_URL: redis://redis:6379/0
-      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      # a API não tem porta publicada: só o painel e o worker a alcançam, pela rede
+      # privada do compose, e o X-Forwarded-For que o painel manda vale
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
       MCP_SECRETS_KEY: ${MCP_SECRETS_KEY:-}
       MCP_SECRETS_PREVIOUS_KEY: ${MCP_SECRETS_PREVIOUS_KEY:-}
       MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-}
@@ -105,14 +124,17 @@ services:
       context: .
       dockerfile: web/Dockerfile
     restart: unless-stopped
+    logging: *logging
     environment:
       AUTOMATA_API_URL: http://api:8000
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
       JWT_PREVIOUS_PUBLIC_KEY: ${JWT_PREVIOUS_PUBLIC_KEY:-}
-      CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:-}
+      # o painel só é alcançável por 127.0.0.1 ou pelo Caddy, que acrescenta o IP real
+      # como último hop do X-Forwarded-For; vazio só com o painel exposto direto
+      CLIENT_IP_HEADER: ${CLIENT_IP_HEADER-x-forwarded-for}
       PUBLIC_URL: ${PUBLIC_URL:-}
     ports:
-      - "3000:3000"
+      - "${WEB_BIND:-127.0.0.1}:3000:3000"
     healthcheck:
       # 127.0.0.1: no Alpine, localhost resolve para ::1 e o Next standalone só escuta em IPv4
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
@@ -129,5 +151,31 @@ services:
           cpus: "0.5"
           memory: 384M
 
+  # TLS automático na frente do painel (Let's Encrypt): `--profile tls` com DOMAIN no .env
+  caddy:
+    image: caddy:2.10-alpine
+    profiles: [tls]
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+
 volumes:
   pg_data:
+  caddy_data:
+  caddy_config:

@@ -18,7 +18,7 @@ from starlette.concurrency import run_in_threadpool
 from app.channels import providers, service
 from app.db import get_engine
 from app.models.channel import Channel
-from app.proxy import get_client_ip
+from app.proxy import known_client_ip
 from app.secrets import decrypt_json
 
 logger = logging.getLogger(__name__)
@@ -53,12 +53,17 @@ async def _body(request: Request) -> bytes:
     return b"".join(chunks)
 
 
+def _limit_ip(request: Request) -> None:
+    # sem o IP real todos os provedores cairiam num balde só; a assinatura segura o resto
+    ip = known_client_ip(request)
+    if ip is not None:
+        request.app.state.rate_limiter.check(f"channel-hook:{ip}", limit=PER_IP_LIMIT)
+
+
 @router.get("/{channel_id}", response_class=PlainTextResponse)
 async def verify(channel_id: UUID, request: Request) -> Response:
     """Verificação do webhook do WhatsApp: devolve o `hub.challenge` com o token certo."""
-    request.app.state.rate_limiter.check(
-        f"channel-hook:{get_client_ip(request)}", limit=PER_IP_LIMIT
-    )
+    _limit_ip(request)
     found = await run_in_threadpool(_channel, channel_id)
     if found is None or found[0] != "whatsapp":
         raise _not_found()
@@ -73,8 +78,7 @@ async def verify(channel_id: UUID, request: Request) -> Response:
 
 @router.post("/{channel_id}")
 async def receive(channel_id: UUID, request: Request, background: BackgroundTasks) -> Response:
-    limiter = request.app.state.rate_limiter
-    limiter.check(f"channel-hook:{get_client_ip(request)}", limit=PER_IP_LIMIT)
+    _limit_ip(request)
     body = await _body(request)
     found = await run_in_threadpool(_channel, channel_id)
     if found is None:
@@ -108,5 +112,5 @@ async def receive(channel_id: UUID, request: Request, background: BackgroundTask
         else providers.slack_messages(payload)
     )
     if messages:
-        background.add_task(service.handle, channel_id, messages, limiter)
+        background.add_task(service.handle, channel_id, messages, request.app.state.rate_limiter)
     return JSONResponse({"ok": True})
