@@ -24,6 +24,7 @@ import { EvalSuitePanel } from "@/components/eval-suite-panel";
 import { LintPanel } from "@/components/lint-panel";
 import {
   DEFAULT_GUARDRAILS,
+  SAFE_NEW_GUARDRAILS,
   type Guardrails,
   GuardrailsEditor,
   withDefaults,
@@ -46,6 +47,7 @@ import {
 import { type OutputSchema, OutputSchemaEditor } from "@/components/output-schema-editor";
 import {
   DEFAULT_RUN,
+  SAFE_NEW_RUN,
   type RunControls,
   RunControlsEditor,
   withRunDefaults,
@@ -239,6 +241,8 @@ export default function AgentEditPage() {
 
   useEffect(() => {
     if (!data || dirtyRef.current) return;
+    // nunca salvo: o formulário abre com as defesas do ADR-0045 ligadas
+    const fresh = !data.current_version && !data.draft_version;
     reset({
       name: data.name,
       description: data.description ?? "",
@@ -260,10 +264,10 @@ export default function AgentEditPage() {
         base_id: k.base_id,
         max_results: k.max_results ?? 5,
       })),
-      guardrails: withDefaults(data.payload?.guardrails),
+      guardrails: fresh ? SAFE_NEW_GUARDRAILS : withDefaults(data.payload?.guardrails),
       conversation: withConversationDefaults(data.payload?.conversation),
       memory: withMemoryDefaults(data.payload?.memory),
-      run: withRunDefaults(data.payload?.run),
+      run: fresh ? SAFE_NEW_RUN : withRunDefaults(data.payload?.run),
       output_schema: (data.payload?.output_schema as OutputSchema | null | undefined) ?? null,
     });
   }, [data, reset]);

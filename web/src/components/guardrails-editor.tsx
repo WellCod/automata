@@ -119,6 +119,14 @@ export const DEFAULT_GUARDRAILS: Guardrails = {
   blocked_message: "Não posso ajudar com essa mensagem por aqui.",
 };
 
+// agente e time sem versão nenhuma nascem com estas defesas (ADR-0045); a API aplica o
+// mesmo no primeiro rascunho quando a seção não vem
+export const SAFE_NEW_GUARDRAILS: Guardrails = {
+  ...DEFAULT_GUARDRAILS,
+  max_input_chars: 20000,
+  tool_results: { terms: true, classifier: false },
+};
+
 // o payload salvo pode vir sem alguma seção (versões anteriores aos guardrails)
 export function withDefaults(g: Partial<Guardrails> | null | undefined): Guardrails {
   return {

@@ -23,6 +23,9 @@ export const DEFAULT_RUN: RunControls = {
   background_retries: 0,
 };
 
+// ADR-0045: limite de chamadas de tool no agente novo
+export const SAFE_NEW_RUN: RunControls = { ...DEFAULT_RUN, tool_call_limit: 15 };
+
 export function withRunDefaults(value: Partial<RunControls> | undefined): RunControls {
   return { ...DEFAULT_RUN, ...(value ?? {}) };
 }

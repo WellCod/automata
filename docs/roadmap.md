@@ -1692,7 +1692,7 @@ As Fases 51 a 54 seguem os horizontes da auditoria: 51 fecha os bloqueadores peq
 - [x] `fix(api)`: rascunho roda no modo teste antes da primeira publicação (UX-01)
 - [x] `fix(infra)`: api com o .env inteiro, proxies confiáveis da rede do compose, painel só em 127.0.0.1 e rotação de log (OPS-02, SEC-05, SEC-12, OPS-05 em parte)
 - [x] `fix(api)`: timeout de provedor, embedder e s3 e uma tentativa extra por padrão (OPS-03, LLM-07)
-- [ ] `fix(api)`: agente novo com defesas ligadas, resultado de tool delimitado e memória fora de token de integração (LLM-01, LLM-02 em parte)
+- [x] `fix(api)`: agente novo com defesas ligadas, resultado de tool delimitado e memória fora de token de integração (LLM-01, LLM-02 em parte)
 - [ ] `chore(deps)`: next, pyjwt, pypdf e urllib3 atualizados, dependabot, auditoria de dependências e actions por sha (SEC-02, SEC-11)
 
 **Critério de aceite:** cada achado com teste que falhava antes; o compose de produção sobe com `OIDC_ISSUER` preenchido e mostra o botão de SSO; agente criado e só salvo responde no modo teste.
