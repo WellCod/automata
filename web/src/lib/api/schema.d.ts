@@ -1866,6 +1866,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/usage/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Export Usage
+     * @description Consumo do mês por dia, agente e modelo, sem o id de quem usou (COM-06).
+     */
+    get: operations["export_usage_api_v1_usage_export_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/users": {
     parameters: {
       query?: never;
@@ -9229,6 +9249,9 @@ export interface operations {
       query?: {
         page?: number;
         page_size?: number;
+        status?: string | null;
+        since?: string | null;
+        until?: string | null;
       };
       header?: never;
       path: {
@@ -9392,6 +9415,36 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["RollupItem"][];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  export_usage_api_v1_usage_export_get: {
+    parameters: {
+      query?: {
+        /** @description Período no formato YYYYMM. Vazio = mês corrente. */
+        period?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {

@@ -17,7 +17,7 @@ from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.repositories.config import ConfigRepository
 from app.schemas.config import ConfigKind, ConfigPayload
-from app.services.config import ConfigService
+from app.services.config import ConfigService, PlanLimitError
 
 router = APIRouter(prefix="/api/v1/templates", tags=["templates"])
 
@@ -72,9 +72,12 @@ def create_from_template(key: str, session: SessionDep, request: Request) -> Cre
     if template is None:
         raise HTTPException(status_code=404, detail="Modelo de agente não encontrado")
     service = ConfigService(ConfigRepository(session))
-    config = service.create_config(
-        template["name"], description=template["description"], kind=ConfigKind.agent
-    )
+    try:
+        config = service.create_config(
+            template["name"], description=template["description"], kind=ConfigKind.agent
+        )
+    except PlanLimitError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     payload: ConfigPayload = template["payload"]
     # cópia sem os campos marcados como enviados: o primeiro rascunho ganha as defesas
     fresh = ConfigPayload.model_validate(payload.model_dump(exclude={"guardrails", "run"}))

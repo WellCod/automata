@@ -43,6 +43,10 @@ def guardrail_errors(guardrails: GuardrailSettings) -> list[str]:
     return errors
 
 
+class PlanLimitError(ValueError):
+    """Passou do limite do plano (`PLAN_MAX_*`): o router responde 409."""
+
+
 class ConfigService:
     def __init__(
         self,
@@ -57,6 +61,12 @@ class ConfigService:
     def create_config(
         self, name: str, description: str, kind: ConfigKind = ConfigKind.agent
     ) -> AgentConfig:
+        from app.settings import get_settings
+
+        limit = get_settings().plan_max_configs
+        if limit and self._repo.count_configs() >= limit:
+            # limite do plano contratado (COM-06)
+            raise PlanLimitError(f"o plano permite {limit} agentes, times e workflows")
         return self._repo.create_config(name=name, description=description, kind=kind)
 
     def save_draft(

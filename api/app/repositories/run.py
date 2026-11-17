@@ -228,10 +228,19 @@ class RunRepository:
         *,
         page: int = 1,
         page_size: int = 50,
+        status: str | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
     ) -> tuple[list[AgentRun], int]:
         base = select(AgentRun).where(
             AgentRun.agent_config_id == config_id, AgentRun.eval_run_id.is_(None)
         )
+        if status:
+            base = base.where(AgentRun.status == status)
+        if since is not None:
+            base = base.where(AgentRun.created_at >= since)
+        if until is not None:
+            base = base.where(AgentRun.created_at < until)
         total: int = self._session.execute(
             select(func.count()).select_from(base.subquery())
         ).scalar_one()

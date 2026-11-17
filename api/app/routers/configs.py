@@ -28,7 +28,7 @@ from app.schemas.config import (
     GuardrailSettings,
     RollbackInput,
 )
-from app.services.config import ConfigService
+from app.services.config import ConfigService, PlanLimitError
 
 router = APIRouter(
     prefix="/api/v1/configs",
@@ -87,7 +87,10 @@ def _to_response(c: AgentConfig) -> AgentConfigResponse:
 def create_config(body: CreateConfigInput, session: SessionDep) -> AgentConfigResponse:
     repo = ConfigRepository(session)
     service = ConfigService(repo, McpServerRepository(session), KnowledgeBaseRepository(session))
-    config = service.create_config(name=body.name, description=body.description, kind=body.kind)
+    try:
+        config = service.create_config(name=body.name, description=body.description, kind=body.kind)
+    except PlanLimitError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     result = _to_response(config)
     session.commit()
     return result

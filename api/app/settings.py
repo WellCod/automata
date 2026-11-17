@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     data_subject_deadline_days: int = 15
     # trilha de auditoria (ADR-0041)
     audit_retention_days: int = 365
+    # limites do plano contratado (COM-06); 0 = sem limite
+    plan_max_configs: int = Field(default=0, ge=0)
+    plan_max_users: int = Field(default=0, ge=0)
     # runs por minuto por quem chama, nas rotas de run e no /mcp (LLM-05); 0 desliga
     run_rate_limit_per_minute: int = Field(default=60, ge=0)
     # orçamento mensal com bloqueio que todo token de integração novo ganha; 0 não cria

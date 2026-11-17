@@ -112,13 +112,20 @@ def list_runs(
     request: Request,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=200),  # noqa: B008
+    status: str | None = Query(  # noqa: B008
+        default=None, pattern=r"^(success|error|paused|blocked|cancelled|running)$"
+    ),
+    since: datetime | None = Query(default=None),  # noqa: B008
+    until: datetime | None = Query(default=None),  # noqa: B008
 ) -> RunsPage:
     config = ConfigRepository(session).get_config(config_id)
     if config is None:
         raise HTTPException(status_code=404, detail="Config não encontrada")
 
     run_repo = RunRepository(session)
-    runs, total = run_repo.list_by_config(config_id, page=page, page_size=page_size)
+    runs, total = run_repo.list_by_config(
+        config_id, page=page, page_size=page_size, status=status, since=since, until=until
+    )
     everyone = sees_everyone(request)
     # consumo do workflow é o das etapas, gravado nos agentes e times que rodaram
     consumo: dict[str, tuple[int | None, int | None, float | None]] = {}
