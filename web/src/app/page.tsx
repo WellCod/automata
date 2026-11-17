@@ -10,6 +10,7 @@ import { useSuiteStatus } from "@/lib/api/evals";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/lib/api/users";
 
 type StatusFilter = components["schemas"]["ConfigPayloadStatus"] | "";
 
@@ -89,6 +90,8 @@ export default function AgentsPage() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<StatusFilter>("");
   const [showNew, setShowNew] = useState(false);
+  // viewer não vê o que a API recusaria (UX-06)
+  const canWrite = useCan("configs:write");
 
   const { data, isPending, isError } = useQuery({
     queryKey: ["configs", page, q, status],
@@ -109,10 +112,12 @@ export default function AgentsPage() {
             </p>
           )}
         </div>
-        <Button onClick={() => setShowNew(true)} variant="accent">
-          <Plus className="h-3.5 w-3.5" />
-          Novo agente
-        </Button>
+        {canWrite && (
+          <Button onClick={() => setShowNew(true)} variant="accent">
+            <Plus className="h-3.5 w-3.5" />
+            Novo agente
+          </Button>
+        )}
       </div>
 
       {showNew && (
@@ -166,7 +171,13 @@ export default function AgentsPage() {
           Erro ao carregar agentes.
         </div>
       ) : data.items.length === 0 && !q && !status && page === 1 ? (
-        <FirstAgent onNew={() => setShowNew(true)} />
+        canWrite ? (
+          <FirstAgent onNew={() => setShowNew(true)} />
+        ) : (
+          <div className="border-border text-muted-foreground rounded border py-16 text-center text-[13px]">
+            Nenhum agente ainda. Quem tem papel de editor cria o primeiro.
+          </div>
+        )
       ) : data.items.length === 0 ? (
         <div className="border-border rounded border py-16 text-center">
           <p className="text-foreground text-[13px] font-medium">Nenhum agente encontrado</p>

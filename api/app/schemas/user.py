@@ -12,8 +12,8 @@ _VIEWER_SCOPES = [
     "agents:read",
     "teams:read",
     "workflows:read",
-    "sessions:read",
-    "traces:read",
+    # sem sessions:read e traces:read: o viewer vê métricas e execuções, não o conteúdo
+    # das conversas, que é dado pessoal (COM-09)
     Scope.CONFIGS_READ,
     Scope.METRICS_READ,
     Scope.MCP_SERVERS_READ,
@@ -130,3 +130,5 @@ class MeResponse(BaseModel):
     id: str
     email: str | None
     role: UserRole | None
+    # o painel esconde o que o papel não permite (UX-06)
+    scopes: list[str] = []

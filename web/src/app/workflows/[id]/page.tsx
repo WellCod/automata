@@ -19,6 +19,7 @@ import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes";
 import { cn } from "@/lib/utils";
 import { structureErrors, type WorkflowNode } from "@/lib/workflow-tree";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/lib/api/users";
 
 const schema = z.object({
   name: z.string().min(1, "Nome obrigatório"),
@@ -43,6 +44,8 @@ const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors focus:border-accent focus:outline-none";
 
 export default function WorkflowEditPage() {
+  const canWrite = useCan("configs:write");
+  const canRun = useCan("workflows:run");
   const { id } = useParams<{ id: string }>();
   const fieldId = useId();
   const queryClient = useQueryClient();
@@ -137,9 +140,13 @@ export default function WorkflowEditPage() {
             </span>
           )}
           {save.isSuccess && !isDirty && <span className="text-accent text-[11px]">Salvo</span>}
-          <Button type="submit" form="workflow-form" disabled={save.isPending} variant="strong">
-            {save.isPending ? "Salvando…" : "Salvar rascunho"}
-          </Button>
+          {canWrite ? (
+            <Button type="submit" form="workflow-form" disabled={save.isPending} variant="strong">
+              {save.isPending ? "Salvando…" : "Salvar rascunho"}
+            </Button>
+          ) : (
+            <span className="text-muted-foreground text-[11px]">Somente leitura</span>
+          )}
         </div>
       </header>
 
@@ -239,11 +246,13 @@ export default function WorkflowEditPage() {
           <div className="p-4" role="tabpanel">
             {/* o teste fica montado: trocar de aba não apaga o progresso */}
             <div hidden={activePanel !== "teste"}>
-              <WorkflowTestPanel
-                workflowId={id}
-                draftVersionId={data?.draft_version?.id}
-                hasCurrentVersion={Boolean(data?.current_version)}
-              />
+              {canRun && (
+                <WorkflowTestPanel
+                  workflowId={id}
+                  draftVersionId={data?.draft_version?.id}
+                  hasCurrentVersion={Boolean(data?.current_version)}
+                />
+              )}
             </div>
             {activePanel === "versoes" && (
               <VersionsPanel

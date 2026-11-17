@@ -128,6 +128,19 @@ describe("AgentsPage", () => {
     );
   });
 
+  it("viewer não vê o botão de criar agente (UX-06)", async () => {
+    vi.mocked(client.GET).mockImplementation((async (path: string) =>
+      path === "/api/v1/me"
+        ? { data: { id: "v", email: "v@x.com", role: "viewer", scopes: ["configs:read"] } }
+        : { data: mockPage }) as never);
+    render(<AgentsPage />, { wrapper });
+
+    await waitFor(() => expect(screen.getByText(/rascunho/i)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /novo agente/i })).not.toBeInTheDocument(),
+    );
+  });
+
   it("exibe mensagem de erro quando a API falha", async () => {
     vi.mocked(client.GET).mockResolvedValue({
       data: undefined,

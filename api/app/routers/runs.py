@@ -1,13 +1,23 @@
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
-from app.authz import Scope, require_scopes
+from app.authz import Scope, require_scopes, sees_everyone
 from app.db import SessionDep
 from app.repositories.config import ConfigRepository
 from app.repositories.run import RunMetrics, RunRepository
+
+
+def masked_user(user_id: str | None) -> str | None:
+    """Quem não é owner vê só o canal e o fim do id: telefone e e-mail são dado pessoal."""
+    if not user_id:
+        return user_id
+    prefix, sep, rest = user_id.rpartition(":")
+    tail = rest[-4:] if len(rest) > 4 else ""
+    return f"{prefix}{sep}•••{tail}"
+
 
 router = APIRouter(
     prefix="/api/v1/configs",
@@ -99,6 +109,7 @@ def get_metrics(
 def list_runs(
     config_id: UUID,
     session: SessionDep,
+    request: Request,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=200),  # noqa: B008
 ) -> RunsPage:
@@ -108,6 +119,7 @@ def list_runs(
 
     run_repo = RunRepository(session)
     runs, total = run_repo.list_by_config(config_id, page=page, page_size=page_size)
+    everyone = sees_everyone(request)
     # consumo do workflow é o das etapas, gravado nos agentes e times que rodaram
     consumo: dict[str, tuple[int | None, int | None, float | None]] = {}
     if config.kind == "workflow":
@@ -118,7 +130,7 @@ def list_runs(
             AgentRunResponse(
                 id=r.id,
                 agent_config_id=r.agent_config_id,
-                user_id=r.user_id,
+                user_id=r.user_id if everyone else masked_user(r.user_id),
                 run_id=r.run_id,
                 status=r.status,
                 duration_ms=r.duration_ms,

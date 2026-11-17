@@ -65,9 +65,10 @@ def me(request: Request, session: SessionDep) -> MeResponse:
         user = UserRepository(session).get(UUID(sub))
     except ValueError:
         user = None
+    scopes = [str(s) for s in getattr(request.state, "scopes", None) or []]
     if user is None:
-        return MeResponse(id=sub, email=None, role=None)
-    return MeResponse(id=str(user.id), email=user.email, role=user.role)
+        return MeResponse(id=sub, email=None, role=None, scopes=scopes)
+    return MeResponse(id=str(user.id), email=user.email, role=user.role, scopes=scopes)
 
 
 @me_router.post("/password", response_model=TokenResponse)
