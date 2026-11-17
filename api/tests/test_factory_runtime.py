@@ -119,7 +119,7 @@ def test_extended_thinking_liga_thinking_no_claude(monkeypatch: pytest.MonkeyPat
     model = resolve_model("claude-sonnet-4-6", CapabilityFlags(extended_thinking=True))
     assert isinstance(model, Claude)
     assert model.thinking is not None
-    assert model.thinking["type"] == "enabled"
+    assert model.thinking["type"] == "adaptive"
     sem = resolve_model("claude-sonnet-4-6", CapabilityFlags())
     assert getattr(sem, "thinking", None) is None
 
