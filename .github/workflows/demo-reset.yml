@@ -5,12 +5,16 @@ on:
   # - cron: '0 */6 * * *'  # a cada 6 horas
   workflow_dispatch:
 
+# só leitura do repositório; quem precisa de mais pede no próprio job
+permissions:
+  contents: read
+
 jobs:
   reset:
     runs-on: ubuntu-latest
     steps:
       - name: Reset via SSH
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1
         # Credenciais vão pelo ambiente da sessão SSH, nunca interpoladas no script:
         # interpolar põe a senha no texto do comando (e quebra com aspas)
         env:
