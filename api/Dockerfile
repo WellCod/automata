@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS builder
+FROM python:3.15-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.12.2 /uv /usr/local/bin/uv
 
@@ -7,7 +7,7 @@ COPY pyproject.toml uv.lock ./
 
 RUN uv sync --frozen --no-dev --no-install-project
 
-FROM python:3.12-slim AS runner
+FROM python:3.15-slim AS runner
 
 RUN useradd --create-home --shell /bin/bash app
 
