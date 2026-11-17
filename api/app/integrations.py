@@ -172,17 +172,25 @@ class RevokedTokens:
 current_actor: ContextVar[str | None] = ContextVar("current_actor", default=None)
 
 
+def bearer_token(authorization: str) -> str:
+    """Token do Authorization com ou sem "Bearer", como o middleware JWT do Agno aceita."""
+    value = authorization.strip()
+    if value.lower().startswith("bearer "):
+        value = value[7:].strip()
+    return value
+
+
 class RevocationMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: object, revoked: RevokedTokens) -> None:
         super().__init__(app)  # type: ignore[arg-type]
         self._revoked = revoked
 
     async def dispatch(self, request: Request, call_next: object) -> Response:
-        auth = request.headers.get("authorization", "")
-        if auth.lower().startswith("bearer "):
+        token = bearer_token(request.headers.get("authorization", ""))
+        if token:
             try:
                 # assinatura é checada pelo Agno; aqui só interessa o jti
-                claims = jwt.decode(auth[7:], options={"verify_signature": False})
+                claims = jwt.decode(token, options={"verify_signature": False})
             except jwt.InvalidTokenError:
                 claims = {}
             jti = claims.get("jti")
@@ -197,11 +205,11 @@ class RevocationMiddleware(BaseHTTPMiddleware):
             if revoked:
                 return JSONResponse({"detail": "Token revogado"}, status_code=401)
             if isinstance(sub, str):
-                token = current_actor.set(sub)
+                actor = current_actor.set(sub)
                 try:
                     response: Response = await call_next(request)  # type: ignore[operator]
                 finally:
-                    current_actor.reset(token)
+                    current_actor.reset(actor)
                 return response
         response = await call_next(request)  # type: ignore[operator]
         return response

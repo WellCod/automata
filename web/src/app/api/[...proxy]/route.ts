@@ -28,14 +28,13 @@ async function forward(req: NextRequest, segments: string[]): Promise<NextRespon
   }
 
   const path = segments.join("/");
-  // Login tem rota própria, que repassa o IP do cliente ao rate limit
-  if (path === "v1/auth/login") {
+  const apiPath = path.startsWith("v1/") ? `api/${path}` : path;
+  // login, logout e SSO têm rotas próprias, que repassam o IP do cliente ao rate limit;
+  // pelo proxy genérico chegariam à API como se viessem do painel
+  if (apiPath.toLowerCase().startsWith("api/v1/auth/")) {
     return new NextResponse("Não encontrado", { status: 404 });
   }
-  const search = req.nextUrl.search;
-  const target = path.startsWith("v1/")
-    ? `${API_URL}/api/${path}${search}`
-    : `${API_URL}/${path}${search}`;
+  const target = `${API_URL}/${apiPath}${req.nextUrl.search}`;
 
   const headers = new Headers(req.headers);
   headers.set("Authorization", `Bearer ${token}`);

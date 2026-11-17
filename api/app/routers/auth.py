@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import insert
 from app import oidc
 from app.auth import decode_token, issue_token
 from app.db import SessionDep
+from app.integrations import bearer_token
 from app.models.revoked_token import RevokedToken
 from app.models.user import UserRole
 from app.proxy import get_client_ip
@@ -40,7 +41,7 @@ def _email_ref(email: str) -> str:
 
 
 def _require_admin(authorization: str = Header(...)) -> None:
-    token = authorization.removeprefix("Bearer ")
+    token = bearer_token(authorization)
     try:
         payload = decode_token(token)
     except jwt.InvalidTokenError as e:
@@ -80,7 +81,7 @@ def login(request: Request, body: LoginInput, session: SessionDep) -> TokenRespo
 @router.post("/logout", status_code=204)
 def logout(request: Request, session: SessionDep, authorization: str = Header(...)) -> Response:
     """Revoga o token da sessão: o RevocationMiddleware passa a recusá-lo até expirar."""
-    token = authorization.removeprefix("Bearer ")
+    token = bearer_token(authorization)
     try:
         payload = decode_token(token)
     except jwt.InvalidTokenError as e:

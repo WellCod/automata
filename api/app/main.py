@@ -45,6 +45,7 @@ from app.routers.health import router as health_router
 from app.session_id import SessionIdMiddleware
 from app.settings import get_settings
 from app.telemetry import attach_otlp
+from app.websocket_guard import NoWebSocketMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -245,6 +246,8 @@ def create_app(
     outer.add_middleware(AuditMiddleware)
     outer.add_middleware(SecurityHeadersMiddleware)
     outer.add_middleware(RequestIDMiddleware)
+    # /workflows/ws do AgentOS escapa da revogação e da trilha (Fase 51)
+    outer.add_middleware(NoWebSocketMiddleware)
     outer.include_router(auth_router)
     outer.include_router(health_router)
     # webhook da origem dos conectores (ADR-0039): público, protegido pela assinatura

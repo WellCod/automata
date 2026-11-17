@@ -1,5 +1,6 @@
 """Logout revoga o token da sessão por jti; os outros tokens do usuário seguem válidos."""
 
+import json
 import os
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
@@ -144,3 +145,52 @@ def test_revogado_expirado_sai_da_lista(client: TestClient) -> None:
         )
         session.commit()
     assert "expirado" not in _load_revoked()
+
+
+def test_token_sem_prefixo_bearer_tambem_e_revogado(client: TestClient, editor: str) -> None:
+    sessao = _login(client, editor)
+    # o middleware JWT do Agno aceita o token cru (SEC-01)
+    assert client.get("/agents", headers={"Authorization": sessao}).status_code == 200
+    assert client.post("/api/v1/auth/logout", headers={"Authorization": sessao}).status_code == 204
+    assert client.get("/agents", headers={"Authorization": sessao}).status_code == 401
+    assert client.get("/agents", headers={"Authorization": f"bearer  {sessao}"}).status_code == 401
+
+
+def test_websocket_de_workflows_fechado(client: TestClient) -> None:
+    from starlette.websockets import WebSocketDisconnect
+
+    with pytest.raises(WebSocketDisconnect), client.websocket_connect("/workflows/ws"):
+        pass
+
+
+def test_versao_especifica_so_para_quem_edita_config(client: TestClient) -> None:
+    from app.auth import issue_token
+
+    owner = _bearer(issue_token("owner", ["agent_os:admin"]))
+    config_id = client.post(
+        "/api/v1/configs",
+        json={"name": "versao fixa", "description": "x", "kind": "agent"},
+        headers=owner,
+    ).json()["id"]
+    payload = {"model_id": "claude-haiku-4-5", "instructions": {"objective": "v1"}}
+    body = {"name": "versao fixa", "description": "x", "payload": payload}
+    draft = client.put(f"/api/v1/configs/{config_id}/draft", json=body, headers=owner)
+    draft.raise_for_status()
+    client.post(f"/api/v1/configs/{config_id}/publish", headers=owner).raise_for_status()
+    version_id = client.get(f"/api/v1/configs/{config_id}", headers=owner).json()[
+        "current_version"
+    ]["id"]
+    data = {
+        "message": "oi",
+        "stream": "false",
+        "factory_input": json.dumps({"version_id": version_id}),
+    }
+
+    so_run = _bearer(issue_token("integration:x", ["agents:run"]))
+    resp = client.post(f"/agents/{config_id}/runs", data=data, headers=so_run)
+    assert resp.status_code == 403
+    sem_versao = {k: v for k, v in data.items() if k != "factory_input"}
+    assert client.post(f"/agents/{config_id}/runs", data=sem_versao, headers=so_run).is_success
+
+    editor = _bearer(issue_token("editor", ["agents:run", "configs:write"]))
+    assert client.post(f"/agents/{config_id}/runs", data=data, headers=editor).is_success
