@@ -446,6 +446,55 @@ def test_tool_sensivel_pausa_e_retoma_com_decisao(
         assert [r["status"] for r in runs] == ["success"]
 
 
+def test_continue_com_argumento_trocado_e_recusado(
+    db_url: str, mcp_url: str, mcp_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Aprovar com outro cliente ou outra tool dá 409 e nada roda (LLM-03)."""
+    import json
+
+    from fastapi.testclient import TestClient
+
+    from tests.fake_models import ToolCallingModel, tool_args
+    from tests.mcp_fake_server import calls
+
+    slug = "crmforja"
+    model = ToolCallingModel(
+        id="claude-haiku-4-5",
+        tool_name=f"{slug}_cancelar_assinatura",
+        tool_args=tool_args(cliente_id="7"),
+    )
+    with TestClient(_app_with_model(monkeypatch, model)) as client:  # type: ignore[arg-type]
+        agent_id = _agent_with_confirmation(client, mcp_url, slug)
+        calls.clear()
+        first = client.post(
+            f"/agents/{agent_id}/runs",
+            data={"message": "cancela o 7", "stream": "false", "session_id": f"s-{slug}"},
+        )
+        assert first.json()["status"] == "PAUSED"
+        item = client.get("/api/v1/approvals", params={"agent_id": agent_id}).json()[0]
+        original = item["tools"][0]["tool_execution"]
+
+        def resume(tool: dict[str, object]) -> object:
+            return client.post(
+                f"/agents/{agent_id}/runs/{item['run_id']}/continue",
+                data={
+                    "tools": json.dumps([{**tool, "confirmed": True}]),
+                    "session_id": item["session_id"],
+                    "stream": "false",
+                },
+            )
+
+        forged_args = resume({**original, "tool_args": {"cliente_id": "8"}})
+        assert forged_args.status_code == 409  # type: ignore[attr-defined]
+        forged_tool = resume({**original, "tool_name": f"{slug}_outra_tool"})
+        assert forged_tool.status_code == 409  # type: ignore[attr-defined]
+        assert calls == []
+
+        ok = resume(original)
+        assert ok.status_code == 200, ok.text  # type: ignore[attr-defined]
+        assert ("cancelar_assinatura", {"cliente_id": "7"}) in calls
+
+
 # --- times multi-agente ---
 
 

@@ -32,6 +32,7 @@ from app.guardrails.input import BlockLog, input_guardrails
 from app.guardrails.instance import effective
 from app.guardrails.instance import floor as instance_floor
 from app.guardrails.output import output_guardrail
+from app.guardrails.tool_args import argument_guard
 from app.guardrails.tool_results import tool_screen
 from app.knowledge.tools import knowledge_instructions, knowledge_tool
 from app.mcp.client import build_mcp_tools
@@ -265,6 +266,10 @@ def tool_hooks_for(config_id: UUID, payload: ConfigPayload, blocks: BlockLog) ->
     hooks: list[Any] = []
     if payload.run.max_cost_usd is not None and payload.model_id is not None:
         hooks += CostCap(payload.run.max_cost_usd, payload.model_id, blocks).hooks()
+    # argumentos antes do resultado: a tool com termo bloqueado nos argumentos nem roda
+    guard = argument_guard(payload.guardrails, blocks)
+    if guard is not None:
+        hooks.append(guard.hook())
     screen = tool_screen(payload.guardrails, blocks, config_id)
     if screen is not None:
         hooks += screen.hooks()

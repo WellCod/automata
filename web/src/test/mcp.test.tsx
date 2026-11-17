@@ -52,20 +52,25 @@ describe("McpToolsSelector", () => {
     vi.mocked(client.GET).mockResolvedValue({ data: [crm], error: undefined } as never);
   });
 
-  it("liga o servidor com todas as tools e depois restringe", async () => {
+  it("liga o servidor sem nenhuma tool e o owner escolhe (LLM-06)", async () => {
     const onValue = vi.fn();
     const user = userEvent.setup();
     render(<Harness onValue={onValue} />, { wrapper });
 
     await user.click(await screen.findByLabelText("CRM"));
     expect(onValue).toHaveBeenLastCalledWith([
-      { server_id: "s1", tools: null, require_confirmation: [] },
+      { server_id: "s1", tools: [], require_confirmation: [] },
     ]);
+    expect(screen.getByText(/Marque as tools que o agente pode chamar/)).toBeInTheDocument();
 
-    await user.click(screen.getByLabelText("Escolher"));
-    await user.click(screen.getByLabelText("Liberar cancelar_assinatura"));
+    await user.click(screen.getByLabelText("Liberar buscar_cliente"));
     expect(onValue).toHaveBeenLastCalledWith([
       { server_id: "s1", tools: ["buscar_cliente"], require_confirmation: [] },
+    ]);
+
+    await user.click(screen.getByLabelText("Todas"));
+    expect(onValue).toHaveBeenLastCalledWith([
+      { server_id: "s1", tools: null, require_confirmation: [] },
     ]);
   });
 
@@ -75,7 +80,8 @@ describe("McpToolsSelector", () => {
     render(<Harness onValue={onValue} />, { wrapper });
 
     await user.click(await screen.findByLabelText("CRM"));
-    await user.click(screen.getByLabelText("Escolher"));
+    await user.click(screen.getByLabelText("Liberar buscar_cliente"));
+    await user.click(screen.getByLabelText("Liberar cancelar_assinatura"));
     await user.click(screen.getByLabelText("Pedir confirmação antes de cancelar_assinatura"));
     expect(onValue).toHaveBeenLastCalledWith([
       {

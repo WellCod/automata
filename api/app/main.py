@@ -29,6 +29,7 @@ from app.agents.workflow_factory import make_workflow_factory
 from app.audit import AuditMiddleware
 from app.auth import verification_keys
 from app.background import background_queue
+from app.continue_guard import ContinueGuardMiddleware
 from app.db import get_engine
 from app.evals.runner import fail_stale as fail_stale_evals
 from app.evals.scheduler import run_forever as run_scheduled_evals
@@ -242,6 +243,8 @@ def create_app(
     outer.add_middleware(SyncPublishedAgentsMiddleware, published=published)
     # conversa nova ganha sessão antes da factory: o canário escolhe pela sessão (Fase 49)
     outer.add_middleware(SessionIdMiddleware)
+    # aprovação só da tool pendente, com os argumentos mostrados (LLM-03)
+    outer.add_middleware(ContinueGuardMiddleware)
     if enable_auth:
         outer.add_middleware(RevocationMiddleware, revoked=revoked)
     # dentro do RequestID, para a trilha levar o mesmo request_id do log (ADR-0041)

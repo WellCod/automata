@@ -83,7 +83,12 @@ function ServerBinding({
             onChange={(e) =>
               onChange(
                 e.target.checked
-                  ? { server_id: server.id, tools: null, require_confirmation: [] }
+                  ? // com as tools conhecidas, nenhuma vem marcada: o owner escolhe (LLM-06)
+                    {
+                      server_id: server.id,
+                      tools: server.tools === null ? null : [],
+                      require_confirmation: [],
+                    }
                   : undefined,
               )
             }
@@ -133,6 +138,12 @@ function ServerBinding({
                 </label>
               </fieldset>
 
+              {!allTools && liberadas.length === 0 && (
+                <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                  Marque as tools que o agente pode chamar. Libere só o necessário e peça
+                  confirmação nas que enviam ou alteram algo.
+                </p>
+              )}
               <ul className="flex flex-col gap-1.5" aria-label={`Tools de ${server.name}`}>
                 {tools.map((tool) => {
                   const liberada = liberadas.includes(tool.name);
