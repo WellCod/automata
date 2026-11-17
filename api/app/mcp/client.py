@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+import logging
 
 from agno.tools.mcp import MCPTools
 from agno.tools.mcp.params import StreamableHTTPClientParams
@@ -10,6 +11,8 @@ from app.mcp.egress import check_url
 from app.models.mcp_server import McpServer
 from app.schemas.mcp_server import McpToolInfo
 from app.secrets import decrypt_json
+
+logger = logging.getLogger(__name__)
 
 
 class McpUnavailable(RuntimeError):
@@ -66,7 +69,9 @@ async def connect_strict(tools: MCPTools, label: str) -> None:
         raise McpUnavailable(f"servidor MCP '{label}' indisponível") from exc
     except Exception as exc:
         await _cleanup(tools)
-        raise McpUnavailable(f"servidor MCP '{label}' indisponível: {exc}") from exc
+        # o detalhe (host, porta, resposta do servidor) fica no log, não volta ao cliente
+        logger.warning("servidor MCP indisponível", extra={"server": label, "error": str(exc)})
+        raise McpUnavailable(f"servidor MCP '{label}' indisponível") from exc
     if not tools.initialized:
         raise McpUnavailable(f"servidor MCP '{label}' indisponível")
 

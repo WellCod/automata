@@ -297,6 +297,8 @@ Gerar a chave: `python -c "from cryptography.fernet import Fernet; print(Fernet.
 
 Tools marcadas em `require_confirmation` no agente pausam o run antes de executar (`status=PAUSED`, evento `RunPaused`). O `TrackedAgent` grava o run como `paused`, com o `session_id` e as tools pendentes (`ToolExecution` serializado) em `agent_run.pending_tools`.
 
+Publicar agente ou time com tool de confirmação recusa (400) quando ele é etapa sem versão fixa de um workflow publicado, porque a etapa passaria a rodar a versão nova e workflow não pausa para confirmação (LLM-11). O bloqueio de um membro de time fica no registro do run do time (LLM-09), e falha de conexão com servidor MCP volta ao cliente só com o nome do servidor; o detalhe (host, porta, resposta) fica no log (LLM-10).
+
 O `continue` só aprova o que estava pendente (LLM-03, `app/continue_guard.py`): o Agno troca a tool gravada pela que vem no form, casando só pelo `tool_call_id`, e quem iniciou o run podia aprovar com outro nome ou outros argumentos. O `ContinueGuardMiddleware` lê o `tools` do form de `POST /agents|teams/{id}/runs/{run_id}/continue` e responde 409 quando uma tool não existe nas pendentes do run ou difere no `tool_name` ou nos `tool_args`. Run sem pendência gravada segue como antes.
 
 **Argumentos de tool** (LLM-06, `app/guardrails/tool_args.py`). Os `blocked_terms` da saída também valem nos argumentos: com um deles, a tool não roda e o modelo recebe um aviso, registrado em `screened_tools` como `tool_args_blocked_term`. Com a máscara de dados pessoais ligada na saída (`output.pii`), os textos dos argumentos chegam à tool mascarados pelos mesmos tipos e padrões próprios (`tool_args_pii`). No painel, ligar um servidor MCP com as tools já descobertas não marca nenhuma: o owner escolhe.
