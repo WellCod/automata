@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 from agno.models.anthropic import Claude
 from agno.models.base import Model
@@ -19,6 +20,26 @@ _SUPPORTED: dict[str, type[Model]] = {
 
 
 _THINKING_BUDGET_TOKENS = 4096
+
+# Claude 4.6 em diante pensa no modo adaptativo, e o 4.7 recusa `budget_tokens` com 400.
+# `summarized` devolve o resumo do raciocínio; sem ele os blocos de thinking vêm vazios
+_ADAPTIVE_THINKING: dict[str, Any] = {"type": "adaptive", "display": "summarized"}
+_ADAPTIVE_MODELS = {"claude-opus-4-7", "claude-sonnet-4-6"}
+
+
+def _thinking(model_name: str) -> dict[str, Any]:
+    """Modo de extended thinking que o modelo aceita.
+
+    Da matriz, os que documentam o adaptativo; de fora dela (EXTRA_MODELS), o orçamento
+    só onde o Agno sabe que ele ainda vale (Claude 4.5 e anteriores).
+    """
+    from agno.utils.models.claude import supports_thinking_budget
+
+    if model_name in _ADAPTIVE_MODELS or not supports_thinking_budget(model_name):
+        return dict(_ADAPTIVE_THINKING)
+    # orçamento abaixo do max_tokens padrão do Claude no Agno (8192)
+    return {"type": "enabled", "budget_tokens": _THINKING_BUDGET_TOKENS}
+
 
 # Os SDKs esperam 600 s com 2 novas tentativas: um provedor que aceita a conexão e não
 # responde segurava cada run, mensagem de canal e caso de suíte por até 30 min (OPS-03).
@@ -56,10 +77,9 @@ def resolve_model(model_id: str, capabilities: CapabilityFlags | None = None) ->
     if cls is None:
         raise ValueError(f"model_id '{model_id}' não suportado. Suportados: {supported_models()}")
     if capabilities is not None and capabilities.extended_thinking and cls is Claude:
-        # budget abaixo do max_tokens padrão do Claude no Agno (8192)
         return Claude(
             id=model_id,
-            thinking={"type": "enabled", "budget_tokens": _THINKING_BUDGET_TOKENS},
+            thinking=_thinking(model_id),
             timeout=PROVIDER_TIMEOUT_SECONDS,
             client_params={"max_retries": PROVIDER_SDK_RETRIES},
         )
@@ -83,9 +103,7 @@ def _from_extra(extra: ExtraModel, capabilities: CapabilityFlags | None) -> Mode
         if extra.base_url:
             params["base_url"] = extra.base_url
         thinking = (
-            {"type": "enabled", "budget_tokens": _THINKING_BUDGET_TOKENS}
-            if capabilities is not None and capabilities.extended_thinking
-            else None
+            _thinking(name) if capabilities is not None and capabilities.extended_thinking else None
         )
         return Claude(
             id=name,
