@@ -2,7 +2,7 @@
 
 Referência das rotas que um sistema externo alcança com um **token de integração** (página Integrações, só owner emite). O token vale até 90 dias, carrega só os agentes, times e suítes liberados na emissão e é revogado na hora pelo painel. Use sempre `Authorization: Bearer <token>`.
 
-A API pública é a do painel: `https://<seu-painel>/api/...` repassa para a API interna. As rotas de execução são as do AgentOS (Agno 3.1.8); o formato abaixo é congelado por `api/tests/test_contrato_integracao.py`, e mudança nele sai nas notas da versão.
+A API pública é a do painel: `https://<seu-painel>/api/...` repassa para a API interna. As rotas de execução são as do AgentOS (Agno 3.2.0); o formato abaixo é congelado por `api/tests/test_contrato_integracao.py`, e mudança nele sai nas notas da versão.
 
 ## Executar um agente
 

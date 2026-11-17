@@ -40,6 +40,9 @@ AGNO_BY_USER: dict[str, str] = {
     "eval_runs": "eval_table_name",
     "learnings": "learnings_table_name",
     "metrics": "metrics_table_name",
+    # métricas diárias por usuário do Agno 3.2 (painel do AgentOS): também são do titular
+    "aggregate_metrics": "aggregate_metrics_table_name",
+    "component_metrics": "component_metrics_table_name",
 }
 
 
