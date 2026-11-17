@@ -3,19 +3,19 @@ name = "automata-api"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "agno[os,mcp]==3.1.8",
+    "agno[os,mcp]==3.2.0",
     "anthropic>=0.40",
     "openai>=1.50",
     "psycopg[binary]>=3.2",
-    "alembic>=1.14",
-    "pydantic-settings>=2.7",
-    "cryptography>=43.0",
-    "fastmcp>=4.0.0",
+    "alembic>=1.20.1",
+    "pydantic-settings>=2.16.3",
+    "cryptography>=50.0.2",
+    "fastmcp>=4.2.0",
     "argon2-cffi>=25.1.0",
     "email-validator>=2.3.0",
     "redis>=8.1.0",
     "pgvector>=0.5.1",
-    "voyageai>=0.5.0",
+    "voyageai>=0.6.0",
     "pypdf>=7.1.0",
     "pyjwt[crypto]>=2.15.1",
     "urllib3>=2.8.0",
@@ -25,7 +25,7 @@ dependencies = [
     "python-docx>=1.2.0",
     "beautifulsoup4>=4.15.0",
     "aiofiles>=25.1.0",
-    "boto3>=1.40",
+    "boto3>=1.44.3",
     # já vinha pelo agno; declarado porque a saída estruturada valida schema e resposta
     "jsonschema>=4.26",
     "cohere>=5.15",
@@ -34,10 +34,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "mypy>=1.14",
-    "pytest>=8.3",
-    "pytest-asyncio>=0.24",
-    "ruff>=0.16.1",
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
+    "ruff>=0.17.5",
     "testcontainers[postgres]>=4.9",
     "pytest-cov>=5.0",
     "pyyaml>=6.0",
