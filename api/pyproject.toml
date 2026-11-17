@@ -3,7 +3,7 @@ name = "automata-api"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "agno[os,mcp]==3.1.8",
+    "agno[os,mcp]==3.2.0",
     "anthropic>=0.125.0",
     "openai>=2.54.0",
     "psycopg[binary]>=3.3.9",

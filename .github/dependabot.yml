@@ -27,9 +27,6 @@ updates:
         patterns: ["*"]
         update-types: [minor, patch]
     ignore:
-      # o Agno é fixado e atualizado à mão: a doc e os internos mudam a cada versão e o
-      # tests/test_contrato_agno.py precisa ser revisto junto
-      - dependency-name: agno
       # versão maior dos SDKs dos provedores só junto com o Agno, que é quem os usa
       - dependency-name: anthropic
         update-types: [version-update:semver-major]

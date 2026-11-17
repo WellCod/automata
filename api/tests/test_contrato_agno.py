@@ -32,6 +32,8 @@ COVERED = {
     "EVAL_TABLE_SCHEMA": "eval_runs",
     "LEARNINGS_TABLE_SCHEMA": "learnings",
     "METRICS_TABLE_SCHEMA": "metrics",
+    "AGGREGATE_METRICS_TABLE_SCHEMA": "aggregate_metrics",
+    "COMPONENT_METRICS_TABLE_SCHEMA": "component_metrics",
 }
 
 
