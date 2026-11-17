@@ -83,14 +83,14 @@ class FakeGitHub:
 
 
 @pytest.fixture(scope="module")
-def github() -> Generator[FakeGitHub, None, None]:
+def github() -> Generator[FakeGitHub]:
     fake = FakeGitHub()
     yield fake
     fake.server.shutdown()
 
 
 @pytest.fixture(scope="module")
-def db_url() -> Generator[str, None, None]:
+def db_url() -> Generator[str]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         env = {
@@ -116,7 +116,7 @@ def db_url() -> Generator[str, None, None]:
 
 
 @pytest.fixture
-def client(db_url: str) -> Generator[TestClient, None, None]:
+def client(db_url: str) -> Generator[TestClient]:
     from app.main import create_app
 
     with TestClient(create_app(auto_provision_dbs=False, enable_auth=False)) as c:
@@ -616,7 +616,7 @@ def test_webhook_da_origem_sincroniza_com_assinatura(
 
 
 @pytest.fixture
-def worker_on(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+def worker_on(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
     monkeypatch.setenv("INGEST_WORKER", "true")
     get_settings.cache_clear()
     yield

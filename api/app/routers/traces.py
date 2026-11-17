@@ -38,7 +38,7 @@ class TraceSpan(BaseModel):
     input: str | None = None
     output: str | None = None
     error: str | None = None
-    spans: list["TraceSpan"] = Field(default_factory=list)
+    spans: list[TraceSpan] = Field(default_factory=list)
 
     @field_validator("spans", mode="before")
     @classmethod

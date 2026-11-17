@@ -19,13 +19,13 @@ from app.models import Base
 
 
 @pytest.fixture(scope="module")
-def postgres_url() -> Generator[str, None, None]:
+def postgres_url() -> Generator[str]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         yield pg.get_connection_url().replace("psycopg2", "psycopg")
 
 
 @pytest.fixture(scope="module")
-def migrated_db(postgres_url: str) -> Generator[str, None, None]:
+def migrated_db(postgres_url: str) -> Generator[str]:
     os.environ["DATABASE_URL"] = postgres_url
 
     engine = create_engine(postgres_url)

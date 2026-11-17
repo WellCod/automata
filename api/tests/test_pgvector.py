@@ -41,7 +41,7 @@ class HashEmbedder(Embedder):
 
 
 @pytest.fixture(scope="module")
-def db_url() -> Generator[str, None, None]:
+def db_url() -> Generator[str]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         yield pg.get_connection_url().replace("psycopg2", "psycopg")
 

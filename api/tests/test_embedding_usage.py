@@ -53,7 +53,7 @@ def test_metered_acusa_vetor_vazio() -> None:
 
 
 @pytest.fixture(scope="module")
-def db_url() -> Generator[str, None, None]:
+def db_url() -> Generator[str]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         os.environ["DATABASE_URL"] = url
@@ -76,7 +76,7 @@ def embedder(monkeypatch: pytest.MonkeyPatch) -> CountingEmbedder:
 @pytest.fixture
 def client(
     db_url: str, monkeypatch: pytest.MonkeyPatch, embedder: CountingEmbedder
-) -> Generator[TestClient, None, None]:
+) -> Generator[TestClient]:
     import app.agents.factory as factory
     from app.main import create_app
     from tests.fake_models import ToolCallingModel, tool_args

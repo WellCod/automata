@@ -16,7 +16,7 @@ from app.settings import get_settings
 
 
 @pytest.fixture(scope="module")
-def db(monkeypatch_module: pytest.MonkeyPatch) -> Generator[str, None, None]:
+def db(monkeypatch_module: pytest.MonkeyPatch) -> Generator[str]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         monkeypatch_module.setenv("DATABASE_URL", url)
@@ -28,7 +28,7 @@ def db(monkeypatch_module: pytest.MonkeyPatch) -> Generator[str, None, None]:
 
 
 @pytest.fixture(scope="module")
-def monkeypatch_module() -> Generator[pytest.MonkeyPatch, None, None]:
+def monkeypatch_module() -> Generator[pytest.MonkeyPatch]:
     patch = pytest.MonkeyPatch()
     yield patch
     patch.undo()

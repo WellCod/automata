@@ -25,7 +25,7 @@ class CrossEncoderSettings(BaseModel):
     model: str = ""
 
     @model_validator(mode="after")
-    def modelo_do_provedor(self) -> "CrossEncoderSettings":
+    def modelo_do_provedor(self) -> CrossEncoderSettings:
         models = CROSS_ENCODER_MODELS[self.provider]
         if not self.model:
             self.model = models[0]
@@ -56,7 +56,7 @@ class RetrievalSettings(BaseModel):
     agentic_filters: bool = False
 
     @model_validator(mode="after")
-    def hyde_com_modelo(self) -> "RetrievalSettings":
+    def hyde_com_modelo(self) -> RetrievalSettings:
         if self.hyde and not self.hyde_model:
             raise ValueError("Escolha o modelo do HyDE")
         return self
@@ -97,7 +97,7 @@ class KnowledgeBaseUpdate(BaseModel):
     chunking: ChunkingSettings | None = None
 
     @model_validator(mode="after")
-    def sobreposicao_menor(self) -> "KnowledgeBaseUpdate":
+    def sobreposicao_menor(self) -> KnowledgeBaseUpdate:
         problem = overlap_problem(self.chunk_size, self.chunking)
         if problem:
             raise ValueError(problem)
@@ -219,7 +219,7 @@ class ChunkPreviewInput(BaseModel):
     chunking: ChunkingSettings | None = None
 
     @model_validator(mode="after")
-    def uma_origem(self) -> "ChunkPreviewInput":
+    def uma_origem(self) -> ChunkPreviewInput:
         if (self.text is None) == (self.content_id is None):
             raise ValueError("Mande um texto ou um conteúdo da base")
         return self
@@ -237,7 +237,7 @@ class ReprocessResult(BaseModel):
     # reprocessados em background
     queued: int
     # arquivo ou texto enviado antes da Fase 31, sem original guardado
-    needs_upload: list["KnowledgeContentResponse"]
+    needs_upload: list[KnowledgeContentResponse]
     # em processamento agora: ficam como estão
     skipped: int
 
@@ -250,7 +250,7 @@ class SearchInput(BaseModel):
 
 
 class SearchResult(BaseModel):
-    hits: list["SearchHit"]
+    hits: list[SearchHit]
     # texto que foi de fato buscado: com HyDE, a resposta hipotética
     searched: str
     # tokens do HyDE nesta busca; na busca de teste não são atribuídos a agente nenhum

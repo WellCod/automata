@@ -51,7 +51,7 @@ class AgentConfigVersion(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    config: Mapped["AgentConfig"] = relationship(
+    config: Mapped[AgentConfig] = relationship(
         "AgentConfig", foreign_keys=[config_id], back_populates="versions"
     )
 

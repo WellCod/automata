@@ -46,14 +46,14 @@ class Receiver:
 
 
 @pytest.fixture(scope="module")
-def receiver() -> Generator[Receiver, None, None]:
+def receiver() -> Generator[Receiver]:
     r = Receiver()
     yield r
     r.server.shutdown()
 
 
 @pytest.fixture(scope="module")
-def client() -> Generator[TestClient, None, None]:
+def client() -> Generator[TestClient]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         env = {

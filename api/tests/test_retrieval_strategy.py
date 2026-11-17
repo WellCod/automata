@@ -25,7 +25,7 @@ TROCA = "Prazo de troca: 30 dias corridos a partir do recebimento, com nota fisc
 
 
 @pytest.fixture(scope="module")
-def db_url() -> Generator[str, None, None]:
+def db_url() -> Generator[str]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         os.environ["DATABASE_URL"] = url
@@ -120,7 +120,7 @@ def test_recencia_poe_a_versao_nova_na_frente_sem_tirar_a_antiga(db_url: str) ->
 
 
 @pytest.fixture
-def client(db_url: str) -> Generator[TestClient, None, None]:
+def client(db_url: str) -> Generator[TestClient]:
     from app.main import create_app
 
     with TestClient(

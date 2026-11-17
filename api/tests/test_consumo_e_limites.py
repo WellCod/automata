@@ -14,7 +14,7 @@ from app.settings import get_settings
 
 
 @pytest.fixture(scope="module")
-def client() -> Generator[TestClient, None, None]:
+def client() -> Generator[TestClient]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         patch = pytest.MonkeyPatch()
         patch.setenv("DATABASE_URL", pg.get_connection_url().replace("psycopg2", "psycopg"))

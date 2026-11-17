@@ -24,7 +24,7 @@ class FakeSMTP:
         self.tls = False
         self.user: str | None = None
 
-    def __enter__(self) -> "FakeSMTP":
+    def __enter__(self) -> FakeSMTP:
         return self
 
     def __exit__(self, *args: Any) -> None:
@@ -46,7 +46,7 @@ class FakeSMTP:
 
 
 @pytest.fixture(scope="module")
-def client() -> Generator[TestClient, None, None]:
+def client() -> Generator[TestClient]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         os.environ["DATABASE_URL"] = pg.get_connection_url().replace("psycopg2", "psycopg")
         os.environ.setdefault("JWT_PRIVATE_KEY", "x")

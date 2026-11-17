@@ -81,7 +81,7 @@ def test_conteudo_liberado() -> None:
 
 
 @pytest.fixture
-def fresh(monkeypatch: pytest.MonkeyPatch) -> Generator[TracerProvider, None, None]:
+def fresh(monkeypatch: pytest.MonkeyPatch) -> Generator[TracerProvider]:
     provider = TracerProvider()
     monkeypatch.setattr(telemetry.trace, "get_tracer_provider", lambda: provider)
     monkeypatch.setattr(telemetry, "_attached", False)

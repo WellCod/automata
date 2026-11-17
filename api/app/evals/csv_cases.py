@@ -157,7 +157,7 @@ def _checks(cells: dict[str, str]) -> tuple[list[Any], list[str]]:
             if not isinstance(parsed, list):
                 raise TypeError
             checks.extend(parsed)
-        except (json.JSONDecodeError, TypeError, RecursionError):
+        except json.JSONDecodeError, TypeError, RecursionError:
             errors.append("outras: JSON inválido")
     return checks, errors
 

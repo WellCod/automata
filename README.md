@@ -11,7 +11,7 @@ O runtime é o [Agno](https://github.com/agno-agi/agno) (AgentOS). O Automata é
 
 | | |
 |---|---|
-| **Backend** | Python 3.12 · FastAPI · Agno 3.2.0 · PostgreSQL 17 + pgvector · Redis · Alembic |
+| **Backend** | Python 3.14 · FastAPI · Agno 3.2.0 · PostgreSQL 17 + pgvector · Redis · Alembic |
 | **Frontend** | Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · TanStack Query |
 | **Qualidade** | mypy strict · ruff · ~1.280 testes pytest (testcontainers) · 257 testes Vitest · Playwright · evals |
 | **Decisões** | 44 ADRs com contexto, alternativas descartadas e gatilho de reversão |
@@ -458,7 +458,7 @@ O histórico de fases, com os problemas encontrados em auditoria e o critério d
 
 ## Rodando local
 
-**Pré-requisitos:** Docker Desktop, Node.js 26+, pnpm, Python 3.12+, `uv` e `openssl`.
+**Pré-requisitos:** Docker Desktop, Node.js 26+, pnpm, Python 3.14+, `uv` e `openssl`.
 
 ```bash
 git clone https://github.com/WellCod/automata.git

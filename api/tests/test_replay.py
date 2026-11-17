@@ -9,7 +9,7 @@ from app.agents.replay import ReplayModel, _load_fixture, _next_response
 
 
 @pytest.fixture(autouse=True)
-def reset_counters() -> Generator[None, None, None]:
+def reset_counters() -> Generator[None]:
     """Limpa o cache de contadores entre testes para evitar dependência de ordem."""
     replay_module._COUNTERS.clear()
     yield

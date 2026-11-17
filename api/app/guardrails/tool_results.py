@@ -82,7 +82,7 @@ def result_text(result: Any) -> str | None:
     if isinstance(content, (dict, list)):
         try:
             return json.dumps(content, ensure_ascii=False)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
     return None
 

@@ -32,7 +32,7 @@ _NEW = _pair()
 
 
 @pytest.fixture(autouse=True)
-def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@localhost/db")
     monkeypatch.setenv("JWT_PRIVATE_KEY", _NEW[0])
     monkeypatch.setenv("JWT_PUBLIC_KEY", _NEW[1])
@@ -104,7 +104,7 @@ def test_chaves_de_verificacao_em_ordem(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 @pytest.fixture
-def client() -> Generator[TestClient, None, None]:
+def client() -> Generator[TestClient]:
     from app.main import create_app
 
     # sem o `with` o lifespan não roda: só interessa a autenticação, que vem antes do handler

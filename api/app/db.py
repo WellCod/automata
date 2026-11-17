@@ -31,7 +31,7 @@ def get_engine() -> Engine:
     return _build_engine(get_settings().database_url)
 
 
-def get_session() -> Generator[Session, None, None]:
+def get_session() -> Generator[Session]:
     with Session(get_engine()) as session:
         yield session
 

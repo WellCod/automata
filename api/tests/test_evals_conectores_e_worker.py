@@ -109,7 +109,7 @@ def test_assinatura_do_webhook(header: str | None, ok: bool) -> None:
 
 
 @pytest.fixture(scope="module")
-def db_url() -> Generator[str, None, None]:
+def db_url() -> Generator[str]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         old = os.environ.get("DATABASE_URL")

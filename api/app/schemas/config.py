@@ -44,7 +44,7 @@ class McpServerBinding(BaseModel):
     require_confirmation: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def confirmacao_dentro_das_liberadas(self) -> "McpServerBinding":
+    def confirmacao_dentro_das_liberadas(self) -> McpServerBinding:
         if self.tools is not None:
             fora = set(self.require_confirmation) - set(self.tools)
             if fora:
@@ -80,7 +80,7 @@ class CustomPiiPattern(BaseModel):
         return v.strip()
 
     @model_validator(mode="after")
-    def faixa_valida(self) -> "CustomPiiPattern":
+    def faixa_valida(self) -> CustomPiiPattern:
         if self.min_digits > self.max_digits:
             raise ValueError("o mínimo de dígitos passa do máximo")
         return self
@@ -115,7 +115,7 @@ class OutputRule(BaseModel):
     pii_types: list[PiiType] = Field(default_factory=lambda: list(PII_TYPES))
     blocked_terms: list[str] = Field(default_factory=list, max_length=50)
     # depois dos termos e dos dados pessoais; no stream, só marca o run (ADR-0034)
-    classifier: "OutputClassifierRule | None" = None
+    classifier: OutputClassifierRule | None = None
 
     @field_validator("blocked_terms")
     @classmethod
@@ -143,7 +143,7 @@ class ClassifierRule(BaseModel):
     on_failure: Literal["allow", "block"] = "allow"
 
     @model_validator(mode="after")
-    def escopo_com_off_topic(self) -> "ClassifierRule":
+    def escopo_com_off_topic(self) -> ClassifierRule:
         if len(self.checks) != len(set(self.checks)):
             raise ValueError("checagem repetida no classificador")
         if "off_topic" in self.checks and not self.scope.strip():
@@ -163,7 +163,7 @@ class OutputClassifierRule(BaseModel):
     on_failure: Literal["allow", "block"] = "allow"
 
     @model_validator(mode="after")
-    def escopo_com_off_topic(self) -> "OutputClassifierRule":
+    def escopo_com_off_topic(self) -> OutputClassifierRule:
         if len(self.checks) != len(set(self.checks)):
             raise ValueError("checagem repetida no classificador da saída")
         if "off_topic" in self.checks and not self.scope.strip():
@@ -272,7 +272,7 @@ class RunControls(BaseModel):
     background_retries: int = Field(default=0, ge=0, le=2)
 
     @model_validator(mode="after")
-    def reservas_unicas(self) -> "RunControls":
+    def reservas_unicas(self) -> RunControls:
         if len(self.fallback_models) != len(set(self.fallback_models)):
             raise ValueError("modelo reserva repetido")
         return self
@@ -287,7 +287,7 @@ class TeamSettings(BaseModel):
     share_member_interactions: bool = False
 
     @model_validator(mode="after")
-    def membros_unicos(self) -> "TeamSettings":
+    def membros_unicos(self) -> TeamSettings:
         ids = [m.agent_id for m in self.members]
         if len(ids) != len(set(ids)):
             raise ValueError("membro repetido no time")
@@ -300,13 +300,13 @@ SAFE_TOOL_CALL_LIMIT = 15
 SAFE_MAX_INPUT_CHARS = 20_000
 
 
-def safe_guardrails() -> "GuardrailSettings":
+def safe_guardrails() -> GuardrailSettings:
     return GuardrailSettings(
         max_input_chars=SAFE_MAX_INPUT_CHARS, tool_results=ToolResultScreening()
     )
 
 
-def safe_run() -> "RunControls":
+def safe_run() -> RunControls:
     return RunControls(tool_call_limit=SAFE_TOOL_CALL_LIMIT)
 
 
@@ -340,7 +340,7 @@ class ConfigPayload(BaseModel):
     # Em workflow: árvore de etapas (ADR-0014); modelo e instruções não se aplicam
     workflow: WorkflowSettings | None = None
 
-    def with_safe_defaults(self) -> "ConfigPayload":
+    def with_safe_defaults(self) -> ConfigPayload:
         """Guardrails e controle do run do ADR-0045 onde quem salvou não mandou a seção."""
         sent = self.model_fields_set
         updates: dict[str, Any] = {}
@@ -359,7 +359,7 @@ class ConfigPayload(BaseModel):
         return data
 
     @model_validator(mode="after")
-    def servidores_unicos(self) -> "ConfigPayload":
+    def servidores_unicos(self) -> ConfigPayload:
         ids = [b.server_id for b in self.mcp_servers]
         if len(ids) != len(set(ids)):
             raise ValueError("servidor MCP repetido no agente")

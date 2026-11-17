@@ -101,7 +101,7 @@ class FakeIdp:
 
 
 @pytest.fixture(scope="module")
-def db_and_keys() -> Generator[None, None, None]:
+def db_and_keys() -> Generator[None]:
     private, public = _pem(_rsa())
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
@@ -145,7 +145,7 @@ def idp(db_and_keys: None, monkeypatch: pytest.MonkeyPatch) -> FakeIdp:
 
 
 @pytest.fixture
-def client(idp: FakeIdp) -> Generator[TestClient, None, None]:
+def client(idp: FakeIdp) -> Generator[TestClient]:
     from app.main import create_app
 
     app = create_app(auto_provision_dbs=True, enable_auth=True, enable_mcp_server=False)

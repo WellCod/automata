@@ -34,7 +34,7 @@ def test_percentual_aproximado_e_teto_de_50() -> None:
 
 
 @pytest.fixture(scope="module")
-def db_url() -> Generator[str, None, None]:
+def db_url() -> Generator[str]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         os.environ["DATABASE_URL"] = url
@@ -48,7 +48,7 @@ def db_url() -> Generator[str, None, None]:
 
 
 @pytest.fixture
-def client(db_url: str, monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]:
+def client(db_url: str, monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient]:
     import app.agents.factory as factory
     from app.main import create_app
 

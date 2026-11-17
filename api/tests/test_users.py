@@ -47,7 +47,7 @@ _PRIVATE_KEY, _PUBLIC_KEY = _generate_rsa_key_pair()
 
 
 @pytest.fixture(scope="module")
-def db_url() -> Generator[str, None, None]:
+def db_url() -> Generator[str]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         os.environ["DATABASE_URL"] = url
@@ -62,7 +62,7 @@ def db_url() -> Generator[str, None, None]:
 
 
 @pytest.fixture
-def session(db_url: str) -> Generator[Session, None, None]:
+def session(db_url: str) -> Generator[Session]:
     engine = create_engine(db_url)
     with engine.connect() as conn:
         transaction = conn.begin()
@@ -73,7 +73,7 @@ def session(db_url: str) -> Generator[Session, None, None]:
 
 
 @pytest.fixture
-def client(db_url: str) -> Generator[TestClient, None, None]:
+def client(db_url: str) -> Generator[TestClient]:
     os.environ["DATABASE_URL"] = db_url
     get_settings.cache_clear()
     from app.main import create_app

@@ -14,7 +14,7 @@ from app.settings import get_settings
 
 
 @pytest.fixture(scope="module")
-def client() -> Generator[TestClient, None, None]:
+def client() -> Generator[TestClient]:
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     priv = key.private_bytes(
         serialization.Encoding.PEM,
