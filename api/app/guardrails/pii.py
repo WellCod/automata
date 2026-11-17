@@ -8,6 +8,7 @@ Padrões próprios do agente (ADR-0032) viram regex montado aqui, nunca regex li
 prefixo literal e uma quantidade limitada de dígitos, o que mantém a busca linear.
 """
 
+import bisect
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -133,14 +134,22 @@ def find_pii(
     """Ocorrências sem sobreposição; CNPJ antes de CPF e cartão, que casariam dentro dele,
     e os padrões próprios por último, para não esconder um CPF com o rótulo de outro."""
     found: list[Match] = []
-    taken: list[tuple[int, int]] = []
+    # intervalos já tomados, sem sobreposição entre si e ordenados pelo início: basta
+    # olhar os dois vizinhos. Comparar com todos deixava a busca quadrática no número de
+    # ocorrências ("1." repetido dá milhares delas num padrão próprio)
+    starts: list[int] = []
+    ends: list[int] = []
 
     def take(kind: str, m: re.Match[str], label: str | None = None) -> None:
         start, end = m.span()
-        if any(start < e and s < end for s, e in taken):
+        i = bisect.bisect_right(starts, start)
+        if i > 0 and ends[i - 1] > start:
+            return
+        if i < len(starts) and starts[i] < end:
             return
         found.append(Match(kind, start, end, label))
-        taken.append((start, end))
+        starts.insert(i, start)
+        ends.insert(i, end)
 
     for kind, (pattern, valid) in _PATTERNS.items():
         if kind not in types:
