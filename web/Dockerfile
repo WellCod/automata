@@ -1,27 +1,27 @@
-FROM node:22-alpine AS deps
+FROM node:26-alpine AS base
 WORKDIR /app
-RUN corepack enable
+# o node 26 não traz mais o corepack: o pnpm vem do npm, na versão do packageManager
+COPY package.json ./
+RUN npm install -g "$(node -p "require('./package.json').packageManager")"
+
+FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY web/package.json ./web/
 RUN pnpm install --frozen-lockfile --filter web
 
-FROM node:22-alpine AS dev
-WORKDIR /app
-RUN corepack enable
+FROM base AS dev
 COPY --from=deps /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/web/node_modules ./web/node_modules
 
-FROM node:22-alpine AS builder
-WORKDIR /app
-RUN corepack enable
+FROM base AS builder
 COPY --from=deps /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/web/node_modules ./web/node_modules
 COPY web/ ./web/
 RUN pnpm --filter web build
 
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs \

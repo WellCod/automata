@@ -458,7 +458,7 @@ O histórico de fases, com os problemas encontrados em auditoria e o critério d
 
 ## Rodando local
 
-**Pré-requisitos:** Docker Desktop, Node.js 22+, pnpm, Python 3.12+, `uv` e `openssl`.
+**Pré-requisitos:** Docker Desktop, Node.js 26+, pnpm, Python 3.12+, `uv` e `openssl`.
 
 ```bash
 git clone https://github.com/WellCod/automata.git
