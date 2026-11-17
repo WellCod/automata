@@ -70,6 +70,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdvancedSection } from "@/components/advanced-section";
 import { VersionsPanel } from "@/components/versions-panel";
 import client from "@/lib/api/client";
+import { apiErrorMessage } from "@/lib/api/errors";
 import { useUnsavedChangesWarning } from "@/lib/use-unsaved-changes";
 import type { components } from "@/lib/api/schema.d.ts";
 
@@ -193,6 +194,8 @@ export default function AgentEditPage() {
   const [tab, setTab] = useState<PageTab>("config");
   // run escolhido em "Virar caso de teste": a aba Testes abre o caso preenchido
   const [caseFromRun, setCaseFromRun] = useState<string | null>(null);
+  // recusa da API abre as seções avançadas, onde ficam as regras que ela valida
+  const [apiRejected, setApiRejected] = useState(false);
   const queryClient = useQueryClient();
 
   const {
@@ -295,18 +298,21 @@ export default function AgentEditPage() {
           },
         },
       });
-      if (res.error) throw new Error("Falha ao salvar rascunho");
+      // a validação das seções avançadas é da API: a mensagem dela diz o que corrigir (UX-04)
+      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar rascunho"));
       return res.data!;
     },
     onSuccess: (_, values) => {
+      setApiRejected(false);
       dirtyRef.current = false;
       reset(values);
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
       void queryClient.invalidateQueries({ queryKey: ["config", id] });
       toast.success("Rascunho salvo");
     },
-    onError: () => {
-      toast.error("Erro ao salvar rascunho");
+    onError: (e) => {
+      setApiRejected(true);
+      toast.error(e.message);
     },
   });
 
@@ -493,7 +499,7 @@ export default function AgentEditPage() {
 
               <AdvancedSection
                 summary="Guardrails, conversa longa, memória do usuário, controle do run e saída estruturada"
-                forceOpen={ADVANCED_FIELDS.some((f) => f in form.formState.errors)}
+                forceOpen={apiRejected || ADVANCED_FIELDS.some((f) => f in form.formState.errors)}
               >
                 <Controller
                   name="guardrails"

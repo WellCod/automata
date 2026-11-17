@@ -109,7 +109,7 @@ function NewBaseForm({ embedders, onDone }: { embedders: EmbedderInfo[]; onDone:
           </FieldDescription>
         </Field>
         <Field>
-          <FieldLabel htmlFor="kb-embedder">Embedder</FieldLabel>
+          <FieldLabel htmlFor="kb-embedder">Modelo de indexação (embedder)</FieldLabel>
           <select
             id="kb-embedder"
             value={embedder}

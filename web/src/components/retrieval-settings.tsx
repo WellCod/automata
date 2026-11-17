@@ -60,7 +60,7 @@ export function CrossEncoderFields({
   return (
     <div className="flex flex-col gap-1">
       <label className="text-foreground flex items-center gap-2 text-[13px]">
-        Ordenar por relevância com cross-encoder
+        Reordenar os trechos por relevância (cross-encoder)
         <select
           aria-label="Provedor do cross-encoder"
           value={current?.provider ?? ""}

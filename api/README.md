@@ -209,6 +209,8 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 | `users:admin` | `/api/v1/users` (listar, criar, alterar papel e situação, redefinir senha, remover) — só owner (`agent_os:admin`) |
 | `agent_os:admin` | `POST /api/v1/auth/users`; `integrations:write` (rotas `/api/v1/integrations`) só vem pelo admin |
 
+`GET /api/v1/templates` (`configs:read`) lista os agentes de exemplo, os mesmos do seed da demo, e `POST /api/v1/templates/{key}` (`configs:write`) cria um agente com o rascunho do exemplo e os padrões seguros do ADR-0045 (UX-02). `GET /api/v1/models/availability` diz, por modelo, se a chave do provedor está no ambiente (UX-03).
+
 `POST /api/v1/auth/login` e `GET /health` são públicos. O `/health` (OPS-04, OPS-05) devolve `status`, `version` e `revision` da imagem (`AUTOMATA_VERSION`/`AUTOMATA_REVISION`, gravadas no build do `publish.yml`), a `migration` do banco, `db`, `redis` (`ok`, `unreachable` ou `off` sem Redis) e `poller_age_s`, a idade da última rodada do poller de avisos neste processo. Responde 503 só com o banco fora; Redis fora ou poller parado há mais de 10 minutos dão `degraded` com 200. O painel repassa tudo em `/api/health`, sem sessão, para o monitor externo. A migração do boot (`python -m app.migrate`) segura um `pg_advisory_lock` e recusa subir, com mensagem clara, quando o banco está numa revisão que a imagem não conhece (volta de versão sem downgrade); `tests/test_migracoes_ida_e_volta.py` roda `downgrade base` e `upgrade head`. `GET /api/v1/me` vale para qualquer token e devolve id, e-mail e papel (token de integração volta só o `sub`). `/api/v1/me/memories` também: lista e apaga as memórias que os agentes guardaram sobre quem está logado (ADR-0025).
 
 ### Papéis

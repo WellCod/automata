@@ -86,6 +86,8 @@ export function TestPanel({
   const [error, setError] = useState<string | null>(null);
   const [paused, setPaused] = useState<PausedRun | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const runIdRef = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const nextId = useRef(0);
 
   function appendToLast(text: string) {
@@ -137,7 +139,11 @@ export function TestPanel({
         }
         continue;
       }
-      if (kind === "team" && event === "TeamToolCallStarted") {
+      if (typeof data.run_id === "string" && event === `${prefix}RunStarted`) {
+        runIdRef.current = data.run_id;
+      }
+      if (event === `${prefix}ToolCallStarted`) {
+        // agente sozinho também mostra as tools que chamou (UX-05)
         addTrace(describeTool(data.tool as ToolEventData, memberNames));
       } else if (event === `${prefix}ToolCallCompleted`) {
         addSources(data.tool as ToolEventData);
@@ -171,16 +177,33 @@ export function TestPanel({
     setTrace((prev) => [...prev, { id: nextId.current++, text }]);
   }
 
-  async function run(request: () => Promise<Response>) {
+  async function run(request: (signal: AbortSignal) => Promise<Response>) {
     setIsRunning(true);
     setError(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    runIdRef.current = null;
     try {
-      await consume(await request());
+      await consume(await request(controller.signal));
     } catch (e) {
-      setError(e instanceof Error && e.message ? e.message : "Erro ao executar agente.");
+      if (controller.signal.aborted) {
+        setError("Execução interrompida.");
+      } else {
+        setError(e instanceof Error && e.message ? e.message : "Erro ao executar agente.");
+      }
     } finally {
+      abortRef.current = null;
       setIsRunning(false);
     }
+  }
+
+  // Parar: avisa o AgentOS para cancelar o run e fecha o stream
+  function stop() {
+    const runId = runIdRef.current;
+    if (runId) {
+      void fetch(`/api/${base}/${agentId}/runs/${runId}/cancel`, { method: "POST" });
+    }
+    abortRef.current?.abort();
   }
 
   async function sendMessage() {
@@ -201,7 +224,9 @@ export function TestPanel({
     if (runsDraft) {
       form.append("factory_input", JSON.stringify({ version_id: draftVersionId }));
     }
-    await run(() => fetch(`/api/${base}/${agentId}/runs`, { method: "POST", body: form }));
+    await run((signal) =>
+      fetch(`/api/${base}/${agentId}/runs`, { method: "POST", body: form, signal }),
+    );
   }
 
   async function decide(approve: boolean) {
@@ -212,8 +237,12 @@ export function TestPanel({
     form.append("tools", JSON.stringify(tools.map((t) => ({ ...t, confirmed: approve }))));
     form.append("session_id", sessionIdRef.current);
     form.append("stream", "true");
-    await run(() =>
-      fetch(`/api/${base}/${agentId}/runs/${runId}/continue`, { method: "POST", body: form }),
+    await run((signal) =>
+      fetch(`/api/${base}/${agentId}/runs/${runId}/continue`, {
+        method: "POST",
+        body: form,
+        signal,
+      }),
     );
   }
 
@@ -282,7 +311,7 @@ export function TestPanel({
                   {m.content || (isRunning && m.role === "assistant" ? "▍" : "")}
                 </div>
                 {m.blockedBy && (
-                  <span role="status" className="text-[11px] text-amber-400">
+                  <span role="status" className="text-[11px] text-amber-700 dark:text-amber-400">
                     bloqueado pelo guardrail · {blockLabel(m.blockedBy)}
                   </span>
                 )}
@@ -357,13 +386,19 @@ export function TestPanel({
               disabled={isRunning || paused !== null}
               className="border-border text-foreground placeholder:text-muted-foreground focus:border-accent flex-1 rounded border bg-[var(--input)] px-3 py-1.5 text-[13px] transition-colors focus:outline-none disabled:opacity-40"
             />
-            <Button
-              onClick={() => void sendMessage()}
-              disabled={isRunning || paused !== null || !input.trim()}
-              variant="strong"
-            >
-              {isRunning ? "…" : "Enviar"}
-            </Button>
+            {isRunning ? (
+              <Button onClick={stop} variant="muted">
+                Parar
+              </Button>
+            ) : (
+              <Button
+                onClick={() => void sendMessage()}
+                disabled={paused !== null || !input.trim()}
+                variant="strong"
+              >
+                Enviar
+              </Button>
+            )}
             {messages.length > 0 && (
               <Button onClick={clearSession} disabled={isRunning} variant="muted">
                 Limpar

@@ -24,3 +24,17 @@ def list_prices(response: Response) -> dict[str, dict[str, float]]:
 def list_capabilities(response: Response) -> dict[str, dict[str, bool]]:
     response.headers["Cache-Control"] = "public, max-age=86400"
     return {model_id: asdict(caps) for model_id, caps in all_capabilities().items()}
+
+
+@router.get("/availability")
+def list_availability() -> dict[str, bool]:
+    """Modelo com a chave do provedor no ambiente (UX-03): sem ela o run falha na hora."""
+    import os
+
+    from app.agents.models_map import demo_replay, provider_of
+
+    keys = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}
+    return {
+        model_id: demo_replay() or bool(os.environ.get(keys[provider_of(model_id)]))
+        for model_id in all_capabilities()
+    }
