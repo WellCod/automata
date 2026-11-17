@@ -12,6 +12,7 @@ import {
   KeyRound,
   LayoutGrid,
   ListOrdered,
+  Lock,
   MessagesSquare,
   LockKeyhole,
   LogOut,
@@ -245,6 +246,13 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
         >
           <Brain className="h-3.5 w-3.5" aria-hidden />
           Minhas memórias
+        </Link>
+        <Link
+          href="/trocar-senha"
+          className="text-muted-foreground hover:text-foreground flex h-7 items-center gap-2 text-[12px] transition-colors"
+        >
+          <Lock className="h-3.5 w-3.5" aria-hidden />
+          Trocar senha
         </Link>
       </nav>
       <div className="border-sidebar-border flex items-center justify-between border-t px-3 py-2">

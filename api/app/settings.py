@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     data_subject_deadline_days: int = 15
     # trilha de auditoria (ADR-0041)
     audit_retention_days: int = 365
+    # endereço do painel, o mesmo PUBLIC_URL do web: link de recuperação de senha
+    public_url: str = ""
     # conversas, runs, traces e mensagens de canal (ADR-0045); 0 desliga
     conversation_retention_days: int = Field(default=0, ge=0)
     # login por SSO (ADR-0042); sem issuer, client_id e redirect, o botão não aparece

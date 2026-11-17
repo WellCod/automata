@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { clientIp } from "@/lib/bff/client-ip";
+import { setSessionCookie } from "@/lib/bff/session-cookie";
 
 const API_URL = process.env.AUTOMATA_API_URL ?? "http://localhost:8000";
 
@@ -18,19 +19,17 @@ export async function POST(req: NextRequest) {
     body: JSON.stringify(body),
   });
 
-  const data = (await upstream.json()) as { access_token?: string };
+  const data = (await upstream.json()) as {
+    access_token?: string;
+    must_change_password?: boolean;
+  };
 
   if (!upstream.ok) {
     return NextResponse.json(data, { status: upstream.status });
   }
 
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set("automata_token", data.access_token!, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60,
-  });
+  // senha provisória do owner: o painel manda para a troca (ADR-0045)
+  const res = NextResponse.json({ ok: true, must_change_password: !!data.must_change_password });
+  setSessionCookie(res, data.access_token!);
   return res;
 }

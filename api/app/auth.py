@@ -74,6 +74,7 @@ def issue_token(
     audience: str = _AUDIENCE,
     expires_in: int = _DEFAULT_EXPIRY,
     jti: str | None = None,
+    extra: dict[str, object] | None = None,
 ) -> str:
     """Emite JWT RS256 assinado com a chave privada da instância.
 
@@ -91,6 +92,7 @@ def issue_token(
         "exp": now + timedelta(seconds=expires_in),
         # identifica o token para revogação (logout e tokens de integração)
         "jti": jti or uuid4().hex,
+        **(extra or {}),
     }
     return jwt.encode(
         payload,

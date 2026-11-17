@@ -109,7 +109,8 @@ function NewUserForm({ onDone }: { onDone: () => void }) {
             </Button>
           </div>
           <FieldDescription>
-            Mínimo de 12 caracteres, com maiúscula e número. Repasse à pessoa por um canal seguro.
+            Mínimo de 12 caracteres, com maiúscula e número. Repasse à pessoa por um canal seguro:
+            no primeiro login ela escolhe outra, que você não conhece.
           </FieldDescription>
         </Field>
       </FieldGroup>
@@ -316,7 +317,8 @@ export default function UsersPage() {
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-6 py-6">
         <p className="text-muted-foreground text-[13px]">
           Quem acessa o painel e com qual papel. Mudar papel, desativar ou redefinir senha encerra
-          na hora as sessões abertas da pessoa. Para remover, desative antes.
+          na hora as sessões abertas da pessoa. Senha criada ou redefinida aqui é provisória: a
+          pessoa troca no próximo login. Para remover, desative antes.
         </p>
 
         {creating && <NewUserForm onDone={() => setCreating(false)} />}

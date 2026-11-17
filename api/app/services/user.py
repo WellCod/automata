@@ -1,15 +1,24 @@
+import hashlib
+import secrets
 from contextlib import suppress
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from sqlalchemy import select
+from sqlalchemy import select, update
 
-from app.models.user import User, UserRole
+from app.models.user import PasswordReset, User, UserRole
 from app.repositories.user import UserRepository
 
 _ph = PasswordHasher()
+
+# link de recuperação por e-mail (ADR-0045)
+RESET_TTL = timedelta(minutes=30)
+
+
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 class ConflictError(ValueError):
@@ -25,10 +34,15 @@ class UserService:
     def __init__(self, repo: UserRepository) -> None:
         self._repo = repo
 
-    def create_user(self, email: str, password: str, role: UserRole) -> User:
+    def create_user(
+        self, email: str, password: str, role: UserRole, *, must_change: bool = False
+    ) -> User:
+        """`must_change` na conta criada pelo owner: a senha que ele escolheu é provisória."""
         if self._repo.get_by_email(email) is not None:
             raise ValueError("Email já cadastrado")
-        return self._repo.create(email=email, hashed_password=_ph.hash(password), role=role)
+        user = self._repo.create(email=email, hashed_password=_ph.hash(password), role=role)
+        user.must_change_password = must_change
+        return user
 
     def _get(self, user_id: UUID) -> User:
         user = self._repo.get(user_id)
@@ -64,11 +78,69 @@ class UserService:
         return user, cut
 
     def reset_password(self, user_id: UUID, password: str) -> tuple[User, datetime]:
+        """Senha definida pelo owner: provisória, a pessoa troca no próximo login."""
         user = self._get(user_id)
         user.hashed_password = _ph.hash(password)
+        user.must_change_password = True
         cut = self._cut_sessions(user)
         self._repo._session.flush()
         return user, cut
+
+    def change_own_password(self, user_id: UUID, current: str, new: str) -> tuple[User, datetime]:
+        """Troca pela própria pessoa, com a senha atual. Corta as outras sessões."""
+        user = self._get(user_id)
+        if not user.hashed_password:
+            raise ConflictError("Conta do SSO: a senha é a do provedor")
+        try:
+            _ph.verify(user.hashed_password, current)
+        except VerifyMismatchError as e:
+            raise ValueError("Senha atual incorreta") from e
+        if current == new:
+            raise ValueError("A nova senha precisa ser diferente da atual")
+        return user, self._set_password(user, new)
+
+    def _set_password(self, user: User, password: str) -> datetime:
+        user.hashed_password = _ph.hash(password)
+        user.must_change_password = False
+        cut = self._cut_sessions(user)
+        self._repo._session.flush()
+        return cut
+
+    def request_reset(self, email: str, now: datetime) -> tuple[User, str] | None:
+        """Token de recuperação para conta ativa com senha; None para qualquer outra."""
+        user = self._repo.get_by_email(email)
+        if user is None or not user.is_active or not user.hashed_password:
+            return None
+        session = self._repo._session
+        # um link válido por vez: o novo derruba os anteriores
+        session.execute(
+            update(PasswordReset)
+            .where(PasswordReset.user_id == user.id, PasswordReset.used_at.is_(None))
+            .values(used_at=now)
+        )
+        token = secrets.token_urlsafe(32)
+        session.add(
+            PasswordReset(
+                user_id=user.id, token_hash=_token_hash(token), expires_at=now + RESET_TTL
+            )
+        )
+        session.flush()
+        return user, token
+
+    def reset_with_token(self, token: str, password: str, now: datetime) -> tuple[User, datetime]:
+        session = self._repo._session
+        reset = session.scalar(
+            select(PasswordReset)
+            .where(PasswordReset.token_hash == _token_hash(token))
+            .with_for_update()
+        )
+        if reset is None or reset.used_at is not None or reset.expires_at <= now:
+            raise ValueError("Link inválido ou vencido. Peça outro.")
+        user = self._get(reset.user_id)
+        if not user.is_active:
+            raise ValueError("Link inválido ou vencido. Peça outro.")
+        reset.used_at = now
+        return user, self._set_password(user, password)
 
     def delete(self, user_id: UUID, *, actor_id: str | None) -> None:
         user = self._get(user_id)
