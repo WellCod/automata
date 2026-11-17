@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import client from "@/lib/api/client";
 import type { components } from "@/lib/api/schema.d.ts";
+import { formatUsd, useInstance } from "@/lib/instance";
 
 type RollupItem = components["schemas"]["RollupItem"];
 
@@ -17,15 +18,6 @@ function currentPeriod(): string {
   return `${y}${m}`;
 }
 
-function formatCost(cost: number | null): string {
-  if (cost === null) return "—";
-  return cost.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 4,
-  });
-}
-
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)} k`;
@@ -33,6 +25,7 @@ function formatTokens(n: number): string {
 }
 
 export function CostPanel({ agentId }: Props) {
+  const { brl_per_usd: brlPerUsd } = useInstance();
   const period = currentPeriod();
 
   const { data, isPending, isError } = useQuery<RollupItem | null>({
@@ -70,7 +63,7 @@ export function CostPanel({ agentId }: Props) {
           <div className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2">
             <dt className="text-label text-[11px] font-medium">Custo</dt>
             <dd className="text-foreground text-[13px] font-medium">
-              {formatCost(data?.cost ?? null)}
+              {formatUsd(data?.cost ?? null, brlPerUsd)}
             </dd>
           </div>
         </dl>
@@ -78,7 +71,7 @@ export function CostPanel({ agentId }: Props) {
       {data && data.embedding_tokens > 0 && (
         <p className="text-muted-foreground text-[11px]">
           Buscas em bases de conhecimento: {formatTokens(data.embedding_tokens)} tokens ·{" "}
-          {formatCost(data.embedding_cost ?? null)}
+          {formatUsd(data.embedding_cost ?? null, brlPerUsd)}
         </p>
       )}
     </div>

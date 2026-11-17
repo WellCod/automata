@@ -211,6 +211,8 @@ O middleware do AgentOS valida a assinatura em todas as rotas, mas só exige sco
 
 `GET /api/v1/templates` (`configs:read`) lista os agentes de exemplo, os mesmos do seed da demo, e `POST /api/v1/templates/{key}` (`configs:write`) cria um agente com o rascunho do exemplo e os padrões seguros do ADR-0045 (UX-02). `GET /api/v1/models/availability` diz, por modelo, se a chave do provedor está no ambiente (UX-03).
 
+**Modelos extras** (ARQ-02, `app/agents/extra_models.py`): `EXTRA_MODELS` em JSON acrescenta modelos à matriz sem release: modelo novo de um dos dois provedores ou endpoint compatível com a OpenAI (Azure OpenAI e afins) com `base_url` e `api_key_env`, as capabilities e o preço. Entram no seletor, na validação do rascunho, no custo e no `/models/availability`; JSON inválido vira aviso no log e vale a matriz fixa. `GET /api/v1/auth/instance` (público) devolve `APP_NAME`, `APP_LOGO_URL` (só data URI, por causa da CSP) e `BRL_PER_USD`, que o painel usa no login, no menu e no custo em reais (COM-12, UX-08).
+
 `GET /api/v1/usage/export?period=YYYYMM` (`metrics:read`) devolve o consumo do mês em CSV para o financeiro: por dia, agente e modelo, com execuções, tokens e custo, sem o id de quem usou, com `;` e BOM para o Excel e célula de fórmula escapada (COM-06). `PLAN_MAX_CONFIGS` e `PLAN_MAX_USERS` (0 = sem limite) recusam com 409 o agente, time, workflow ou usuário além do plano; no SSO, 403. A lista de execuções de um config aceita `status`, `since` e `until`, e o painel pagina de 25 em 25 (UX-07).
 
 `GET /api/v1/me` também devolve os `scopes` do token: o painel esconde o que o papel não permite (`useCan`, UX-06).

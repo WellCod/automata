@@ -1725,7 +1725,7 @@ As Fases 51 a 54 seguem os horizontes da auditoria: 51 fecha os bloqueadores peq
 - [x] `feat`: ações do painel conforme o papel e viewer sem conteúdo de conversa nem telefone (UX-06, COM-09, SEC-10)
 - [x] `feat`: execuções com paginação e filtro, consumo em csv e limites de plano por variável de ambiente (UX-07, COM-06)
 - [x] `feat(api)`: login e leituras sensíveis na trilha e exportação da trilha em csv (COM-07)
-- [ ] `feat`: modelos extras por variável de ambiente, custo em reais e marca da instância (ARQ-02, UX-08, COM-12)
+- [x] `feat`: modelos extras por variável de ambiente, custo em reais e marca da instância (ARQ-02, UX-08, COM-12)
 - [ ] `docs`: guia de uso, referência das rotas de integração, versão no rodapé, limites da exclusão do titular e minutas jurídicas (COM-08, ARQ-05, COM-10, COM-01, COM-11, LLM-13, SEC-08, ARQ-06)
 
 **Critério de aceite:** viewer não vê botão que a API recusa; o financeiro baixa o consumo do mês em CSV; um modelo novo da OpenAI entra pelo `.env` sem release.

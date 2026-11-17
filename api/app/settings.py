@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     data_subject_deadline_days: int = 15
     # trilha de auditoria (ADR-0041)
     audit_retention_days: int = 365
+    # modelos além da matriz fixa (ARQ-02); lido também direto do ambiente em
+    # app/agents/extra_models.py, para valer sem banco nos scripts
+    extra_models: str = ""
+    # cotação para mostrar custo em reais no painel (UX-08); 0 mostra só dólar
+    brl_per_usd: float = Field(default=0.0, ge=0)
+    # marca da instância no login e no menu (COM-12)
+    app_name: str = "automata"
+    app_logo_url: str = ""
     # limites do plano contratado (COM-06); 0 = sem limite
     plan_max_configs: int = Field(default=0, ge=0)
     plan_max_users: int = Field(default=0, ge=0)

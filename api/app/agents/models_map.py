@@ -4,6 +4,7 @@ from agno.models.anthropic import Claude
 from agno.models.base import Model
 from agno.models.openai import OpenAIChat
 
+from app.agents.extra_models import ExtraModel, extra_models
 from app.schemas.config import CapabilityFlags
 
 _SUPPORTED: dict[str, type[Model]] = {
@@ -48,9 +49,12 @@ def resolve_model(model_id: str, capabilities: CapabilityFlags | None = None) ->
 
         return ReplayModel(id=model_id)
 
+    extra = extra_models().get(model_id)
+    if extra is not None:
+        return _from_extra(extra, capabilities)
     cls = _SUPPORTED.get(model_id)
     if cls is None:
-        raise ValueError(f"model_id '{model_id}' não suportado. Suportados: {sorted(_SUPPORTED)}")
+        raise ValueError(f"model_id '{model_id}' não suportado. Suportados: {supported_models()}")
     if capabilities is not None and capabilities.extended_thinking and cls is Claude:
         # budget abaixo do max_tokens padrão do Claude no Agno (8192)
         return Claude(
@@ -70,10 +74,50 @@ def resolve_model(model_id: str, capabilities: CapabilityFlags | None = None) ->
     )
 
 
+def _from_extra(extra: ExtraModel, capabilities: CapabilityFlags | None) -> Model:
+    """Modelo do EXTRA_MODELS, com o mesmo prazo e as mesmas tentativas da matriz (ARQ-02)."""
+    name = extra.model or extra.id
+    key = os.environ.get(extra.key_env)
+    if extra.provider == "anthropic":
+        params: dict[str, object] = {"max_retries": PROVIDER_SDK_RETRIES}
+        if extra.base_url:
+            params["base_url"] = extra.base_url
+        thinking = (
+            {"type": "enabled", "budget_tokens": _THINKING_BUDGET_TOKENS}
+            if capabilities is not None and capabilities.extended_thinking
+            else None
+        )
+        return Claude(
+            id=name,
+            api_key=key,
+            thinking=thinking,
+            timeout=PROVIDER_TIMEOUT_SECONDS,
+            client_params=params,
+        )
+    return OpenAIChat(
+        id=name,
+        api_key=key,
+        base_url=extra.base_url,
+        timeout=PROVIDER_TIMEOUT_SECONDS,
+        max_retries=PROVIDER_SDK_RETRIES,
+    )
+
+
 def provider_of(model_id: str) -> str:
-    """ "anthropic" ou "openai", pela classe do modelo na matriz."""
+    """ "anthropic" ou "openai", pela classe do modelo na matriz ou pelo EXTRA_MODELS."""
+    extra = extra_models().get(model_id)
+    if extra is not None:
+        return extra.provider
     return "anthropic" if _SUPPORTED.get(model_id) is Claude else "openai"
 
 
+def key_env_of(model_id: str) -> str:
+    """Variável com a chave do provedor do modelo."""
+    extra = extra_models().get(model_id)
+    if extra is not None:
+        return extra.key_env
+    return "ANTHROPIC_API_KEY" if provider_of(model_id) == "anthropic" else "OPENAI_API_KEY"
+
+
 def supported_models() -> list[str]:
-    return sorted(_SUPPORTED)
+    return sorted({*_SUPPORTED, *extra_models()})

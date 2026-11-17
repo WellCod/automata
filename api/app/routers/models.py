@@ -31,10 +31,9 @@ def list_availability() -> dict[str, bool]:
     """Modelo com a chave do provedor no ambiente (UX-03): sem ela o run falha na hora."""
     import os
 
-    from app.agents.models_map import demo_replay, provider_of
+    from app.agents.models_map import demo_replay, key_env_of
 
-    keys = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}
     return {
-        model_id: demo_replay() or bool(os.environ.get(keys[provider_of(model_id)]))
+        model_id: demo_replay() or bool(os.environ.get(key_env_of(model_id)))
         for model_id in all_capabilities()
     }

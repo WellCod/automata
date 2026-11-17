@@ -313,3 +313,26 @@ def oidc_callback(request: Request, body: OidcCallback, session: SessionDep) -> 
     logger.info("sso ok", extra={"ip": ip, "user_id": user_id, "role": user_role})
     _audit_login(request, user_id, 200, {"via": "sso"})
     return TokenResponse(access_token=issue_token(user_id, ROLE_SCOPES[user_role]))
+
+
+class InstanceInfo(BaseModel):
+    """Marca e moeda da instância, públicas para a tela de login (COM-12, UX-08)."""
+
+    app_name: str
+    # só data URI de imagem: a CSP do painel não carrega imagem de outro domínio
+    app_logo: str | None
+    brl_per_usd: float | None
+
+
+@router.get("/instance", response_model=InstanceInfo)
+def instance_info() -> InstanceInfo:
+    settings = get_settings()
+    logo = settings.app_logo_url.strip()
+    if logo and not logo.startswith("data:image/"):
+        logger.warning("APP_LOGO_URL precisa ser data:image/...; usando o logo padrão")
+        logo = ""
+    return InstanceInfo(
+        app_name=settings.app_name.strip()[:40] or "automata",
+        app_logo=logo or None,
+        brl_per_usd=settings.brl_per_usd or None,
+    )

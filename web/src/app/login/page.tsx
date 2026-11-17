@@ -10,6 +10,8 @@ import { z } from "zod";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "@/components/layout/sidebar";
+import { useInstance } from "@/lib/instance";
 
 const schema = z.object({
   email: z.string().email("Email inválido"),
@@ -20,18 +22,6 @@ type FormValues = z.infer<typeof schema>;
 
 const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors focus:border-accent focus:outline-none";
-
-function LogoMark() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-      <rect width="18" height="18" rx="2" fill="#25E0C8" />
-      <rect x="4" y="4" width="4" height="4" fill="#0B0B0B" />
-      <rect x="10" y="4" width="4" height="4" fill="#0B0B0B" />
-      <rect x="4" y="10" width="4" height="4" fill="#0B0B0B" />
-      <rect x="10" y="10" width="2" height="2" fill="#0B0B0B" />
-    </svg>
-  );
-}
 
 const SSO_ERRORS: Record<string, string> = {
   cancelado: "Login cancelado no provedor.",
@@ -53,6 +43,7 @@ export default function LoginPage() {
 
 function LoginForm() {
   const router = useRouter();
+  const instance = useInstance();
   // erro do retorno do provedor vem na URL (ADR-0042)
   // erro do retorno do provedor vem como código; texto livre na URL não aparece (Fase 49)
   const ssoCode = useSearchParams().get("sso_erro");
@@ -101,10 +92,12 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <h1 className="sr-only">Entrar no automata</h1>
+        <h1 className="sr-only">Entrar no {instance.app_name}</h1>
         <div className="mb-8 flex items-center gap-2">
-          <LogoMark />
-          <span className="text-foreground text-[13px] font-medium tracking-tight">automata</span>
+          <BrandMark logo={instance.app_logo} />
+          <span className="text-foreground text-[13px] font-medium tracking-tight">
+            {instance.app_name}
+          </span>
         </div>
 
         {sso?.enabled && (
