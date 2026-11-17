@@ -49,12 +49,24 @@ def test_cpf_vence_o_padrao_proprio_que_casaria_nele() -> None:
     assert match.type == "cpf"
 
 
+def _scan_time(n: int) -> float:
+    """Melhor de três, para o ruído do runner não contar."""
+    hostil = ["1." * n, "MAT " * (n // 2), "1" * (2 * n)]
+    custom = [MAT, PROTOCOLO, CustomPattern("x", "A-1", 4, 20)]
+    best = float("inf")
+    for _ in range(3):
+        started = time.perf_counter()
+        for texto in hostil:
+            find_pii(texto, custom=custom)
+        best = min(best, time.perf_counter() - started)
+    return best
+
+
 def test_busca_linear_em_texto_hostil() -> None:
-    hostil = ["1." * 50_000, "MAT " * 25_000, "1" * 100_000]
-    started = time.perf_counter()
-    for texto in hostil:
-        find_pii(texto, custom=[MAT, PROTOCOLO, CustomPattern("x", "A-1", 4, 20)])
-    assert time.perf_counter() - started < 2
+    # tempo absoluto depende da máquina; o que importa é a forma da curva. Com o texto
+    # 4x maior, busca linear leva ~4x; backtracking quadrático levaria ~16x
+    small, large = _scan_time(12_500), _scan_time(50_000)
+    assert large < small * 8, (small, large)
 
 
 @pytest.mark.parametrize(
