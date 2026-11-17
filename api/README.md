@@ -156,7 +156,7 @@ O rollup agrega tokens e custo por `(agent_config_id, period)`. Campos: `run_cou
 - **Tools MCP** (ADR-0010): o payload v2 traz `mcp_servers: [{server_id, tools, require_confirmation}]`, em que `tools: null` libera todas as tools do servidor. A factory monta um `MCPTools` por servidor, com prefixo pelo slug (`crm_buscar_cliente`) e só as tools liberadas. O `TrackedAgent` conecta todos **antes** do run, na mesma task, e registra as conexões para o próprio Agno fechá-las no fim. Se um servidor não conecta, o run termina com `status=ERROR` (ou `RunError` no stream) dizendo qual servidor falhou, e fica gravado como `error`. O agente nunca responde sem as tools que deveria ter.
 - **Validação na escrita**: o servidor precisa existir, e as tools liberadas e as que pedem confirmação precisam constar no retrato descoberto, quando ele existe. Confirmação só vale para tool liberada (422).
 - **Payload v1** (`tools: list[str]`, que nunca teve efeito) é convertido para v2 na leitura. Versões antigas seguem legíveis e o próximo rascunho já sai em v2.
-- **Capabilities**: `extended_thinking` liga `thinking` no Claude (budget de 4096 tokens). Visão depende só do modelo; `structured_output` ainda não tem efeito porque o config não guarda `output_schema`.
+- **Capabilities**: `extended_thinking` liga `thinking` no Claude: adaptativo, com o resumo do raciocínio, no Opus 4.7 e no Sonnet 4.6 (o 4.7 recusa `budget_tokens` com 400); orçamento de 4096 tokens só nos modelos do `EXTRA_MODELS` em que o Agno sabe que ele ainda vale (Claude 4.5 e anteriores). Visão depende só do modelo; `structured_output` ainda não tem efeito porque o config não guarda `output_schema`.
 
 ## Scopes JWT
 
