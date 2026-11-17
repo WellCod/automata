@@ -6,7 +6,6 @@ que é o id com que o agente ou o time é registrado no AgentOS.
 
 import logging
 from datetime import UTC, datetime, timedelta
-from functools import lru_cache
 from typing import Any
 from uuid import UUID
 
@@ -15,6 +14,7 @@ from agno.db.schemas.jobs import JOB_STATUSES
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.db import get_engine
 from app.models.config import AgentConfig, AgentConfigVersion
 from app.schemas.config import ConfigPayload
 from app.settings import get_settings
@@ -26,13 +26,9 @@ JOB_FAILED = "job.failed"
 RECENT = timedelta(hours=24)
 
 
-@lru_cache(maxsize=1)
-def _db(db_url: str) -> PostgresDb:
-    return PostgresDb(db_url=db_url)
-
-
 def jobs_db() -> PostgresDb:
-    return _db(get_settings().database_url)
+    # mesmo pool da API (OPS-09)
+    return PostgresDb(db_engine=get_engine())
 
 
 def durable() -> bool:

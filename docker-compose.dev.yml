@@ -11,6 +11,8 @@ services:
       DEMO_REPLAY: ${DEMO_REPLAY:-false}
       # com a 8000 publicada, a rede privada não é só do compose: X-Forwarded-For não vale
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      # em dev a ingestão roda na própria API, com o código montado
+      INGEST_WORKER: ${INGEST_WORKER:-false}
     volumes:
       - ./api:/app
       - /app/.venv
@@ -31,3 +33,7 @@ services:
     volumes:
       - ./web:/app/web
       - /app/web/node_modules
+
+  # o worker de produção fica de fora no dev: --profile worker para testar
+  ingest-worker:
+    profiles: [worker]
