@@ -8,10 +8,11 @@ reenvio), a conversa é achada ou criada e, com a conversa no bot, o agente resp
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
@@ -365,7 +366,8 @@ async def handle(channel_id: UUID, messages: list[providers.Inbound], limiter: A
         if limiter is not None:
             try:
                 limiter.check(f"channel:{channel.id}:{msg.sender}", limit=PER_SENDER_LIMIT)
-            except Exception:
+            except HTTPException:
+                # só o 429 é limite; outra falha marcava a mensagem com motivo falso (OPS-06)
                 await asyncio.to_thread(_mark, saved.message_id, "ignored", "limite por minuto")
                 continue
         if msg.text is None:
@@ -414,3 +416,77 @@ async def handle(channel_id: UUID, messages: list[providers.Inbound], limiter: A
             msg.reply_to,
             sender=providers.user_id(channel.kind, msg.sender),
         )
+
+
+# mensagem recebida e não respondida: o processo caiu entre o 200 ao provedor e a resposta
+STUCK_AFTER = timedelta(minutes=2)
+STUCK_GIVE_UP = timedelta(hours=1)
+RETRYING = "retrying"
+
+
+def _claim_stuck(now: datetime) -> list[UUID]:
+    """Marca as mensagens presas para uma rodada só, mesmo com réplicas (SKIP LOCKED)."""
+    with Session(get_engine()) as session:
+        rows = session.execute(
+            select(ChannelMessage.id, ChannelMessage.created_at)
+            .join(ChannelConversation, ChannelConversation.id == ChannelMessage.conversation_id)
+            .where(
+                ChannelMessage.direction == "in",
+                ChannelMessage.status == "received",
+                ChannelMessage.created_at < now - STUCK_AFTER,
+                ChannelConversation.status == "bot",
+            )
+            .with_for_update(of=ChannelMessage, skip_locked=True)
+            .limit(20)
+        ).all()
+        retry: list[UUID] = []
+        for message_id, created_at in rows:
+            message = session.get(ChannelMessage, message_id)
+            if message is None:
+                continue
+            if created_at < now - STUCK_GIVE_UP:
+                message.status = "failed"
+                message.error = "interrompida antes da resposta"
+            else:
+                message.status = RETRYING
+                retry.append(message_id)
+        session.commit()
+        return retry
+
+
+_Stuck = tuple[Channel, AgentConfig, Saved, str, dict[str, str], str]
+
+
+def _stuck_context(message_id: UUID) -> _Stuck | None:
+    with Session(get_engine()) as session:
+        message = session.get(ChannelMessage, message_id)
+        if message is None:
+            return None
+        conv = session.get(ChannelConversation, message.conversation_id)
+        if conv is None:
+            return None
+        meta = message.meta or {}
+        sender = str(meta.get("sender") or conv.user_id)
+        reply = dict(meta.get("reply_to") or {})
+        saved = Saved(conv.id, conv.user_id, conv.status, message.id)
+        channel_id = conv.channel_id
+        text = message.text
+    loaded = _load(channel_id)
+    if loaded is None:
+        return None
+    channel, config = loaded
+    return channel, config, saved, text, reply, sender
+
+
+async def retry_stuck(now: datetime | None = None) -> int:
+    """Rodada do poller: responde de novo a mensagem que ficou sem resposta (OPS-07)."""
+    claimed = await asyncio.to_thread(_claim_stuck, now or datetime.now(UTC))
+    for message_id in claimed:
+        context = await asyncio.to_thread(_stuck_context, message_id)
+        if context is None:
+            await asyncio.to_thread(_mark, message_id, "failed", "canal ou conversa sumiu")
+            continue
+        channel, config, saved, text, reply, sender = context
+        await answer(channel, config, saved, text, reply, sender=sender)
+        await asyncio.to_thread(_mark, message_id, "answered")
+    return len(claimed)

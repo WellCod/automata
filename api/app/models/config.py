@@ -28,7 +28,12 @@ class Base(DeclarativeBase):
 class AgentConfigVersion(Base):
     __tablename__ = "agent_config_version"
     __table_args__ = (
-        Index("ix_agent_config_version_config_id_version_number", "config_id", "version_number"),
+        Index(
+            "ix_agent_config_version_config_id_version_number",
+            "config_id",
+            "version_number",
+            unique=True,
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

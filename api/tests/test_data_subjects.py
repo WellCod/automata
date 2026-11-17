@@ -279,3 +279,41 @@ def test_exportacao_nao_grava_depois_da_exclusao(
             row = session.get(DataSubjectRequest, UUID(request_id))
             assert row is not None
             assert (row.status, row.result) == ("expired", None)
+
+
+def test_pedido_interrompido_no_deploy_vira_falha(client: TestClient) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy.orm import Session
+
+    from app.data_subjects import check_requests
+    from app.db import get_engine
+    from app.models.data_subject import DataSubjectRequest
+
+    now = datetime.now(UTC)
+    with Session(get_engine()) as session:
+        stuck = DataSubjectRequest(
+            kind="erase",
+            subject=None,
+            subject_hash="h" * 64,
+            status="running",
+            requested_by="owner",
+            source="panel",
+            created_at=now - timedelta(hours=2),
+        )
+        fresh = DataSubjectRequest(
+            kind="export",
+            subject="x",
+            subject_hash="i" * 64,
+            status="running",
+            requested_by="owner",
+            source="panel",
+        )
+        session.add_all([stuck, fresh])
+        session.commit()
+        check_requests(session, now)
+        session.refresh(stuck)
+        session.refresh(fresh)
+        # parado há mais de 1 h: o processo caiu e o aviso de falha pede para refazer (OPS-07)
+        assert stuck.status == "failed" and stuck.error
+        assert fresh.status == "running"

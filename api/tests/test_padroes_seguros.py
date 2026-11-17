@@ -105,3 +105,25 @@ def test_frase_do_resultado_de_tool_so_com_mcp() -> None:
 def test_memoria_nao_liga_para_token_de_integracao(user_id: str | None, owner: str | None) -> None:
     ctx = SimpleNamespace(user_id=user_id)
     assert memory_owner(ctx) == owner  # type: ignore[arg-type]
+
+
+def test_numero_de_versao_e_unico_por_config(svc: tuple[ConfigService, Session]) -> None:
+    import sqlalchemy.exc
+
+    from app.models.config import AgentConfigVersion
+
+    service, session = svc
+    config = service.create_config("versoes", "x")
+    first = service.save_draft(config.id, _payload({}), "autor")
+    second = service.save_draft(config.id, _payload({}), "autor")
+    session.commit()
+    assert (first.version_number, second.version_number) == (1, 2)
+    # dois editores no mesmo instante: o banco recusa o número repetido (OPS-11)
+    session.add(
+        AgentConfigVersion(
+            config_id=config.id, version_number=2, status="draft", payload={}, author="outro"
+        )
+    )
+    with pytest.raises(sqlalchemy.exc.IntegrityError):
+        session.commit()
+    session.rollback()

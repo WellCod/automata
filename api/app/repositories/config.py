@@ -57,6 +57,10 @@ class ConfigRepository:
         author: str,
         status: ConfigPayloadStatus = ConfigPayloadStatus.draft,
     ) -> AgentConfigVersion:
+        # a linha do config serializa quem cria versão do mesmo config (OPS-11)
+        self._session.execute(
+            select(AgentConfig.id).where(AgentConfig.id == config_id).with_for_update()
+        )
         stmt = (
             select(AgentConfigVersion)
             .where(AgentConfigVersion.config_id == config_id)
