@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     data_subject_deadline_days: int = 15
     # trilha de auditoria (ADR-0041)
     audit_retention_days: int = 365
+    # runs por minuto por quem chama, nas rotas de run e no /mcp (LLM-05); 0 desliga
+    run_rate_limit_per_minute: int = Field(default=60, ge=0)
+    # orçamento mensal com bloqueio que todo token de integração novo ganha; 0 não cria
+    default_integration_budget_usd: float = Field(default=50.0, ge=0)
+    # mensagens por dia por pessoa num canal, além das 20 por minuto
+    channel_daily_limit_per_sender: int = Field(default=200, ge=0)
     # endereço do painel, o mesmo PUBLIC_URL do web: link de recuperação de senha
     public_url: str = ""
     # conversas, runs, traces e mensagens de canal (ADR-0045); 0 desliga

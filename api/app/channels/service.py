@@ -22,6 +22,7 @@ from app.db import get_db, get_engine
 from app.models.channel import Channel, ChannelConversation, ChannelMessage
 from app.models.config import AgentConfig
 from app.secrets import decrypt_json
+from app.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -366,6 +367,12 @@ async def handle(channel_id: UUID, messages: list[providers.Inbound], limiter: A
         if limiter is not None:
             try:
                 limiter.check(f"channel:{channel.id}:{msg.sender}", limit=PER_SENDER_LIMIT)
+                daily = get_settings().channel_daily_limit_per_sender
+                if daily > 0:
+                    # 20 por minuto ainda davam 28.800 por dia a um número só (LLM-05)
+                    limiter.check(
+                        f"channel-day:{channel.id}:{msg.sender}", limit=daily, window=86400
+                    )
             except HTTPException:
                 # só o 429 é limite; outra falha marcava a mensagem com motivo falso (OPS-06)
                 await asyncio.to_thread(_mark, saved.message_id, "ignored", "limite por minuto")

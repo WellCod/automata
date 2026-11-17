@@ -1712,7 +1712,7 @@ As Fases 51 a 54 seguem os horizontes da auditoria: 51 fecha os bloqueadores peq
 - [x] `fix(api)`: redis fora não derruba o login, trabalho aceito e preso é retomado e conector e versão sem corrida (OPS-06, OPS-07, OPS-11, OPS-12)
 - [x] `fix(api)`: ingestão no worker por padrão, teto no conteúdo descomprimido e um pool só para o banco do agno (OPS-08, SEC-06, OPS-09)
 - [x] `fix(security)`: continue confere a tool pendente e argumentos de tool passam pela máscara e pelos termos bloqueados (LLM-03, LLM-06)
-- [ ] `feat(api)`: limite por chamador nas rotas de run e orçamento padrão em token de integração e canal (LLM-05)
+- [x] `feat(api)`: limite por chamador nas rotas de run e orçamento padrão em token de integração e canal (LLM-05)
 - [ ] `feat(api)`: usuário final identificado pelo integrador no token de integração (LLM-02)
 - [ ] `fix(api)`: bloqueio de membro registrado, erro de provedor sem detalhe interno e checagem da tool com confirmação ao publicar etapa (LLM-09, LLM-10, LLM-11)
 - [ ] `test(api)`: contrato dos internos do agno, httpx fixado, varredura de scope por rota e smoke do compose no ci (ARQ-01, ARQ-03, ARQ-04, OPS-10)

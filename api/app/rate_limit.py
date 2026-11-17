@@ -17,11 +17,12 @@ class MemoryRateLimiter:
         self._attempts: dict[str, list[float]] = defaultdict(list)
         self._lock = Lock()
 
-    def check(self, key: str, limit: int | None = None) -> None:
+    def check(self, key: str, limit: int | None = None, window: int | None = None) -> None:
         limit = limit or self._limit
+        span = window or self._window
         now = time.time()
         with self._lock:
-            self._attempts[key] = [t for t in self._attempts[key] if now - t < self._window]
+            self._attempts[key] = [t for t in self._attempts[key] if now - t < span]
             if len(self._attempts[key]) >= limit:
                 raise HTTPException(
                     status_code=429, detail="Muitas tentativas. Tente novamente em breve."
@@ -44,20 +45,20 @@ class RedisRateLimiter:
         # Redis fora não derruba login nem webhook: o limite vale por processo até voltar
         self._fallback = MemoryRateLimiter(limit=limit, window=window)
 
-    def check(self, key: str, limit: int | None = None) -> None:
+    def check(self, key: str, limit: int | None = None, window: int | None = None) -> None:
         try:
-            self._check(key, limit)
+            self._check(key, limit, window)
         except RedisError as exc:
             logger.warning("redis fora: limite em memória", extra={"error": type(exc).__name__})
-            self._fallback.check(key, limit)
+            self._fallback.check(key, limit, window)
 
-    def _check(self, key: str, limit: int | None) -> None:
+    def _check(self, key: str, limit: int | None, window: int | None) -> None:
         limit = limit or self._limit
         pipe = self._client.pipeline()
         pipe.incr(key)
         # NX: a janela começa na primeira tentativa; renovar a cada tentativa
         # manteria a chave bloqueada para sempre sob tentativas contínuas
-        pipe.expire(key, self._window, nx=True)
+        pipe.expire(key, window or self._window, nx=True)
         results = pipe.execute()
         if int(results[0]) > limit:
             raise HTTPException(

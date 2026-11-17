@@ -2,6 +2,7 @@
 
 import logging
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -11,6 +12,7 @@ from app.auth import current_kid, issue_token
 from app.authz import Scope, require_scopes
 from app.db import SessionDep
 from app.integrations import MAX_DAYS, integration_scopes
+from app.models.caller_budget import CallerBudget
 from app.models.integration import IntegrationToken
 from app.repositories.config import ConfigRepository
 from app.schemas.config import ConfigKind
@@ -124,6 +126,18 @@ def issue(body: IntegrationInput, session: SessionDep, request: Request) -> Issu
         signing_kid=current_kid(),
     )
     session.add(row)
+    default_budget = get_settings().default_integration_budget_usd
+    if default_budget > 0:
+        # token novo já nasce com teto: vazado, não vira proxy de LLM sem limite (LLM-05)
+        session.add(
+            CallerBudget(
+                subject=f"integration:{token_id}",
+                monthly_usd=Decimal(str(default_budget)),
+                warn_percent=80,
+                hard_stop=True,
+                updated_by=row.created_by,
+            )
+        )
     session.commit()
     session.refresh(row)
     token = issue_token(

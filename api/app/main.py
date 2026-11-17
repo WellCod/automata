@@ -44,6 +44,7 @@ from app.routers.auth import router as auth_router
 from app.routers.channel_hooks import router as channel_hooks_router
 from app.routers.connector_webhook import router as connector_webhook_router
 from app.routers.health import router as health_router
+from app.run_limit import RunRateLimitMiddleware
 from app.session_id import SessionIdMiddleware
 from app.settings import get_settings
 from app.telemetry import attach_otlp
@@ -243,6 +244,8 @@ def create_app(
     outer.add_middleware(SyncPublishedAgentsMiddleware, published=published)
     # conversa nova ganha sessão antes da factory: o canário escolhe pela sessão (Fase 49)
     outer.add_middleware(SessionIdMiddleware)
+    # runs por minuto por quem chama, depois de saber o sub (LLM-05)
+    outer.add_middleware(RunRateLimitMiddleware)
     # aprovação só da tool pendente, com os argumentos mostrados (LLM-03)
     outer.add_middleware(ContinueGuardMiddleware)
     if enable_auth:
