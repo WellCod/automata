@@ -55,6 +55,15 @@ class Scope:
     CONVERSATIONS_HANDLE = "conversations:handle"
 
 
+def scopes_enforced(request: Request) -> bool:
+    """Scope conferido salvo quando o app desliga de propósito (`create_app(enable_auth=False)`).
+
+    O padrão era o contrário: app sem a flag liberava tudo, e uma rota montada em outro app
+    ficaria aberta a qualquer token (ARQ-03).
+    """
+    return bool(getattr(request.app.state, "enforce_scopes", True))
+
+
 def require_resource_scope(resource: str, action: str) -> Callable[[Request], None]:
     """Escopo global (`evals:run`) ou do recurso do path (`evals:<config_id>:run`).
 
@@ -63,7 +72,7 @@ def require_resource_scope(resource: str, action: str) -> Callable[[Request], No
     """
 
     def dependency(request: Request) -> None:
-        if not getattr(request.app.state, "enforce_scopes", False):
+        if not scopes_enforced(request):
             return
         user_scopes: list[str] = getattr(request.state, "scopes", None) or []
         admin_scope: str | None = getattr(request.state, "admin_scope", None)
@@ -83,7 +92,7 @@ def require_resource_scope(resource: str, action: str) -> Callable[[Request], No
 
 def sees_everyone(request: Request) -> bool:
     """Owner (admin) ou app sem autenticação: enxerga dados de conversa de todos os usuários."""
-    if not getattr(request.app.state, "enforce_scopes", False):
+    if not scopes_enforced(request):
         return True
     admin = getattr(request.state, "admin_scope", None) or "agent_os:admin"
     return admin in (getattr(request.state, "scopes", None) or [])
@@ -92,7 +101,7 @@ def sees_everyone(request: Request) -> bool:
 def require_scopes(*required: str) -> Callable[[Request], None]:
     def dependency(request: Request) -> None:
         # Sem auth (testes e create_app(enable_auth=False)) o app não marca a flag
-        if not getattr(request.app.state, "enforce_scopes", False):
+        if not scopes_enforced(request):
             return
         user_scopes: list[str] = getattr(request.state, "scopes", None) or []
         admin_scope: str | None = getattr(request.state, "admin_scope", None)

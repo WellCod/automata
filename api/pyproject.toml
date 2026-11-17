@@ -19,6 +19,9 @@ dependencies = [
     "pypdf>=7.1.0",
     "pyjwt[crypto]>=2.15.1",
     "urllib3>=2.8.0",
+    # o pino de IP das saídas usa interno do httpcore (app/mcp/egress.py, ARQ-01)
+    "httpx==0.28.1",
+    "httpcore==1.0.9",
     "python-docx>=1.2.0",
     "beautifulsoup4>=4.15.0",
     "aiofiles>=25.1.0",

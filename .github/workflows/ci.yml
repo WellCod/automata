@@ -148,8 +148,57 @@ jobs:
             exit 1
           fi
 
+  # Compose de produção de ponta a ponta (ARQ-04): foi por nunca subir que o .env não
+  # chegava à API (OPS-02). Replay da demo, sem chave de LLM.
+  compose-smoke:
+    needs: changes
+    if: needs.changes.outputs.api == 'true' || needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: .env com chaves novas
+        run: |
+          priv=$(openssl genrsa 2048 2>/dev/null)
+          pub=$(printf '%s\n' "$priv" | openssl rsa -pubout 2>/dev/null)
+          pw=$(openssl rand -hex 16)
+          {
+            echo "AUTOMATA_VERSION=ci"
+            echo "POSTGRES_DB=automata"
+            echo "POSTGRES_USER=automata"
+            echo "POSTGRES_PASSWORD=$pw"
+            echo "DATABASE_URL=postgresql+psycopg://automata:$pw@db:5432/automata"
+            # PEM entre aspas duplas, com as quebras de linha: o compose lê assim
+            printf 'JWT_PRIVATE_KEY="%s"\n' "$priv"
+            printf 'JWT_PUBLIC_KEY="%s"\n' "$pub"
+            echo "MCP_SECRETS_KEY=$(openssl rand -base64 32 | tr '+/' '-_')"
+            echo "DEMO_REPLAY=true"
+          } > .env
+          echo "OWNER_PASSWORD=Ci$(openssl rand -hex 12)" >> "$GITHUB_ENV"
+      - name: sobe o compose de produção
+        run: docker compose up -d --build --wait --wait-timeout 300
+      - name: health, login, agente publicado e um run pelo painel
+        run: |
+          set -euo pipefail
+          docker compose exec -T -e SEED_OWNER_EMAIL=ci@exemplo.com \
+            -e SEED_OWNER_PASSWORD="$OWNER_PASSWORD" api python scripts/seed_owner.py
+          base=http://127.0.0.1:3000
+          curl -fsS "$base/api/health" | tee /tmp/health.json
+          grep -q '"status":"ok"' /tmp/health.json
+          curl -fsS -c /tmp/c -H 'Content-Type: application/json' \
+            -d "{\"email\":\"ci@exemplo.com\",\"password\":\"$OWNER_PASSWORD\"}" "$base/api/auth/login"
+          id=$(curl -fsS -b /tmp/c -H 'Content-Type: application/json' \
+            -d '{"name":"smoke","description":"x"}' "$base/api/api/v1/configs" | jq -r .id)
+          curl -fsS -b /tmp/c -X PUT -H 'Content-Type: application/json' \
+            -d '{"name":"smoke","description":"x","payload":{"model_id":"claude-haiku-4-5"}}' \
+            "$base/api/api/v1/configs/$id/draft" > /dev/null
+          curl -fsS -b /tmp/c -X POST "$base/api/api/v1/configs/$id/publish" > /dev/null
+          curl -fsS -b /tmp/c -F message=oi -F stream=false "$base/api/agents/$id/runs" | jq -e '.content | length > 0'
+      - name: logs em caso de falha
+        if: failure()
+        run: docker compose logs --tail 200
+
   gate:
-    needs: [api, web, e2e, api-image, web-image]
+    needs: [api, web, e2e, api-image, web-image, compose-smoke]
     if: always()
     runs-on: ubuntu-latest
     steps:

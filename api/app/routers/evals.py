@@ -21,7 +21,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.authz import Scope, require_resource_scope, require_scopes
+from app.authz import Scope, require_resource_scope, require_scopes, scopes_enforced
 from app.db import SessionDep, get_db
 from app.evals import csv_cases, webhook
 from app.evals.compare import compare, suite_states
@@ -165,7 +165,7 @@ def suggest_case(
     if row.status == "blocked":
         raise HTTPException(status_code=422, detail="Run bloqueado por guardrail não vira caso")
     # a sugestão traz a conversa: mesma regra do trace, só o dono ou admin
-    enforce = getattr(request.app.state, "enforce_scopes", False)
+    enforce = scopes_enforced(request)
     is_admin = "agent_os:admin" in (getattr(request.state, "scopes", None) or [])
     if enforce and not is_admin and row.user_id != getattr(request.state, "user_id", None):
         raise HTTPException(status_code=403, detail="Só quem teve a conversa ou um admin")
@@ -233,7 +233,7 @@ def suggest_cases(
         .order_by(AgentRun.created_at.desc())
     )
     # a sugestão traz a conversa: quem não é admin vê só as próprias
-    enforce = getattr(request.app.state, "enforce_scopes", False)
+    enforce = scopes_enforced(request)
     is_admin = "agent_os:admin" in (getattr(request.state, "scopes", None) or [])
     if enforce and not is_admin:
         query = query.where(AgentRun.user_id == getattr(request.state, "user_id", None))

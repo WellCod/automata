@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.authz import Scope
+from app.authz import Scope, scopes_enforced
 from app.data_subjects import (
     due_date,
     inventory,
@@ -43,7 +43,7 @@ def _scopes(request: Request) -> tuple[list[str], str | None]:
 
 def _is_admin(request: Request) -> bool:
     """Owner, ou app sem autenticação (testes): vê todos os pedidos."""
-    if not getattr(request.app.state, "enforce_scopes", False):
+    if not scopes_enforced(request):
         return True
     scopes, admin = _scopes(request)
     return has_required_scopes(scopes, [Scope.DATA_SUBJECTS_ADMIN], admin_scope=admin)
