@@ -11,6 +11,12 @@ updates:
       painel:
         patterns: ["*"]
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      # os plugins do eslint-config-next ainda pedem o eslint 9
+      - dependency-name: eslint
+        update-types: [version-update:semver-major]
   - package-ecosystem: uv
     directory: /api
     schedule:
@@ -20,6 +26,15 @@ updates:
       api:
         patterns: ["*"]
         update-types: [minor, patch]
+    ignore:
+      # o Agno é fixado e atualizado à mão: a doc e os internos mudam a cada versão e o
+      # tests/test_contrato_agno.py precisa ser revisto junto
+      - dependency-name: agno
+      # versão maior dos SDKs dos provedores só junto com o Agno, que é quem os usa
+      - dependency-name: anthropic
+        update-types: [version-update:semver-major]
+      - dependency-name: openai
+        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -28,3 +43,9 @@ updates:
     directories: [/api, /web]
     schedule:
       interval: monthly
+    ignore:
+      # python 3.12 e node 22 (LTS) são a base da stack; troca de versão é decisão, não rotina
+      - dependency-name: python
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: node
+        update-types: [version-update:semver-major]
