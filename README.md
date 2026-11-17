@@ -50,7 +50,7 @@ O Automata trata esses pontos como requisito de produto, não como disciplina de
 
 ### Agentes com versão, teste e rollback
 
-Cada agente é uma configuração versionada: modelo, instruções em seções (persona, situação, tom, objetivo, limites), ferramentas, bases de conhecimento, guardrails e capabilities. Publicar cria uma versão imutável; rollback move um ponteiro. O modo teste roda a versão publicada ou o rascunho, sem publicar.
+Cada agente é uma configuração versionada: modelo, instruções em seções (persona, situação, tom, objetivo, limites), ferramentas, bases de conhecimento, guardrails e capabilities. Publicar cria uma versão imutável; rollback move um ponteiro. O modo teste roda a versão publicada ou o rascunho, sem publicar; agente que ainda não tem versão publicada é testado direto pelo rascunho salvo.
 
 Uma versão nova também pode sair aos poucos. O **canário** manda uma parte das conversas, até 50%, para o rascunho ou outra versão publicada, sem mexer na vigente. A escolha é pela sessão, então a conversa não troca de versão no meio. A aba Versões compara as duas desde o início do canário (conversas, taxa de erro, p50 e p95, custo médio e a última suíte), e a promoção é manual ([ADR-0040](docs/adr/0040-liberacao-gradual-de-versao.md)).
 

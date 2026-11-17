@@ -105,8 +105,31 @@ describe("TestPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: /enviar/i }));
 
     await waitFor(() => {
-      expect(screen.getByText("Erro ao executar agente.")).toBeInTheDocument();
+      expect(screen.getByText("Erro ao executar (HTTP 500).")).toBeInTheDocument();
     });
+  });
+
+  it("sem versão publicada roda o rascunho e mostra o motivo da recusa", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ detail: "Rodar uma versão específica exige configs:write" }), {
+        status: 403,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<TestPanel agentId="abc-123" draftVersionId="draft-uuid" hasCurrentVersion={false} />);
+    await userEvent.click(screen.getByRole("button", { name: /abrir chat/i }));
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.getByText(/o teste roda o último rascunho/)).toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText(/Digite uma mensagem/i), "Oi");
+    await userEvent.click(screen.getByRole("button", { name: /enviar/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const form = fetchMock.mock.calls[0][1].body as FormData;
+    expect(JSON.parse(form.get("factory_input") as string)).toEqual({ version_id: "draft-uuid" });
+    expect(
+      await screen.findByText("Rodar uma versão específica exige configs:write"),
+    ).toBeInTheDocument();
   });
 
   it("limpa sessão ao clicar em limpar", async () => {

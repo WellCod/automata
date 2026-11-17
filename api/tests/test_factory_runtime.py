@@ -68,17 +68,24 @@ def test_versao_vigente_e_carregada(publicados: tuple[ConfigService, Session]) -
     assert resolved.description == "Use para vigente"
 
 
-def test_publicados_inclui_so_quem_tem_versao_vigente(
+def test_registro_inclui_rascunho_e_deixa_de_fora_config_vazio(
     publicados: tuple[ConfigService, Session],
 ) -> None:
     svc, session = publicados
     config, _ = _publica(svc, session, "publicado")
     rascunho = svc.create_config("so-rascunho", description="nunca publicado")
+    draft = svc.save_draft(rascunho.id, ConfigPayload(model_id="gpt-4o"), "autor")
+    vazio = svc.create_config("vazio", description="nada salvo")
     session.commit()
 
     ids = [i for i, _ in published_configs()]
     assert config.id in ids  # type: ignore[attr-defined]
-    assert rascunho.id not in ids
+    # o modo teste roda o rascunho antes da primeira publicação (UX-01)
+    assert rascunho.id in ids
+    assert vazio.id not in ids
+    assert load_version(rascunho.id, draft.id).payload.model_id == "gpt-4o"
+    with pytest.raises(FactoryValidationError):
+        load_version(rascunho.id, None)
 
 
 def test_persist_atualiza_run_pausado_e_grava_consumo(

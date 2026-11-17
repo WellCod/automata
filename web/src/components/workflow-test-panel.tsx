@@ -25,10 +25,12 @@ import {
   type WorkflowProgress,
 } from "@/lib/workflow-progress";
 import { Button } from "@/components/ui/button";
+import { failureText } from "@/lib/run-failure";
 
 interface Props {
   workflowId: string;
   draftVersionId?: string;
+  hasCurrentVersion?: boolean;
 }
 
 const KIND_ICON: Record<ProgressKind, typeof Bot> = {
@@ -54,12 +56,13 @@ const STATUS_LABEL: Record<ProgressStatus, string> = {
   blocked: "bloqueada",
 };
 
-export function WorkflowTestPanel({ workflowId, draftVersionId }: Props) {
+export function WorkflowTestPanel({ workflowId, draftVersionId, hasCurrentVersion = true }: Props) {
   const queryClient = useQueryClient();
   const [progress, setProgress] = useState<WorkflowProgress>(EMPTY_PROGRESS);
   const [input, setInput] = useState("");
   const [message, setMessage] = useState("");
   const [useDraft, setUseDraft] = useState(false);
+  const runsDraft = Boolean(draftVersionId) && (useDraft || !hasCurrentVersion);
   const [failure, setFailure] = useState<string | null>(null);
   const running = progress.status === "running";
   const [deciding, setDeciding] = useState(false);
@@ -100,20 +103,20 @@ export function WorkflowTestPanel({ workflowId, draftVersionId }: Props) {
     form.append("message", text);
     form.append("stream", "true");
     if (sessionId) form.append("session_id", sessionId);
-    if (useDraft && draftVersionId) {
+    if (runsDraft) {
       form.append("factory_input", JSON.stringify({ version_id: draftVersionId }));
     }
     try {
       const res = await fetch(`/api/workflows/${workflowId}/runs`, { method: "POST", body: form });
-      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok || !res.body) throw new Error(await failureText(res));
       for await (const ev of readSse(res.body)) {
         state = applyEvent(state, ev);
         setProgress(state);
       }
       // stream que fecha sem WorkflowCompleted nem WorkflowError
       if (state.status === "running") setProgress({ ...state, status: "done" });
-    } catch {
-      setFailure("Erro ao executar o workflow.");
+    } catch (e) {
+      setFailure(e instanceof Error && e.message ? e.message : "Erro ao executar o workflow.");
       setProgress((p) => ({ ...p, status: "error" }));
     } finally {
       void queryClient.invalidateQueries({ queryKey: ["runs", workflowId] });
@@ -123,7 +126,14 @@ export function WorkflowTestPanel({ workflowId, draftVersionId }: Props) {
   return (
     <div className="flex flex-col gap-3">
       <h2 className="text-foreground text-[13px] font-medium">Modo teste</h2>
-      {draftVersionId && (
+      {!hasCurrentVersion && (
+        <p className="text-muted-foreground text-[13px]">
+          {draftVersionId
+            ? "Sem versão publicada: o teste roda o último rascunho."
+            : "Salve um rascunho para testar."}
+        </p>
+      )}
+      {draftVersionId && hasCurrentVersion && (
         <label className="text-muted-foreground flex items-center gap-2 text-[13px]">
           <input
             type="checkbox"

@@ -506,6 +506,7 @@ export default function TeamEditPage() {
                 kind="team"
                 memberNames={memberNames}
                 draftVersionId={data?.draft_version?.id}
+                hasCurrentVersion={Boolean(data?.current_version)}
                 defaultOpen
               />
             </div>
