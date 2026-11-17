@@ -5,7 +5,7 @@ requires-python = ">=3.12"
 dependencies = [
     "agno[os,mcp]==3.1.8",
     "anthropic>=0.40",
-    "openai>=1.50",
+    "openai>=3.51.0",
     "psycopg[binary]>=3.2",
     "alembic>=1.14",
     "pydantic-settings>=2.7",
