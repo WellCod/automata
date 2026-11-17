@@ -32,7 +32,7 @@ class AlertDestinationCreate(BaseModel):
     events: list[AlertEvent] = Field(min_length=1)
 
     @model_validator(mode="after")
-    def destino_do_tipo(self) -> "AlertDestinationCreate":
+    def destino_do_tipo(self) -> AlertDestinationCreate:
         if self.kind == "webhook" and not self.url:
             raise ValueError("o webhook precisa da URL")
         if self.kind == "email" and not self.emails:

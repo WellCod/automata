@@ -36,7 +36,7 @@ _OLD, _NEW, _STRANGER = _pair(), _pair(), _pair()
 
 
 @pytest.fixture(autouse=True)
-def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@localhost/db")
     monkeypatch.setenv("JWT_PRIVATE_KEY", _NEW[0])
     monkeypatch.setenv("JWT_PUBLIC_KEY", _NEW[1])

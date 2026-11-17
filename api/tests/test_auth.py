@@ -37,7 +37,7 @@ _ID = "00000000-0000-0000-0000-000000000001"
 
 
 @pytest.fixture
-def client_with_auth(monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]:
+def client_with_auth(monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient]:
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@localhost/db")
     monkeypatch.setenv("JWT_PRIVATE_KEY", _PRIVATE_KEY)
     monkeypatch.setenv("JWT_PUBLIC_KEY", _PUBLIC_KEY)
@@ -50,7 +50,7 @@ def client_with_auth(monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, N
 
 
 @pytest.fixture(autouse=True)
-def set_env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+def set_env(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@localhost/db")
     monkeypatch.setenv("JWT_PRIVATE_KEY", _PRIVATE_KEY)
     monkeypatch.setenv("JWT_PUBLIC_KEY", _PUBLIC_KEY)

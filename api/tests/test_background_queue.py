@@ -37,7 +37,7 @@ def test_redis_quando_existe_e_interruptor() -> None:
 
 
 @pytest.fixture(scope="module")
-def client() -> Generator[TestClient, None, None]:
+def client() -> Generator[TestClient]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         env = {"DATABASE_URL": url, "DEMO_REPLAY": "true"}

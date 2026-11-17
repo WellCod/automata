@@ -32,7 +32,7 @@ class TextCheck(BaseModel):
         return WorkflowRule(kind=self.kind, source="previous", value=self.value)
 
     @model_validator(mode="after")
-    def valor_quando_precisa(self) -> "TextCheck":
+    def valor_quando_precisa(self) -> TextCheck:
         if self.kind in NEEDS_VALUE and not self.value.strip():
             raise ValueError(f"regra '{self.kind}' precisa de um texto")
         return self
@@ -117,7 +117,7 @@ CHECKS_BY_KIND: dict[str, frozenset[str]] = {
 
 def kind_problem(
     kind: str,
-    spec: "EvalCaseInput",
+    spec: EvalCaseInput,
     history_runs: int = 0,
     step_names: set[str] | None = None,
 ) -> str | None:
@@ -159,7 +159,7 @@ class EvalCaseInput(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def um_por_tipo_no_runner(self) -> "EvalCaseInput":
+    def um_por_tipo_no_runner(self) -> EvalCaseInput:
         # o Case do Agno tem um campo de critério e um de tools; texto vira um scorer só
         for kind in ("tools", "judge", "steps", "schema"):
             if sum(1 for c in self.checks if c.type == kind) > 1:
@@ -201,7 +201,7 @@ class EvalRunCreate(BaseModel):
     judge_model: str | None = None
 
     @model_validator(mode="after")
-    def versao_ou_alvo(self) -> "EvalRunCreate":
+    def versao_ou_alvo(self) -> EvalRunCreate:
         if self.version_id is not None and self.target is not None:
             raise ValueError("Informe version_id ou target, não os dois")
         return self

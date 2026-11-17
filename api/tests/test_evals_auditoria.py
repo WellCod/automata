@@ -43,7 +43,7 @@ def _pair() -> tuple[str, str]:
 
 
 @pytest.fixture(scope="module")
-def client() -> Generator[TestClient, None, None]:
+def client() -> Generator[TestClient]:
     private, public = _pair()
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")

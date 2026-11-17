@@ -55,7 +55,7 @@ def _free_port() -> int:
 
 
 @contextmanager
-def running_server() -> Generator[str, None, None]:
+def running_server() -> Generator[str]:
     """Sobe o servidor numa thread e devolve a URL do endpoint MCP."""
     port = _free_port()
     app = _RequireToken(mcp.http_app(path="/mcp"))

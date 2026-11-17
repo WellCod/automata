@@ -28,7 +28,7 @@ from app.settings import get_settings
 
 
 @pytest.fixture(scope="module")
-def db_url() -> Generator[str, None, None]:
+def db_url() -> Generator[str]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         os.environ["DATABASE_URL"] = url
@@ -42,7 +42,7 @@ def db_url() -> Generator[str, None, None]:
 
 
 @pytest.fixture
-def client(db_url: str, monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]:
+def client(db_url: str, monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient]:
     from app.main import create_app
 
     # embedder local e determinístico: sem chave e sem rede
@@ -55,7 +55,7 @@ def client(db_url: str, monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient
 
 
 @pytest.fixture
-def base_id(client: TestClient) -> Generator[str, None, None]:
+def base_id(client: TestClient) -> Generator[str]:
     created = client.post(
         "/api/v1/knowledge-bases",
         json={"name": f"RH {os.urandom(3).hex()}", "slug": f"rh_{os.urandom(3).hex()}"},
@@ -248,7 +248,7 @@ class _Site(BaseHTTPRequestHandler):
 
 
 @pytest.fixture(scope="module")
-def site() -> Generator[str, None, None]:
+def site() -> Generator[str]:
     server = HTTPServer(("127.0.0.1", 0), _Site)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

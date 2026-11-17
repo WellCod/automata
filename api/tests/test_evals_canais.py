@@ -32,7 +32,7 @@ from tests.test_channels import SLACK, WA, FakeProviders, _slack_post, _wa_body,
 
 
 @pytest.fixture(scope="module")
-def db_url() -> Generator[str, None, None]:
+def db_url() -> Generator[str]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         os.environ["DATABASE_URL"] = url
@@ -59,7 +59,7 @@ def fake(monkeypatch: pytest.MonkeyPatch) -> FakeProviders:
 @pytest.fixture
 def client(
     db_url: str, fake: FakeProviders, monkeypatch: pytest.MonkeyPatch
-) -> Generator[TestClient, None, None]:
+) -> Generator[TestClient]:
     import app.agents.factory as factory
     from app.main import create_app
 

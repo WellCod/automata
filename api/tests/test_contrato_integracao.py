@@ -25,7 +25,7 @@ CONTRACT = {
 
 
 @pytest.fixture(scope="module")
-def app() -> Generator[Any, None, None]:
+def app() -> Generator[Any]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         patch = pytest.MonkeyPatch()
         patch.setenv("DATABASE_URL", pg.get_connection_url().replace("psycopg2", "psycopg"))

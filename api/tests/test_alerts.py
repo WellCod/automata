@@ -29,14 +29,14 @@ ALL_EVENTS = [
 
 
 @pytest.fixture(scope="module")
-def receiver() -> Generator[Receiver, None, None]:
+def receiver() -> Generator[Receiver]:
     r = Receiver()
     yield r
     r.server.shutdown()
 
 
 @pytest.fixture(scope="module")
-def db_url() -> Generator[str, None, None]:
+def db_url() -> Generator[str]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         env = {
@@ -61,7 +61,7 @@ def db_url() -> Generator[str, None, None]:
 
 
 @pytest.fixture
-def client(db_url: str, monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]:
+def client(db_url: str, monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient]:
     import app.agents.factory as factory
     from app.main import create_app
 

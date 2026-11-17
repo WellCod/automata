@@ -46,7 +46,7 @@ def cross_encoder_id(settings: CrossEncoderSettings) -> str:
 COHERE_TIMEOUT_SECONDS = 30.0
 
 
-def _timed_cohere(model: str) -> "CohereReranker":
+def _timed_cohere(model: str) -> CohereReranker:
     from agno.knowledge.reranker.cohere import CohereReranker
     from cohere import Client as CohereClient
 

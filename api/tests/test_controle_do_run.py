@@ -11,7 +11,7 @@ from app.settings import get_settings
 
 
 @pytest.fixture(autouse=True)
-def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
     monkeypatch.setenv("DATABASE_URL", "postgresql://x")
     monkeypatch.setenv("JWT_PRIVATE_KEY", "x")
     monkeypatch.setenv("JWT_PUBLIC_KEY", "x")

@@ -14,7 +14,7 @@ from app.settings import get_settings
 
 
 @pytest.fixture(autouse=True)
-def _sem_replay(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+def _sem_replay(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
     monkeypatch.delenv("DEMO_REPLAY", raising=False)
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@localhost/db")
     monkeypatch.setenv("JWT_PRIVATE_KEY", "x")

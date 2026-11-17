@@ -107,7 +107,7 @@ class EcIdp:
 
 
 @pytest.fixture(scope="module")
-def db() -> Generator[None, None, None]:
+def db() -> Generator[None]:
     private, public = _jwt_keys()
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
@@ -150,7 +150,7 @@ def idp(db: None, monkeypatch: pytest.MonkeyPatch) -> EcIdp:
 
 
 @pytest.fixture
-def client(idp: EcIdp) -> Generator[TestClient, None, None]:
+def client(idp: EcIdp) -> Generator[TestClient]:
     from app.main import create_app
 
     app = create_app(auto_provision_dbs=True, enable_auth=True, enable_mcp_server=False)

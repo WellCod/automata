@@ -22,7 +22,7 @@ class WorkflowRule(BaseModel):
     value: str = Field(default="", max_length=200)
 
     @model_validator(mode="after")
-    def valor_quando_precisa(self) -> "WorkflowRule":
+    def valor_quando_precisa(self) -> WorkflowRule:
         if self.kind in NEEDS_VALUE and not self.value.strip():
             raise ValueError(f"regra '{self.kind}' precisa de um texto")
         return self
@@ -42,7 +42,7 @@ class StepReview(BaseModel):
     timeout_hours: int | None = Field(default=None, ge=1, le=168)
 
     @model_validator(mode="after")
-    def retry_so_depois(self) -> "StepReview":
+    def retry_so_depois(self) -> StepReview:
         if self.on_reject == "retry" and self.when != "after":
             raise ValueError("refazer na recusa só vale na revisão da saída")
         return self
@@ -65,7 +65,7 @@ class StepNode(BaseModel):
     template: str | None = Field(default=None, max_length=2000)
 
     @model_validator(mode="after")
-    def um_executor(self) -> "StepNode":
+    def um_executor(self) -> StepNode:
         if (self.agent_id is None) == (self.team_id is None):
             raise ValueError(f"etapa '{self.name}' precisa de um agente ou de um time")
         if self.input == "template" and not (self.template or "").strip():
@@ -104,8 +104,8 @@ class ConditionNode(BaseModel):
     type: Literal["condition"] = "condition"
     name: _Name
     rule: WorkflowRule
-    steps: list["WorkflowNode"] = Field(min_length=1)
-    else_steps: list["WorkflowNode"] = Field(default_factory=list)
+    steps: list[WorkflowNode] = Field(min_length=1)
+    else_steps: list[WorkflowNode] = Field(default_factory=list)
 
 
 class LoopReview(BaseModel):
@@ -122,7 +122,7 @@ class LoopReview(BaseModel):
 class LoopNode(BaseModel):
     type: Literal["loop"] = "loop"
     name: _Name
-    steps: list["WorkflowNode"] = Field(min_length=1)
+    steps: list[WorkflowNode] = Field(min_length=1)
     max_iterations: int = Field(default=3, ge=1, le=10)
     # avaliada na saída da última etapa de cada volta; None roda até max_iterations
     until: WorkflowRule | None = None
@@ -134,7 +134,7 @@ WorkflowNode = Annotated[
 ]
 
 
-def _children(node: "WorkflowNode") -> list["WorkflowNode"]:
+def _children(node: WorkflowNode) -> list[WorkflowNode]:
     if isinstance(node, ParallelNode):
         return list(node.branches)
     if isinstance(node, ConditionNode):
@@ -147,7 +147,7 @@ def _children(node: "WorkflowNode") -> list["WorkflowNode"]:
     return []
 
 
-def walk(nodes: list["WorkflowNode"], depth: int = 1) -> list[tuple["WorkflowNode", int]]:
+def walk(nodes: list[WorkflowNode], depth: int = 1) -> list[tuple[WorkflowNode, int]]:
     out: list[tuple[WorkflowNode, int]] = []
     for node in nodes:
         out.append((node, depth))
@@ -155,11 +155,11 @@ def walk(nodes: list["WorkflowNode"], depth: int = 1) -> list[tuple["WorkflowNod
     return out
 
 
-def step_nodes(nodes: list["WorkflowNode"]) -> list[StepNode]:
+def step_nodes(nodes: list[WorkflowNode]) -> list[StepNode]:
     return [n for n, _ in walk(nodes) if isinstance(n, StepNode)]
 
 
-def _reviews_inside_containers(nodes: list["WorkflowNode"]) -> list[str]:
+def _reviews_inside_containers(nodes: list[WorkflowNode]) -> list[str]:
     """Etapas com revisão fora do nível principal.
 
     No Agno 3.1.8 a revisão de etapa dentro de condição não pausa; em paralelo e laço
@@ -172,7 +172,7 @@ def _reviews_inside_containers(nodes: list["WorkflowNode"]) -> list[str]:
     ]
 
 
-def _loop_review_problems(nodes: list["WorkflowNode"]) -> list[str]:
+def _loop_review_problems(nodes: list[WorkflowNode]) -> list[str]:
     """Laço com revisão por volta: no nível principal e com uma etapa simples por volta.
 
     A retomada do Agno 3.1.8 supõe uma etapa por volta; com mais, os resultados voltam
@@ -197,7 +197,7 @@ class WorkflowSettings(BaseModel):
     history_runs: int = Field(default=0, ge=0, le=5)
 
     @model_validator(mode="after")
-    def estrutura_valida(self) -> "WorkflowSettings":
+    def estrutura_valida(self) -> WorkflowSettings:
         nodes = walk(self.steps)
         names = [n.name for n, _ in nodes]
         repetidos = sorted({n for n in names if names.count(n) > 1})

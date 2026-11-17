@@ -50,7 +50,7 @@ def _fake_dns(ip: str) -> Any:
 
 
 @pytest.fixture
-def env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+def env(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
     monkeypatch.setenv("DATABASE_URL", os.environ.get("DATABASE_URL", "postgresql+psycopg://x"))
     monkeypatch.setenv("JWT_PRIVATE_KEY", os.environ.get("JWT_PRIVATE_KEY", "x"))
     monkeypatch.setenv("JWT_PUBLIC_KEY", os.environ.get("JWT_PUBLIC_KEY", "x"))
@@ -118,7 +118,7 @@ def test_chave_errada_recusa(env: None, monkeypatch: pytest.MonkeyPatch) -> None
 
 
 @pytest.fixture(scope="module")
-def db_url() -> Generator[str, None, None]:
+def db_url() -> Generator[str]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         os.environ["DATABASE_URL"] = url
@@ -132,7 +132,7 @@ def db_url() -> Generator[str, None, None]:
 
 
 @pytest.fixture
-def client(db_url: str, env: None) -> Generator[TestClient, None, None]:
+def client(db_url: str, env: None) -> Generator[TestClient]:
     from app.main import create_app
 
     with TestClient(create_app(auto_provision_dbs=False, enable_auth=False)) as c:
@@ -258,7 +258,7 @@ def test_so_owner_cadastra_servidor(
 
 
 @pytest.fixture(scope="module")
-def mcp_url() -> Generator[str, None, None]:
+def mcp_url() -> Generator[str]:
     from tests.mcp_fake_server import running_server
 
     with running_server() as url:

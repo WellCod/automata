@@ -13,7 +13,7 @@ from app.settings import get_settings
 
 
 @pytest.fixture(autouse=True)
-def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
     monkeypatch.setenv("DATABASE_URL", "postgresql://x")
     monkeypatch.setenv("JWT_PRIVATE_KEY", "x")
     monkeypatch.setenv("JWT_PUBLIC_KEY", "x")
@@ -50,7 +50,7 @@ def login_app(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     app.include_router(auth.router)
     from app.db import get_session
 
-    def _session() -> Generator[Any, None, None]:
+    def _session() -> Generator[Any]:
         yield SimpleNamespace(commit=lambda: None)
 
     app.dependency_overrides[get_session] = _session

@@ -39,7 +39,7 @@ _PRIVATE_KEY, _PUBLIC_KEY = _generate_rsa_key_pair()
 
 
 @pytest.fixture(autouse=True)
-def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@localhost/db")
     monkeypatch.setenv("JWT_PRIVATE_KEY", _PRIVATE_KEY)
     monkeypatch.setenv("JWT_PUBLIC_KEY", _PUBLIC_KEY)
@@ -49,7 +49,7 @@ def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
 
 
 @pytest.fixture
-def mcp_client() -> Generator[TestClient, None, None]:
+def mcp_client() -> Generator[TestClient]:
     from app.main import create_app
 
     # sem o `with`, o lifespan não roda e o handler MCP do fastmcp lança RuntimeError:

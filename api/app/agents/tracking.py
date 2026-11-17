@@ -300,7 +300,7 @@ class RunTracking:
                 if isinstance(event, _OUTPUT_TYPES):
                     output = event
                 yield event
-        except (asyncio.CancelledError, GeneratorExit):
+        except asyncio.CancelledError, GeneratorExit:
             self._schedule(self._record(kwargs, start, output, run_id, "cancelled", None))
             raise
         except Exception as exc:
@@ -644,7 +644,7 @@ class TrackedWorkflow(Workflow):
                 if name == "WorkflowPaused":
                     pending = pending_steps(getattr(event, "step_requirements", None))
                 yield event
-        except (asyncio.CancelledError, GeneratorExit):
+        except asyncio.CancelledError, GeneratorExit:
             RunTracking._schedule(self._record(kwargs, start, None, run_id, "cancelled", None))
             raise
         except Exception as exc:

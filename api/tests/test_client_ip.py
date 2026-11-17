@@ -15,7 +15,7 @@ def _request(peer: str, xff: str | None = None) -> Request:
 
 
 @pytest.fixture(autouse=True)
-def env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+def env(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@localhost/db")
     monkeypatch.setenv("JWT_PRIVATE_KEY", "x")
     monkeypatch.setenv("JWT_PUBLIC_KEY", "x")

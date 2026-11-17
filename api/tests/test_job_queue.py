@@ -18,7 +18,7 @@ from app.settings import get_settings
 
 
 @pytest.fixture(scope="module")
-def client() -> Generator[TestClient, None, None]:
+def client() -> Generator[TestClient]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         os.environ["DATABASE_URL"] = pg.get_connection_url().replace("psycopg2", "psycopg")
         os.environ.setdefault("JWT_PRIVATE_KEY", "x")

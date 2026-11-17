@@ -30,7 +30,7 @@ from app.settings import get_settings
 
 
 @pytest.fixture(scope="module")
-def svc() -> Generator[tuple[ConfigService, Session], None, None]:
+def svc() -> Generator[tuple[ConfigService, Session]]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         os.environ["DATABASE_URL"] = pg.get_connection_url().replace("psycopg2", "psycopg")
         os.environ.setdefault("JWT_PRIVATE_KEY", "x")

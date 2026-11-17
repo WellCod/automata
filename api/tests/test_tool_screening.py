@@ -85,7 +85,7 @@ def _settings(**tool_results: Any) -> GuardrailSettings:
 
 
 @pytest.fixture(autouse=True)
-def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
     monkeypatch.setenv("DATABASE_URL", os.environ.get("DATABASE_URL", "postgresql://x"))
     monkeypatch.setenv("JWT_PRIVATE_KEY", "x")
     monkeypatch.setenv("JWT_PUBLIC_KEY", "x")
@@ -207,7 +207,7 @@ async def test_classificador_pega_o_que_os_termos_nao_pegam(
 
 
 @pytest.fixture(scope="module")
-def db_url() -> Generator[str, None, None]:
+def db_url() -> Generator[str]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         os.environ["DATABASE_URL"] = url
@@ -219,7 +219,7 @@ def db_url() -> Generator[str, None, None]:
 
 
 @pytest.fixture
-def client(db_url: str, monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]:
+def client(db_url: str, monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient]:
     from app.main import create_app
 
     monkeypatch.setenv("DATABASE_URL", db_url)

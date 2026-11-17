@@ -44,7 +44,7 @@ def _model(model_id: str, *_: Any, **__: Any) -> ReplayModel:
 
 
 @pytest.fixture(scope="module")
-def client() -> Generator[TestClient, None, None]:
+def client() -> Generator[TestClient]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         os.environ["DATABASE_URL"] = pg.get_connection_url().replace("psycopg2", "psycopg")
         os.environ.setdefault("JWT_PRIVATE_KEY", "x")

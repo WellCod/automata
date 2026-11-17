@@ -27,7 +27,7 @@ def _keys(monkeypatch: pytest.MonkeyPatch, current: str, previous: str | None = 
 
 
 @pytest.fixture(autouse=True)
-def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+def _env(monkeypatch: pytest.MonkeyPatch) -> Generator[None]:
     monkeypatch.setenv("DATABASE_URL", os.environ.get("DATABASE_URL", "postgresql://x"))
     monkeypatch.setenv("JWT_PRIVATE_KEY", "x")
     monkeypatch.setenv("JWT_PUBLIC_KEY", "x")
@@ -71,7 +71,7 @@ def test_reencrypt_passa_para_a_atual_e_recusa_chave_desconhecida(
 
 
 @pytest.fixture(scope="module")
-def db_url() -> Generator[str, None, None]:
+def db_url() -> Generator[str]:
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         url = pg.get_connection_url().replace("psycopg2", "psycopg")
         old = os.environ.get("DATABASE_URL")

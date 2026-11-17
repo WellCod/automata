@@ -36,8 +36,9 @@ updates:
     schedule:
       interval: monthly
     ignore:
+      # 3.15 sem wheel do zstandard e do pyyaml (2026-11): a imagem slim não tem compilador
       - dependency-name: python
-        update-types: [version-update:semver-major, version-update:semver-minor]
+        versions: ["3.15.x"]
       # node só nas versões LTS (pares): a ímpar dura seis meses
       - dependency-name: node
         versions: ["27.x", "29.x", "31.x"]
