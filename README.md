@@ -499,6 +499,8 @@ docker compose --profile tls --profile backup up -d --build # com Caddy (TLS) e 
 
 O `.env` inteiro chega à API (`env_file`), então SSO, OTLP, preços e retenção valem sem mexer no compose. O painel é publicado só em `127.0.0.1:3000`; o perfil `tls` sobe um Caddy nas portas 80 e 443 com certificado do Let's Encrypt para o `DOMAIN` ([`deploy/Caddyfile`](deploy/Caddyfile)). Com outro proxy, aponte-o para `127.0.0.1:3000` e mantenha `CLIENT_IP_HEADER=x-forwarded-for`. O log de cada serviço fica limitado a 5 arquivos de 10 MB.
 
+A versão das imagens vem de `AUTOMATA_VERSION` (tag publicada no GHCR); atualizar e voltar estão em [`docs/atualizacao.md`](docs/atualizacao.md), e `scripts/instance.sh` faz `provision`, `upgrade`, `backup` e `status` sem perguntas, para rodar por SSH. O painel expõe `/api/health` com a versão, a migration, o Redis e a idade da última rodada do poller, para um monitor externo.
+
 O perfil `backup` faz um dump diário cifrado do banco para um bucket S3 compatível fora da máquina, com 7 diários e 4 semanais. A restauração foi testada e está em [`docs/restauracao.md`](docs/restauracao.md), junto com as três chaves que o operador guarda fora da VM.
 
 ### Testes

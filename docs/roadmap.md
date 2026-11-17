@@ -1703,7 +1703,7 @@ As Fases 51 a 54 seguem os horizontes da auditoria: 51 fecha os bloqueadores peq
 - [x] `feat(api)`: retenção de conversas, runs, traces e mensagens de canal por instância (COM-03, LLM-08)
 - [x] `feat`: troca e recuperação de senha pelo próprio usuário e troca obrigatória no primeiro acesso (COM-04)
 - [x] `feat`: aviso de primeiro contato e palavra de saída nos canais, remetente certo no slack e assinatura fora do ascii (COM-05, LLM-04, LLM-12, SEC-09)
-- [ ] `feat(infra)`: imagem por tag, versão e migration no health, health do painel, lock na migração e guia de atualização (OPS-04, OPS-05, OPS-10)
+- [x] `feat(infra)`: imagem por tag, versão e migration no health, health do painel, lock na migração e guia de atualização (OPS-04, OPS-05, OPS-10)
 
 **Critério de aceite:** restauração de um dump real num banco vazio com o painel funcionando; conversa mais velha que o prazo some com a sessão do Agno; usuário troca a própria senha e o owner não a conhece mais; a primeira mensagem do WhatsApp recebe o aviso antes da resposta.
 

@@ -60,7 +60,7 @@ Na API:
 
 Reinicie a API. A partir daí todo token sai com o `kid` da chave nova.
 
-No compose: atualize o `.env` e rode `docker compose up -d api web`. Quem usa o `scripts/deploy.sh` precisa atualizar também o `.deploy-keys`, senão o próximo deploy volta a mandar o par velho.
+No compose: atualize o `.env` e rode `docker compose up -d api web`. Quem usa o `scripts/deploy-demo.sh` precisa atualizar também o `.deploy-keys`, senão o próximo deploy volta a mandar o par velho.
 
 ### 4. Migrar quem depende da chave velha
 

@@ -24,6 +24,10 @@ class MemoryRateLimiter:
                 )
             self._attempts[key].append(now)
 
+    def state(self) -> str:
+        """Para o /health: sem Redis, o limite é por processo."""
+        return "off"
+
 
 class RedisRateLimiter:
     def __init__(self, redis_url: str, limit: int = 10, window: int = 60) -> None:
@@ -46,6 +50,14 @@ class RedisRateLimiter:
             raise HTTPException(
                 status_code=429, detail="Muitas tentativas. Tente novamente em breve."
             )
+
+    def state(self) -> str:
+        """Para o /health: "ok" ou "unreachable"."""
+        try:
+            self._client.ping()
+        except Exception:
+            return "unreachable"
+        return "ok"
 
 
 def make_rate_limiter(

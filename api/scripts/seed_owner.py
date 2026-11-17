@@ -1,4 +1,8 @@
-"""Cria o primeiro usuário owner. Uso: uv run python scripts/seed_owner.py EMAIL SENHA"""
+"""Cria o primeiro usuário owner.
+
+Uso: SEED_OWNER_EMAIL=... SEED_OWNER_PASSWORD=... python scripts/seed_owner.py
+(ou EMAIL SENHA como argumentos). SEED_OWNER_MUST_CHANGE=true deixa a senha provisória.
+"""
 
 import sys
 from pathlib import Path
@@ -16,11 +20,16 @@ from app.services.user import UserService
 
 
 def main() -> None:
-    if len(sys.argv) != 3:
-        print("uso: uv run python scripts/seed_owner.py EMAIL SENHA")
+    # pelo ambiente a senha não aparece na lista de processos
+    if len(sys.argv) == 3:
+        email, password = sys.argv[1], sys.argv[2]
+    else:
+        email = os.environ.get("SEED_OWNER_EMAIL", "")
+        password = os.environ.get("SEED_OWNER_PASSWORD", "")
+    if not email or not password:
+        print("uso: SEED_OWNER_EMAIL=... SEED_OWNER_PASSWORD=... python scripts/seed_owner.py")
         sys.exit(1)
-
-    email, password = sys.argv[1], sys.argv[2]
+    must_change = os.environ.get("SEED_OWNER_MUST_CHANGE", "").lower() == "true"
     db_url = os.environ.get(
         "DATABASE_URL", "postgresql+psycopg://automata:automata@localhost:5432/automata"
     )
@@ -29,7 +38,9 @@ def main() -> None:
     with Session(engine) as session:
         svc = UserService(UserRepository(session))
         try:
-            user = svc.create_user(email=email, password=password, role=UserRole.owner)
+            user = svc.create_user(
+                email=email, password=password, role=UserRole.owner, must_change=must_change
+            )
             session.commit()
             print(f"owner criado: {user.email}")
         except ValueError as e:
