@@ -39,10 +39,11 @@ _DB_PASS=$(openssl rand -hex 16)
 # chave Fernet: 32 bytes em base64 url-safe (cifra headers de servidores MCP)
 _MCP_KEY=$(openssl rand -base64 32 | tr '+/' '-_')
 
-# converte PEM multi-linha para uma linha com \n literal (lido por python-dotenv)
-inline() { printf '%s' "$1" | awk 'NF {sub(/\r/, ""); printf "%s\\n", $0}'; }
-PRIV_INLINE=$(inline "$_PRIV_PEM")
-PUB_INLINE=$(inline "$_PUB_PEM")
+# PEM entre aspas duplas, com as quebras de linha: é o formato que o compose (env_file),
+# o python-dotenv e o Next leem igual. Uma linha com \n literal sem aspas chega à API
+# como texto, e a chave não carrega
+PRIV_QUOTED="\"$(printf '%s' "$_PRIV_PEM" | tr -d '\r')\""
+PUB_QUOTED="\"$(printf '%s' "$_PUB_PEM" | tr -d '\r')\""
 ok
 
 # ── 3. .env (docker-compose) ─────────────────────────────────────────────────
@@ -53,8 +54,8 @@ if [ ! -f .env ]; then
     printf 'POSTGRES_USER=automata\n'
     printf 'POSTGRES_PASSWORD=%s\n\n' "$_DB_PASS"
     printf 'DATABASE_URL=postgresql+psycopg://automata:%s@db:5432/automata\n\n' "$_DB_PASS"
-    printf 'JWT_PRIVATE_KEY=%s\n' "$PRIV_INLINE"
-    printf 'JWT_PUBLIC_KEY=%s\n\n' "$PUB_INLINE"
+    printf 'JWT_PRIVATE_KEY=%s\n' "$PRIV_QUOTED"
+    printf 'JWT_PUBLIC_KEY=%s\n\n' "$PUB_QUOTED"
     printf 'MCP_SECRETS_KEY=%s\n\n' "$_MCP_KEY"
     printf 'AUTOMATA_API_URL=http://localhost:8000\n'
   } > .env
@@ -68,8 +69,8 @@ step "api/.env"
 if [ ! -f api/.env ]; then
   {
     printf 'DATABASE_URL=postgresql+psycopg://automata:%s@localhost:5432/automata\n' "$_DB_PASS"
-    printf 'JWT_PRIVATE_KEY=%s\n' "$PRIV_INLINE"
-    printf 'JWT_PUBLIC_KEY=%s\n' "$PUB_INLINE"
+    printf 'JWT_PRIVATE_KEY=%s\n' "$PRIV_QUOTED"
+    printf 'JWT_PUBLIC_KEY=%s\n' "$PUB_QUOTED"
     printf 'MCP_SECRETS_KEY=%s\n' "$_MCP_KEY"
   } > api/.env
   echo -e "  ${GREEN}criado${NC}"
@@ -83,7 +84,7 @@ if [ ! -f web/.env.local ]; then
   {
     printf 'AUTOMATA_API_URL=http://localhost:8000\n'
     # o painel só verifica tokens: chave pública, nunca a privada
-    printf 'JWT_PUBLIC_KEY=%s\n' "$PUB_INLINE"
+    printf 'JWT_PUBLIC_KEY=%s\n' "$PUB_QUOTED"
     printf 'JWT_AUDIENCE=automata\n'
   } > web/.env.local
   echo -e "  ${GREEN}criado${NC}"

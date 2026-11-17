@@ -26,11 +26,14 @@ openssl genrsa 2048 > jwt-novo.pem
 openssl rsa -in jwt-novo.pem -pubout > jwt-novo.pub
 ```
 
-No `.env` do compose, o PEM vai entre aspas duplas, em uma linha, com `\n` literal. No Vercel e no Railway, o arquivo pode ir como está.
+No `.env`, o PEM vai entre aspas duplas, com as quebras de linha, que é o formato que o compose (`env_file`), a API e o painel leem igual. Sem aspas, só a primeira linha chega. No Vercel e no Railway, o arquivo pode ir como está.
 
 ```bash
-awk 'NF {sub(/\r/, ""); printf "%s\\n",$0}' jwt-novo.pem
+printf 'JWT_PRIVATE_KEY="%s"\n' "$(tr -d '\r' < jwt-novo.pem)" >> .env
+printf 'JWT_PUBLIC_KEY="%s"\n' "$(tr -d '\r' < jwt-novo.pub)" >> .env
 ```
+
+Antes, apague do `.env` as linhas antigas das duas chaves.
 
 Guarde os arquivos fora do repositório e apague-os depois de configurar.
 
