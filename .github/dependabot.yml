@@ -36,8 +36,8 @@ updates:
     schedule:
       interval: monthly
     ignore:
-      # python 3.12 e node 22 (LTS) são a base da stack; troca de versão é decisão, não rotina
       - dependency-name: python
         update-types: [version-update:semver-major, version-update:semver-minor]
+      # node só nas versões LTS (pares): a ímpar dura seis meses
       - dependency-name: node
-        update-types: [version-update:semver-major]
+        versions: ["27.x", "29.x", "31.x"]
