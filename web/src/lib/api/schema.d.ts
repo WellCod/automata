@@ -109,6 +109,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/audit/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Export Events
+     * @description A trilha filtrada em CSV, até 50 mil linhas, para a auditoria do cliente (COM-07).
+     */
+    get: operations["export_events_api_v1_audit_export_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/configs/{config_id}/budget": {
     parameters: {
       query?: never;
@@ -5603,6 +5623,39 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["AuditPage"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  export_events_api_v1_audit_export_get: {
+    parameters: {
+      query?: {
+        actor?: string | null;
+        config_id?: string | null;
+        action?: string | null;
+        since?: string | null;
+        until?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Validation Error */
       422: {

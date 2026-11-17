@@ -246,7 +246,7 @@ def test_provedor_na_rede_interna_e_barrado(db: None, monkeypatch: pytest.Monkey
         oidc.reset_cache()
 
 
-def test_login_por_sso_fora_da_trilha(client: TestClient, idp: EcIdp) -> None:
+def test_login_por_sso_entra_na_trilha_como_login(client: TestClient, idp: EcIdp) -> None:
     from sqlalchemy import select
     from sqlalchemy.orm import Session
 
@@ -255,5 +255,8 @@ def test_login_por_sso_fora_da_trilha(client: TestClient, idp: EcIdp) -> None:
 
     assert _login(client, idp, **_person()).status_code == 200
     with Session(get_engine()) as session:
-        actions = list(session.scalars(select(AuditEvent.action)))
-    assert not [a for a in actions if "/auth/" in a]
+        events = list(session.scalars(select(AuditEvent)))
+    auth = [e for e in events if "/auth/" in e.action]
+    # só a linha que a rota grava, nunca o caminho do retorno do provedor
+    assert auth and all(e.action == "POST /api/v1/auth/login" for e in auth)
+    assert any((e.detail or {}).get("via") == "sso" for e in auth)

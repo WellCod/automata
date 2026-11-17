@@ -188,12 +188,21 @@ def test_continue_de_aprovacao_entra_mesmo_recusado(client: TestClient) -> None:
     assert row["status"] == resp.status_code
 
 
-def test_leitura_e_login_ficam_de_fora(client: TestClient) -> None:
+def test_leitura_comum_fica_de_fora_e_login_recusado_entra_sem_o_email(
+    client: TestClient,
+) -> None:
     before = len(_rows())
     client.get("/api/v1/configs", headers=_owner())
     client.get("/api/v1/audit", headers=_owner())
-    client.post("/api/v1/auth/login", json={"email": "x@exemplo.com", "password": "errada"})
     assert len(_rows()) == before
+    client.post("/api/v1/auth/login", json={"email": "x@exemplo.com", "password": "errada"})
+    rows = _rows()
+    assert len(rows) == before + 1
+    row = rows[-1]
+    assert row["action"] == "POST /api/v1/auth/login"
+    assert row["actor"] is None
+    assert row["status"] == 401
+    assert "x@exemplo.com" not in str(row["detail"])
 
 
 def test_exclusao_do_titular_troca_o_autor_pelo_pseudonimo(client: TestClient) -> None:

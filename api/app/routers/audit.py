@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -157,4 +157,56 @@ def list_events(
             for r in rows
         ],
         next_cursor=_encode(rows[-1].created_at, rows[-1].id) if more and rows else None,
+    )
+
+
+_EXPORT_MAX = 50_000
+
+
+@router.get("/export", response_class=Response)
+def export_events(
+    session: SessionDep,
+    actor: str | None = Query(default=None, max_length=128),
+    config_id: UUID | None = None,
+    action: str | None = Query(default=None, max_length=100),
+    since: datetime | None = None,
+    until: datetime | None = None,
+) -> Response:
+    """A trilha filtrada em CSV, até 50 mil linhas, para a auditoria do cliente (COM-07)."""
+    import csv
+    import io
+    import json
+
+    rows = audit.page(
+        session,
+        actor=actor,
+        config_id=config_id,
+        action=action,
+        since=since,
+        until=until,
+        before=None,
+        limit=_EXPORT_MAX,
+    )
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";")
+    writer.writerow(["quando", "quem", "acao", "config", "status", "ip", "request_id", "detalhe"])
+    for r in rows:
+        values = [
+            r.created_at.isoformat(),
+            r.actor or "",
+            r.action,
+            str(r.config_id or ""),
+            r.status_code,
+            r.ip or "",
+            r.request_id or "",
+            json.dumps(r.detail, ensure_ascii=False) if r.detail else "",
+        ]
+        # célula começando com = + - @ vira fórmula no Excel
+        writer.writerow(
+            ["'" + v if isinstance(v, str) and v[:1] in ("=", "+", "-", "@") else v for v in values]
+        )
+    return Response(
+        content="\ufeff" + buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="trilha-de-auditoria.csv"'},
     )
