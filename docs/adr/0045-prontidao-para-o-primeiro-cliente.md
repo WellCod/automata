@@ -13,7 +13,7 @@ A auditoria de 2026-11-16 (Fase 51 do roadmap) concluiu que o código está pert
 
 **Rascunho roda no modo teste, com `configs:write`.** Todo config com rascunho fica registrado no runtime; `factory_input.version_id` só vale para quem tem `configs:write` ou é admin. Quem só tem `run` roda a versão vigente ou o canário, como antes.
 
-**Identidade do usuário final no token de integração.** O `sub` do token continua `integration:<id>`. O integrador pode mandar o usuário final no campo `user_id` do formulário; a API grava `integration:<id>:<user_id>` e usa esse id na memória, no orçamento por quem chama e no titular. Sem `user_id`, a memória não liga para chamador `integration:*`.
+**Identidade do usuário final no token de integração.** O `sub` do token continua `integration:<id>`, e o Agno o força como `user_id` do run (o campo `user_id` do formulário é ignorado para chamador com scope). O integrador manda o usuário final em `factory_input.end_user`; a memória passa a ser de `integration:<id>:<end_user>`, que também é o id para pedir os dados ou a exclusão dela. Sem `end_user`, a memória não liga para chamador `integration:*`. Run, consumo e orçamento seguem pelo token.
 
 **Retenção por instância.** `CONVERSATION_RETENTION_DAYS` (padrão 0, desligado) apaga, no poller que já expurga a trilha, sessões e runs do Agno, `agent_run`, traces e mensagens de canal mais velhos que o prazo, na ordem da exclusão do titular. Consumo (`usage_event`) fica, sem conteúdo. Retenção por agente fica para quando um cliente pedir.
 

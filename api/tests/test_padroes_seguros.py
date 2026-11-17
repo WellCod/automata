@@ -103,8 +103,22 @@ def test_frase_do_resultado_de_tool_so_com_mcp() -> None:
     [("u-1", "u-1"), ("integration:abc", None), (None, None)],
 )
 def test_memoria_nao_liga_para_token_de_integracao(user_id: str | None, owner: str | None) -> None:
-    ctx = SimpleNamespace(user_id=user_id)
+    ctx = SimpleNamespace(user_id=user_id, input=None)
     assert memory_owner(ctx) == owner  # type: ignore[arg-type]
+
+
+def test_memoria_por_usuario_final_do_integrador() -> None:
+    import pydantic
+
+    from app.agents.factory import FactoryInput
+
+    pessoa = SimpleNamespace(user_id="integration:abc", input=FactoryInput(end_user="cli-42"))
+    assert memory_owner(pessoa) == "integration:abc:cli-42"  # type: ignore[arg-type]
+    # usuário do painel não troca de dono mandando end_user
+    painel = SimpleNamespace(user_id="u-1", input=FactoryInput(end_user="outro"))
+    assert memory_owner(painel) == "u-1"  # type: ignore[arg-type]
+    with pytest.raises(pydantic.ValidationError):
+        FactoryInput(end_user="tem espaço")
 
 
 def test_numero_de_versao_e_unico_por_config(svc: tuple[ConfigService, Session]) -> None:
