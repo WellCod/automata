@@ -86,7 +86,7 @@ def test_log_do_login_nao_grava_o_email(
         def _keep(self, msg: str, *args: Any, extra: dict[str, Any] | None = None) -> None:
             lines.append(f"{msg} {extra}")
 
-        info = warning = _keep
+        info = warning = error = _keep
 
     monkeypatch.setattr(auth, "logger", _Logger())
     _try(login_app, "203.0.113.9", "fulano@empresa.com")
