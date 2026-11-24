@@ -3,20 +3,20 @@ name = "automata-api"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
-    "agno[os,mcp]==3.2.0",
-    "anthropic>=2.9",
-    "openai>=3.52",
+    "agno[os,mcp]==3.2.1",
+    "anthropic>=2.12.0",
+    "openai>=3.57.0",
     "psycopg[binary]>=3.3.9",
     "alembic>=1.14",
     "pydantic-settings>=2.7",
     "cryptography>=43.0",
-    "fastmcp>=4.0.0",
+    "fastmcp>=4.2.4",
     "argon2-cffi>=25.1.0",
-    "email-validator>=2.3.0",
+    "email-validator>=2.4.0",
     "redis>=8.1.0",
     "pgvector>=0.5.1",
     "voyageai>=0.5.0",
-    "pypdf>=7.1.0",
+    "pypdf>=7.1.1",
     "pyjwt[crypto]>=2.15.1",
     "urllib3>=2.8.0",
     # o pino de IP das saídas usa interno do httpcore (app/mcp/egress.py, ARQ-01)
@@ -25,10 +25,10 @@ dependencies = [
     "python-docx>=1.2.0",
     "beautifulsoup4>=4.15.0",
     "aiofiles>=25.1.0",
-    "boto3>=1.40",
+    "boto3>=1.44.9",
     # já vinha pelo agno; declarado porque a saída estruturada valida schema e resposta
     "jsonschema>=4.26",
-    "cohere>=5.15",
+    "cohere>=7.3.2",
     "opentelemetry-exporter-otlp-proto-http==1.45.2",
 ]
 
@@ -37,10 +37,10 @@ dev = [
     "mypy>=1.14",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
-    "ruff>=0.16.1",
+    "ruff>=0.17.6",
     "testcontainers[postgres]>=4.15.0",
     "pytest-cov>=5.0",
-    "pyyaml>=6.0",
+    "pyyaml>=6.0.4",
 ]
 
 [tool.ruff]
