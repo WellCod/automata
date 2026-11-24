@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 
 class ExtraModel(BaseModel):
+    """Um item do EXTRA_MODELS: provedor, endpoint, chave, capabilities e preço."""
+
     id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.:/-]+$")
     provider: Literal["anthropic", "openai"]
     model: str | None = Field(default=None, max_length=128)
@@ -40,12 +42,16 @@ class ExtraModel(BaseModel):
 
     @property
     def key_env(self) -> str:
+        """Variável de ambiente com a chave do provedor."""
         default = "ANTHROPIC_API_KEY" if self.provider == "anthropic" else "OPENAI_API_KEY"
         return self.api_key_env or default
 
 
+# cache pelo texto da variável: o EXTRA_MODELS é lido a cada request, e um valor novo
+# (nos testes, por exemplo) gera outra entrada em vez de reaproveitar a antiga
 @lru_cache(maxsize=4)
 def _parse(raw: str) -> dict[str, ExtraModel]:
+    """Modelos do JSON pelo id; JSON inválido vira vazio com aviso no log."""
     if not raw.strip():
         return {}
     try:
@@ -53,8 +59,9 @@ def _parse(raw: str) -> dict[str, ExtraModel]:
     except (ValueError, ValidationError) as exc:
         logger.warning("EXTRA_MODELS inválido; só a matriz fixa", extra={"error": str(exc)})
         return {}
-    return {m.id: m for m in models}
+    return {model.id: model for model in models}
 
 
 def extra_models() -> dict[str, ExtraModel]:
+    """Modelos do EXTRA_MODELS pelo id, lidos do ambiente a cada chamada."""
     return _parse(os.environ.get("EXTRA_MODELS", ""))

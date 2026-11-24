@@ -38,11 +38,14 @@ def spent(messages: list[Any] | None, model_id: str) -> float:
 
 @dataclass
 class CostCap:
+    """Teto de custo de um run, aplicado como `tool_hooks` do agente ou do líder do time."""
+
     limit_usd: float
     model_id: str
     log: BlockLog
 
     def check(self, run_context: RunContext | None) -> None:
+        """Para o run com `StopAgentRun` quando o gasto já chegou ao teto."""
         cost = spent(run_context.messages if run_context else None, self.model_id)
         if cost < self.limit_usd:
             return
@@ -53,6 +56,8 @@ class CostCap:
         )
 
     def hooks(self) -> list[Callable[..., Any]]:
+        """Ganchos síncrono e assíncrono; o Agno passa os argumentos pelo nome da assinatura."""
+
         def cap_sync(
             function_call: Callable[..., Any],
             arguments: Any,

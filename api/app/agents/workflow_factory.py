@@ -49,22 +49,26 @@ def _text(value: Any) -> str:
 
 def rule_matches(rule: WorkflowRule, text: str) -> bool:
     """Regra própria no lugar de CEL: sem pacote extra e sem `False` silencioso."""
-    alvo = text.strip().casefold()
-    valor = rule.value.strip().casefold()
+    # comparação sem diferença de caixa e sem espaço nas pontas, dos dois lados
+    normalized_text = text.strip().casefold()
+    normalized_value = rule.value.strip().casefold()
     if rule.kind == "always":
         return True
     if rule.kind == "contains":
-        return valor in alvo
+        return normalized_value in normalized_text
     if rule.kind == "not_contains":
-        return valor not in alvo
+        return normalized_value not in normalized_text
     if rule.kind == "starts_with":
-        return alvo.startswith(valor)
+        return normalized_text.startswith(normalized_value)
     if rule.kind == "empty":
-        return alvo == ""
-    return alvo != ""
+        return normalized_text == ""
+    # "not_empty"
+    return normalized_text != ""
 
 
 def condition_evaluator(rule: WorkflowRule) -> Any:
+    """`evaluator` da Condition do Agno a partir da regra do payload."""
+
     def evaluate(step_input: StepInput) -> bool:
         if rule.source == "input":
             return rule_matches(rule, _text(step_input.input))
@@ -77,12 +81,15 @@ def condition_evaluator(rule: WorkflowRule) -> Any:
 
 
 def _deepest(output: StepOutput) -> str:
+    """Texto da última etapa folha: paralelo, condição e laço guardam as filhas em `steps`."""
     if output.steps:
         return _deepest(output.steps[-1])
     return _text(output.content)
 
 
 def loop_end_condition(rule: WorkflowRule) -> Any:
+    """`end_condition` do Loop do Agno: a regra aplicada à saída da última volta."""
+
     def done(outputs: list[StepOutput]) -> bool:
         return bool(outputs) and rule_matches(rule, _deepest(outputs[-1]))
 
@@ -91,6 +98,8 @@ def loop_end_condition(rule: WorkflowRule) -> Any:
 
 @dataclass
 class ResolvedStep:
+    """Etapa com a versão do agente ou do time que a executa."""
+
     node: StepNode
     agent: ResolvedVersion | None = None
     team: ResolvedTeam | None = None
@@ -98,6 +107,8 @@ class ResolvedStep:
 
 @dataclass
 class ResolvedWorkflow:
+    """Versão do workflow com a árvore de etapas e o executor de cada uma."""
+
     name: str
     description: str
     steps: list[WorkflowNode]
@@ -114,6 +125,7 @@ def history_kwargs(resolved: ResolvedWorkflow) -> dict[str, Any]:
 
 
 def load_workflow(config_id: UUID, version_id: UUID | None) -> ResolvedWorkflow:
+    """Versão do workflow e a de cada agente ou time das etapas, lidas de uma vez."""
     resolved = load_version(config_id, version_id)
     workflow = resolved.payload.workflow
     if workflow is None:
@@ -155,15 +167,16 @@ def render_input(
         return message
     previous = _deepest(list(outputs.values())[-1]) if outputs else ""
 
-    entrada = _text(message)
+    original_input = _text(message)
 
     def fill(match: re.Match[str]) -> str:
+        """Troca um marcador pelo texto; etapa citada que não rodou vira vazio."""
         if match.group(0) == "{entrada}":
-            return entrada
+            return original_input
         if match.group(0) == "{anterior}":
             return previous
-        found = _find(outputs, match.group(1).strip())
-        return _deepest(found) if found else ""
+        referenced_output = _find(outputs, match.group(1).strip())
+        return _deepest(referenced_output) if referenced_output else ""
 
     # uma passada só: o texto que entra não é relido, e o `{anterior}` digitado pelo
     # usuário chega literal (Fase 43)
@@ -178,6 +191,8 @@ class MappedStep(Step):
         self.input_mode = input_mode
         self.template = template
 
+    # o Step do Agno manda ao agente a saída mais funda da etapa anterior, ou a mensagem
+    # original quando não há etapa anterior; aqui quem decide é o modo da etapa
     def _prepare_message(
         self, message: Any, previous_step_outputs: dict[str, StepOutput] | None = None
     ) -> Any:
@@ -190,12 +205,14 @@ STEP_TYPE_MAPPING[MappedStep] = StepType.STEP
 
 
 def router_selector(routes: list[tuple[WorkflowRule, str]], default: str | None) -> Any:
+    """`selector` do Router do Agno: a primeira rota cuja regra bate escolhe a etapa."""
+
     def select(step_input: StepInput) -> Any:
         previous = step_input.get_last_step_content() or step_input.previous_step_content
-        for rule, name in routes:
-            text = step_input.input if rule.source == "input" else previous
-            if rule_matches(rule, _text(text)):
-                return name
+        for rule, step_name in routes:
+            checked_text = step_input.input if rule.source == "input" else previous
+            if rule_matches(rule, _text(checked_text)):
+                return step_name
         # nenhum caminho: o padrão, ou nada roda e a saída anterior segue
         return default if default else []
 
@@ -203,15 +220,16 @@ def router_selector(routes: list[tuple[WorkflowRule, str]], default: str | None)
 
 
 def _step(resolved: ResolvedStep) -> Step:
+    """Step do Agno com uma instância nova do agente ou do time, que grava o próprio run."""
     node = resolved.node
     if resolved.agent is not None:
         assert node.agent_id is not None
         executor: RunTracking = agent_from(node.agent_id, resolved.agent, tracked=True)  # type: ignore[assignment]
-        kind = {"agent": executor}
+        executor_kwargs = {"agent": executor}
     else:
         assert node.team_id is not None and resolved.team is not None
         executor = team_from(node.team_id, resolved.team)
-        kind = {"team": executor}
+        executor_kwargs = {"team": executor}
     # erro ou bloqueio na etapa vira exceção: on_error e max_retries do Agno passam a valer
     executor.automata_raise_on_error = True
     if node.input != "previous":
@@ -221,13 +239,13 @@ def _step(resolved: ResolvedStep) -> Step:
             human_review=human_review_for(node),
             input_mode=node.input,
             template=node.template,
-            **kind,
+            **executor_kwargs,
         )
     return Step(
         name=node.name,
         max_retries=node.max_retries,
         human_review=human_review_for(node),
-        **kind,  # type: ignore[arg-type]
+        **executor_kwargs,  # type: ignore[arg-type]
     )
 
 
@@ -236,6 +254,10 @@ REVIEW_RETRIES = 3
 
 
 def human_review_for(node: StepNode) -> HumanReview:
+    """HumanReview da etapa: o `on_error` sempre, e a revisão antes ou depois quando há.
+
+    No Agno 3 o `on_error` da etapa mora no HumanReview, por isso ele sai mesmo sem revisão.
+    """
     on_error = OnError.fail if node.on_error == "stop" else OnError.skip
     review: StepReview | None = node.review
     if review is None:
@@ -269,12 +291,15 @@ def loop_review_for(node: LoopNode) -> HumanReview | None:
 
 
 def build_nodes(nodes: list[WorkflowNode], resolved: ResolvedWorkflow) -> list[Any]:
+    """Converte a árvore do payload nos nós do Agno, recursivamente."""
     built: list[Any] = []
     for node in nodes:
         if isinstance(node, StepNode):
             built.append(_step(resolved.executors[node.name]))
         elif isinstance(node, ParallelNode):
-            branches: list[Any] = [_step(resolved.executors[b.name]) for b in node.branches]
+            branches: list[Any] = [
+                _step(resolved.executors[branch.name]) for branch in node.branches
+            ]
             built.append(Parallel(*branches, name=node.name))
         elif isinstance(node, ConditionNode):
             built.append(
@@ -286,13 +311,18 @@ def build_nodes(nodes: list[WorkflowNode], resolved: ResolvedWorkflow) -> list[A
                 )
             )
         elif isinstance(node, RouterNode):
-            steps = [r.step for r in node.routes] + ([node.default] if node.default else [])
+            # o caminho padrão também precisa estar entre as escolhas do Router
+            route_steps = [route.step for route in node.routes] + (
+                [node.default] if node.default else []
+            )
             built.append(
                 Router(
                     name=node.name,
-                    choices=[_step(resolved.executors[s.name]) for s in steps],
+                    choices=[
+                        _step(resolved.executors[route_step.name]) for route_step in route_steps
+                    ],
                     selector=router_selector(
-                        [(r.rule, r.step.name) for r in node.routes],
+                        [(route.rule, route.step.name) for route in node.routes],
                         node.default.name if node.default else None,
                     ),
                 )
@@ -311,7 +341,10 @@ def build_nodes(nodes: list[WorkflowNode], resolved: ResolvedWorkflow) -> list[A
 
 
 def make_workflow_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> WorkflowFactory:
+    """Workflow por request, montado do zero a partir da versão vigente ou da pedida."""
+
     async def build(ctx: RequestContext) -> TrackedWorkflow:
+
         version_id = requested_version(ctx)
         resolved = await asyncio.to_thread(load_workflow, config_id, version_id)
         workflow = TrackedWorkflow(

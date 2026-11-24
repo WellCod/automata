@@ -5,6 +5,8 @@ from app.schemas.config import CapabilityFlags
 
 @dataclass(frozen=True)
 class ModelCapabilities:
+    """O que o modelo aceita; a escrita do config recusa pedir o que ele não tem."""
+
     extended_thinking: bool = False
     structured_output: bool = False
     vision: bool = False
@@ -28,21 +30,24 @@ _CAPABILITIES: dict[str, ModelCapabilities] = {
 
 
 def _all() -> dict[str, ModelCapabilities]:
+    """Matriz fixa somada aos modelos do EXTRA_MODELS, que valem por cima dela."""
     from app.agents.extra_models import extra_models
 
     extras = {
-        m.id: ModelCapabilities(
-            extended_thinking=m.extended_thinking,
-            structured_output=m.structured_output,
-            vision=m.vision,
+        extra.id: ModelCapabilities(
+            extended_thinking=extra.extended_thinking,
+            structured_output=extra.structured_output,
+            vision=extra.vision,
         )
-        for m in extra_models().values()
+        for extra in extra_models().values()
     }
     return {**_CAPABILITIES, **extras}
 
 
 def get_capabilities(model_id: str) -> ModelCapabilities:
+    """Capabilities do modelo; modelo fora da matriz e do EXTRA_MODELS levanta ValueError."""
     known = _all()
+
     caps = known.get(model_id)
     if caps is None:
         raise ValueError(f"model_id '{model_id}' não suportado. Suportados: {sorted(known)}")

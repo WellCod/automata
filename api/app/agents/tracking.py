@@ -73,6 +73,8 @@ _OUTPUT_TYPES = (RunOutput, TeamRunOutput)
 
 @dataclass
 class RunRecord:
+    """Desfecho de um run, gravado em agent_run e, com tokens, em usage_event."""
+
     agent_config_id: UUID
     model_id: str
     user_id: str
@@ -103,6 +105,8 @@ current_workflow_run: ContextVar[str | None] = ContextVar("current_workflow_run"
 
 @dataclass(frozen=True)
 class EvalContext:
+    """Execução da suíte a que o run pertence."""
+
     eval_run_id: UUID
     # o runner de suíte do Agno não passa user_id: o run fica com quem disparou a suíte
     actor: str
@@ -113,6 +117,7 @@ current_eval_run: ContextVar[EvalContext | None] = ContextVar("current_eval_run"
 
 
 def persist(record: RunRecord) -> None:
+    """Grava o run e o consumo numa transação só; síncrono, roda fora do event loop."""
     with Session(get_engine()) as session:
         RunRepository(session).upsert(
             agent_config_id=record.agent_config_id,
@@ -153,12 +158,15 @@ def _pending_tools(output: AnyOutput | None) -> list[dict[str, Any]] | None:
     if output is None or output.status != RunStatus.paused:
         return None
     pending = [
-        t.to_dict() for t in output.tools or [] if t.requires_confirmation and t.confirmed is None
+        tool.to_dict()
+        for tool in output.tools or []
+        if tool.requires_confirmation and tool.confirmed is None
     ]
     return pending or None
 
 
 def _status_of(output: AnyOutput | None, last_event: str | None) -> str:
+    """Status do run pela saída do Agno ou, sem ela, pelo último evento do stream."""
     if output is not None and output.status in _STATUS:
         return _STATUS[output.status]
     if last_event in _ERROR_EVENTS:
@@ -202,6 +210,11 @@ class RunTracking:
         return self._track(result, kwargs)
 
     def _track(self, result: Any, kwargs: dict[str, Any]) -> Any:
+        """Envolve a corrotina ou o stream devolvido pelo Agno com o registro do run.
+
+        Componente montado fora da factory (sem config) e run em background, que o Agno
+        devolve na hora e a fila executa depois, passam sem registro aqui.
+        """
         if self.automata_config_id is None or kwargs.get("background"):
             return result
         if asyncio.iscoroutine(result):
@@ -209,10 +222,12 @@ class RunTracking:
         return self._track_stream(result, kwargs)
 
     def _mcp_tools(self) -> list[MCPTools]:
+        """Tools MCP do próprio componente."""
         tools = self.tools if isinstance(self.tools, list) else []
-        return [t for t in tools if isinstance(t, MCPTools)]
+        return [tool for tool in tools if isinstance(tool, MCPTools)]
 
     def _member_mcp_tools(self) -> list[MCPTools]:
+        """Tools MCP dos membros; só o time tem."""
         return []
 
     async def _connect_mcp(self) -> list[MCPTools]:
@@ -226,25 +241,33 @@ class RunTracking:
         connected: list[MCPTools] = []
         own = self._mcp_tools()
         try:
-            for tools in [*own, *self._member_mcp_tools()]:
-                await connect_strict(tools, tools.tool_name_prefix or tools.name)
-                connected.append(tools)
+            for server_tools in [*own, *self._member_mcp_tools()]:
+                await connect_strict(
+                    server_tools, server_tools.tool_name_prefix or server_tools.name
+                )
+                connected.append(server_tools)
         except McpUnavailable:
             await _close_all(connected)
             raise
-        self._mcp_tools_initialized_on_run.extend(t for t in connected if t in own)
-        return [t for t in connected if t not in own]
+        self._mcp_tools_initialized_on_run.extend(
+            server_tools for server_tools in connected if server_tools in own
+        )
+        return [server_tools for server_tools in connected if server_tools not in own]
 
     def _is_own_event(self, event: Any) -> bool:
+        """Se o evento do stream é do componente, e não de um membro do time."""
         return True
 
     def _error_output(self, kwargs: dict[str, Any], message: str) -> AnyOutput:
+        """Saída de erro montada à mão quando o MCP falha e o Agno nem chega a rodar."""
         raise NotImplementedError
 
     def _error_event(self, failed: AnyOutput, message: str) -> Any:
+        """Evento de erro equivalente a `_error_output`, para o stream."""
         raise NotImplementedError
 
     async def _track_output(self, coro: Any, kwargs: dict[str, Any]) -> Any:
+        """Run sem stream: aguarda a saída e grava o desfecho, inclusive erro e cancelamento."""
         start = monotonic()
         try:
             members = await self._connect_mcp()
@@ -275,6 +298,7 @@ class RunTracking:
         return output
 
     async def _track_stream(self, stream: AsyncIterator[Any], kwargs: dict[str, Any]) -> Any:
+        """Run em stream: repassa cada evento e grava o desfecho quando o stream acaba."""
         start = monotonic()
         run_id: str | None = kwargs.get("run_id")
         session_id: str | None = kwargs.get("session_id")
@@ -308,6 +332,7 @@ class RunTracking:
             raise
         finally:
             await _close_all(members)
+        # stream sem o RunOutput no fim: a saída vem do que o Agno gravou na sessão
         if output is None and run_id and session_id:
             try:
                 output = await self.aget_run_output(  # type: ignore[attr-defined]
@@ -323,13 +348,16 @@ class RunTracking:
         self._fail_step(record)
 
     def _stopped_by_cost(self) -> bool:
+        """Se o teto de custo (ADR-0031) parou este run."""
         blocks = self.automata_blocks
         return blocks is not None and blocks.stop_reason == STOP_RUN_COST
 
     def _notice_event(self, run_id: str, session_id: str | None, message: str) -> Any:
+        """Evento de conteúdo com um aviso do app, no formato do componente."""
         raise NotImplementedError
 
     def _fail_step(self, record: RunRecord) -> None:
+        """Em etapa de workflow, relança erro ou bloqueio como `StepFailed`."""
         # No Agno, etapa cujo agente falha segue e passa o erro como entrada da próxima
         if self.automata_raise_on_error and record.status in ("error", "blocked"):
             raise StepFailed(record.error or record.status)
@@ -343,6 +371,7 @@ class RunTracking:
         status: str | None,
         error: str | None,
     ) -> RunRecord:
+        """Monta o registro do run; `status` None deixa o status sair da saída do Agno."""
         assert self.automata_config_id is not None
         final_status = status or _status_of(output, None)
         block = self.automata_blocks.last if self.automata_blocks is not None else None
@@ -387,6 +416,7 @@ class RunTracking:
 
     @staticmethod
     async def _save(record: RunRecord) -> None:
+        """Grava fora do event loop; falha de banco vira log e não derruba a resposta."""
         try:
             await asyncio.to_thread(persist, record)
         except Exception as exc:
@@ -402,9 +432,10 @@ class RunTracking:
 
 
 async def _close_all(tools: list[MCPTools]) -> None:
-    for t in tools:
+    """Fecha as conexões MCP ignorando erro: o fechamento não muda o desfecho do run."""
+    for server_tools in tools:
         with contextlib.suppress(Exception):
-            await t.close()
+            await server_tools.close()
 
 
 class TrackedAgent(RunTracking, Agent):
@@ -444,7 +475,7 @@ class TrackedTeam(RunTracking, Team):
         result: list[MCPTools] = []
         for member in members:
             tools = member.tools if isinstance(member.tools, list) else []
-            result.extend(t for t in tools if isinstance(t, MCPTools))
+            result.extend(tool for tool in tools if isinstance(tool, MCPTools))
         return result
 
     def _is_own_event(self, event: Any) -> bool:
@@ -483,30 +514,40 @@ PENDING_OUTPUT_CHARS = 4000
 
 def pending_steps(requirements: list[Any] | None) -> list[dict[str, Any]] | None:
     """Resumo dos requisitos ativos do workflow pausado (ADR-0023)."""
-    active = [r for r in requirements or [] if not getattr(r, "is_resolved", False)]
+    active = [
+        requirement
+        for requirement in requirements or []
+        if not getattr(requirement, "is_resolved", False)
+    ]
     if not active:
         return None
-    out: list[dict[str, Any]] = []
-    for req in active:
-        after = bool(getattr(req, "requires_output_review", False))
+    summaries: list[dict[str, Any]] = []
+    for requirement in active:
+        reviews_output = bool(getattr(requirement, "requires_output_review", False))
         # revisão da volta de laço (ADR-0028): a saída é a da volta que acabou
-        loop = getattr(req, "step_type", None) == "Loop"
-        step_output = getattr(req, "step_output", None)
+        is_loop_review = getattr(requirement, "step_type", None) == "Loop"
+        step_output = getattr(requirement, "step_output", None)
         content = getattr(step_output, "content", None) if step_output is not None else None
-        timeout_at = getattr(req, "timeout_at", None)
-        out.append(
+        timeout_at = getattr(requirement, "timeout_at", None)
+        summaries.append(
             {
-                "step_id": req.step_id,
-                "step_name": req.step_name,
-                "when": "loop" if loop else "after" if after else "before",
-                "message": (req.output_review_message if after else req.confirmation_message)
+                "step_id": requirement.step_id,
+                "step_name": requirement.step_name,
+                "when": "loop" if is_loop_review else "after" if reviews_output else "before",
+                "message": (
+                    requirement.output_review_message
+                    if reviews_output
+                    else requirement.confirmation_message
+                )
                 or None,
-                "output": str(content)[:PENDING_OUTPUT_CHARS] if after and content else None,
+                "output": str(content)[:PENDING_OUTPUT_CHARS]
+                if reviews_output and content
+                else None,
                 "timeout_at": timeout_at.isoformat() if timeout_at else None,
-                "retry_count": getattr(req, "retry_count", 0),
+                "retry_count": getattr(requirement, "retry_count", 0),
             }
         )
-    return out
+    return summaries
 
 
 class TrackedWorkflow(Workflow):
@@ -548,6 +589,7 @@ class TrackedWorkflow(Workflow):
 
     @staticmethod
     async def _record_reviews(run_id: str, requirements: list[Any] | None) -> None:
+        """Grava as decisões humanas do continue com quem decidiu (ADR-0028)."""
         from app.agents.reviews import record_reviews
         from app.integrations import current_actor
 
@@ -568,6 +610,7 @@ class TrackedWorkflow(Workflow):
         error: str | None,
         pending: list[dict[str, Any]] | None = None,
     ) -> RunRecord:
+        """Registro do run do workflow: sem modelo nem tokens, que ficam nas etapas."""
         assert self.automata_config_id is not None
         # caso da suíte (ADR-0022): o run do workflow fica fora das conversas, como as etapas
         evaluation = current_eval_run.get()
@@ -587,6 +630,7 @@ class TrackedWorkflow(Workflow):
     def _failed(
         self, kwargs: dict[str, Any], run_id: str | None, message: str
     ) -> WorkflowRunOutput:
+        """Saída com erro no lugar da exceção que o Agno relançaria."""
         return WorkflowRunOutput(
             run_id=run_id or kwargs.get("run_id") or str(uuid4()),
             workflow_id=self.id,
@@ -598,6 +642,7 @@ class TrackedWorkflow(Workflow):
         )
 
     async def _track_output(self, coro: Any, kwargs: dict[str, Any]) -> Any:
+        """Workflow sem stream, com o run_id no contexto para as etapas se ligarem a ele."""
         start = monotonic()
         token = current_workflow_run.set(kwargs["run_id"])
         try:
@@ -622,6 +667,7 @@ class TrackedWorkflow(Workflow):
         return output
 
     async def _track_stream(self, stream: AsyncIterator[Any], kwargs: dict[str, Any]) -> Any:
+        """Workflow em stream: o desfecho sai do último evento de fim ou de pausa."""
         start = monotonic()
         run_id: str | None = kwargs.get("run_id")
         last_event: str | None = None
@@ -632,16 +678,17 @@ class TrackedWorkflow(Workflow):
         try:
             async for event in stream:
                 run_id = getattr(event, "run_id", None) or run_id
-                name = getattr(event, "event", None)
-                if name in _WORKFLOW_END_EVENTS:
-                    last_event = name
+                event_name = getattr(event, "event", None)
+                if event_name in _WORKFLOW_END_EVENTS:
+                    last_event = event_name
                     error = getattr(event, "error", None) or error
                 elif (
-                    name == "StepStarted" and _WORKFLOW_END_EVENTS.get(last_event or "") == "paused"
+                    event_name == "StepStarted"
+                    and _WORKFLOW_END_EVENTS.get(last_event or "") == "paused"
                 ):
                     # pausa da etapa já decidida no mesmo stream: o fluxo seguiu
                     last_event = None
-                if name == "WorkflowPaused":
+                if event_name == "WorkflowPaused":
                     pending = pending_steps(getattr(event, "step_requirements", None))
                 yield event
         except asyncio.CancelledError, GeneratorExit:
@@ -658,6 +705,7 @@ class TrackedWorkflow(Workflow):
             await RunTracking._save(self._record(kwargs, start, None, run_id, "error", str(exc)))
             return
         status = _WORKFLOW_END_EVENTS.get(last_event or "", "success")
+        # pausa vista só pela etapa: os requisitos vêm do run que o Agno gravou
         if status == "paused" and pending is None and run_id is not None:
             pending = await self._pending_from_db(run_id, kwargs.get("session_id"))
         await RunTracking._save(self._record(kwargs, start, None, run_id, status, error, pending))
@@ -665,8 +713,10 @@ class TrackedWorkflow(Workflow):
     async def _pending_from_db(
         self, run_id: str, session_id: str | None
     ) -> list[dict[str, Any]] | None:
+        """Pendências do workflow pausado lidas do run gravado; falha de leitura dá None."""
         try:
             paused = await self.aget_run_output(run_id, session_id=session_id)
+
         except Exception as exc:
             logger.warning("pausa sem requisitos", extra={"run_id": run_id, "error": str(exc)})
             return None
