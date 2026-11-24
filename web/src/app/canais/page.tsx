@@ -29,26 +29,28 @@ const DEFAULT_WELCOME =
   "As mensagens desta conversa são guardadas para o atendimento. Para falar com uma " +
   "pessoa, peça um atendente. Para encerrar e apagar seus dados, envie SAIR.";
 
+// lista separada por vírgula, como as palavras de saída do canal
 function words(value: string): string[] {
   return value
     .split(",")
-    .map((k) => k.trim())
+    .map((word) => word.trim())
     .filter(Boolean);
 }
 
+// quem pode responder num canal: agentes e times publicados
 function useResponders() {
   return useQuery({
     queryKey: ["configs", "responders"],
     queryFn: async () => {
-      const out = [];
+      const responders = [];
       for (const kind of ["agent", "team"] as const) {
-        const res = await client.GET("/api/v1/configs", {
+        const result = await client.GET("/api/v1/configs", {
           params: { query: { kind, status: "published", page_size: 100 } },
         });
-        if (res.error) throw new Error("Falha ao carregar os agentes");
-        out.push(...res.data!.items);
+        if (result.error) throw new Error("Falha ao carregar os agentes");
+        responders.push(...result.data!.items);
       }
-      return out;
+      return responders;
     },
   });
 }
@@ -87,9 +89,9 @@ function ChannelForm({ channel, onDone }: FormProps) {
   function submit() {
     const handoffKeywords = keywords
       .split(",")
-      .map((k) => k.trim())
+      .map((word) => word.trim())
       .filter(Boolean);
-    const filled = Object.fromEntries(Object.entries(creds).filter(([, v]) => v.trim()));
+    const filled = Object.fromEntries(Object.entries(creds).filter(([, value]) => value.trim()));
     const common = {
       name,
       config_id: configId,
@@ -123,8 +125,8 @@ function ChannelForm({ channel, onDone }: FormProps) {
     <form
       aria-label={channel ? `Editar ${channel.name}` : "Novo canal"}
       className="border-border bg-card flex flex-col gap-3 rounded border p-4"
-      onSubmit={(e) => {
-        e.preventDefault();
+      onSubmit={(event) => {
+        event.preventDefault();
         submit();
       }}
     >
@@ -160,10 +162,10 @@ function ChannelForm({ channel, onDone }: FormProps) {
             onChange={(e) => setConfigId(e.target.value)}
           >
             <option value="">Escolha um agente ou time</option>
-            {responders.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {c.kind === "team" ? " (time)" : ""}
+            {responders.map((responder) => (
+              <option key={responder.id} value={responder.id}>
+                {responder.name}
+                {responder.kind === "team" ? " (time)" : ""}
               </option>
             ))}
           </select>
@@ -175,15 +177,17 @@ function ChannelForm({ channel, onDone }: FormProps) {
           Credencial {channel ? "(vazio mantém a atual)" : ""}
         </legend>
         <div className="grid gap-3 sm:grid-cols-2">
-          {CREDENTIAL_FIELDS[kind].map((f) => (
-            <label key={f.key} className={labelCls}>
-              {f.label}
+          {CREDENTIAL_FIELDS[kind].map((field) => (
+            <label key={field.key} className={labelCls}>
+              {field.label}
               <PasswordInput
                 className={inputCls}
-                value={creds[f.key] ?? ""}
+                value={creds[field.key] ?? ""}
                 required={channel === null}
                 autoComplete="off"
-                onChange={(e) => setCreds((c) => ({ ...c, [f.key]: e.target.value }))}
+                onChange={(e) =>
+                  setCreds((current) => ({ ...current, [field.key]: e.target.value }))
+                }
               />
             </label>
           ))}
@@ -269,21 +273,22 @@ function ChannelRow({ channel, onEdit }: { channel: Channel; onEdit: () => void 
   const [confirm, setConfirm] = useState(false);
   const test = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/channels/{channel_id}/test", {
+      const result = await client.POST("/api/v1/channels/{channel_id}/test", {
         params: { path: { channel_id: channel.id } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha no teste"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha no teste"));
+      return result.data!;
     },
-    onSuccess: (r) => (r.ok ? toast.success(r.detail) : toast.error(r.detail)),
+    onSuccess: (testResult) =>
+      testResult.ok ? toast.success(testResult.detail) : toast.error(testResult.detail),
     onError: (e) => toast.error(e.message),
   });
   const remove = useMutation({
     mutationFn: async () => {
-      const res = await client.DELETE("/api/v1/channels/{channel_id}", {
+      const result = await client.DELETE("/api/v1/channels/{channel_id}", {
         params: { path: { channel_id: channel.id } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao apagar"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao apagar"));
     },
     onSuccess: () => {
       toast.success("Canal apagado");
@@ -385,8 +390,8 @@ export default function ChannelsPage() {
         )}
         {channels.length > 0 && (
           <ul aria-label="Canais">
-            {channels.map((c) => (
-              <ChannelRow key={c.id} channel={c} onEdit={() => setEditing(c)} />
+            {channels.map((channel) => (
+              <ChannelRow key={channel.id} channel={channel} onEdit={() => setEditing(channel)} />
             ))}
           </ul>
         )}

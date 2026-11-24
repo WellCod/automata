@@ -54,11 +54,11 @@ export default function WorkflowEditPage() {
   const { data, isPending } = useQuery({
     queryKey: ["config", id],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/configs/{config_id}", {
+      const result = await client.GET("/api/v1/configs/{config_id}", {
         params: { path: { config_id: id } },
       });
-      if (res.error) throw new Error("Falha ao carregar workflow");
-      return res.data!;
+      if (result.error) throw new Error("Falha ao carregar workflow");
+      return result.data!;
     },
   });
 
@@ -84,7 +84,7 @@ export default function WorkflowEditPage() {
     mutationFn: async (values: FormValues) => {
       const pendencias = structureErrors(values.steps);
       if (pendencias.length > 0) throw new Error(pendencias[0]);
-      const res = await client.PUT("/api/v1/configs/{config_id}/draft", {
+      const result = await client.PUT("/api/v1/configs/{config_id}/draft", {
         params: { path: { config_id: id } },
         body: {
           name: values.name,
@@ -97,8 +97,8 @@ export default function WorkflowEditPage() {
           },
         },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar rascunho"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao salvar rascunho"));
+      return result.data!;
     },
     onSuccess: (_, values) => {
       reset(values);
@@ -154,7 +154,7 @@ export default function WorkflowEditPage() {
         <div className="min-w-0 flex-1 px-6 py-6 lg:px-8">
           <form
             id="workflow-form"
-            onSubmit={form.handleSubmit((v) => save.mutate(v))}
+            onSubmit={form.handleSubmit((values) => save.mutate(values))}
             className="mx-auto flex max-w-3xl flex-col gap-5"
           >
             <div className="flex flex-col gap-1">
@@ -203,9 +203,13 @@ export default function WorkflowEditPage() {
                   // o inputCls desta página é w-full: aqui o select fica do tamanho da opção
                   className={inputCls.replace("w-full", "w-auto")}
                 >
-                  {[0, 1, 2, 3, 4, 5].map((n) => (
-                    <option key={n} value={n}>
-                      {n === 0 ? "Sem histórico" : n === 1 ? "Última troca" : `Últimas ${n} trocas`}
+                  {[0, 1, 2, 3, 4, 5].map((runCount) => (
+                    <option key={runCount} value={runCount}>
+                      {runCount === 0
+                        ? "Sem histórico"
+                        : runCount === 1
+                          ? "Última troca"
+                          : `Últimas ${runCount} trocas`}
                     </option>
                   ))}
                 </select>

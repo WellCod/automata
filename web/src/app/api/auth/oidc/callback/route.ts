@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { API_URL, BROWSER_COOKIE, type SsoError, forwardHeaders, publicUrl } from "@/lib/bff/oidc";
 
-function back(req: NextRequest, code: SsoError) {
+// volta ao login com o motivo e apaga o segredo do navegador, que só vale para uma tentativa
+function backToLogin(req: NextRequest, code: SsoError) {
   const url = publicUrl(req, "/login");
   // código, não texto: a tela de login mostra só as mensagens dela (Fase 49)
   url.searchParams.set("sso_erro", code);
@@ -14,13 +15,13 @@ function back(req: NextRequest, code: SsoError) {
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   // o provedor devolve error quando a pessoa cancela ou não tem acesso ao app
-  if (params.get("error")) return back(req, "cancelado");
+  if (params.get("error")) return backToLogin(req, "cancelado");
   const code = params.get("code");
   const state = params.get("state");
   const browserKey = req.cookies.get(BROWSER_COOKIE)?.value;
-  if (!code || !state || !browserKey) return back(req, "expirado");
+  if (!code || !state || !browserKey) return backToLogin(req, "expirado");
 
-  let data: { access_token?: string };
+  let callbackBody: { access_token?: string };
   let status = 0;
   try {
     const upstream = await fetch(`${API_URL}/api/v1/auth/oidc/callback`, {
@@ -29,22 +30,22 @@ export async function GET(req: NextRequest) {
       body: JSON.stringify({ code, state, browser_key: browserKey }),
     });
     status = upstream.status;
-    data = (await upstream.json()) as typeof data;
+    callbackBody = (await upstream.json()) as typeof callbackBody;
   } catch {
-    return back(req, "indisponivel");
+    return backToLogin(req, "indisponivel");
   }
-  if (status === 403) return back(req, "sem_acesso");
-  if (status === 401) return back(req, "expirado");
-  if (status !== 200 || !data.access_token) return back(req, "indisponivel");
+  if (status === 403) return backToLogin(req, "sem_acesso");
+  if (status === 401) return backToLogin(req, "expirado");
+  if (status !== 200 || !callbackBody.access_token) return backToLogin(req, "indisponivel");
 
-  const res = NextResponse.redirect(publicUrl(req, "/"));
-  res.cookies.delete({ name: BROWSER_COOKIE, path: "/api/auth/oidc" });
-  res.cookies.set("automata_token", data.access_token, {
+  const response = NextResponse.redirect(publicUrl(req, "/"));
+  response.cookies.delete({ name: BROWSER_COOKIE, path: "/api/auth/oidc" });
+  response.cookies.set("automata_token", callbackBody.access_token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60,
   });
-  return res;
+  return response;
 }

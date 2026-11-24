@@ -35,6 +35,7 @@ const VERBS: Record<string, string> = {
   DELETE: "Removeu",
 };
 
+/** Rótulo da ação; sem regra própria, o verbo do método seguido da rota sem o prefixo. */
 export function auditLabel(action: string): string {
   for (const [pattern, label] of LABELS) if (pattern.test(action)) return label;
   const [method, path = ""] = action.split(" ");
@@ -56,7 +57,8 @@ export const ACTION_FILTERS: { value: string; label: string }[] = [
 
 type Detail = Record<string, unknown>;
 
-function short(value: unknown): string {
+// valor do antes e depois em até 60 caracteres, legível para quem não lê JSON
+function shortText(value: unknown): string {
   if (value === null || value === undefined) return "nada";
   if (typeof value === "boolean") return value ? "sim" : "não";
   if (typeof value === "number") return value.toLocaleString("pt-BR");
@@ -70,30 +72,35 @@ export function describeDetail(
   versions: Record<string, number>,
 ): string[] {
   if (!detail) return [];
-  const v = (id: unknown) =>
+  // id de versão fora do mapa recebido (de outro config ou apagada) vira "outra versão"
+  const versionLabel = (id: unknown) =>
     typeof id === "string" && versions[id] ? `v${versions[id]}` : id ? "outra versão" : "nenhuma";
-  const out: string[] = [];
+  const lines: string[] = [];
   if ("current_before" in detail || "current_after" in detail)
-    out.push(`vigente: ${v(detail.current_before)} → ${v(detail.current_after)}`);
+    lines.push(
+      `vigente: ${versionLabel(detail.current_before)} → ${versionLabel(detail.current_after)}`,
+    );
   if ("canary_version" in detail) {
-    const pct = typeof detail.percent === "number" ? ` em ${detail.percent}%` : "";
-    out.push(`canário: ${v(detail.canary_version)}${pct}`);
+    const percentText = typeof detail.percent === "number" ? ` em ${detail.percent}%` : "";
+    lines.push(`canário: ${versionLabel(detail.canary_version)}${percentText}`);
   }
   if ("percent_before" in detail)
-    out.push(`percentual: ${short(detail.percent_before)}% → ${short(detail.percent_after)}%`);
+    lines.push(
+      `percentual: ${shortText(detail.percent_before)}% → ${shortText(detail.percent_after)}%`,
+    );
   const before = detail.before as Detail | null | undefined;
   const after = detail.after as Detail | null | undefined;
   if ("before" in detail || "after" in detail) {
-    if (!before && after) out.push("criado");
-    else if (before && !after) out.push("removido");
+    if (!before && after) lines.push("criado");
+    else if (before && !after) lines.push("removido");
     else if (before && after) {
       const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
       for (const key of keys) {
         if (JSON.stringify(before[key]) !== JSON.stringify(after[key]))
-          out.push(`${key}: ${short(before[key])} → ${short(after[key])}`);
+          lines.push(`${key}: ${shortText(before[key])} → ${shortText(after[key])}`);
       }
-      if (out.length === 0) out.push("sem mudança");
+      if (lines.length === 0) lines.push("sem mudança");
     }
   }
-  return out;
+  return lines;
 }

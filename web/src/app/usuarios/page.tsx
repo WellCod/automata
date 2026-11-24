@@ -30,6 +30,7 @@ function formatDate(iso: string | null | undefined): string {
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+// recarrega a lista depois de criar, alterar ou remover
 function useInvalidate() {
   const queryClient = useQueryClient();
   return () => void queryClient.invalidateQueries({ queryKey: ["users"] });
@@ -43,9 +44,9 @@ function NewUserForm({ onDone }: { onDone: () => void }) {
 
   const create = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/users", { body: { email, role, password } });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao criar usuário"));
-      return res.data!;
+      const result = await client.POST("/api/v1/users", { body: { email, role, password } });
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao criar usuário"));
+      return result.data!;
     },
     onSuccess: (user) => {
       toast.success(`${user.email} criado`);
@@ -58,8 +59,8 @@ function NewUserForm({ onDone }: { onDone: () => void }) {
     <form
       aria-label="Novo usuário"
       className="border-border bg-card flex flex-col gap-4 rounded border p-4"
-      onSubmit={(e) => {
-        e.preventDefault();
+      onSubmit={(event) => {
+        event.preventDefault();
         create.mutate();
       }}
     >
@@ -84,9 +85,9 @@ function NewUserForm({ onDone }: { onDone: () => void }) {
             onChange={(e) => setRole(e.target.value as UserRole)}
             className={inputCls}
           >
-            {ROLES.map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABELS[r]}
+            {ROLES.map((roleOption) => (
+              <option key={roleOption} value={roleOption}>
+                {ROLE_LABELS[roleOption]}
               </option>
             ))}
           </select>
@@ -138,15 +139,15 @@ function UserRow({ user, isSelf }: { user: UserAccount; isSelf: boolean }) {
 
   const update = useMutation({
     mutationFn: async (body: { role?: UserRole; is_active?: boolean }) => {
-      const res = await client.PATCH("/api/v1/users/{user_id}", {
+      const result = await client.PATCH("/api/v1/users/{user_id}", {
         params: { path: { user_id: user.id } },
         body,
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao alterar usuário"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao alterar usuário"));
+      return result.data!;
     },
-    onSuccess: (u) => {
-      toast.success(`${u.email} atualizado; sessões abertas encerradas`);
+    onSuccess: (updatedUser) => {
+      toast.success(`${updatedUser.email} atualizado; sessões abertas encerradas`);
       invalidate();
     },
     onError: (e) => toast.error(e.message),
@@ -154,11 +155,11 @@ function UserRow({ user, isSelf }: { user: UserAccount; isSelf: boolean }) {
 
   const reset = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/users/{user_id}/password", {
+      const result = await client.POST("/api/v1/users/{user_id}/password", {
         params: { path: { user_id: user.id } },
         body: { password },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao redefinir senha"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao redefinir senha"));
     },
     onSuccess: () => {
       toast.success(`Senha de ${user.email} redefinida`);
@@ -169,10 +170,10 @@ function UserRow({ user, isSelf }: { user: UserAccount; isSelf: boolean }) {
 
   const remove = useMutation({
     mutationFn: async () => {
-      const res = await client.DELETE("/api/v1/users/{user_id}", {
+      const result = await client.DELETE("/api/v1/users/{user_id}", {
         params: { path: { user_id: user.id } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao remover"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao remover"));
     },
     onSuccess: () => {
       toast.success(`${user.email} removido`);
@@ -201,8 +202,8 @@ function UserRow({ user, isSelf }: { user: UserAccount; isSelf: boolean }) {
         {mode === "password" && (
           <form
             className="mt-2 flex flex-col gap-1.5"
-            onSubmit={(e) => {
-              e.preventDefault();
+            onSubmit={(event) => {
+              event.preventDefault();
               reset.mutate();
             }}
           >
@@ -242,9 +243,9 @@ function UserRow({ user, isSelf }: { user: UserAccount; isSelf: boolean }) {
           onChange={(e) => update.mutate({ role: e.target.value as UserRole })}
           className="border-border text-foreground focus:border-accent rounded border bg-[var(--input)] px-2 py-1 text-[13px] focus:outline-none"
         >
-          {ROLES.map((r) => (
-            <option key={r} value={r}>
-              {ROLE_LABELS[r]}
+          {ROLES.map((roleOption) => (
+            <option key={roleOption} value={roleOption}>
+              {ROLE_LABELS[roleOption]}
             </option>
           ))}
         </select>
@@ -344,8 +345,8 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => (
-                  <UserRow key={u.id} user={u} isSelf={u.id === me?.id} />
+                {users.map((user) => (
+                  <UserRow key={user.id} user={user} isSelf={user.id === me?.id} />
                 ))}
               </tbody>
             </table>

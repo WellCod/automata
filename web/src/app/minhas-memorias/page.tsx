@@ -13,26 +13,26 @@ export default function MyMemoriesPage() {
   const { data, isPending, isError } = useQuery({
     queryKey: ["my-memories"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/me/memories");
-      if (!res.data) throw new Error("Falha ao carregar");
-      return res.data;
+      const result = await client.GET("/api/v1/me/memories");
+      if (!result.data) throw new Error("Falha ao carregar");
+      return result.data;
     },
   });
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["my-memories"] });
   const removeOne = useMutation({
     mutationFn: async (memoryId: string) => {
-      const res = await client.DELETE("/api/v1/me/memories/{memory_id}", {
+      const result = await client.DELETE("/api/v1/me/memories/{memory_id}", {
         params: { path: { memory_id: memoryId } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao apagar"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao apagar"));
     },
     onSuccess: refresh,
     onError: (e) => toast.error(e.message),
   });
   const forgetAll = useMutation({
     mutationFn: async () => {
-      const res = await client.DELETE("/api/v1/me/memories");
-      if (!res.response.ok) throw new Error("Falha ao apagar");
+      const result = await client.DELETE("/api/v1/me/memories");
+      if (!result.response.ok) throw new Error("Falha ao apagar");
     },
     onSuccess: () => {
       toast.success("Memórias apagadas");
@@ -64,19 +64,23 @@ export default function MyMemoriesPage() {
       {data && data.length > 0 && (
         <>
           <ul aria-label="Memórias" className="border-border bg-card rounded border px-3">
-            {data.map((m) => (
+            {data.map((memory) => (
               <li
-                key={m.memory_id}
+                key={memory.memory_id}
                 className="border-border flex items-start justify-between gap-2 border-b py-2 text-[13px] last:border-b-0"
               >
                 <span className="text-foreground">
-                  {m.memory}
+                  {memory.memory}
                   <span className="text-muted-foreground text-[11px]">
                     {" "}
-                    · {m.agent_name ?? "agente removido"}
+                    · {memory.agent_name ?? "agente removido"}
                   </span>
                 </span>
-                <Button size="xs" variant="ghost" onClick={() => removeOne.mutate(m.memory_id)}>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => removeOne.mutate(memory.memory_id)}
+                >
                   Apagar
                 </Button>
               </li>

@@ -5,9 +5,9 @@ export function usePendingApprovals() {
   return useQuery({
     queryKey: ["approvals"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/approvals");
-      if (res.error) throw new Error("Falha ao carregar aprovações");
-      return res.data!;
+      const result = await client.GET("/api/v1/approvals");
+      if (result.error) throw new Error("Falha ao carregar aprovações");
+      return result.data!;
     },
     refetchInterval: 10_000,
   });
@@ -34,11 +34,15 @@ export async function decideWorkflowStep(
   decision: StepDecision,
 ): Promise<Record<string, unknown>> {
   const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
-  const run = await fetch(`/api/workflows/${workflowId}/runs/${runId}${query}`);
-  if (!run.ok) throw new Error(`Falha ao ler a execução (HTTP ${run.status})`);
-  const data = (await run.json()) as { step_requirements?: Record<string, unknown>[] | null };
-  const requirements = data.step_requirements ?? [];
+  const runResponse = await fetch(`/api/workflows/${workflowId}/runs/${runId}${query}`);
+  if (!runResponse.ok) throw new Error(`Falha ao ler a execução (HTTP ${runResponse.status})`);
+  const runBody = (await runResponse.json()) as {
+    step_requirements?: Record<string, unknown>[] | null;
+  };
+  const requirements = runBody.step_requirements ?? [];
   if (requirements.length === 0) throw new Error("A execução não tem etapa esperando revisão");
+  // edited_output só vale na aprovação e rejection_feedback só na recusa: o Agno lê
+  // cada um no seu caminho, e o campo vazio não deve chegar ao continue
   const active = {
     ...requirements[requirements.length - 1],
     confirmed: decision.approve,
@@ -51,10 +55,11 @@ export async function decideWorkflowStep(
   form.append("step_requirements", JSON.stringify([...requirements.slice(0, -1), active]));
   form.append("session_id", sessionId ?? "");
   form.append("stream", "false");
-  const res = await fetch(`/api/workflows/${workflowId}/runs/${runId}/continue`, {
+  const continueResponse = await fetch(`/api/workflows/${workflowId}/runs/${runId}/continue`, {
     method: "POST",
     body: form,
   });
-  if (!res.ok) throw new Error(`Falha ao registrar a decisão (HTTP ${res.status})`);
-  return (await res.json()) as Record<string, unknown>;
+  if (!continueResponse.ok)
+    throw new Error(`Falha ao registrar a decisão (HTTP ${continueResponse.status})`);
+  return (await continueResponse.json()) as Record<string, unknown>;
 }

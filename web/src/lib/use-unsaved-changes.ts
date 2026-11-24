@@ -10,19 +10,27 @@ export function useUnsavedChangesWarning(dirty: boolean) {
   useEffect(() => {
     if (!dirty) return;
 
-    function onBeforeUnload(e: BeforeUnloadEvent) {
-      e.preventDefault();
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
     }
 
-    function onClick(e: MouseEvent) {
-      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
-      const anchor = (e.target as Element | null)?.closest?.("a[href]");
+    // clique com modificador ou botão do meio abre outra aba: a página atual fica
+    function onClick(event: MouseEvent) {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey
+      )
+        return;
+      const anchor = (event.target as Element | null)?.closest?.("a[href]");
       if (!(anchor instanceof HTMLAnchorElement) || anchor.target === "_blank") return;
       if (anchor.origin !== window.location.origin) return;
       if (anchor.pathname === window.location.pathname) return;
       if (!window.confirm(UNSAVED_MESSAGE)) {
-        e.preventDefault();
-        e.stopPropagation();
+        event.preventDefault();
+        event.stopPropagation();
       }
     }
 

@@ -16,15 +16,16 @@ type Issued = components["schemas"]["IssuedIntegration"];
 const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none";
 
+// o token só chama o que está publicado
 function usePublished(kind: "agent" | "team") {
   return useQuery({
     queryKey: ["configs", "published", kind],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/configs", {
+      const result = await client.GET("/api/v1/configs", {
         params: { query: { kind, status: "published", page_size: 100 } },
       });
-      if (res.error) throw new Error("Falha ao carregar");
-      return res.data!.items;
+      if (result.error) throw new Error("Falha ao carregar");
+      return result.data!.items;
     },
   });
 }
@@ -34,11 +35,11 @@ function useTestable(kind: "agent" | "team") {
   return useQuery({
     queryKey: ["configs", "testable", kind],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/configs", {
+      const result = await client.GET("/api/v1/configs", {
         params: { query: { kind, page_size: 100 } },
       });
-      if (res.error) throw new Error("Falha ao carregar");
-      return res.data!.items;
+      if (result.error) throw new Error("Falha ao carregar");
+      return result.data!.items;
     },
   });
 }
@@ -113,7 +114,7 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
 
   const issue = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/integrations", {
+      const result = await client.POST("/api/v1/integrations", {
         body: {
           name: name.trim(),
           agent_ids: agentIds,
@@ -123,8 +124,8 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
           expires_in_days: days,
         },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao emitir token"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao emitir token"));
+      return result.data!;
     },
     onSuccess: (issued) => {
       setName("");
@@ -137,8 +138,8 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
     },
   });
 
-  function toggle(list: string[], set: (v: string[]) => void, value: string, on: boolean) {
-    set(on ? [...list, value] : list.filter((v) => v !== value));
+  function toggle(list: string[], set: (next: string[]) => void, value: string, on: boolean) {
+    set(on ? [...list, value] : list.filter((item) => item !== value));
   }
 
   const nothingSelected =
@@ -146,8 +147,8 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
 
   return (
     <form
-      onSubmit={(e) => {
-        e.preventDefault();
+      onSubmit={(event) => {
+        event.preventDefault();
         issue.mutate();
       }}
       className="border-border bg-card flex flex-col gap-4 rounded border p-4"
@@ -188,14 +189,14 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
           {agents?.length === 0 && (
             <p className="text-muted-foreground text-[11px]">Nenhum agente publicado.</p>
           )}
-          {agents?.map((a) => (
-            <label key={a.id} className="flex items-center gap-2 text-[13px]">
+          {agents?.map((agent) => (
+            <label key={agent.id} className="flex items-center gap-2 text-[13px]">
               <input
                 type="checkbox"
-                checked={agentIds.includes(a.id)}
-                onChange={(e) => toggle(agentIds, setAgentIds, a.id, e.target.checked)}
+                checked={agentIds.includes(agent.id)}
+                onChange={(e) => toggle(agentIds, setAgentIds, agent.id, e.target.checked)}
               />
-              <span className="text-foreground">{a.name}</span>
+              <span className="text-foreground">{agent.name}</span>
             </label>
           ))}
         </fieldset>
@@ -204,14 +205,14 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
           {teams?.length === 0 && (
             <p className="text-muted-foreground text-[11px]">Nenhum time publicado.</p>
           )}
-          {teams?.map((t) => (
-            <label key={t.id} className="flex items-center gap-2 text-[13px]">
+          {teams?.map((team) => (
+            <label key={team.id} className="flex items-center gap-2 text-[13px]">
               <input
                 type="checkbox"
-                checked={teamIds.includes(t.id)}
-                onChange={(e) => toggle(teamIds, setTeamIds, t.id, e.target.checked)}
+                checked={teamIds.includes(team.id)}
+                onChange={(e) => toggle(teamIds, setTeamIds, team.id, e.target.checked)}
               />
-              <span className="text-foreground">{t.name}</span>
+              <span className="text-foreground">{team.name}</span>
             </label>
           ))}
         </fieldset>
@@ -226,14 +227,14 @@ function NewIntegration({ onIssued }: { onIssued: (issued: Issued) => void }) {
           consome. Cada execução gasta tokens até o token ser revogado; casos e gate continuam só no
           painel.
         </p>
-        {testable.map((c) => (
-          <label key={c.id} className="flex items-center gap-2 text-[13px]">
+        {testable.map((config) => (
+          <label key={config.id} className="flex items-center gap-2 text-[13px]">
             <input
               type="checkbox"
-              checked={evalIds.includes(c.id)}
-              onChange={(e) => toggle(evalIds, setEvalIds, c.id, e.target.checked)}
+              checked={evalIds.includes(config.id)}
+              onChange={(e) => toggle(evalIds, setEvalIds, config.id, e.target.checked)}
             />
-            <span className="text-foreground">{c.name}</span>
+            <span className="text-foreground">{config.name}</span>
           </label>
         ))}
       </fieldset>
@@ -283,10 +284,10 @@ function IntegrationRow({ item, names }: { item: Integration; names: Record<stri
   const [confirm, setConfirm] = useState(false);
   const revoke = useMutation({
     mutationFn: async () => {
-      const res = await client.DELETE("/api/v1/integrations/{integration_id}", {
+      const result = await client.DELETE("/api/v1/integrations/{integration_id}", {
         params: { path: { integration_id: item.id } },
       });
-      if (res.error) throw new Error("Falha ao revogar");
+      if (result.error) throw new Error("Falha ao revogar");
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["integrations"] }),
   });
@@ -365,14 +366,14 @@ export default function IntegrationsPage() {
   const { data: agents } = useTestable("agent");
   const { data: teams } = useTestable("team");
   const names = Object.fromEntries(
-    [...(agents ?? []), ...(teams ?? [])].map((c) => [c.id, c.name]),
+    [...(agents ?? []), ...(teams ?? [])].map((config) => [config.id, config.name]),
   );
   const { data, isPending, isError } = useQuery({
     queryKey: ["integrations"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/integrations");
-      if (res.error) throw new Error("Falha ao carregar integrações");
-      return res.data!;
+      const result = await client.GET("/api/v1/integrations");
+      if (result.error) throw new Error("Falha ao carregar integrações");
+      return result.data!;
     },
   });
 

@@ -143,6 +143,7 @@ const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors focus:border-accent focus:outline-none";
 const textareaCls = `${inputCls} min-h-24 resize-y`;
 
+// publicada com rascunho por cima, só publicada, só rascunho ou nunca salva
 function StatusBadge({ data }: { data: AgentConfigDetail | undefined }) {
   if (!data) return null;
   if (data.current_version && data.draft_version) {
@@ -162,11 +163,11 @@ function TeamsUsingAgent({ agentId }: { agentId: string }) {
   const { data: teams } = useQuery({
     queryKey: ["config", agentId, "teams"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/configs/{config_id}/teams", {
+      const result = await client.GET("/api/v1/configs/{config_id}/teams", {
         params: { path: { config_id: agentId } },
       });
-      if (res.error) throw new Error("Falha ao carregar times");
-      return res.data!;
+      if (result.error) throw new Error("Falha ao carregar times");
+      return result.data!;
     },
   });
   // aviso secundário: resposta inesperada não pode derrubar a tela de edição
@@ -174,11 +175,11 @@ function TeamsUsingAgent({ agentId }: { agentId: string }) {
   return (
     <p className="border-border text-muted-foreground rounded border px-3 py-2 text-[13px]">
       Membro de{" "}
-      {teams.map((t, i) => (
-        <span key={t.id}>
+      {teams.map((team, i) => (
+        <span key={team.id}>
           {i > 0 && ", "}
-          <Link href={`/times/${t.id}`} className="text-accent hover:underline">
-            {t.name}
+          <Link href={`/times/${team.id}`} className="text-accent hover:underline">
+            {team.name}
           </Link>
         </span>
       ))}
@@ -210,11 +211,11 @@ export default function AgentEditPage() {
   } = useQuery({
     queryKey: ["config", id],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/configs/{config_id}", {
+      const result = await client.GET("/api/v1/configs/{config_id}", {
         params: { path: { config_id: id } },
       });
-      if (res.error) throw new Error("Falha ao carregar agente");
-      return res.data!;
+      if (result.error) throw new Error("Falha ao carregar agente");
+      return result.data!;
     },
   });
 
@@ -262,14 +263,14 @@ export default function AgentEditPage() {
         objective: data.payload?.instructions?.objective ?? "",
         guardrails: data.payload?.instructions?.guardrails ?? "",
       },
-      mcp_servers: (data.payload?.mcp_servers ?? []).map((b) => ({
-        server_id: b.server_id,
-        tools: b.tools ?? null,
-        require_confirmation: b.require_confirmation ?? [],
+      mcp_servers: (data.payload?.mcp_servers ?? []).map((binding) => ({
+        server_id: binding.server_id,
+        tools: binding.tools ?? null,
+        require_confirmation: binding.require_confirmation ?? [],
       })),
-      knowledge: (data.payload?.knowledge ?? []).map((k) => ({
-        base_id: k.base_id,
-        max_results: k.max_results ?? 5,
+      knowledge: (data.payload?.knowledge ?? []).map((source) => ({
+        base_id: source.base_id,
+        max_results: source.max_results ?? 5,
       })),
       guardrails: fresh ? SAFE_NEW_GUARDRAILS : withDefaults(data.payload?.guardrails),
       conversation: withConversationDefaults(data.payload?.conversation),
@@ -279,9 +280,10 @@ export default function AgentEditPage() {
     });
   }, [data, reset]);
 
+  // salvar grava o rascunho; publicar é outra ação, na aba de versões
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
-      const res = await client.PUT("/api/v1/configs/{config_id}/draft", {
+      const result = await client.PUT("/api/v1/configs/{config_id}/draft", {
         params: { path: { config_id: id } },
         body: {
           name: values.name,
@@ -303,20 +305,21 @@ export default function AgentEditPage() {
         },
       });
       // a validação das seções avançadas é da API: a mensagem dela diz o que corrigir (UX-04)
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar rascunho"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao salvar rascunho"));
+      return result.data!;
     },
     onSuccess: (_, values) => {
       setApiRejected(false);
+      // limpo antes do reset, para o refetch da invalidação abaixo poder repor o formulário
       dirtyRef.current = false;
       reset(values);
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
       void queryClient.invalidateQueries({ queryKey: ["config", id] });
       toast.success("Rascunho salvo");
     },
-    onError: (e) => {
+    onError: (error) => {
       setApiRejected(true);
-      toast.error(e.message);
+      toast.error(error.message);
     },
   });
 
@@ -402,7 +405,7 @@ export default function AgentEditPage() {
       <div className="flex flex-1 flex-col lg:flex-row">
         <Tabs
           value={tab}
-          onValueChange={(v) => setTab(v as PageTab)}
+          onValueChange={(value) => setTab(value as PageTab)}
           className="min-w-0 flex-1 px-4 pt-2 pb-6 md:px-8"
         >
           <TabsList className="overflow-x-auto [mask-image:linear-gradient(to_right,black_85%,transparent)] md:[mask-image:none]">
@@ -418,7 +421,7 @@ export default function AgentEditPage() {
           <TabsContent value="config" keepMounted className="pt-5">
             <form
               id="agent-form"
-              onSubmit={form.handleSubmit((v) => mutation.mutate(v))}
+              onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
               className="mx-auto flex max-w-2xl flex-col gap-5"
             >
               <TeamsUsingAgent agentId={id} />
@@ -507,7 +510,9 @@ export default function AgentEditPage() {
 
               <AdvancedSection
                 summary="Guardrails, conversa longa, memória do usuário, controle do run e saída estruturada"
-                forceOpen={apiRejected || ADVANCED_FIELDS.some((f) => f in form.formState.errors)}
+                forceOpen={
+                  apiRejected || ADVANCED_FIELDS.some((field) => field in form.formState.errors)
+                }
               >
                 <Controller
                   name="guardrails"

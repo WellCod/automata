@@ -20,7 +20,7 @@ export const MAX_ROUTES = 5;
 
 // {etapa:Nome} no texto de entrada (ADR-0038); mesma regra de STEP_REF na API
 export function templateRefs(template: string | null | undefined): string[] {
-  return [...(template ?? "").matchAll(/\{etapa:([^{}]{1,60})\}/g)].map((m) => m[1].trim());
+  return [...(template ?? "").matchAll(/\{etapa:([^{}]{1,60})\}/g)].map((match) => match[1].trim());
 }
 
 export const RULE_KINDS: { value: WorkflowRule["kind"]; label: string; needsValue: boolean }[] = [
@@ -33,24 +33,25 @@ export const RULE_KINDS: { value: WorkflowRule["kind"]; label: string; needsValu
 ];
 
 export function ruleNeedsValue(kind: WorkflowRule["kind"]): boolean {
-  return RULE_KINDS.find((k) => k.value === kind)?.needsValue ?? false;
+  return RULE_KINDS.find((option) => option.value === kind)?.needsValue ?? false;
 }
 
+// filhos diretos de um contêiner, na ordem em que aparecem no editor
 export function children(node: WorkflowNode): WorkflowNode[] {
   if (node.type === "parallel") return node.branches;
   if (node.type === "condition") return [...node.steps, ...(node.else_steps ?? [])];
   if (node.type === "loop") return node.steps;
   if (node.type === "router")
-    return [...node.routes.map((r) => r.step), ...(node.default ? [node.default] : [])];
+    return [...node.routes.map((route) => route.step), ...(node.default ? [node.default] : [])];
   return [];
 }
 
 export function allNodes(nodes: WorkflowNode[]): WorkflowNode[] {
-  return nodes.flatMap((n) => [n, ...allNodes(children(n))]);
+  return nodes.flatMap((node) => [node, ...allNodes(children(node))]);
 }
 
 export function countSteps(nodes: WorkflowNode[]): number {
-  return allNodes(nodes).filter((n) => n.type === "step").length;
+  return allNodes(nodes).filter((node) => node.type === "step").length;
 }
 
 const BASE_NAME: Record<NodeType, string> = {
@@ -61,24 +62,26 @@ const BASE_NAME: Record<NodeType, string> = {
   router: "roteador",
 };
 
+// "etapa", "etapa 2", "etapa 3"...: o primeiro sufixo livre a partir de 2
 export function uniqueName(base: string, taken: Set<string>): string {
   if (!taken.has(base)) return base;
-  let i = 2;
-  while (taken.has(`${base} ${i}`)) i += 1;
-  return `${base} ${i}`;
+  let suffix = 2;
+  while (taken.has(`${base} ${suffix}`)) suffix += 1;
+  return `${base} ${suffix}`;
 }
 
 // recebe os nomes já usados na árvore inteira: o nome é único no workflow todo
 export function newNode(type: NodeType, taken: Set<string>): WorkflowNode {
   const name = uniqueName(BASE_NAME[type], taken);
-  const step = (n: string): StepNode => ({
+  const step = (stepName: string): StepNode => ({
     type: "step",
-    name: n,
+    name: stepName,
     on_error: "stop",
     max_retries: 0,
     input: "previous",
   });
   if (type === "step") return step(name);
+  // os filhos também entram no conjunto de nomes, para os dois ramos não colidirem
   if (type === "parallel") {
     const first = uniqueName("ramo", new Set([...taken, name]));
     const second = uniqueName("ramo", new Set([...taken, name, first]));
@@ -112,7 +115,7 @@ export function newNode(type: NodeType, taken: Set<string>): WorkflowNode {
 }
 
 export function namesOf(nodes: WorkflowNode[]): Set<string> {
-  return new Set(allNodes(nodes).map((n) => n.name));
+  return new Set(allNodes(nodes).map((node) => node.name));
 }
 
 export function move<T>(list: T[], index: number, delta: number): T[] {
@@ -135,20 +138,24 @@ export function removeAt<T>(list: T[], index: number): T[] {
 // dentro de condição, e em paralelo e laço o contêiner ficaria pela metade
 export function reviewsInsideContainers(nodes: WorkflowNode[]): string[] {
   return nodes
-    .flatMap((n) => allNodes(children(n)))
-    .filter((n) => n.type === "step" && n.review)
-    .map((n) => n.name);
+    .flatMap((topNode) => allNodes(children(topNode)))
+    .filter((node) => node.type === "step" && node.review)
+    .map((node) => node.name);
 }
 
 // laço com revisão por volta (ADR-0028): no nível principal e com uma etapa simples
 export function loopReviewErrors(nodes: WorkflowNode[]): string[] {
   const errors: string[] = [];
-  for (const n of nodes.flatMap((top) => allNodes(children(top))))
-    if (n.type === "loop" && n.review)
-      errors.push(`O laço "${n.name}" com revisão precisa estar no nível principal.`);
-  for (const n of nodes)
-    if (n.type === "loop" && n.review && (n.steps.length !== 1 || n.steps[0].type !== "step"))
-      errors.push(`O laço "${n.name}" com revisão por volta precisa de uma etapa só.`);
+  for (const node of nodes.flatMap((topNode) => allNodes(children(topNode))))
+    if (node.type === "loop" && node.review)
+      errors.push(`O laço "${node.name}" com revisão precisa estar no nível principal.`);
+  for (const node of nodes)
+    if (
+      node.type === "loop" &&
+      node.review &&
+      (node.steps.length !== 1 || node.steps[0].type !== "step")
+    )
+      errors.push(`O laço "${node.name}" com revisão por volta precisa de uma etapa só.`);
   return errors;
 }
 
@@ -158,26 +165,26 @@ export function structureErrors(nodes: WorkflowNode[]): string[] {
   if (nodes.length === 0) errors.push("Adicione ao menos uma etapa.");
   const all = allNodes(nodes);
   const seen = new Set<string>();
-  for (const n of all) {
-    if (!n.name.trim()) errors.push("Toda etapa precisa de nome.");
-    else if (seen.has(n.name)) errors.push(`Nome repetido: "${n.name}".`);
-    seen.add(n.name);
-    if (n.type === "step" && !n.agent_id && !n.team_id)
-      errors.push(`Escolha o agente ou time de "${n.name}".`);
-    if ((n.type === "condition" || n.type === "loop") && n.steps.length === 0)
-      errors.push(`"${n.name}" precisa de ao menos uma etapa.`);
-    const rule = n.type === "condition" ? n.rule : n.type === "loop" ? n.until : null;
+  for (const node of all) {
+    if (!node.name.trim()) errors.push("Toda etapa precisa de nome.");
+    else if (seen.has(node.name)) errors.push(`Nome repetido: "${node.name}".`);
+    seen.add(node.name);
+    if (node.type === "step" && !node.agent_id && !node.team_id)
+      errors.push(`Escolha o agente ou time de "${node.name}".`);
+    if ((node.type === "condition" || node.type === "loop") && node.steps.length === 0)
+      errors.push(`"${node.name}" precisa de ao menos uma etapa.`);
+    const rule = node.type === "condition" ? node.rule : node.type === "loop" ? node.until : null;
     if (rule && ruleNeedsValue(rule.kind) && !rule.value?.trim())
-      errors.push(`Preencha o texto da regra de "${n.name}".`);
-    if (n.type === "router")
-      for (const r of n.routes)
-        if (ruleNeedsValue(r.rule.kind) && !r.rule.value?.trim())
-          errors.push(`Preencha o texto da regra do caminho "${r.step.name}".`);
-    if (n.type === "step" && n.input === "template") {
-      if (!n.template?.trim()) errors.push(`Escreva o texto de entrada de "${n.name}".`);
-      for (const ref of templateRefs(n.template))
+      errors.push(`Preencha o texto da regra de "${node.name}".`);
+    if (node.type === "router")
+      for (const route of node.routes)
+        if (ruleNeedsValue(route.rule.kind) && !route.rule.value?.trim())
+          errors.push(`Preencha o texto da regra do caminho "${route.step.name}".`);
+    if (node.type === "step" && node.input === "template") {
+      if (!node.template?.trim()) errors.push(`Escreva o texto de entrada de "${node.name}".`);
+      for (const ref of templateRefs(node.template))
         if (!all.some((other) => other.name === ref))
-          errors.push(`O texto de "${n.name}" cita a etapa "${ref}", que não existe.`);
+          errors.push(`O texto de "${node.name}" cita a etapa "${ref}", que não existe.`);
     }
   }
   if (countSteps(nodes) > MAX_STEPS) errors.push(`No máximo ${MAX_STEPS} etapas.`);

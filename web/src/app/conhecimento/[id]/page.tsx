@@ -81,10 +81,13 @@ function ContentRow({ baseId, content }: { baseId: string; content: KnowledgeCon
   const [editingFields, setEditingFields] = useState(false);
   const remove = useMutation({
     mutationFn: async () => {
-      const res = await client.DELETE("/api/v1/knowledge-bases/{base_id}/contents/{content_id}", {
-        params: { path: { base_id: baseId, content_id: content.id } },
-      });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao remover"));
+      const result = await client.DELETE(
+        "/api/v1/knowledge-bases/{base_id}/contents/{content_id}",
+        {
+          params: { path: { base_id: baseId, content_id: content.id } },
+        },
+      );
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao remover"));
     },
     onSuccess: () => {
       toast.success(`${content.name} removido`);
@@ -94,11 +97,11 @@ function ContentRow({ baseId, content }: { baseId: string; content: KnowledgeCon
   });
   const refetch = useMutation({
     mutationFn: async () => {
-      const res = await client.POST(
+      const result = await client.POST(
         "/api/v1/knowledge-bases/{base_id}/contents/{content_id}/refresh",
         { params: { path: { base_id: baseId, content_id: content.id } } },
       );
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao baixar de novo"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao baixar de novo"));
     },
     onSuccess: () => {
       // só reindexa se mudou; a lista mostra o estado
@@ -204,23 +207,23 @@ function AddContent({ baseId }: { baseId: string }) {
       for (const file of files) await uploadFile(baseId, file);
       return files.length;
     },
-    onSuccess: (n) => {
-      toast.success(n === 1 ? "Arquivo enviado" : `${n} arquivos enviados`);
+    onSuccess: (sentCount) => {
+      toast.success(sentCount === 1 ? "Arquivo enviado" : `${sentCount} arquivos enviados`);
       refresh();
     },
-    onError: (e) => {
-      toast.error(e.message);
+    onError: (error) => {
+      toast.error(error.message);
       refresh();
     },
   });
 
   const addUrl = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/knowledge-bases/{base_id}/contents/url", {
+      const result = await client.POST("/api/v1/knowledge-bases/{base_id}/contents/url", {
         params: { path: { base_id: baseId } },
         body: { url, refresh_every_hours: refreshHours ? Number(refreshHours) : null },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao adicionar URL"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao adicionar URL"));
     },
     onSuccess: () => {
       setUrl("");
@@ -232,11 +235,11 @@ function AddContent({ baseId }: { baseId: string }) {
 
   const addText = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/knowledge-bases/{base_id}/contents/text", {
+      const result = await client.POST("/api/v1/knowledge-bases/{base_id}/contents/text", {
         params: { path: { base_id: baseId } },
         body: { name: textName, text },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao adicionar texto"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao adicionar texto"));
     },
     onSuccess: () => {
       setTextName("");
@@ -249,15 +252,15 @@ function AddContent({ baseId }: { baseId: string }) {
   return (
     <div className="flex flex-col gap-3">
       <div
-        onDragOver={(e) => {
-          e.preventDefault();
+        onDragOver={(event) => {
+          event.preventDefault();
           setDragging(true);
         }}
         onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
+        onDrop={(event) => {
+          event.preventDefault();
           setDragging(false);
-          const files = Array.from(e.dataTransfer.files);
+          const files = Array.from(event.dataTransfer.files);
           if (files.length) upload.mutate(files);
         }}
         className={cn(
@@ -291,10 +294,10 @@ function AddContent({ baseId }: { baseId: string }) {
           accept={ACCEPT}
           className="sr-only"
           aria-label="Arquivos para a base"
-          onChange={(e) => {
-            const files = Array.from(e.target.files ?? []);
+          onChange={(event) => {
+            const files = Array.from(event.target.files ?? []);
             if (files.length) upload.mutate(files);
-            e.target.value = "";
+            event.target.value = "";
           }}
         />
       </div>
@@ -302,8 +305,8 @@ function AddContent({ baseId }: { baseId: string }) {
       {mode === "url" && (
         <form
           className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
+          onSubmit={(event) => {
+            event.preventDefault();
             addUrl.mutate();
           }}
         >
@@ -340,8 +343,8 @@ function AddContent({ baseId }: { baseId: string }) {
       {mode === "text" && (
         <form
           className="flex flex-col gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
+          onSubmit={(event) => {
+            event.preventDefault();
             addText.mutate();
           }}
         >
@@ -393,8 +396,8 @@ function Documents({ baseId }: { baseId: string }) {
       )}
       {data && data.length > 0 && (
         <ul className="flex flex-col gap-1">
-          {data.map((c) => (
-            <ContentRow key={c.id} baseId={baseId} content={c} />
+          {data.map((content) => (
+            <ContentRow key={content.id} baseId={baseId} content={content} />
           ))}
         </ul>
       )}
@@ -458,6 +461,7 @@ function ResultColumn({ title, result }: { title: string; result: SearchResult }
   );
 }
 
+// só faz sentido comparar com a busca simples quando a base tem algo além dela
 function hasStrategy(base: KnowledgeBase): boolean {
   return (
     base.retrieval.reranker !== "none" ||
@@ -474,22 +478,22 @@ function TestSearch({ base }: { base: KnowledgeBase }) {
   const filtersBody = Object.keys(filters).length ? filters : null;
   const search = useMutation({
     mutationFn: async (): Promise<SearchHit[]> => {
-      const res = await client.POST("/api/v1/knowledge-bases/{base_id}/search", {
+      const result = await client.POST("/api/v1/knowledge-bases/{base_id}/search", {
         params: { path: { base_id: base.id } },
         body: { query, max_results: 5, filters: filtersBody },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha na busca"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha na busca"));
+      return result.data!;
     },
   });
   const comparison = useMutation({
     mutationFn: async (): Promise<SearchComparison> => {
-      const res = await client.POST("/api/v1/knowledge-bases/{base_id}/search/compare", {
+      const result = await client.POST("/api/v1/knowledge-bases/{base_id}/search/compare", {
         params: { path: { base_id: base.id } },
         body: { query, max_results: 5, filters: filtersBody },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha na busca"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha na busca"));
+      return result.data!;
     },
   });
   // com filtro, a comparação devolve se o filtro caiu; a busca simples só traz os trechos
@@ -503,8 +507,8 @@ function TestSearch({ base }: { base: KnowledgeBase }) {
       </p>
       <form
         className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
+        onSubmit={(event) => {
+          event.preventDefault();
           if (query.trim() && filterProblems.length === 0) active.mutate();
         }}
       >
@@ -528,9 +532,9 @@ function TestSearch({ base }: { base: KnowledgeBase }) {
           className={inputCls}
         />
       </label>
-      {filterProblems.map((p) => (
-        <p key={p} className="text-destructive text-[11px]">
-          {p}
+      {filterProblems.map((problem) => (
+        <p key={problem} className="text-destructive text-[11px]">
+          {problem}
         </p>
       ))}
       <label className="text-muted-foreground flex items-center gap-2 text-[12px]">
@@ -575,11 +579,11 @@ function Settings({ base }: { base: KnowledgeBase }) {
 
   const save = useMutation({
     mutationFn: async () => {
-      const res = await client.PUT("/api/v1/knowledge-bases/{base_id}", {
+      const result = await client.PUT("/api/v1/knowledge-bases/{base_id}", {
         params: { path: { base_id: base.id } },
         body: { name, description, chunk_size: chunkSize, retrieval, chunking },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao salvar"));
     },
     onSuccess: () => {
       toast.success("Base salva");
@@ -590,10 +594,10 @@ function Settings({ base }: { base: KnowledgeBase }) {
 
   const remove = useMutation({
     mutationFn: async () => {
-      const res = await client.DELETE("/api/v1/knowledge-bases/{base_id}", {
+      const result = await client.DELETE("/api/v1/knowledge-bases/{base_id}", {
         params: { path: { base_id: base.id } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao remover a base"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao remover a base"));
     },
     onSuccess: () => {
       toast.success(`${base.name} removida`);
@@ -605,8 +609,8 @@ function Settings({ base }: { base: KnowledgeBase }) {
   return (
     <form
       className="flex flex-col gap-4"
-      onSubmit={(e) => {
-        e.preventDefault();
+      onSubmit={(event) => {
+        event.preventDefault();
         save.mutate();
       }}
     >

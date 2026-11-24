@@ -20,21 +20,21 @@ function ServerCard({ server, onEdit }: { server: McpServer; onEdit: () => void 
 
   const discover = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/mcp-servers/{server_id}/discover", {
+      const result = await client.POST("/api/v1/mcp-servers/{server_id}/discover", {
         params: { path: { server_id: server.id } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao conectar"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao conectar"));
+      return result.data!;
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["mcp-servers"] }),
   });
 
   const remove = useMutation({
     mutationFn: async () => {
-      const res = await client.DELETE("/api/v1/mcp-servers/{server_id}", {
+      const result = await client.DELETE("/api/v1/mcp-servers/{server_id}", {
         params: { path: { server_id: server.id } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao excluir"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao excluir"));
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["mcp-servers"] }),
   });
@@ -145,15 +145,15 @@ export default function McpServersPage() {
 
   const save = useMutation({
     mutationFn: async (body: McpServerBody) => {
-      const res =
+      const result =
         editing && editing !== "new"
           ? await client.PUT("/api/v1/mcp-servers/{server_id}", {
               params: { path: { server_id: editing.id } },
               body,
             })
           : await client.POST("/api/v1/mcp-servers", { body });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar servidor"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao salvar servidor"));
+      return result.data!;
     },
     onSuccess: () => {
       setEditing(null);
