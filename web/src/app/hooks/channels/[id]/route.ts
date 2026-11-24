@@ -16,6 +16,7 @@ const FORWARDED = [
 // webhook dos canais (ADR-0044): o WhatsApp e o Slack chamam o painel, que é o único
 // endereço público; a API fica na rede interna. Sem cookie, a assinatura é a proteção
 async function forward(req: NextRequest, id: string, method: "GET" | "POST") {
+  // id fora do formato não chega à API: a rota é pública e o id vai no path
   if (!UUID.test(id)) return NextResponse.json({ detail: "Not Found" }, { status: 404 });
   const headers: Record<string, string> = {};
   for (const name of FORWARDED) {
@@ -24,6 +25,7 @@ async function forward(req: NextRequest, id: string, method: "GET" | "POST") {
   }
   const ip = clientIp(req);
   if (ip) headers["X-Forwarded-For"] = ip;
+  // o GET é a verificação do webhook do WhatsApp, com o desafio na query
   const query = method === "GET" ? req.nextUrl.search : "";
   const upstream = await fetch(`${API_URL}/hooks/channels/${id}${query}`, {
     method,

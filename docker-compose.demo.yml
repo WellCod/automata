@@ -101,7 +101,10 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 512M  # embedder e leitores de documento do RAG (ADR-0012)
+          # parada, a API ocupa de 440 a 490 MB (Agno 3.2, SDKs novos, Python 3.14); o
+          # seed do owner por `exec` no mesmo container soma 270 MB de pico (o argon2 usa
+          # 64 MB por hash). Com 512 MB o kernel matava o seed e qualquer pico derrubava a API
+          memory: 1G
 
   web:
     image: ghcr.io/wellcod/automata-web:latest

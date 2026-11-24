@@ -32,6 +32,7 @@ from app.schemas.knowledge_base import ChunkingSettings
 logger = logging.getLogger(__name__)
 
 STALE_AFTER = timedelta(minutes=30)
+# tamanho máximo da mensagem de erro gravada no conteúdo
 _MAX_MESSAGE = 500
 
 # content-type da resposta HTTP para a extensão do leitor
@@ -51,6 +52,7 @@ class IngestError(ValueError):
 
 
 def _reader(extension: str, chunk_size: int, chunking: ChunkingSettings) -> Reader:
+    """Leitor do Agno para a extensão, já com o corte escolhido na base."""
     reader = ReaderFactory.get_reader_for_extension(f".{extension}")
     reader.chunk = True
     reader.chunking_strategy = strategy_for(chunk_size, chunking)
@@ -58,6 +60,7 @@ def _reader(extension: str, chunk_size: int, chunking: ChunkingSettings) -> Read
 
 
 def _html_to_text(data: bytes) -> str:
+    """Texto visível da página, sem script, estilo e a moldura de navegação."""
     soup = BeautifulSoup(data, "html.parser")
     for tag in soup(["script", "style", "nav", "footer", "header", "noscript"]):
         tag.decompose()
@@ -79,7 +82,7 @@ def _check_unzipped(data: bytes) -> None:
         raise IngestError("arquivo corrompido ou que não é do formato indicado") from exc
     if len(entries) > MAX_ZIP_ENTRIES:
         raise IngestError("arquivo com partes demais")
-    if sum(e.file_size for e in entries) > MAX_UNZIPPED_BYTES:
+    if sum(entry.file_size for entry in entries) > MAX_UNZIPPED_BYTES:
         raise IngestError("arquivo grande demais depois de descomprimido (máximo 200 MB)")
 
 
@@ -90,6 +93,8 @@ def read_documents(
     chunk_size: int,
     chunking: ChunkingSettings | None = None,
 ) -> list[Document]:
+    """Lê os bytes e devolve os trechos com texto; sem texto nenhum, levanta IngestError."""
+    # HTML vira texto antes: o leitor de HTML do Agno traria menu e rodapé junto
     if extension == "html":
         extension, data = "txt", _html_to_text(data).encode()
     if extension in ZIP_FORMATS:
@@ -97,7 +102,7 @@ def read_documents(
     stream = io.BytesIO(data)
     stream.name = f"{name}.{extension}"
     docs = _reader(extension, chunk_size, chunking or ChunkingSettings()).read(stream, name=name)
-    docs = [d for d in docs if d.content and d.content.strip()]
+    docs = [doc for doc in docs if doc.content and doc.content.strip()]
     if not docs:
         raise IngestError("nenhum texto extraído do conteúdo")
     return docs
@@ -112,6 +117,7 @@ def _finish(
     digest: str | None = None,
     suspects: int = 0,
 ) -> None:
+    """Grava o estado final da ingestão no conteúdo."""
     values: dict[str, object] = {
         "status": status,
         "status_message": message,
@@ -140,16 +146,17 @@ def keep_previous(content_id: UUID, error: str) -> None:
 
 
 def count_chunks(base: KnowledgeBase, content_id: UUID) -> int:
+    """Trechos do conteúdo que estão de fato na tabela de vetores da base."""
     vector_db = vector_db_for(base)
     if not vector_db.table_exists():
         return 0
     with Session(get_engine()) as session:
-        stmt = (
+        count_query = (
             select(func.count())
             .select_from(vector_db.table)
             .where(vector_db.table.c.content_id == str(content_id))
         )
-        return int(session.execute(stmt).scalar_one())
+        return int(session.execute(count_query).scalar_one())
 
 
 def remove_chunks(base: KnowledgeBase, content_id: UUID) -> None:
@@ -197,11 +204,12 @@ def ingest(content_id: UUID, data: bytes, *, replace: bool = False) -> None:
         digest = hashlib.sha256(data).hexdigest()
         vector_db.insert(content_hash=digest, documents=docs)
         stored = count_chunks(base, content_id)
+        # o insert pula em silêncio o trecho que falha: indexação parcial vira falha inteira
         if stored < len(docs):
             vector_db.delete_by_content_id(str(content_id))
             raise IngestError(f"{len(docs) - stored} de {len(docs)} trechos não foram indexados")
         # o trecho segue indexado: quem decide no run é o exame do resultado de tool
-        suspects = suspect_count([d.content for d in docs])
+        suspects = suspect_count([doc.content for doc in docs])
         _finish(
             content_id,
             status="completed",

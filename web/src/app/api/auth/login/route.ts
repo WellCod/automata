@@ -19,17 +19,20 @@ export async function POST(req: NextRequest) {
     body: JSON.stringify(body),
   });
 
-  const data = (await upstream.json()) as {
+  const loginBody = (await upstream.json()) as {
     access_token?: string;
     must_change_password?: boolean;
   };
 
   if (!upstream.ok) {
-    return NextResponse.json(data, { status: upstream.status });
+    return NextResponse.json(loginBody, { status: upstream.status });
   }
 
   // senha provisória do owner: o painel manda para a troca (ADR-0045)
-  const res = NextResponse.json({ ok: true, must_change_password: !!data.must_change_password });
-  setSessionCookie(res, data.access_token!);
-  return res;
+  const response = NextResponse.json({
+    ok: true,
+    must_change_password: !!loginBody.must_change_password,
+  });
+  setSessionCookie(response, loginBody.access_token!);
+  return response;
 }

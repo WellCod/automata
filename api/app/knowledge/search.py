@@ -57,6 +57,7 @@ def search_base(
     agent_config_id: UUID | None = None,
     filters: dict[str, str] | None = None,
 ) -> list[Hit]:
+    """Trechos da busca, com o consumo atribuído ao agente quando ele é informado."""
     caller = Caller(agent_config_id, "agent") if agent_config_id else None
     return search(base, query, limit, caller=caller, filters=filters).hits
 
@@ -93,7 +94,7 @@ def search(
     from app.agents import models_map
 
     # no modo de demonstração nada sai da instância, como o HyDE
-    cross = None if plain or models_map.demo_replay() else retrieval.cross_encoder
+    cross_encoder = None if plain or models_map.demo_replay() else retrieval.cross_encoder
     vector_db = vector_db_for(base, "query", with_dates=reranker is not None)
     if not vector_db.table_exists():
         return SearchOutcome([], searched, hyde_tokens)
@@ -103,20 +104,22 @@ def search(
     embedder = metered_embedder(vector_db)
     embedder.get_embedding_and_usage(searched)
     # o reranker só resgata trecho que foi buscado: pede um lote maior e corta depois
-    batch = limit if plain else candidate_limit(base, limit)
-    docs = vector_db.search(searched, limit=batch, filters={"fields": filters} if filters else None)
+    candidate_count = limit if plain else candidate_limit(base, limit)
+    docs = vector_db.search(
+        searched, limit=candidate_count, filters={"fields": filters} if filters else None
+    )
     filters_dropped = False
     if filters and not docs:
         # um filtro errado do modelo não pode virar "não há nada sobre isso"
-        docs = vector_db.search(searched, limit=batch)
+        docs = vector_db.search(searched, limit=candidate_count)
         filters_dropped = True
     rerank_cost: float | None = None
-    if cross is not None:
+    if cross_encoder is not None:
         try:
-            docs = cross_encode(cross, query, docs)
-            rerank_cost = CROSS_ENCODER_PRICES.get(cross_encoder_id(cross), 0.0)
+            docs = cross_encode(cross_encoder, query, docs)
+            rerank_cost = CROSS_ENCODER_PRICES.get(cross_encoder_id(cross_encoder), 0.0)
             if caller is not None:
-                record_side_cost(caller, cross_encoder_id(cross), rerank_cost)
+                record_side_cost(caller, cross_encoder_id(cross_encoder), rerank_cost)
         except Exception as exc:
             # sem a ordem do provedor, segue com a da busca e a estratégia da base
             logger.warning(
@@ -142,30 +145,31 @@ def search(
         kind="search",
         agent_config_id=caller.agent_config_id if caller else None,
     )
-    ids: set[UUID] = set()
+    # nome do documento numa consulta só, para a citação de cada trecho
+    content_ids: set[UUID] = set()
     for doc in docs:
-        raw = (doc.meta_data or {}).get("content_id")
-        if raw:
-            ids.add(UUID(str(raw)))
+        raw_content_id = (doc.meta_data or {}).get("content_id")
+        if raw_content_id:
+            content_ids.add(UUID(str(raw_content_id)))
     names: dict[UUID, str] = {}
-    if ids:
+    if content_ids:
         with Session(get_engine()) as session:
             rows = session.execute(
                 select(KnowledgeContent.id, KnowledgeContent.name).where(
-                    KnowledgeContent.id.in_(ids)
+                    KnowledgeContent.id.in_(content_ids)
                 )
             )
             names = {row.id: row.name for row in rows}
     hits = []
     for doc in docs:
-        meta = doc.meta_data or {}
-        content_id = UUID(str(meta["content_id"])) if meta.get("content_id") else None
-        score = meta.get("similarity_score")
+        chunk_meta = doc.meta_data or {}
+        content_id = UUID(str(chunk_meta["content_id"])) if chunk_meta.get("content_id") else None
+        score = chunk_meta.get("similarity_score")
         hits.append(
             Hit(
                 content_id=content_id,
                 content_name=names.get(content_id) if content_id else None,
-                source=meta.get("source"),
+                source=chunk_meta.get("source"),
                 text=doc.content,
                 score=float(score) if score is not None else None,
             )

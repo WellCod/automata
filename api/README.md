@@ -442,7 +442,7 @@ Fase 13 ([ADR-0012](../docs/adr/0012-bases-de-conhecimento.md)). Ingestão, busc
   - O worker reivindica com `FOR UPDATE SKIP LOCKED`, então várias réplicas dividem a fila. Job em `running` há mais de 30 minutos volta para a fila uma vez; na segunda, falha junto com o conteúdo ou o conector. Enquanto roda, o worker renova o `started_at` a cada 5 minutos, então um job longo não volta à fila no meio (Fase 43). Job terminado sai depois de 7 dias.
   - O conteúdo esperando o worker vem com `queued: true`. Com o worker ligado, a API não marca no boot como falha o conteúdo parado em `processing`: ele está na fila.
   - No `docker-compose.yml` o serviço `ingest-worker` sobe por padrão, com `INGEST_WORKER=true` e 768 MB próprios, e reaproveita a configuração da `api` (OPS-08); o override de dev o deixa no perfil `worker` e processa na própria API. Arquivo zip (docx, xlsx, pptx, odt, epub) com mais de 200 MB descomprimidos ou 10 mil partes é recusado antes do leitor abrir (SEC-06). O `/health` da API não sabe do worker.
-- O SDK da Voyage e os leitores somam ~85 MB de memória quando importados; o limite da API nos compose passou de 256M para 512M.
+- O SDK da Voyage e os leitores somam ~85 MB de memória quando importados; o limite da API nos compose passou de 256M para 512M e, com o Agno 3.2, os SDKs novos e o Python 3.14 (a API parada em 440 a 490 MB), para 1G.
 
 - Busca de teste e comparação: 30 por minuto por usuário, porque cada uma paga embedding (e HyDE, na comparação). Falha do embedder volta como mensagem genérica; o detalhe do provedor fica só no log.
 

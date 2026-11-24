@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
 
+# atributos que todo LogRecord tem; o que sobra veio do `extra` de quem logou e vai para o JSON
 _RESERVED: frozenset[str] = frozenset(
     {
         "name",
@@ -34,6 +35,8 @@ _RESERVED: frozenset[str] = frozenset(
 
 
 class JsonFormatter(logging.Formatter):
+    """Uma linha JSON por registro, com o request_id da request em curso e os campos do `extra`."""
+
     def format(self, record: logging.LogRecord) -> str:
         record.message = record.getMessage()
         log_data: dict[str, object] = {
@@ -43,9 +46,9 @@ class JsonFormatter(logging.Formatter):
             "msg": record.message,
             "request_id": request_id_var.get(),
         }
-        for key, val in record.__dict__.items():
+        for key, value in record.__dict__.items():
             if key not in _RESERVED and not key.startswith("_"):
-                log_data[key] = val
+                log_data[key] = value
         if record.exc_info:
             log_data["exc"] = self.formatException(record.exc_info)
         return json.dumps(log_data, ensure_ascii=False)

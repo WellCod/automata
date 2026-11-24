@@ -34,18 +34,20 @@ class InstanceGuardrailsResponse(BaseModel):
     updated_at: datetime | None = None
 
 
-def _response(row: InstanceGuardrails | None) -> InstanceGuardrailsResponse:
-    if row is None:
+def _response(floor_row: InstanceGuardrails | None) -> InstanceGuardrailsResponse:
+    """Piso gravado no formato da resposta; sem linha, a instância não tem piso."""
+    if floor_row is None:
         return InstanceGuardrailsResponse(settings=None)
     return InstanceGuardrailsResponse(
-        settings=GuardrailSettings.model_validate(row.settings),
-        updated_by=row.updated_by,
-        updated_at=row.updated_at,
+        settings=GuardrailSettings.model_validate(floor_row.settings),
+        updated_by=floor_row.updated_by,
+        updated_at=floor_row.updated_at,
     )
 
 
 @router.get("", response_model=InstanceGuardrailsResponse)
 def get_floor(session: SessionDep) -> InstanceGuardrailsResponse:
+    """Piso atual; a tabela tem no máximo uma linha, sempre com id 1."""
     return _response(session.get(InstanceGuardrails, 1))
 
 
@@ -53,16 +55,17 @@ def get_floor(session: SessionDep) -> InstanceGuardrailsResponse:
 def put_floor(
     body: InstanceGuardrailsInput, session: SessionDep, request: Request
 ) -> InstanceGuardrailsResponse:
+    """Grava ou tira o piso, com o antes e o depois na trilha de auditoria."""
     actor = str(getattr(request.state, "user_id", None) or "panel")
-    row = session.get(InstanceGuardrails, 1)
+    floor_row = session.get(InstanceGuardrails, 1)
     note(
         request,
-        before=row.settings if row is not None else None,
+        before=floor_row.settings if floor_row is not None else None,
         after=body.settings.model_dump(mode="json") if body.settings is not None else None,
     )
     if body.settings is None:
-        if row is not None:
-            session.delete(row)
+        if floor_row is not None:
+            session.delete(floor_row)
             session.commit()
         forget()
         logger.info("piso de guardrails removido", extra={"actor": actor})
@@ -70,15 +73,16 @@ def put_floor(
     errors = guardrail_errors(body.settings)
     if errors:
         raise HTTPException(status_code=422, detail="; ".join(errors))
-    data = body.settings.model_dump(mode="json")
-    if row is None:
-        row = InstanceGuardrails(id=1, settings=data, updated_by=actor)
-        session.add(row)
+    floor_settings = body.settings.model_dump(mode="json")
+    if floor_row is None:
+        floor_row = InstanceGuardrails(id=1, settings=floor_settings, updated_by=actor)
+        session.add(floor_row)
     else:
-        row.settings = data
-        row.updated_by = actor
+        floor_row.settings = floor_settings
+        floor_row.updated_by = actor
     session.commit()
-    session.refresh(row)
+    session.refresh(floor_row)
+    # o piso fica em cache por processo; sem isso o próximo run usaria o piso antigo
     forget()
     logger.info("piso de guardrails alterado", extra={"actor": actor})
-    return _response(row)
+    return _response(floor_row)

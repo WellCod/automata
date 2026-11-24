@@ -11,6 +11,8 @@ from app.models.usage import UsageEvent
 
 @dataclass
 class UsageSummary:
+    """Tokens e custo somados no período; custo None quando nenhum evento informou."""
+
     total_tokens: int
     total_cost: float | None
 
@@ -31,6 +33,8 @@ class DailyUsage:
 
 @dataclass
 class UsageRollup:
+    """Consumo de um config num mês (`period` no formato AAAAMM)."""
+
     agent_config_id: UUID
     period: str
     run_count: int
@@ -41,6 +45,8 @@ class UsageRollup:
 
 
 class UsageRepository:
+    """Eventos de consumo de modelo; as somas das conversas deixam de fora os da suíte."""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -58,6 +64,7 @@ class UsageRepository:
         period: str | None = None,
         eval_run_id: UUID | None = None,
     ) -> UsageEvent:
+        """Grava o consumo de uma chamada; sem `period`, o mês corrente em UTC."""
         if period is None:
             period = datetime.now(UTC).strftime("%Y%m")
         event = UsageEvent(
@@ -83,6 +90,7 @@ class UsageRepository:
         until: datetime | None = None,
         period_days: int = 30,
     ) -> UsageSummary:
+        """Consumo das conversas da instância; sem `since`, os últimos `period_days` dias."""
         if since is None:
             since = datetime.now(UTC) - timedelta(days=period_days)
         where_clauses = [UsageEvent.created_at >= since, UsageEvent.eval_run_id.is_(None)]
@@ -94,6 +102,7 @@ class UsageRepository:
                 func.sum(UsageEvent.cost).label("cost"),
             ).where(*where_clauses)
         ).one()
+        # a soma de coluna numeric volta como Decimal; o resumo expõe float
         cost = float(row.cost) if isinstance(row.cost, Decimal) else row.cost
         return UsageSummary(
             total_tokens=int(row.tokens or 0),
@@ -121,6 +130,7 @@ class UsageRepository:
         until: datetime | None = None,
         period_days: int = 30,
     ) -> list[AgentUsageSummary]:
+        """Consumo das conversas por config no período."""
         if since is None:
             since = datetime.now(UTC) - timedelta(days=period_days)
         where_clauses = [UsageEvent.created_at >= since, UsageEvent.eval_run_id.is_(None)]
@@ -137,11 +147,11 @@ class UsageRepository:
         ).all()
         return [
             AgentUsageSummary(
-                agent_config_id=r.agent_config_id,
-                total_tokens=int(r.tokens or 0),
-                total_cost=float(r.cost) if isinstance(r.cost, Decimal) else r.cost,
+                agent_config_id=row.agent_config_id,
+                total_tokens=int(row.tokens or 0),
+                total_cost=float(row.cost) if isinstance(row.cost, Decimal) else row.cost,
             )
-            for r in rows
+            for row in rows
         ]
 
     def daily(
@@ -151,6 +161,7 @@ class UsageRepository:
         until: datetime | None = None,
         agent_config_id: UUID | None = None,
     ) -> list[DailyUsage]:
+        """Consumo por dia (UTC), da instância ou de um config; dias sem consumo não aparecem."""
         day = cast(func.timezone("UTC", UsageEvent.created_at), Date).label("day")
         where_clauses = [UsageEvent.created_at >= since, UsageEvent.eval_run_id.is_(None)]
         if until is not None:
@@ -169,11 +180,11 @@ class UsageRepository:
         ).all()
         return [
             DailyUsage(
-                day=r.day,
-                total_tokens=int(r.tokens or 0),
-                total_cost=float(r.cost) if isinstance(r.cost, Decimal) else r.cost,
+                day=row.day,
+                total_tokens=int(row.tokens or 0),
+                total_cost=float(row.cost) if isinstance(row.cost, Decimal) else row.cost,
             )
-            for r in rows
+            for row in rows
         ]
 
     def rollup(
@@ -182,6 +193,7 @@ class UsageRepository:
         period: str,
         agent_config_id: UUID | None = None,
     ) -> list[UsageRollup]:
+        """Consumo do mês por config, com suíte incluída; `run_count` conta eventos."""
         stmt = select(
             UsageEvent.agent_config_id,
             UsageEvent.period,

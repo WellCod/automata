@@ -8,6 +8,8 @@ from app.schemas.config import ConfigKind, ConfigPayload, ConfigPayloadStatus
 
 
 class ConfigRepository:
+    """Configs (agente, time, workflow) e suas versões imutáveis."""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -27,6 +29,7 @@ class ConfigRepository:
 
     def teams_using(self, agent_id: UUID) -> list[AgentConfig]:
         """Times cuja versão vigente ou rascunho tem o agente como membro."""
+        # `@>` do JSONB: a lista de membros contém um com esse agent_id
         member = [{"agent_id": str(agent_id)}]
         version_ids = select(AgentConfigVersion.id).where(
             AgentConfigVersion.payload["team"]["members"].contains(member)
@@ -60,6 +63,7 @@ class ConfigRepository:
         author: str,
         status: ConfigPayloadStatus = ConfigPayloadStatus.draft,
     ) -> AgentConfigVersion:
+        """Grava uma versão nova com o próximo número; versão existente nunca muda."""
         # a linha do config serializa quem cria versão do mesmo config (OPS-11)
         self._session.execute(
             select(AgentConfig.id).where(AgentConfig.id == config_id).with_for_update()
@@ -114,14 +118,18 @@ class ConfigRepository:
         status: ConfigPayloadStatus | None = None,
         kind: ConfigKind | None = None,
     ) -> tuple[list[AgentConfig], int]:
+        """Página de configs, mais recentes primeiro, com o total para a paginação.
+
+        `q` que é um UUID busca pelo id; qualquer outro texto busca no nome.
+        """
         base = select(AgentConfig)
         if kind is not None:
             base = base.where(AgentConfig.kind == kind.value)
 
         if q is not None:
             try:
-                uid = UUID(q)
-                base = base.where(AgentConfig.id == uid)
+                config_id = UUID(q)
+                base = base.where(AgentConfig.id == config_id)
             except ValueError:
                 base = base.where(AgentConfig.name.ilike(f"%{q}%"))
 
@@ -133,6 +141,7 @@ class ConfigRepository:
         count_result = self._session.scalar(select(func.count()).select_from(base.subquery()))
         total = int(count_result) if count_result is not None else 0
 
+        # versões carregadas junto: a lista mostra cada config sem uma consulta por linha
         rows = self._session.scalars(
             base.options(
                 selectinload(AgentConfig.current_version),

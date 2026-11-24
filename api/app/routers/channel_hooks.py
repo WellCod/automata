@@ -31,10 +31,12 @@ PER_IP_LIMIT = 300
 
 
 def _not_found() -> HTTPException:
+    """Mesma resposta para canal inexistente, desligado ou de outro tipo: não revela qual."""
     return HTTPException(status_code=404, detail="Canal não encontrado")
 
 
 def _channel(channel_id: UUID) -> tuple[str, dict[str, str]] | None:
+    """Tipo e credencial do canal ligado; roda em thread porque a sessão é síncrona."""
     with Session(get_engine()) as session:
         channel = session.get(Channel, channel_id)
         if channel is None or not channel.enabled:
@@ -43,6 +45,7 @@ def _channel(channel_id: UUID) -> tuple[str, dict[str, str]] | None:
 
 
 async def _body(request: Request) -> bytes:
+    """Lê o corpo em pedaços e para no teto, sem carregar um corpo gigante inteiro."""
     chunks: list[bytes] = []
     size = 0
     async for chunk in request.stream():
@@ -64,13 +67,15 @@ def _limit_ip(request: Request) -> None:
 async def verify(channel_id: UUID, request: Request) -> Response:
     """Verificação do webhook do WhatsApp: devolve o `hub.challenge` com o token certo."""
     _limit_ip(request)
-    found = await run_in_threadpool(_channel, channel_id)
-    if found is None or found[0] != "whatsapp":
+    channel_info = await run_in_threadpool(_channel, channel_id)
+    if channel_info is None or channel_info[0] != "whatsapp":
         raise _not_found()
+    _, credentials = channel_info
     params = request.query_params
     token = params.get("hub.verify_token", "")
+    # comparação em tempo constante: o token de verificação é um segredo do canal
     if params.get("hub.mode") != "subscribe" or not hmac.compare_digest(
-        token.encode("utf-8", "replace"), found[1]["verify_token"].encode()
+        token.encode("utf-8", "replace"), credentials["verify_token"].encode()
     ):
         raise HTTPException(status_code=403, detail="Token de verificação não confere")
     return PlainTextResponse(params.get("hub.challenge", ""))
@@ -78,24 +83,26 @@ async def verify(channel_id: UUID, request: Request) -> Response:
 
 @router.post("/{channel_id}")
 async def receive(channel_id: UUID, request: Request, background: BackgroundTasks) -> Response:
+    """Recebe a mensagem do provedor, confere a assinatura e responde antes de processar."""
     _limit_ip(request)
+    # o corpo cru é o que o provedor assinou: ler antes de qualquer parse
     body = await _body(request)
-    found = await run_in_threadpool(_channel, channel_id)
-    if found is None:
+    channel_info = await run_in_threadpool(_channel, channel_id)
+    if channel_info is None:
         raise _not_found()
-    kind, creds = found
+    kind, credentials = channel_info
     if kind == "whatsapp":
-        ok = providers.whatsapp_signature_ok(
-            creds, body, request.headers.get("x-hub-signature-256")
+        signature_ok = providers.whatsapp_signature_ok(
+            credentials, body, request.headers.get("x-hub-signature-256")
         )
     else:
-        ok = providers.slack_signature_ok(
-            creds,
+        signature_ok = providers.slack_signature_ok(
+            credentials,
             body,
             request.headers.get("x-slack-request-timestamp"),
             request.headers.get("x-slack-signature"),
         )
-    if not ok:
+    if not signature_ok:
         logger.warning("canal: assinatura recusada", extra={"channel_id": str(channel_id)})
         raise HTTPException(status_code=401, detail="Assinatura inválida")
     try:
@@ -104,6 +111,7 @@ async def receive(channel_id: UUID, request: Request, background: BackgroundTask
         raise HTTPException(status_code=400, detail="Corpo não é JSON") from exc
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="Corpo não é JSON")
+    # o Slack confere a URL do evento devolvendo o challenge, uma vez no cadastro
     if kind == "slack" and payload.get("type") == "url_verification":
         return JSONResponse({"challenge": payload.get("challenge", "")})
     messages = (

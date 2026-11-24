@@ -6,37 +6,41 @@ export interface SseEvent {
   data: Record<string, unknown>;
 }
 
+// Um bloco é o texto entre duas linhas em branco. Sem `event:`, o padrão do SSE é
+// "message"; bloco sem `data:` (comentário, keep-alive) ou com JSON quebrado é ignorado.
 export function parseSseBlock(block: string): SseEvent | null {
   let event = "message";
-  const data: string[] = [];
+  const dataLines: string[] = [];
   for (const line of block.split("\n")) {
     if (line.startsWith("event:")) event = line.slice(6).trim();
-    else if (line.startsWith("data:")) data.push(line.slice(5).trim());
+    else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
   }
-  if (data.length === 0) return null;
+  if (dataLines.length === 0) return null;
   try {
-    return { event, data: JSON.parse(data.join("\n")) as Record<string, unknown> };
+    return { event, data: JSON.parse(dataLines.join("\n")) as Record<string, unknown> };
   } catch {
     return null;
   }
 }
 
+// Um pedaço lido do stream pode cortar um bloco no meio: o resto fica no buffer até o
+// próximo pedaço, e o que sobrar no fim do stream é lido como último bloco.
 export async function* readSse(body: ReadableStream<Uint8Array>): AsyncGenerator<SseEvent> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
-  let buf = "";
+  let buffer = "";
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    buf += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
-    let sep = buf.indexOf("\n\n");
-    while (sep !== -1) {
-      const parsed = parseSseBlock(buf.slice(0, sep));
-      buf = buf.slice(sep + 2);
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+    let separatorIndex = buffer.indexOf("\n\n");
+    while (separatorIndex !== -1) {
+      const parsed = parseSseBlock(buffer.slice(0, separatorIndex));
+      buffer = buffer.slice(separatorIndex + 2);
       if (parsed) yield parsed;
-      sep = buf.indexOf("\n\n");
+      separatorIndex = buffer.indexOf("\n\n");
     }
   }
-  const tail = parseSseBlock(buf);
+  const tail = parseSseBlock(buffer);
   if (tail) yield tail;
 }

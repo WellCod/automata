@@ -17,9 +17,9 @@ export function useKnowledgeBases() {
   return useQuery({
     queryKey: ["knowledge-bases"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/knowledge-bases");
-      if (!res.data) throw new Error("Falha ao carregar bases");
-      return res.data;
+      const result = await client.GET("/api/v1/knowledge-bases");
+      if (!result.data) throw new Error("Falha ao carregar bases");
+      return result.data;
     },
   });
 }
@@ -28,11 +28,11 @@ export function useKnowledgeBase(baseId: string) {
   return useQuery({
     queryKey: ["knowledge-bases", baseId],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/knowledge-bases/{base_id}", {
+      const result = await client.GET("/api/v1/knowledge-bases/{base_id}", {
         params: { path: { base_id: baseId } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao carregar a base"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao carregar a base"));
+      return result.data!;
     },
   });
 }
@@ -41,9 +41,9 @@ export function useEmbedders() {
   return useQuery({
     queryKey: ["knowledge-bases", "embedders"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/knowledge-bases/embedders");
-      if (!res.data) throw new Error("Falha ao carregar embedders");
-      return res.data;
+      const result = await client.GET("/api/v1/knowledge-bases/embedders");
+      if (!result.data) throw new Error("Falha ao carregar embedders");
+      return result.data;
     },
     staleTime: 5 * 60_000,
   });
@@ -54,26 +54,27 @@ export function useKnowledgeContents(baseId: string) {
   return useQuery({
     queryKey: ["knowledge-bases", baseId, "contents"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/knowledge-bases/{base_id}/contents", {
+      const result = await client.GET("/api/v1/knowledge-bases/{base_id}/contents", {
         params: { path: { base_id: baseId } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao carregar documentos"));
-      return res.data!;
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao carregar documentos"));
+      return result.data!;
     },
     refetchInterval: (query) =>
-      query.state.data?.some((c) => c.status === "processing") ? 3_000 : false,
+      query.state.data?.some((content) => content.status === "processing") ? 3_000 : false,
   });
 }
 
 export async function uploadFile(baseId: string, file: File): Promise<KnowledgeContent> {
   const form = new FormData();
   form.append("file", file);
-  const res = await client.POST("/api/v1/knowledge-bases/{base_id}/contents/file", {
+  const result = await client.POST("/api/v1/knowledge-bases/{base_id}/contents/file", {
     params: { path: { base_id: baseId } },
     // o tipo gerado espera o objeto do schema; o corpo real é multipart
     body: form as unknown as never,
     bodySerializer: (body) => body as unknown as FormData,
   });
-  if (res.error) throw new Error(apiErrorMessage(res.error, `Falha ao enviar ${file.name}`));
-  return res.data!;
+  if (result.error) throw new Error(apiErrorMessage(result.error, `Falha ao enviar ${file.name}`));
+  return result.data!;
 }

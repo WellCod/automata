@@ -30,16 +30,18 @@ def tool_name(base: KnowledgeBase) -> str:
 def knowledge_tool(
     base: KnowledgeBase, max_results: int, agent_config_id: UUID | None = None
 ) -> Function:
+    """Tool `buscar_<slug>` da base, com `filtros` só quando a base tem campos e os libera."""
     retrieval = RetrievalSettings.model_validate(base.retrieval or {})
-    known = field_values(base.id) if retrieval.agentic_filters else {}
+    known_fields = field_values(base.id) if retrieval.agentic_filters else {}
 
     async def run_search(
         pergunta: str, run_context: RunContext, filtros: dict[str, str] | None = None
     ) -> str:
+        """Corpo comum das duas tools: busca fora do event loop e devolve JSON ao modelo."""
         notes: list[str] = []
         kept: dict[str, str] = {}
         if filtros:
-            kept, ignored = clean_filters(filtros, known)
+            kept, ignored = clean_filters(filtros, known_fields)
             if ignored:
                 notes.append("filtro ignorado, não existe nesta base: " + ", ".join(ignored))
         try:
@@ -77,18 +79,20 @@ def knowledge_tool(
                 **result,
                 "trechos": [
                     {
-                        "documento": h.content_name,
-                        "fonte": h.source,
-                        "content_id": str(h.content_id) if h.content_id else None,
-                        "texto": h.text,
+                        "documento": hit.content_name,
+                        "fonte": hit.source,
+                        "content_id": str(hit.content_id) if hit.content_id else None,
+                        "texto": hit.text,
                     }
-                    for h in hits
+                    for hit in hits
                 ],
             },
             ensure_ascii=False,
         )
 
-    if known:
+    # duas assinaturas porque o Agno descreve ao modelo os parâmetros pela assinatura:
+    # `filtros` só aparece quando há campos para filtrar
+    if known_fields:
 
         async def buscar_com_filtros(
             pergunta: str, run_context: RunContext, filtros: dict[str, str] | None = None
@@ -101,7 +105,7 @@ def knowledge_tool(
             """
             return await run_search(pergunta, run_context, filtros)
 
-        fn = Function.from_callable(buscar_com_filtros, name=tool_name(base))
+        tool = Function.from_callable(buscar_com_filtros, name=tool_name(base))
     else:
 
         async def buscar(pergunta: str, run_context: RunContext) -> str:
@@ -112,21 +116,22 @@ def knowledge_tool(
             """
             return await run_search(pergunta, run_context)
 
-        fn = Function.from_callable(buscar, name=tool_name(base))
-    fn.description = (
+        tool = Function.from_callable(buscar, name=tool_name(base))
+    tool.description = (
         f"Busca trechos na base de conhecimento '{base.name}'. {base.description}".strip()
         + " Use antes de responder sobre os temas desta base."
-        + describe(known)
+        + describe(known_fields)
     )
-    return fn
+    return tool
 
 
 def knowledge_instructions(bases: list[KnowledgeBase]) -> str | None:
+    """Instruções ao agente com as bases disponíveis e como tratar o texto devolvido."""
     if not bases:
         return None
     lines = [
-        f"- {tool_name(b)}: {b.name}" + (f" — {b.description}" if b.description else "")
-        for b in bases
+        f"- {tool_name(base)}: {base.name}" + (f" — {base.description}" if base.description else "")
+        for base in bases
     ]
     return (
         "Bases de conhecimento disponíveis:\n"

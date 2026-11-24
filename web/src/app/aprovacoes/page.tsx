@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 
 type ApprovalItem = components["schemas"]["ApprovalItem"];
 
+// prazo da revisão já passou: a decisão não vale mais (Fase 44)
 function expired(iso: string): boolean {
   return new Date(iso).getTime() <= Date.now();
 }
@@ -25,6 +26,7 @@ const WHEN_TEXT: Record<"before" | "after" | "loop", string> = {
   loop: " terminou uma volta e espera a decisão de seguir ou pedir outra",
 };
 
+/** Etapa de workflow pausada para revisão: aprovar ou recusar. */
 function WorkflowApprovalCard({ item }: { item: ApprovalItem }) {
   const queryClient = useQueryClient();
   const active = item.steps[item.steps.length - 1];
@@ -100,6 +102,7 @@ function WorkflowApprovalCard({ item }: { item: ApprovalItem }) {
   );
 }
 
+/** Tools de um agente que pedem confirmação humana; a decisão vale para todas de uma vez. */
 function ApprovalCard({ item }: { item: ApprovalItem }) {
   const queryClient = useQueryClient();
   const decide = useMutation({
@@ -108,15 +111,15 @@ function ApprovalCard({ item }: { item: ApprovalItem }) {
       const form = new FormData();
       form.append(
         "tools",
-        JSON.stringify(item.tools.map((t) => ({ ...t.tool_execution, confirmed: approve }))),
+        JSON.stringify(item.tools.map((tool) => ({ ...tool.tool_execution, confirmed: approve }))),
       );
       form.append("session_id", item.session_id ?? "");
       form.append("stream", "false");
-      const res = await fetch(`/api/agents/${item.agent_id}/runs/${item.run_id}/continue`, {
+      const response = await fetch(`/api/agents/${item.agent_id}/runs/${item.run_id}/continue`, {
         method: "POST",
         body: form,
       });
-      if (!res.ok) throw new Error(`Falha ao registrar a decisão (HTTP ${res.status})`);
+      if (!response.ok) throw new Error(`Falha ao registrar a decisão (HTTP ${response.status})`);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["approvals"] });
@@ -143,11 +146,11 @@ function ApprovalCard({ item }: { item: ApprovalItem }) {
       </div>
 
       <ul className="flex flex-col gap-2">
-        {item.tools.map((t) => (
-          <li key={t.tool_call_id ?? t.tool_name ?? ""}>
-            <code className="text-foreground text-[13px]">{t.tool_name}</code>
+        {item.tools.map((tool) => (
+          <li key={tool.tool_call_id ?? tool.tool_name ?? ""}>
+            <code className="text-foreground text-[13px]">{tool.tool_name}</code>
             <pre className="border-border bg-muted text-muted-foreground mt-1 overflow-x-auto rounded border p-2 text-[12px]">
-              {JSON.stringify(t.tool_args ?? {}, null, 2)}
+              {JSON.stringify(tool.tool_args ?? {}, null, 2)}
             </pre>
           </li>
         ))}

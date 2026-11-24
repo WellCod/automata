@@ -92,10 +92,10 @@ async def discover_tools(server: McpServer) -> list[McpToolInfo]:
         return [
             McpToolInfo(
                 name=name.removeprefix(prefix),
-                description=fn.description,
-                input_schema=fn.parameters or {},
+                description=function.description,
+                input_schema=function.parameters or {},
             )
-            for name, fn in tools.functions.items()
+            for name, function in tools.functions.items()
         ]
     finally:
         await tools.close()

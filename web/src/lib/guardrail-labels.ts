@@ -23,17 +23,17 @@ export const CHECK_ERROR_TYPES = new Set(["input_check_error", "output_check_err
 // guardrail funcionando não é falha: aparece à parte, com os motivos mais comuns
 export function blockedHint(byRule: Record<string, number>): string {
   const top = Object.entries(byRule)
-    .sort((a, b) => b[1] - a[1])
+    .sort(([, countA], [, countB]) => countB - countA)
     .slice(0, 2)
-    .map(([rule, n]) => `${blockLabel(rule)} ${n}`);
+    .map(([rule, count]) => `${blockLabel(rule)} ${count}`);
   return top.length ? top.join(" · ") : "mensagens barradas por guardrail";
 }
 
 // resultados de tool retirados por instrução embutida (ADR-0030); o trecho fica só no banco
 export function screenedText(items: { tool: string }[]): string {
-  const tools = [...new Set(items.map((i) => i.tool))].join(", ");
-  const n = items.length;
-  return `${n} resultado${n === 1 ? "" : "s"} de tool retirado${n === 1 ? "" : "s"} por instrução embutida: ${tools}`;
+  const tools = [...new Set(items.map((item) => item.tool))].join(", ");
+  const count = items.length;
+  return `${count} resultado${count === 1 ? "" : "s"} de tool retirado${count === 1 ? "" : "s"} por instrução embutida: ${tools}`;
 }
 
 // run encerrado antes do fim sem ser erro (ADR-0031)

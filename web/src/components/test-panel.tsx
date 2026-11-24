@@ -74,6 +74,7 @@ export function TestPanel({
   kind = "agent",
   memberNames = {},
 }: Props) {
+  // rota do BFF e prefixo dos eventos SSE mudam entre agente (RunContent) e time (TeamRunContent)
   const base = kind === "team" ? "teams" : "agents";
   const prefix = kind === "team" ? "Team" : "";
   const [trace, setTrace] = useState<TraceStep[]>([]);
@@ -85,11 +86,16 @@ export function TestPanel({
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paused, setPaused] = useState<PausedRun | null>(null);
+  // refs e não estado: são lidos e trocados dentro do laço do stream, sem re-render
+  // sessão mantida entre mensagens para o agente lembrar a conversa; "Limpar" zera
   const sessionIdRef = useRef<string | null>(null);
+  // run em andamento, para o botão Parar pedir o cancelamento no AgentOS
   const runIdRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // chave crescente das mensagens e dos passos do rastro
   const nextId = useRef(0);
 
+  // o texto do stream chega em pedaços e vai para a última mensagem, a do agente
   function appendToLast(text: string) {
     setMessages((prev) => {
       const copy = [...prev];
@@ -122,9 +128,11 @@ export function TestPanel({
     });
   }
 
-  async function consume(res: Response) {
-    if (!res.ok || !res.body) throw new Error(await failureText(res));
-    for await (const { event, data } of readSse(res.body)) {
+  /** Lê o stream SSE do run e distribui cada evento entre resposta, rastro, pausa e erro. */
+  async function consume(response: Response) {
+    if (!response.ok || !response.body) throw new Error(await failureText(response));
+    for await (const { event, data } of readSse(response.body)) {
+      // no time, evento de membro traz a sessão do membro: só a do líder vale para continuar
       if (typeof data.session_id === "string" && (kind !== "team" || !data.agent_id)) {
         sessionIdRef.current = data.session_id;
       }
@@ -150,8 +158,9 @@ export function TestPanel({
       } else if (event === `${prefix}RunContent` && typeof data.content === "string") {
         appendToLast(data.content);
       } else if (event === `${prefix}RunPaused`) {
+        // só as tools que ainda esperam decisão humana vão para a caixa de confirmação
         const tools = ((data.tools as PendingToolExecution[] | undefined) ?? []).filter(
-          (t) => t.requires_confirmation && t.confirmed == null,
+          (tool) => tool.requires_confirmation && tool.confirmed == null,
         );
         if (typeof data.run_id === "string" && tools.length > 0) {
           setPaused({ runId: data.run_id, tools });
@@ -177,6 +186,7 @@ export function TestPanel({
     setTrace((prev) => [...prev, { id: nextId.current++, text }]);
   }
 
+  /** Roda uma requisição de stream (mensagem nova ou continue) com o estado de execução e a parada. */
   async function run(request: (signal: AbortSignal) => Promise<Response>) {
     setIsRunning(true);
     setError(null);
@@ -229,12 +239,13 @@ export function TestPanel({
     );
   }
 
+  // aprova ou recusa todas as tools pendentes de uma vez e retoma o run pausado
   async function decide(approve: boolean) {
     if (!paused || !sessionIdRef.current) return;
     const { runId, tools } = paused;
     setPaused(null);
     const form = new FormData();
-    form.append("tools", JSON.stringify(tools.map((t) => ({ ...t, confirmed: approve }))));
+    form.append("tools", JSON.stringify(tools.map((tool) => ({ ...tool, confirmed: approve }))));
     form.append("session_id", sessionIdRef.current);
     form.append("stream", "true");
     await run((signal) =>
@@ -258,7 +269,7 @@ export function TestPanel({
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-foreground text-[13px] font-medium">Modo teste</h2>
-        <Button onClick={() => setOpen((o) => !o)} variant="muted" size="sm">
+        <Button onClick={() => setOpen((wasOpen) => !wasOpen)} variant="muted" size="sm">
           {open ? "Fechar" : "Abrir chat"}
         </Button>
       </div>
@@ -293,31 +304,31 @@ export function TestPanel({
             {messages.length === 0 && (
               <p className="text-muted-foreground text-[13px]">Nenhuma mensagem ainda.</p>
             )}
-            {messages.map((m) => (
+            {messages.map((message) => (
               <div
-                key={m.id}
-                className={`flex flex-col gap-0.5 ${m.role === "user" ? "items-end" : "items-start"}`}
+                key={message.id}
+                className={`flex flex-col gap-0.5 ${message.role === "user" ? "items-end" : "items-start"}`}
               >
                 <span className="text-muted-foreground text-[11px]">
-                  {m.role === "user" ? "Você" : "Agente"}
+                  {message.role === "user" ? "Você" : "Agente"}
                 </span>
                 <div
                   className={`max-w-xs rounded border px-3 py-1.5 text-[13px] whitespace-pre-wrap ${
-                    m.role === "user"
+                    message.role === "user"
                       ? "border-foreground/20 bg-muted text-foreground"
                       : "border-border bg-background text-foreground"
                   }`}
                 >
-                  {m.content || (isRunning && m.role === "assistant" ? "▍" : "")}
+                  {message.content || (isRunning && message.role === "assistant" ? "▍" : "")}
                 </div>
-                {m.blockedBy && (
+                {message.blockedBy && (
                   <span role="status" className="text-[11px] text-amber-700 dark:text-amber-400">
-                    bloqueado pelo guardrail · {blockLabel(m.blockedBy)}
+                    bloqueado pelo guardrail · {blockLabel(message.blockedBy)}
                   </span>
                 )}
-                {m.sources && m.sources.length > 0 && (
+                {message.sources && message.sources.length > 0 && (
                   <ul aria-label="Fontes" className="flex max-w-xs flex-col gap-0.5 text-[11px]">
-                    {m.sources.map((src) => (
+                    {message.sources.map((src) => (
                       <li key={`${src.base}|${src.documento}`} className="text-muted-foreground">
                         <span className="text-[var(--text-label)]">fonte</span> {src.documento}
                         {src.base && <span> · {src.base}</span>}
@@ -349,11 +360,11 @@ export function TestPanel({
                 O agente quer executar uma ação que exige confirmação
               </p>
               <ul className="flex flex-col gap-1.5">
-                {paused.tools.map((t) => (
-                  <li key={t.tool_call_id ?? t.tool_name ?? ""} className="text-[13px]">
-                    <code className="text-foreground">{t.tool_name}</code>
+                {paused.tools.map((tool) => (
+                  <li key={tool.tool_call_id ?? tool.tool_name ?? ""} className="text-[13px]">
+                    <code className="text-foreground">{tool.tool_name}</code>
                     <pre className="text-muted-foreground mt-1 overflow-x-auto text-[12px]">
-                      {JSON.stringify(t.tool_args ?? {}, null, 2)}
+                      {JSON.stringify(tool.tool_args ?? {}, null, 2)}
                     </pre>
                   </li>
                 ))}

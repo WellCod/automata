@@ -13,6 +13,8 @@ from app.models.usage import UsageEvent
 
 @dataclass
 class AgentRunSummary:
+    """Contagem de runs de um config no período."""
+
     agent_config_id: UUID
     total_runs: int
     error_count: int
@@ -21,6 +23,8 @@ class AgentRunSummary:
 
 @dataclass
 class DailyRunStats:
+    """Runs, erros, bloqueios e latência de um dia (UTC)."""
+
     day: date
     total_runs: int
     error_count: int
@@ -31,6 +35,8 @@ class DailyRunStats:
 
 @dataclass
 class RunMetrics:
+    """Totais e latência p50/p95 do período, de um config ou da instância."""
+
     total_runs: int
     error_rate: float
     p50_ms: float | None
@@ -41,6 +47,8 @@ class RunMetrics:
 
 
 class RunRepository:
+    """Runs registrados pelo tracking; as leituras de métrica deixam de fora os runs da suíte."""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -87,12 +95,14 @@ class RunRepository:
         return run
 
     def pending_steps(self, run_id: str) -> list[dict[str, Any]]:
+        """Etapas do workflow pausado que esperam revisão humana."""
         stmt = select(AgentRun.pending_steps).where(AgentRun.run_id == run_id)
         return list(self._session.scalar(stmt) or [])
 
     def append_reviews(self, run_id: str, entries: list[dict[str, Any]]) -> None:
         """Acrescenta ao registro do run num UPDATE só: dois continues ao mesmo tempo não
         perdem entrada (ADR-0028, auditoria da Fase 33)."""
+        # `||` do JSONB concatena no próprio banco, sem ler o registro antes
         current = func.coalesce(AgentRun.review_log, cast(literal("[]"), JSONB))
         added = bindparam("entries", entries, type_=JSONB)
         self._session.execute(
@@ -195,18 +205,21 @@ class RunRepository:
             .where(AgentRun.parent_run_id.in_(run_ids))
             .group_by(AgentRun.parent_run_id)
         )
+        # contagem e consumo em consultas separadas: o join com usage_event multiplicaria
+        # as etapas pelo número de eventos de cada uma
         totals = {
-            r.parent: (int(r.tokens), float(r.cost) if r.cost is not None else None)
-            for r in self._session.execute(usage)
+            row.parent: (int(row.tokens), float(row.cost) if row.cost is not None else None)
+            for row in self._session.execute(usage)
         }
         return {
-            r.parent: (int(r.steps), *totals.get(r.parent, (0, None)))
-            for r in self._session.execute(children)
+            row.parent: (int(row.steps), *totals.get(row.parent, (0, None)))
+            for row in self._session.execute(children)
         }
 
     def list_paused(
         self, config_ids: list[UUID] | None = None, *, user_id: str | None = None
     ) -> list[AgentRun]:
+        """Runs pausados com pendência, fora da suíte; filtra por configs e por dono."""
         stmt = (
             select(AgentRun)
             .where(
@@ -232,6 +245,7 @@ class RunRepository:
         since: datetime | None = None,
         until: datetime | None = None,
     ) -> tuple[list[AgentRun], int]:
+        """Página de runs do config, mais recentes primeiro, com o total para a paginação."""
         base = select(AgentRun).where(
             AgentRun.agent_config_id == config_id, AgentRun.eval_run_id.is_(None)
         )
@@ -263,6 +277,7 @@ class RunRepository:
         until: datetime | None = None,
         period_days: int = 30,
     ) -> RunMetrics:
+        """Métricas de um config; sem `since`, os últimos `period_days` dias."""
         if since is None:
             since = datetime.now(UTC) - timedelta(days=period_days)
         base_filter = [
@@ -287,14 +302,14 @@ class RunRepository:
         p50: float | None = None
         p95: float | None = None
         if total > 0:
-            pct = self._session.execute(
+            percentiles = self._session.execute(
                 select(
                     func.percentile_cont(0.5).within_group(AgentRun.duration_ms).label("p50"),
                     func.percentile_cont(0.95).within_group(AgentRun.duration_ms).label("p95"),
                 ).where(*base_filter, AgentRun.duration_ms.isnot(None))
             ).one()
-            p50 = float(pct.p50) if pct.p50 is not None else None
-            p95 = float(pct.p95) if pct.p95 is not None else None
+            p50 = float(percentiles.p50) if percentiles.p50 is not None else None
+            p95 = float(percentiles.p95) if percentiles.p95 is not None else None
 
         return RunMetrics(
             total_runs=total,
@@ -312,6 +327,7 @@ class RunRepository:
         until: datetime | None = None,
         period_days: int = 30,
     ) -> list[AgentRunSummary]:
+        """Contagens por config no período, do que mais rodou ao que menos rodou."""
         if since is None:
             since = datetime.now(UTC) - timedelta(days=period_days)
         where_clauses = [AgentRun.created_at >= since, AgentRun.eval_run_id.is_(None)]
@@ -330,12 +346,12 @@ class RunRepository:
         ).all()
         return [
             AgentRunSummary(
-                agent_config_id=r.agent_config_id,
-                total_runs=int(r.total),
-                error_count=int(r.errors),
-                blocked_count=int(r.blocked),
+                agent_config_id=row.agent_config_id,
+                total_runs=int(row.total),
+                error_count=int(row.errors),
+                blocked_count=int(row.blocked),
             )
-            for r in rows
+            for row in rows
         ]
 
     def metrics_global(
@@ -345,6 +361,7 @@ class RunRepository:
         until: datetime | None = None,
         period_days: int = 30,
     ) -> RunMetrics:
+        """Métricas da instância inteira; sem `since`, os últimos `period_days` dias."""
         if since is None:
             since = datetime.now(UTC) - timedelta(days=period_days)
         where_clauses = [AgentRun.created_at >= since, AgentRun.eval_run_id.is_(None)]
@@ -365,14 +382,14 @@ class RunRepository:
         p50: float | None = None
         p95: float | None = None
         if total > 0:
-            pct = self._session.execute(
+            percentiles = self._session.execute(
                 select(
                     func.percentile_cont(0.5).within_group(AgentRun.duration_ms).label("p50"),
                     func.percentile_cont(0.95).within_group(AgentRun.duration_ms).label("p95"),
                 ).where(*where_clauses, AgentRun.duration_ms.isnot(None))
             ).one()
-            p50 = float(pct.p50) if pct.p50 is not None else None
-            p95 = float(pct.p95) if pct.p95 is not None else None
+            p50 = float(percentiles.p50) if percentiles.p50 is not None else None
+            p95 = float(percentiles.p95) if percentiles.p95 is not None else None
 
         return RunMetrics(
             total_runs=total,
@@ -412,14 +429,14 @@ class RunRepository:
         ).all()
         return [
             DailyRunStats(
-                day=r.day,
-                total_runs=int(r.total),
-                error_count=int(r.errors),
-                blocked_count=int(r.blocked),
-                p50_ms=float(r.p50) if r.p50 is not None else None,
-                p95_ms=float(r.p95) if r.p95 is not None else None,
+                day=row.day,
+                total_runs=int(row.total),
+                error_count=int(row.errors),
+                blocked_count=int(row.blocked),
+                p50_ms=float(row.p50) if row.p50 is not None else None,
+                p95_ms=float(row.p95) if row.p95 is not None else None,
             )
-            for r in rows
+            for row in rows
         ]
 
     def blocked_by_rule(
@@ -429,6 +446,7 @@ class RunRepository:
         until: datetime | None = None,
         config_id: UUID | None = None,
     ) -> dict[str, int]:
+        """Runs bloqueados por regra; bloqueio sem regra gravada conta como "desconhecido"."""
         where = [
             AgentRun.status == "blocked",
             AgentRun.created_at >= since,
@@ -443,4 +461,4 @@ class RunRepository:
             .where(*where)
             .group_by(AgentRun.blocked_by)
         ).all()
-        return {str(rule or "desconhecido"): int(n) for rule, n in rows}
+        return {str(rule or "desconhecido"): int(count) for rule, count in rows}

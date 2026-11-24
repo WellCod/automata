@@ -29,6 +29,7 @@ class TextCheck(BaseModel):
     step: str | None = Field(default=None, min_length=1, max_length=60)
 
     def rule(self) -> WorkflowRule:
+        """A checagem como regra de workflow, para usar o mesmo `rule_matches`."""
         return WorkflowRule(kind=self.kind, source="previous", value=self.value)
 
     @model_validator(mode="after")
@@ -48,10 +49,10 @@ class ToolsCheck(BaseModel):
 
     @field_validator("tools")
     @classmethod
-    def sem_repeticao(cls, v: list[str]) -> list[str]:
-        if len(v) != len(set(v)):
+    def sem_repeticao(cls, tools: list[str]) -> list[str]:
+        if len(tools) != len(set(tools)):
             raise ValueError("tool repetida na lista")
-        return v
+        return tools
 
 
 class SchemaCheck(BaseModel):
@@ -123,13 +124,13 @@ def kind_problem(
 ) -> str | None:
     """Motivo de o caso não servir a este tipo de config, ou None."""
     allowed = CHECKS_BY_KIND.get(kind, frozenset())
-    refused = sorted({c.type for c in spec.checks} - allowed)
+    refused = sorted({check.type for check in spec.checks} - allowed)
     if refused:
         return f"checagem {', '.join(refused)} não vale para {kind}"
     if kind == "workflow" and spec.context and not history_runs:
         # sem histórico, os turnos anteriores não chegariam às etapas (ADR-0038)
         return "turnos anteriores em workflow exigem o histórico ligado no workflow"
-    steps = [c.step for c in spec.checks if isinstance(c, TextCheck) and c.step]
+    steps = [check.step for check in spec.checks if isinstance(check, TextCheck) and check.step]
     if steps and kind != "workflow":
         return "checagem de texto numa etapa só vale para workflow"
     if steps and step_names is not None:
@@ -152,20 +153,21 @@ class EvalCaseInput(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def nome_limpo(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
+    def nome_limpo(cls, name: str) -> str:
+        # o min_length passa com só espaços; o nome limpo é o que fica gravado
+        name = name.strip()
+        if not name:
             raise ValueError("nome obrigatório")
-        return v
+        return name
 
     @model_validator(mode="after")
     def um_por_tipo_no_runner(self) -> EvalCaseInput:
         # o Case do Agno tem um campo de critério e um de tools; texto vira um scorer só
         for kind in ("tools", "judge", "steps", "schema"):
-            if sum(1 for c in self.checks if c.type == kind) > 1:
+            if sum(1 for check in self.checks if check.type == kind) > 1:
                 raise ValueError(f"no máximo uma checagem do tipo {kind} por caso")
         # run barrado não tem resposta para comparar, julgar ou conferir tools
-        if any(c.type == "blocked" for c in self.checks) and len(self.checks) > 1:
+        if any(check.type == "blocked" for check in self.checks) and len(self.checks) > 1:
             raise ValueError("caso que espera bloqueio não leva outras checagens")
         return self
 

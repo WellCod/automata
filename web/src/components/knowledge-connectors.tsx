@@ -73,7 +73,7 @@ function ConnectorForm({
       // campo vazio não vai: a API aplica o padrão (branch main, AWS, pasta raiz)
       const cleaned: Record<string, unknown> = Object.fromEntries(
         SETTINGS_FIELDS[kind]
-          .map((f) => [f.key, settings[f.key]?.trim() ?? ""])
+          .map((field) => [field.key, settings[field.key]?.trim() ?? ""])
           .filter(([, v]) => v !== ""),
       );
       // a configuração é trocada inteira: padrão ausente é lista vazia
@@ -85,7 +85,7 @@ function ConnectorForm({
         if (patterns.length) cleaned[key] = patterns;
       }
       if (kind === "gdrive") cleaned.shared_drive = sharedDrive;
-      const typed = Object.values(secret).some((v) => v.trim());
+      const typed = Object.values(secret).some((secretValue) => secretValue.trim());
       const body = {
         kind,
         name: name.trim(),
@@ -94,7 +94,7 @@ function ConnectorForm({
         secret: typed || !initial ? secret : null,
         sync_every_hours: hours ? Number(hours) : null,
       };
-      const res = initial
+      const result = initial
         ? await client.PUT("/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}", {
             params: { path: { base_id: baseId, connector_id: initial.id } },
             body,
@@ -103,7 +103,8 @@ function ConnectorForm({
             params: { path: { base_id: baseId } },
             body,
           });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar o conector"));
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao salvar o conector"));
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["knowledge-bases", baseId, "connectors"] });
@@ -133,9 +134,9 @@ function ConnectorForm({
           }}
           className={`${inputCls} w-auto`}
         >
-          {(Object.keys(KIND_LABEL) as ConnectorKind[]).map((k) => (
-            <option key={k} value={k}>
-              {KIND_LABEL[k]}
+          {(Object.keys(KIND_LABEL) as ConnectorKind[]).map((connectorKind) => (
+            <option key={connectorKind} value={connectorKind}>
+              {KIND_LABEL[connectorKind]}
             </option>
           ))}
         </select>
@@ -150,28 +151,28 @@ function ConnectorForm({
         />
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
-        {SETTINGS_FIELDS[kind].map((f) => (
-          <label key={f.key} className="text-muted-foreground flex flex-col gap-1 text-[12px]">
-            {f.label}
+        {SETTINGS_FIELDS[kind].map((field) => (
+          <label key={field.key} className="text-muted-foreground flex flex-col gap-1 text-[12px]">
+            {field.label}
             <input
-              required={f.required}
-              value={settings[f.key] ?? ""}
-              placeholder={f.placeholder}
-              onChange={(e) => setSettings({ ...settings, [f.key]: e.target.value })}
+              required={field.required}
+              value={settings[field.key] ?? ""}
+              placeholder={field.placeholder}
+              onChange={(e) => setSettings({ ...settings, [field.key]: e.target.value })}
               className={inputCls}
             />
           </label>
         ))}
-        {SECRET_FIELDS[kind].map((f) => (
-          <label key={f.key} className="text-muted-foreground flex flex-col gap-1 text-[12px]">
-            {f.label}
+        {SECRET_FIELDS[kind].map((field) => (
+          <label key={field.key} className="text-muted-foreground flex flex-col gap-1 text-[12px]">
+            {field.label}
             <PasswordInput
-              aria-label={f.label}
-              required={f.required && !initial?.has_secret}
-              value={secret[f.key] ?? ""}
+              aria-label={field.label}
+              required={field.required && !initial?.has_secret}
+              value={secret[field.key] ?? ""}
               autoComplete="off"
               placeholder={initial?.has_secret ? "configurado; vazio mantém" : undefined}
-              onChange={(e) => setSecret({ ...secret, [f.key]: e.target.value })}
+              onChange={(e) => setSecret({ ...secret, [field.key]: e.target.value })}
               className={inputCls}
             />
           </label>
@@ -266,33 +267,33 @@ function ConnectorRow({
 
   const test = useMutation({
     mutationFn: async () => {
-      const res = await client.POST(
+      const result = await client.POST(
         "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/test",
         path,
       );
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao testar"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao testar"));
+      return result.data!;
     },
     onSuccess: setTested,
   });
   const sync = useMutation({
     mutationFn: async () => {
-      const res = await client.POST(
+      const result = await client.POST(
         "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/sync",
         path,
       );
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao sincronizar"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao sincronizar"));
     },
     onSuccess: refresh,
     onError: (e) => toast.error(e.message),
   });
   const remove = useMutation({
     mutationFn: async () => {
-      const res = await client.DELETE(
+      const result = await client.DELETE(
         "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}",
         path,
       );
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao remover"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao remover"));
     },
     onSuccess: () => {
       toast.success(`${connector.name} removido, com os documentos dele`);
@@ -303,12 +304,12 @@ function ConnectorRow({
 
   const createHook = useMutation({
     mutationFn: async () => {
-      const res = await client.POST(
+      const result = await client.POST(
         "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/webhook",
         path,
       );
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao gerar o webhook"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao gerar o webhook"));
+      return result.data!;
     },
     onSuccess: (data) => {
       setHook(data);
@@ -318,11 +319,12 @@ function ConnectorRow({
   });
   const removeHook = useMutation({
     mutationFn: async () => {
-      const res = await client.DELETE(
+      const result = await client.DELETE(
         "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/webhook",
         path,
       );
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao desligar o webhook"));
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao desligar o webhook"));
     },
     onSuccess: () => {
       setHook(null);
@@ -504,8 +506,13 @@ export function KnowledgeConnectors({ baseId }: { baseId: string }) {
       )}
       {data && data.length > 0 && (
         <ul className="flex flex-col gap-1.5" aria-label="Conectores">
-          {data.map((c) => (
-            <ConnectorRow key={c.id} baseId={baseId} connector={c} canManage={canManage} />
+          {data.map((connector) => (
+            <ConnectorRow
+              key={connector.id}
+              baseId={baseId}
+              connector={connector}
+              canManage={canManage}
+            />
           ))}
         </ul>
       )}

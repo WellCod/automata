@@ -26,6 +26,7 @@ class CrossEncoderSettings(BaseModel):
 
     @model_validator(mode="after")
     def modelo_do_provedor(self) -> CrossEncoderSettings:
+        """Sem modelo, o primeiro da lista do provedor; modelo de outro provedor é recusado."""
         models = CROSS_ENCODER_MODELS[self.provider]
         if not self.model:
             self.model = models[0]
@@ -78,6 +79,10 @@ MAX_OVERLAP_RATIO = 0.3
 
 
 def overlap_problem(chunk_size: int, chunking: ChunkingSettings | None) -> str | None:
+    """Motivo da recusa quando a sobreposição passa de 30% do trecho, ou None.
+
+    Também chamada pela rota, que usa o corte gravado quando a requisição não manda o dela.
+    """
     if chunking is None or chunking.overlap is None:
         return None
     if chunking.overlap > chunk_size * MAX_OVERLAP_RATIO:
@@ -149,10 +154,10 @@ def check_fields(value: dict[str, str] | None) -> dict[str, str] | None:
     if len(value) > MAX_FIELDS:
         raise ValueError(f"no máximo {MAX_FIELDS} campos por documento")
     cleaned: dict[str, str] = {}
-    for name, raw in value.items():
+    for name, raw_value in value.items():
         if not _FIELD_NAME.match(name):
             raise ValueError(f"campo inválido: {name!r} (minúsculas, dígitos e _, até 40)")
-        text = str(raw).strip()
+        text = str(raw_value).strip()
         if not 1 <= len(text) <= 100:
             raise ValueError(f"o valor de {name} precisa ter de 1 a 100 caracteres")
         cleaned[name] = text

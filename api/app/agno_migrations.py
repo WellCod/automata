@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 def migrate() -> None:
+    """Leva as tabelas do Agno à versão de schema que a versão instalada espera."""
     asyncio.run(MigrationManager(get_db()).up())
 
 

@@ -34,8 +34,9 @@ router = APIRouter(
 Kind = Literal["whatsapp", "slack"]
 
 
-def _keywords(v: list[str]) -> list[str]:
-    cleaned = [k.strip().lower() for k in v if k.strip()]
+def _keywords(keywords: list[str]) -> list[str]:
+    """Normaliza as palavras-chave (sem espaço, minúsculas) e recusa repetidas."""
+    cleaned = [keyword.strip().lower() for keyword in keywords if keyword.strip()]
     if len(set(cleaned)) != len(cleaned):
         raise ValueError("palavra repetida")
     return cleaned
@@ -103,6 +104,7 @@ class ChannelTest(BaseModel):
 
 
 def _response(channel: Channel, config_name: str | None) -> ChannelResponse:
+    """Resposta do canal com só os nomes dos campos da credencial, nunca os valores."""
     return ChannelResponse(
         id=channel.id,
         kind=channel.kind,
@@ -121,25 +123,32 @@ def _response(channel: Channel, config_name: str | None) -> ChannelResponse:
     )
 
 
-def _check_credentials(kind: str, creds: dict[str, str]) -> dict[str, str]:
+def _check_credentials(kind: str, credentials: dict[str, str]) -> dict[str, str]:
+    """Fica só com os campos que o provedor usa, sem vazios, e exige todos eles."""
     needed = providers.CREDENTIAL_FIELDS[kind]
-    cleaned = {k: v.strip() for k, v in creds.items() if k in needed and v.strip()}
-    missing = [k for k in needed if k not in cleaned]
+    cleaned = {
+        field: value.strip()
+        for field, value in credentials.items()
+        if field in needed and value.strip()
+    }
+    missing = [field for field in needed if field not in cleaned]
     if missing:
         raise HTTPException(status_code=422, detail=f"Faltam na credencial: {', '.join(missing)}")
-    if any(len(v) > 2000 for v in cleaned.values()):
+    if any(len(value) > 2000 for value in cleaned.values()):
         raise HTTPException(status_code=422, detail="Credencial grande demais")
     return cleaned
 
 
-def _seal(creds: dict[str, str]) -> str:
+def _seal(credentials: dict[str, str]) -> str:
+    """Cifra a credencial; sem a chave de segredos configurada, 422 em vez de 500."""
     try:
-        return encrypt_json(creds)
+        return encrypt_json(credentials)
     except SecretsKeyMissing as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 def _config_or_422(session: SessionDep, config_id: UUID) -> AgentConfig:
+    """Canal só liga agente ou time com versão publicada: o rascunho não atende cliente."""
     config = session.get(AgentConfig, config_id)
     if config is None or config.kind not in ("agent", "team"):
         raise HTTPException(status_code=422, detail="Escolha um agente ou time")
@@ -159,7 +168,7 @@ def _with_warnings(
     if version is None:
         return response
     payload = ConfigPayload.model_validate(version.payload)
-    if any(b.require_confirmation for b in payload.mcp_servers):
+    if any(binding.require_confirmation for binding in payload.mcp_servers):
         response.warnings.append(
             "O agente tem tool com confirmação humana. No canal o run pausa e a conversa"
             " passa para um atendente; a tool só roda depois da aprovação na página Aprovações."
@@ -175,6 +184,7 @@ def _channel_or_404(session: SessionDep, channel_id: UUID) -> Channel:
 
 
 def _actor(request: Request) -> str:
+    """Quem fez a escrita; "panel" quando a requisição não traz usuário."""
     return str(getattr(request.state, "user_id", None) or "panel")
 
 
@@ -191,13 +201,13 @@ def list_channels(session: SessionDep) -> list[ChannelResponse]:
 @router.post("", response_model=ChannelResponse, status_code=201)
 def create_channel(body: ChannelInput, request: Request, session: SessionDep) -> ChannelResponse:
     config = _config_or_422(session, body.config_id)
-    creds = _check_credentials(body.kind, body.credentials)
+    credentials = _check_credentials(body.kind, body.credentials)
     channel = Channel(
         kind=body.kind,
         name=body.name.strip(),
         config_id=config.id,
         enabled=body.enabled,
-        credentials_encrypted=_seal(creds),
+        credentials_encrypted=_seal(credentials),
         handoff_enabled=body.handoff_enabled,
         handoff_keywords=body.handoff_keywords,
         handoff_message=body.handoff_message,
@@ -216,6 +226,7 @@ def update_channel(channel_id: UUID, body: ChannelUpdate, session: SessionDep) -
     channel = _channel_or_404(session, channel_id)
     config = _config_or_422(session, body.config_id)
     if body.credentials:
+        # troca só os campos enviados e mantém os outros da credencial atual
         merged = {**decrypt_json(channel.credentials_encrypted), **body.credentials}
         channel.credentials_encrypted = _seal(_check_credentials(channel.kind, merged))
     channel.name = body.name.strip()
@@ -242,28 +253,33 @@ def delete_channel(channel_id: UUID, session: SessionDep) -> Response:
 def test_channel(channel_id: UUID, session: SessionDep) -> ChannelTest:
     """Confere a credencial no provedor sem mandar mensagem a ninguém."""
     channel = _channel_or_404(session, channel_id)
-    creds = decrypt_json(channel.credentials_encrypted)
+    credentials = decrypt_json(channel.credentials_encrypted)
     try:
         with providers._http() as client:
             if channel.kind == "whatsapp":
-                resp = client.get(
-                    f"{providers.GRAPH_URL}/{creds['phone_number_id']}",
+                # leitura do número na Graph API: falha se o token não vale para ele
+                graph_response = client.get(
+                    f"{providers.GRAPH_URL}/{credentials['phone_number_id']}",
                     params={"fields": "display_phone_number"},
-                    headers={"Authorization": f"Bearer {creds['access_token']}"},
+                    headers={"Authorization": f"Bearer {credentials['access_token']}"},
                 )
-                if resp.status_code != 200:
-                    return ChannelTest(ok=False, detail=f"Meta recusou ({resp.status_code})")
-                number = resp.json().get("display_phone_number", "")
+                if graph_response.status_code != 200:
+                    return ChannelTest(
+                        ok=False, detail=f"Meta recusou ({graph_response.status_code})"
+                    )
+                number = graph_response.json().get("display_phone_number", "")
                 return ChannelTest(ok=True, detail=f"Número {number}".strip())
-            resp = client.post(
+            # o Slack responde 200 com ok=false para token inválido
+            slack_response = client.post(
                 f"{providers.SLACK_URL}/auth.test",
-                headers={"Authorization": f"Bearer {creds['bot_token']}"},
+                headers={"Authorization": f"Bearer {credentials['bot_token']}"},
             )
-            data = resp.json() if resp.status_code < 500 else {}
-            if not data.get("ok"):
+            slack_reply = slack_response.json() if slack_response.status_code < 500 else {}
+            if not slack_reply.get("ok"):
                 return ChannelTest(
-                    ok=False, detail=f"Slack recusou: {data.get('error', resp.status_code)}"
+                    ok=False,
+                    detail=f"Slack recusou: {slack_reply.get('error', slack_response.status_code)}",
                 )
-            return ChannelTest(ok=True, detail=f"Workspace {data.get('team', '')}".strip())
+            return ChannelTest(ok=True, detail=f"Workspace {slack_reply.get('team', '')}".strip())
     except (httpx.HTTPError, ValueError) as exc:
         return ChannelTest(ok=False, detail=f"Sem resposta do provedor: {exc.__class__.__name__}")

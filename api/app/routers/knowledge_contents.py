@@ -47,6 +47,7 @@ _WRITE = [Depends(require_scopes(Scope.KNOWLEDGE_WRITE))]
 
 
 def to_response(c: KnowledgeContent, *, queued: bool = False) -> KnowledgeContentResponse:
+    """Conteúdo no formato da resposta; `queued` diz se ainda espera o worker de ingestão."""
     return KnowledgeContentResponse(
         id=c.id,
         base_id=c.base_id,
@@ -72,6 +73,7 @@ def to_response(c: KnowledgeContent, *, queued: bool = False) -> KnowledgeConten
 
 
 def _actor(request: Request) -> str:
+    """Quem enviou; "panel" quando a requisição não traz usuário."""
     return str(getattr(request.state, "user_id", None) or "panel")
 
 
@@ -94,6 +96,7 @@ def _content_or_404(session: Session, base_id: UUID, content_id: UUID) -> Knowle
 
 
 def _register(session: Session, content: KnowledgeContent) -> KnowledgeContent:
+    """Grava o conteúdo como em processamento antes de mandar para a ingestão."""
     session.add(content)
     session.commit()
     session.refresh(content)
@@ -112,8 +115,8 @@ def list_contents(base_id: UUID, session: SessionDep) -> list[KnowledgeContentRe
         .where(KnowledgeContent.base_id == base_id)
         .order_by(KnowledgeContent.created_at.desc())
     ).all()
-    waiting = queued_contents(session, [c.id for c in rows])
-    return [to_response(c, queued=c.id in waiting) for c in rows]
+    queued_ids = queued_contents(session, [content.id for content in rows])
+    return [to_response(content, queued=content.id in queued_ids) for content in rows]
 
 
 @router.get("/{content_id}", response_model=KnowledgeContentResponse)
@@ -131,22 +134,26 @@ def upload_file(
     file: UploadFile = File(...),  # noqa: B008
     name: str | None = Form(default=None),  # noqa: B008
 ) -> KnowledgeContentResponse:
+    """Recebe o arquivo, guarda o original para reprocessar e manda para a ingestão."""
     _base_or_404(session, base_id)
+    # só o nome final: o nome enviado pode trazer caminho
     filename = PurePath(file.filename or "arquivo").name
     extension = PurePath(filename).suffix.lower().lstrip(".")
-    allowed = get_settings().knowledge_extensions
-    if extension not in allowed:
-        aceitas = ", ".join(sorted(allowed))
+    allowed_extensions = get_settings().knowledge_extensions
+    if extension not in allowed_extensions:
+        accepted_list = ", ".join(sorted(allowed_extensions))
         raise HTTPException(
-            status_code=415, detail=f"Extensão .{extension or '?'} não aceita (aceitas: {aceitas})"
+            status_code=415,
+            detail=f"Extensão .{extension or '?'} não aceita (aceitas: {accepted_list})",
         )
-    limit = _max_bytes()
-    data = file.file.read(limit + 1)
-    if len(data) > limit:
+    max_bytes = _max_bytes()
+    # um byte além do teto basta para saber que o arquivo passou dele, sem ler tudo
+    file_bytes = file.file.read(max_bytes + 1)
+    if len(file_bytes) > max_bytes:
         raise HTTPException(
-            status_code=413, detail=f"Arquivo maior que {limit // (1024 * 1024)} MB"
+            status_code=413, detail=f"Arquivo maior que {max_bytes // (1024 * 1024)} MB"
         )
-    if not data:
+    if not file_bytes:
         raise HTTPException(status_code=422, detail="Arquivo vazio")
     content = _register(
         session,
@@ -156,12 +163,12 @@ def upload_file(
             source_type="file",
             source=filename,
             extension=extension,
-            size_bytes=len(data),
+            size_bytes=len(file_bytes),
             status="processing",
             created_by=_actor(request),
         ),
     )
-    save_original(session, content.id, data)
+    save_original(session, content.id, file_bytes)
     session.commit()
     submit(background, "ingest", content.id)
     return to_response(content, queued=worker_enabled())
@@ -175,6 +182,7 @@ def add_url(
     request: Request,
     background: BackgroundTasks,
 ) -> KnowledgeContentResponse:
+    """Cadastra uma URL para baixar e indexar, com reindexação opcional no intervalo."""
     _base_or_404(session, base_id)
     url = str(body.url)
     try:
@@ -208,9 +216,10 @@ def add_text(
     request: Request,
     background: BackgroundTasks,
 ) -> KnowledgeContentResponse:
+    """Indexa um texto colado, guardando o original para reprocessar."""
     _base_or_404(session, base_id)
-    data = body.text.encode()
-    if len(data) > _max_bytes():
+    text_bytes = body.text.encode()
+    if len(text_bytes) > _max_bytes():
         raise HTTPException(status_code=413, detail="Texto maior que o limite de upload")
     content = _register(
         session,
@@ -220,13 +229,13 @@ def add_text(
             source_type="text",
             source=body.name,
             extension="txt",
-            size_bytes=len(data),
+            size_bytes=len(text_bytes),
             status="processing",
             created_by=_actor(request),
             fields=body.fields,
         ),
     )
-    save_original(session, content.id, data)
+    save_original(session, content.id, text_bytes)
     session.commit()
     submit(background, "ingest", content.id)
     return to_response(content, queued=worker_enabled())
@@ -285,6 +294,7 @@ def refresh_content(
 
 @router.delete("/{content_id}", status_code=204, dependencies=_WRITE)
 def delete_content(base_id: UUID, content_id: UUID, session: SessionDep) -> None:
+    """Apaga os trechos do vetor e depois o registro do conteúdo."""
     base = _base_or_404(session, base_id)
     content = _content_or_404(session, base_id, content_id)
     remove_chunks(base, content.id)

@@ -40,32 +40,36 @@ SPIKE_ERROR_RATE = 0.5
 
 
 def _usd(value: float) -> str:
+    """Valor em dólar no formato brasileiro: US$ 1.234,56."""
     return f"US$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def destinations_for(session: Session, event: str) -> list[AlertDestination]:
+    """Destinos que assinam o evento, na ordem de criação."""
     rows = session.scalars(select(AlertDestination).order_by(AlertDestination.created_at)).all()
-    return [d for d in rows if event in d.events]
+    return [destination for destination in rows if event in destination.events]
 
 
 def broadcast(session: Session, event: str, data: dict[str, Any], text: str) -> int:
     """Manda a todos os destinos do evento; devolve quantos receberam. Nunca levanta."""
     delivered = 0
     body = webhook.body_for(event, data, text)
-    for dest in destinations_for(session, event):
-        if dest.kind == "email":
+    for destination in destinations_for(session, event):
+        if destination.kind == "email":
             # o mesmo texto do webhook; nada de dado de conversa (ADR-0037)
-            status = mailer.send(list(dest.email_to or []), f"[Automata] {event}", text)
-            ok = status == mailer.SENT
+            status = mailer.send(list(destination.email_to or []), f"[Automata] {event}", text)
+            was_delivered = status == mailer.SENT
         else:
             try:
-                status = webhook.deliver(webhook.unseal(dest.webhook_encrypted or ""), event, body)
+                status = webhook.deliver(
+                    webhook.unseal(destination.webhook_encrypted or ""), event, body
+                )
             except SecretsKeyMissing as exc:
                 status = f"recusado: {exc}"
-            ok = status.startswith("HTTP 2")
-        dest.last_status = status
-        dest.last_at = datetime.now(UTC)
-        delivered += ok
+            was_delivered = status.startswith("HTTP 2")
+        destination.last_status = status
+        destination.last_at = datetime.now(UTC)
+        delivered += was_delivered
     session.commit()
     return delivered
 
@@ -83,6 +87,7 @@ def claim(session: Session, config_id: UUID, event: str, window: str) -> bool:
 
 
 def _budget_text(event: str, config: AgentConfig, state: budget.BudgetState) -> str:
+    """Texto do aviso de orçamento: chegada ao percentual ou estouro, com o efeito do bloqueio."""
     assert state.limit_usd is not None and state.percent is not None
     if event == BUDGET_WARNING:
         return (
@@ -101,6 +106,7 @@ def _budget_text(event: str, config: AgentConfig, state: budget.BudgetState) -> 
 
 
 def check_budgets(session: Session, now: datetime) -> list[tuple[UUID, str]]:
+    """Rodada do poller: um aviso e um estouro de orçamento por config e mês."""
     period = budget.current_period(now)
     sent: list[tuple[UUID, str]] = []
     # sem destino para o aviso, nada a somar (Fase 44)
@@ -140,6 +146,7 @@ def check_budgets(session: Session, now: datetime) -> list[tuple[UUID, str]]:
 
 
 def is_spike(runs: int, errors: int) -> bool:
+    """Pico: ao menos SPIKE_MIN_RUNS runs na janela e SPIKE_ERROR_RATE deles com erro."""
     return runs >= SPIKE_MIN_RUNS and errors / runs >= SPIKE_ERROR_RATE
 
 
@@ -152,9 +159,9 @@ class ErrorRate:
 
 def error_rates(session: Session, now: datetime) -> list[ErrorRate]:
     """Taxa de erro recente por config, só de conversa: bloqueio não é erro e teste fica fora."""
-    errors = func.sum(case((AgentRun.status == "error", 1), else_=0))
+    error_count = func.sum(case((AgentRun.status == "error", 1), else_=0))
     rows = session.execute(
-        select(AgentRun.agent_config_id, func.count(AgentRun.id), errors)
+        select(AgentRun.agent_config_id, func.count(AgentRun.id), error_count)
         .where(
             AgentRun.created_at >= now - SPIKE_WINDOW,
             AgentRun.status.in_(("success", "error")),
@@ -162,10 +169,14 @@ def error_rates(session: Session, now: datetime) -> list[ErrorRate]:
         )
         .group_by(AgentRun.agent_config_id)
     )
-    return [ErrorRate(config_id=c, runs=int(n), errors=int(e or 0)) for c, n, e in rows]
+    return [
+        ErrorRate(config_id=config_id, runs=int(run_count), errors=int(errors or 0))
+        for config_id, run_count, errors in rows
+    ]
 
 
 def check_errors(session: Session, now: datetime) -> list[UUID]:
+    """Rodada do poller: aviso de pico de erro, no máximo um por config por hora."""
     if not destinations_for(session, ERRORS_SPIKE):
         return []
     sent: list[UUID] = []

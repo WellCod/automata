@@ -32,19 +32,22 @@ router = APIRouter(
 )
 
 
-def _response(d: AlertDestination, emails: dict[str, str] | None = None) -> dict[str, Any]:
+def _response(
+    destination: AlertDestination, emails: dict[str, str] | None = None
+) -> dict[str, Any]:
+    """Campos comuns às respostas do destino; o segredo do webhook nunca sai daqui."""
     return {
-        "id": d.id,
-        "name": d.name,
-        "kind": d.kind,
-        "host": d.webhook_host,
-        "emails": list(d.email_to or []),
-        "events": cast(list[AlertEvent], d.events),
+        "id": destination.id,
+        "name": destination.name,
+        "kind": destination.kind,
+        "host": destination.webhook_host,
+        "emails": list(destination.email_to or []),
+        "events": cast(list[AlertEvent], destination.events),
         # e-mail de quem criou, quando é usuário do painel (Fase 44)
-        "created_by": (emails or {}).get(d.created_by, d.created_by),
-        "last_status": d.last_status,
-        "last_at": d.last_at,
-        "created_at": d.created_at,
+        "created_by": (emails or {}).get(destination.created_by, destination.created_by),
+        "last_status": destination.last_status,
+        "last_at": destination.last_at,
+        "created_at": destination.created_at,
     }
 
 
@@ -56,19 +59,21 @@ def _or_404(session: SessionDep, destination_id: UUID) -> AlertDestination:
 
 
 def _unique(events: list[AlertEvent]) -> list[str]:
+    """Tira eventos repetidos mantendo a ordem em que vieram."""
     return list(dict.fromkeys(events))
 
 
 @router.get("/channels", response_model=AlertChannels)
 def channels() -> AlertChannels:
+    """Canais disponíveis na instância: e-mail só aparece com SMTP configurado."""
     return AlertChannels(email=mailer.configured())
 
 
 @router.get("", response_model=list[AlertDestinationResponse])
 def list_destinations(session: SessionDep) -> list[AlertDestinationResponse]:
     rows = session.scalars(select(AlertDestination).order_by(AlertDestination.created_at)).all()
-    emails = emails_by_id(session, {d.created_by for d in rows})
-    return [AlertDestinationResponse(**_response(d, emails)) for d in rows]
+    emails = emails_by_id(session, {destination.created_by for destination in rows})
+    return [AlertDestinationResponse(**_response(destination, emails)) for destination in rows]
 
 
 @router.post("", response_model=AlertDestinationIssued, status_code=201)
@@ -80,46 +85,46 @@ def create_destination(
     if body.kind == "email":
         if not mailer.configured():
             raise HTTPException(status_code=422, detail="SMTP_HOST não configurado na API")
-        dest = AlertDestination(
+        destination = AlertDestination(
             name=body.name,
             kind="email",
             webhook_encrypted=None,
             webhook_host="e-mail",
-            email_to=list(dict.fromkeys(str(e).lower() for e in body.emails)),
+            email_to=list(dict.fromkeys(str(email).lower() for email in body.emails)),
             events=_unique(body.events),
             created_by=actor,
         )
-        session.add(dest)
+        session.add(destination)
         session.commit()
-        session.refresh(dest)
-        return AlertDestinationIssued(**_response(dest), secret="")
+        session.refresh(destination)
+        return AlertDestinationIssued(**_response(destination), secret="")
     try:
         encrypted, host, secret = webhook.seal(body.url or "")
     except (EgressDenied, SecretsKeyMissing) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    dest = AlertDestination(
+    destination = AlertDestination(
         name=body.name,
         webhook_encrypted=encrypted,
         webhook_host=host,
         events=_unique(body.events),
         created_by=actor,
     )
-    session.add(dest)
+    session.add(destination)
     session.commit()
-    session.refresh(dest)
-    return AlertDestinationIssued(**_response(dest), secret=secret)
+    session.refresh(destination)
+    return AlertDestinationIssued(**_response(destination), secret=secret)
 
 
 @router.put("/{destination_id}", response_model=AlertDestinationResponse)
 def update_destination(
     destination_id: UUID, body: AlertDestinationUpdate, session: SessionDep
 ) -> AlertDestinationResponse:
-    dest = _or_404(session, destination_id)
-    dest.name = body.name
-    dest.events = _unique(body.events)
+    destination = _or_404(session, destination_id)
+    destination.name = body.name
+    destination.events = _unique(body.events)
     session.commit()
-    session.refresh(dest)
-    return AlertDestinationResponse(**_response(dest))
+    session.refresh(destination)
+    return AlertDestinationResponse(**_response(destination))
 
 
 @router.delete("/{destination_id}", status_code=204)
@@ -132,28 +137,28 @@ def delete_destination(destination_id: UUID, session: SessionDep) -> Response:
 @router.post("/{destination_id}/test", response_model=AlertTestResult)
 def test_destination(destination_id: UUID, session: SessionDep) -> AlertTestResult:
     """Manda um alert.test, uma tentativa só, para conferir a integração."""
-    dest = _or_404(session, destination_id)
-    if dest.kind == "email":
+    destination = _or_404(session, destination_id)
+    if destination.kind == "email":
         status = mailer.send(
-            list(dest.email_to or []),
+            list(destination.email_to or []),
             "[Automata] teste do destino de aviso",
-            f"Teste do destino de aviso {dest.name}: o e-mail está funcionando.",
+            f"Teste do destino de aviso {destination.name}: o e-mail está funcionando.",
         )
-        dest.last_status = status
-        dest.last_at = datetime.now(UTC)
+        destination.last_status = status
+        destination.last_at = datetime.now(UTC)
         session.commit()
         return AlertTestResult(status=status, delivered=status == mailer.SENT)
     try:
-        target = webhook.unseal(dest.webhook_encrypted or "")
+        target = webhook.unseal(destination.webhook_encrypted or "")
     except SecretsKeyMissing as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     body = webhook.body_for(
         "alert.test",
-        {"destination": dest.name},
-        f"Teste do destino de aviso {dest.name}: o webhook está funcionando.",
+        {"destination": destination.name},
+        f"Teste do destino de aviso {destination.name}: o webhook está funcionando.",
     )
     status = webhook.deliver(target, "alert.test", body, attempts=1)
-    dest.last_status = status
-    dest.last_at = datetime.now(UTC)
+    destination.last_status = status
+    destination.last_at = datetime.now(UTC)
     session.commit()
     return AlertTestResult(status=status, delivered=status.startswith("HTTP 2"))

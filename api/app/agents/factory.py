@@ -46,6 +46,8 @@ from app.secrets import SecretsKeyMissing
 
 
 class FactoryInput(BaseModel):
+    """`factory_input` aceito pelas rotas de run do AgentOS para agente, time e workflow."""
+
     version_id: UUID | None = None
     # usuário final do sistema integrado (ADR-0045, LLM-02): separa a memória de cada
     # pessoa atrás de um mesmo token de integração. Ignorado para usuário do painel
@@ -71,6 +73,8 @@ def requested_version(ctx: RequestContext) -> UUID | None:
 
 @dataclass
 class ResolvedVersion:
+    """Versão lida do banco com o que o run precisa já montado: tools MCP e bases."""
+
     name: str
     description: str
     payload: ConfigPayload
@@ -103,7 +107,7 @@ def load_version(
         if config is None:
             raise FactoryValidationError(f"Config {config_id} não encontrada")
 
-        vid = version_id or config.current_version_id
+        selected_version_id = version_id or config.current_version_id
         # liberação gradual (ADR-0040): sem versão pedida, a sessão pode cair no canário
         if (
             canary
@@ -111,36 +115,40 @@ def load_version(
             and config.canary_version_id is not None
             and in_canary(config_id, session_id, config.canary_percent)
         ):
-            vid = config.canary_version_id
-        if vid is None:
+            selected_version_id = config.canary_version_id
+        if selected_version_id is None:
             raise FactoryValidationError("Nenhuma versão publicada para este agente")
 
-        version = repo.get_version(vid)
+        version = repo.get_version(selected_version_id)
         if version is None or version.config_id != config_id:
-            raise FactoryValidationError(f"Versão {vid} não pertence a este agente")
+            raise FactoryValidationError(f"Versão {selected_version_id} não pertence a este agente")
 
         payload = ConfigPayload.model_validate(version.payload)
         # piso da instância (ADR-0034): vale no próximo run, sem publicar de novo
         payload.guardrails = effective(instance_floor(), payload.guardrails)
-        bases = _bases_for(session, payload)
+        bases_with_limits = _bases_for(session, payload)
         return ResolvedVersion(
             name=config.name,
             description=config.description,
             payload=payload,
             mcp_tools=_mcp_tools_for(session, payload),
-            bases=[b for b, _ in bases],
-            knowledge_tools=[knowledge_tool(b, n, config_id) for b, n in bases],
+            bases=[base for base, _ in bases_with_limits],
+            knowledge_tools=[
+                knowledge_tool(base, max_results, config_id)
+                for base, max_results in bases_with_limits
+            ],
             budget_limit_usd=hard_limit(config),
-            version_id=vid,
+            version_id=selected_version_id,
         )
 
 
 def _bases_for(session: Session, payload: ConfigPayload) -> list[tuple[KnowledgeBase, int]]:
-    """Bases ligadas, soltas da sessão: a busca roda em outra thread, durante o run."""
-    found = {
-        b.id: b
-        for b in KnowledgeBaseRepository(session).get_many([k.base_id for k in payload.knowledge])
-    }
+    """Bases ligadas, soltas da sessão: a busca roda em outra thread, durante o run.
+
+    Devolve cada base com o `max_results` do vínculo, na ordem do payload.
+    """
+    linked_ids = [binding.base_id for binding in payload.knowledge]
+    found = {base.id: base for base in KnowledgeBaseRepository(session).get_many(linked_ids)}
     result: list[tuple[KnowledgeBase, int]] = []
     for binding in payload.knowledge:
         base = found.get(binding.base_id)
@@ -153,8 +161,9 @@ def _bases_for(session: Session, payload: ConfigPayload) -> list[tuple[Knowledge
 
 def _mcp_tools_for(session: Session, payload: ConfigPayload) -> list[MCPTools]:
     """Um MCPTools por servidor vinculado. A conexão acontece no run (TrackedAgent)."""
-    servers = McpServerRepository(session).get_many([b.server_id for b in payload.mcp_servers])
-    by_id = {s.id: s for s in servers}
+    linked_ids = [binding.server_id for binding in payload.mcp_servers]
+    servers = McpServerRepository(session).get_many(linked_ids)
+    by_id = {server.id: server for server in servers}
     result: list[MCPTools] = []
     for binding in payload.mcp_servers:
         server = by_id.get(binding.server_id)
@@ -184,6 +193,7 @@ TOOL_RESULT_NOTICE = (
 def build_instructions(
     payload: ConfigPayload, bases: list[KnowledgeBase] | None = None
 ) -> str | None:
+    """Instruções do modelo: as seções preenchidas do payload, separadas por linha em branco."""
     sections = [
         payload.instructions.persona,
         payload.instructions.situation,
@@ -193,7 +203,7 @@ def build_instructions(
         knowledge_instructions(bases or []),
         TOOL_RESULT_NOTICE if payload.mcp_servers else None,
     ]
-    return "\n\n".join(s for s in sections if s) or None
+    return "\n\n".join(section for section in sections if section) or None
 
 
 def _post_hooks(hook: Callable[..., Any] | None) -> list[Any] | None:
@@ -226,6 +236,7 @@ def compaction_for(payload: ConfigPayload) -> Compaction | None:
 def pre_hooks_for(
     config_id: UUID, resolved: ResolvedVersion, blocks: BlockLog, *, budget: bool
 ) -> list[Any] | None:
+    """Pre hooks do run: orçamentos (só com `budget`) e depois os guardrails de entrada."""
     # orçamento antes dos guardrails: estourado, nem a moderação (que sai da API) roda
     hooks: list[BaseGuardrail] = []
     if budget and resolved.budget_limit_usd is not None:
@@ -238,6 +249,7 @@ def pre_hooks_for(
 
 
 def required_model(payload: ConfigPayload) -> str:
+    """`model_id` da versão; agente e time sem modelo não montam."""
     # o serviço exige modelo em agente e time; versão gravada sem ele é dado inválido
     if payload.model_id is None:
         raise FactoryValidationError("versão sem modelo")
@@ -261,7 +273,9 @@ def fallback_for(payload: ConfigPayload) -> FallbackConfig | None:
     """Reservas em erro do provedor e em 429; erro 4xx do cliente não troca de modelo."""
     if not payload.run.fallback_models or demo_replay():
         return None
-    models: list[Model | str] = [model_for(mid, payload) for mid in payload.run.fallback_models]
+    models: list[Model | str] = [
+        model_for(fallback_model_id, payload) for fallback_model_id in payload.run.fallback_models
+    ]
     return FallbackConfig(on_error=models, on_rate_limit=list(models))
 
 
@@ -308,9 +322,10 @@ def agent_from(
     `blocks` é o registro do run: o membro de time grava os bloqueios no do líder (LLM-09).
     """
     payload = resolved.payload
-    cls = TrackedAgent if tracked else Agent
+    # membro de time não grava run próprio: o run do time já soma o consumo (ADR-0011)
+    agent_class = TrackedAgent if tracked else Agent
     blocks = blocks if blocks is not None else BlockLog()
-    agent = cls(
+    agent = agent_class(
         id=str(config_id),
         name=resolved.name,
         # em time, a descrição é o que o líder usa para decidir a quem delegar
@@ -373,6 +388,7 @@ def make_agent_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> AgentFactor
     """
 
     async def build(ctx: RequestContext) -> Agent:
+        """Monta o agente da request; chamado pelo AgentFactory do Agno a cada run."""
         version_id = requested_version(ctx)
         # leitura síncrona do banco fora do event loop
         resolved = await asyncio.to_thread(
@@ -390,6 +406,8 @@ def make_agent_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> AgentFactor
 
 @dataclass
 class ResolvedTeam:
+    """Versão do líder (que traz a seção `team`) e a de cada membro, com o id do config."""
+
     leader: ResolvedVersion
     members: list[tuple[UUID, ResolvedVersion]]
 
@@ -401,12 +419,16 @@ def load_team(
     *,
     canary: bool = False,
 ) -> ResolvedTeam:
+    """Versões do líder e dos membros do time, como `load_version` faz para o agente."""
     # o líder segue o canário do time; os membros, a vigente deles (ADR-0040)
     leader = load_version(config_id, version_id, session_id, canary=canary)
     team = leader.payload.team
     if team is None:
         raise FactoryValidationError(f"Config {config_id} não é um time")
-    members = [(m.agent_id, load_version(m.agent_id, m.version_id)) for m in team.members]
+    members = [
+        (member.agent_id, load_version(member.agent_id, member.version_id))
+        for member in team.members
+    ]
     return ResolvedTeam(leader=leader, members=members)
 
 
@@ -417,6 +439,7 @@ def make_team_factory(config_id: UUID, db: BaseDb | AsyncBaseDb) -> TeamFactory:
     """
 
     async def build(ctx: RequestContext) -> Team:
+        """Monta o time da request; chamado pelo TeamFactory do Agno a cada run."""
         version_id = requested_version(ctx)
         resolved = await asyncio.to_thread(
             load_team, config_id, version_id, ctx.session_id, canary=True
@@ -438,7 +461,9 @@ def team_from(
     leader = resolved.leader
     settings = leader.payload.team
     assert settings is not None
+    # um registro só para o run: líder e membros gravam nele os bloqueios e as retiradas
     blocks = BlockLog()
+
     team = TrackedTeam(
         id=str(config_id),
         name=leader.name,
@@ -449,7 +474,10 @@ def team_from(
         tools=[*leader.mcp_tools, *leader.knowledge_tools],
         pre_hooks=pre_hooks_for(config_id, leader, blocks, budget=True),
         post_hooks=_post_hooks(output_guardrail(leader.payload.guardrails, blocks, config_id)),
-        members=[agent_from(mid, m, tracked=False, blocks=blocks) for mid, m in resolved.members],
+        members=[
+            agent_from(member_id, member_version, tracked=False, blocks=blocks)
+            for member_id, member_version in resolved.members
+        ],
         mode=TeamMode(settings.mode),
         max_iterations=settings.max_iterations,
         share_member_interactions=settings.share_member_interactions,

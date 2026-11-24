@@ -45,10 +45,11 @@ class McpServerBinding(BaseModel):
 
     @model_validator(mode="after")
     def confirmacao_dentro_das_liberadas(self) -> McpServerBinding:
+        """Tool com confirmação precisa estar liberada; com `tools` vazio, todas estão."""
         if self.tools is not None:
-            fora = set(self.require_confirmation) - set(self.tools)
-            if fora:
-                raise ValueError(f"tools com confirmação não liberadas: {sorted(fora)}")
+            not_allowed = set(self.require_confirmation) - set(self.tools)
+            if not_allowed:
+                raise ValueError(f"tools com confirmação não liberadas: {sorted(not_allowed)}")
         return self
 
 
@@ -74,10 +75,11 @@ class CustomPiiPattern(BaseModel):
 
     @field_validator("label")
     @classmethod
-    def rotulo_sem_espaco_nas_pontas(cls, v: str) -> str:
-        if not v.strip():
+    def rotulo_sem_espaco_nas_pontas(cls, label: str) -> str:
+        # o pattern aceita só espaços; o rótulo vazio não diria o que foi removido
+        if not label.strip():
             raise ValueError("o rótulo precisa de texto")
-        return v.strip()
+        return label.strip()
 
     @model_validator(mode="after")
     def faixa_valida(self) -> CustomPiiPattern:
@@ -86,6 +88,7 @@ class CustomPiiPattern(BaseModel):
         return self
 
     def compiled(self) -> CustomPattern:
+        """Padrão no formato que a máscara de dados pessoais usa."""
         return CustomPattern(self.label, self.prefix, self.min_digits, self.max_digits)
 
 
@@ -98,14 +101,15 @@ class PiiRule(BaseModel):
 
     @field_validator("custom")
     @classmethod
-    def rotulos_unicos(cls, v: list[CustomPiiPattern]) -> list[CustomPiiPattern]:
-        labels = [p.label.lower() for p in v]
+    def rotulos_unicos(cls, patterns: list[CustomPiiPattern]) -> list[CustomPiiPattern]:
+        # sem diferença de caixa: "Matrícula" e "matrícula" dariam o mesmo marcador
+        labels = [pattern.label.lower() for pattern in patterns]
         if len(labels) != len(set(labels)):
             raise ValueError("rótulo repetido nos padrões próprios")
-        return v
+        return patterns
 
     def custom_patterns(self) -> tuple[CustomPattern, ...]:
-        return tuple(p.compiled() for p in self.custom)
+        return tuple(pattern.compiled() for pattern in self.custom)
 
 
 class OutputRule(BaseModel):
@@ -119,9 +123,10 @@ class OutputRule(BaseModel):
 
     @field_validator("blocked_terms")
     @classmethod
-    def termos_validos(cls, v: list[str]) -> list[str]:
-        cleaned = [t.strip() for t in v if t.strip()]
-        if any(len(t) < 3 or len(t) > 100 for t in cleaned):
+    def termos_validos(cls, terms: list[str]) -> list[str]:
+        """Descarta termo em branco; cada um entre 3 e 100 caracteres."""
+        cleaned = [term.strip() for term in terms if term.strip()]
+        if any(len(term) < 3 or len(term) > 100 for term in cleaned):
             raise ValueError("cada termo precisa ter de 3 a 100 caracteres")
         return cleaned
 
@@ -144,6 +149,7 @@ class ClassifierRule(BaseModel):
 
     @model_validator(mode="after")
     def escopo_com_off_topic(self) -> ClassifierRule:
+        """Checagens sem repetição; a de assunto só decide com o escopo do agente escrito."""
         if len(self.checks) != len(set(self.checks)):
             raise ValueError("checagem repetida no classificador")
         if "off_topic" in self.checks and not self.scope.strip():
@@ -164,6 +170,7 @@ class OutputClassifierRule(BaseModel):
 
     @model_validator(mode="after")
     def escopo_com_off_topic(self) -> OutputClassifierRule:
+        """Mesmas regras do classificador da entrada."""
         if len(self.checks) != len(set(self.checks)):
             raise ValueError("checagem repetida no classificador da saída")
         if "off_topic" in self.checks and not self.scope.strip():
@@ -202,9 +209,10 @@ class GuardrailSettings(BaseModel):
 
     @field_validator("injection_extra_terms", "blocked_topics")
     @classmethod
-    def termos_validos(cls, v: list[str]) -> list[str]:
-        cleaned = [t.strip() for t in v if t.strip()]
-        if any(len(t) < 3 or len(t) > 100 for t in cleaned):
+    def termos_validos(cls, terms: list[str]) -> list[str]:
+        """Descarta termo em branco; cada um entre 3 e 100 caracteres."""
+        cleaned = [term.strip() for term in terms if term.strip()]
+        if any(len(term) < 3 or len(term) > 100 for term in cleaned):
             raise ValueError("cada termo precisa ter de 3 a 100 caracteres")
         return cleaned
 
@@ -288,8 +296,8 @@ class TeamSettings(BaseModel):
 
     @model_validator(mode="after")
     def membros_unicos(self) -> TeamSettings:
-        ids = [m.agent_id for m in self.members]
-        if len(ids) != len(set(ids)):
+        agent_ids = [member.agent_id for member in self.members]
+        if len(agent_ids) != len(set(agent_ids)):
             raise ValueError("membro repetido no time")
         return self
 
@@ -301,6 +309,7 @@ SAFE_MAX_INPUT_CHARS = 20_000
 
 
 def safe_guardrails() -> GuardrailSettings:
+    """Teto de tamanho da mensagem e exame do resultado de tool por termos."""
     return GuardrailSettings(
         max_input_chars=SAFE_MAX_INPUT_CHARS, tool_results=ToolResultScreening()
     )
@@ -342,6 +351,7 @@ class ConfigPayload(BaseModel):
 
     def with_safe_defaults(self) -> ConfigPayload:
         """Guardrails e controle do run do ADR-0045 onde quem salvou não mandou a seção."""
+        # `model_fields_set` distingue a seção omitida da enviada com os valores padrão
         sent = self.model_fields_set
         updates: dict[str, Any] = {}
         if "guardrails" not in sent:
@@ -353,17 +363,19 @@ class ConfigPayload(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def upgrade_v1(cls, data: Any) -> Any:
+        """Payload v1 gravado vira v2 na leitura; o `tools` antigo nunca chegou ao agente."""
         if isinstance(data, dict) and data.get("schema_version", 1) == 1:
-            data = {k: v for k, v in data.items() if k != "tools"}
+            data = {key: value for key, value in data.items() if key != "tools"}
             data["schema_version"] = 2
         return data
 
     @model_validator(mode="after")
     def servidores_unicos(self) -> ConfigPayload:
-        ids = [b.server_id for b in self.mcp_servers]
-        if len(ids) != len(set(ids)):
+        """Cada servidor MCP e cada base aparecem uma vez só no agente."""
+        server_ids = [binding.server_id for binding in self.mcp_servers]
+        if len(server_ids) != len(set(server_ids)):
             raise ValueError("servidor MCP repetido no agente")
-        bases = [b.base_id for b in self.knowledge]
+        bases = [binding.base_id for binding in self.knowledge]
         if len(bases) != len(set(bases)):
             raise ValueError("base de conhecimento repetida no agente")
         return self

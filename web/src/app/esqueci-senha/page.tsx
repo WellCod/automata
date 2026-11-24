@@ -16,13 +16,13 @@ export default function ForgotPasswordPage() {
     setError("");
     setBusy(true);
     try {
-      const res = await fetch("/api/auth/password/forgot", {
+      const response = await fetch("/api/auth/password/forgot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      if (res.status === 429) setError("Muitas tentativas. Aguarde um minuto.");
-      else if (!res.ok) setError("Informe um e-mail válido.");
+      if (response.status === 429) setError("Muitas tentativas. Aguarde um minuto.");
+      else if (!response.ok) setError("Informe um e-mail válido.");
       else setSent(true);
     } catch {
       setError("Erro de conexão. Tente novamente.");

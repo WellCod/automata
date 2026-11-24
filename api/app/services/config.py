@@ -48,6 +48,11 @@ class PlanLimitError(ValueError):
 
 
 class ConfigService:
+    """Ciclo de vida do config: rascunho, publicação, canário e rollback, com validação na escrita.
+
+    Os repositórios de servidores MCP e de bases só são exigidos quando o payload os referencia.
+    """
+
     def __init__(
         self,
         repo: ConfigRepository,
@@ -61,6 +66,7 @@ class ConfigService:
     def create_config(
         self, name: str, description: str, kind: ConfigKind = ConfigKind.agent
     ) -> AgentConfig:
+        """Cria o config vazio, respeitando o limite de configs do plano."""
         from app.settings import get_settings
 
         limit = get_settings().plan_max_configs
@@ -72,9 +78,10 @@ class ConfigService:
     def save_draft(
         self, config_id: UUID, payload: ConfigPayload, author: str
     ) -> AgentConfigVersion:
+        """Grava o payload como versão de rascunho nova e aponta o rascunho para ela."""
         config = self._get_or_raise(config_id)
-        first = config.current_version_id is None and config.draft_version_id is None
-        if first and config.kind in (ConfigKind.agent, ConfigKind.team):
+        first_version = config.current_version_id is None and config.draft_version_id is None
+        if first_version and config.kind in (ConfigKind.agent, ConfigKind.team):
             # agente novo não nasce sem defesa (ADR-0045, LLM-01)
             payload = payload.with_safe_defaults()
         self._validate(config, payload)
@@ -161,6 +168,7 @@ class ConfigService:
         return config
 
     def get_detail(self, config_id: UUID) -> tuple[AgentConfig, ConfigPayload | None]:
+        """Config com o payload que o editor mostra: o rascunho, ou a vigente sem rascunho."""
         config = self._get_or_raise(config_id)
         version_id = config.draft_version_id or config.current_version_id
         if version_id is None:
@@ -178,6 +186,7 @@ class ConfigService:
         payload: ConfigPayload,
         author: str,
     ) -> AgentConfigVersion:
+        """Atualiza nome e descrição e grava o payload como rascunho novo."""
         config = self._get_or_raise(config_id)
         self._validate(config, payload)
         self._repo.update_config(config, name=name, description=description)
@@ -214,6 +223,7 @@ class ConfigService:
         return config
 
     def _validate(self, config: AgentConfig, payload: ConfigPayload) -> None:
+        """Junta todos os problemas do payload numa mensagem só, para o editor ver de uma vez."""
         errors = self._model_errors(config, payload)
         if payload.model_id is not None:
             errors += validate_capabilities(payload.model_id, payload.capabilities)
@@ -239,6 +249,7 @@ class ConfigService:
 
     @staticmethod
     def _schema_errors(config: AgentConfig, payload: ConfigPayload) -> list[str]:
+        """Schema de saída válido e com custo de validação limitado, só em agente e time."""
         if payload.output_schema is None:
             return []
         if config.kind == ConfigKind.workflow:
@@ -262,28 +273,29 @@ class ConfigService:
             except ValueError as exc:
                 errors.append(f"modelo reserva: {exc}")
                 continue
-            errors += [f"modelo reserva: {e}" for e in missing]
+            errors += [f"modelo reserva: {problem}" for problem in missing]
         return errors
 
     @staticmethod
     def _compression_errors(payload: ConfigPayload) -> list[str]:
         """Modelos da compressão (ADR-0029) e do resumo (ADR-0035) só da matriz; recebem texto."""
         errors: list[str] = []
-        settings = payload.run.compress_tool_results
-        if settings is not None and settings.model_id is not None:
+        compression = payload.run.compress_tool_results
+        if compression is not None and compression.model_id is not None:
             try:
-                get_capabilities(settings.model_id)
+                get_capabilities(compression.model_id)
             except ValueError as exc:
                 errors.append(f"modelo da compressão: {exc}")
-        summary = payload.conversation.summary_model
-        if summary is not None:
+        summary_model = payload.conversation.summary_model
+        if summary_model is not None:
             try:
-                get_capabilities(summary)
+                get_capabilities(summary_model)
             except ValueError as exc:
                 errors.append(f"modelo do resumo da conversa: {exc}")
         return errors
 
     def _model_errors(self, config: AgentConfig, payload: ConfigPayload) -> list[str]:
+        """Agente e time precisam de modelo; workflow não pode ter."""
         if config.kind == ConfigKind.workflow:
             # workflow não chama modelo: quem chama são os agentes e times das etapas
             return ["workflow não tem modelo próprio"] if payload.model_id is not None else []
@@ -302,12 +314,13 @@ class ConfigService:
             expected = ConfigKind.agent if step.agent_id else ConfigKind.team
             target = self._repo.get_config(target_id)
             if target is None or target.kind != expected:
-                rotulo = "agente" if expected == ConfigKind.agent else "time"
-                errors.append(f"etapa '{step.name}': {rotulo} {target_id} não existe")
+                kind_label = "agente" if expected == ConfigKind.agent else "time"
+                errors.append(f"etapa '{step.name}': {kind_label} {target_id} não existe")
                 continue
             if target.current_version_id is None:
                 errors.append(f"etapa '{step.name}': '{target.name}' não tem versão publicada")
                 continue
+            # sem versão fixada, a etapa segue a vigente do agente ou time
             version_id = step.version_id or target.current_version_id
             version = self._repo.get_version(version_id)
             if (
@@ -337,27 +350,28 @@ class ConfigService:
             version = self._repo.get_version(workflow.current_version_id)
             if version is None:
                 continue
-            settings = ConfigPayload.model_validate(version.payload).workflow
-            if settings is None:
+            workflow_settings = ConfigPayload.model_validate(version.payload).workflow
+            if workflow_settings is None:
                 continue
-            for step in step_nodes(settings.steps):
+            for step in step_nodes(workflow_settings.steps):
                 if (step.agent_id or step.team_id) == config_id and step.version_id is None:
                     names.append(workflow.name)
                     break
         return names
 
     def _needs_confirmation(self, payload: ConfigPayload) -> bool:
-        if any(b.require_confirmation for b in payload.mcp_servers):
+        """Se o agente, ou algum membro do time na versão que roda, tem tool com confirmação."""
+        if any(binding.require_confirmation for binding in payload.mcp_servers):
             return True
         if payload.team is None:
             return False
         for member in payload.team.members:
             agent = self._repo.get_config(member.agent_id)
-            vid = member.version_id or (agent.current_version_id if agent else None)
-            version = self._repo.get_version(vid) if vid else None
+            member_version_id = member.version_id or (agent.current_version_id if agent else None)
+            version = self._repo.get_version(member_version_id) if member_version_id else None
             if version is not None and any(
-                b.require_confirmation
-                for b in ConfigPayload.model_validate(version.payload).mcp_servers
+                binding.require_confirmation
+                for binding in ConfigPayload.model_validate(version.payload).mcp_servers
             ):
                 return True
         return False
@@ -395,22 +409,27 @@ class ConfigService:
         return guardrail_errors(payload.guardrails)
 
     def _knowledge_errors(self, payload: ConfigPayload) -> list[str]:
+        """Bases citadas no payload que não existem."""
         if not payload.knowledge:
             return []
         if self._bases is None:
             raise RuntimeError("ConfigService sem KnowledgeBaseRepository para validar knowledge")
-        ids = [b.base_id for b in payload.knowledge]
-        found = {b.id for b in self._bases.get_many(ids)}
-        return [f"base de conhecimento {i} não existe" for i in ids if i not in found]
+        base_ids = [binding.base_id for binding in payload.knowledge]
+        found = {base.id for base in self._bases.get_many(base_ids)}
+        return [
+            f"base de conhecimento {base_id} não existe"
+            for base_id in base_ids
+            if base_id not in found
+        ]
 
     def _mcp_errors(self, payload: ConfigPayload) -> list[str]:
+        """Servidores MCP inexistentes e tools pedidas que o servidor não tem."""
         if not payload.mcp_servers:
             return []
         if self._servers is None:
             raise RuntimeError("ConfigService sem McpServerRepository para validar mcp_servers")
-        found = {
-            s.id: s for s in self._servers.get_many([b.server_id for b in payload.mcp_servers])
-        }
+        server_ids = [binding.server_id for binding in payload.mcp_servers]
+        found = {server.id: server for server in self._servers.get_many(server_ids)}
         errors: list[str] = []
         for binding in payload.mcp_servers:
             server = found.get(binding.server_id)
@@ -420,11 +439,11 @@ class ConfigService:
             if server.tools_snapshot is None:
                 # nunca descoberto: a lista de tools não tem contra o que conferir
                 continue
-            known = {t["name"] for t in server.tools_snapshot}
-            pedidas = set(binding.tools or []) | set(binding.require_confirmation)
-            faltando = pedidas - known
-            if faltando:
-                errors.append(f"tools inexistentes em '{server.slug}': {sorted(faltando)}")
+            known = {tool["name"] for tool in server.tools_snapshot}
+            requested = set(binding.tools or []) | set(binding.require_confirmation)
+            unknown = requested - known
+            if unknown:
+                errors.append(f"tools inexistentes em '{server.slug}': {sorted(unknown)}")
         return errors
 
 

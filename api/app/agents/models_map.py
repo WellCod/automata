@@ -8,6 +8,7 @@ from agno.models.openai import OpenAIChat
 from app.agents.extra_models import ExtraModel, extra_models
 from app.schemas.config import CapabilityFlags
 
+# matriz fixa: id do painel e classe do Agno que fala com o provedor
 _SUPPORTED: dict[str, type[Model]] = {
     "claude-opus-4-7": Claude,
     "claude-sonnet-4-6": Claude,
@@ -73,17 +74,17 @@ def resolve_model(model_id: str, capabilities: CapabilityFlags | None = None) ->
     extra = extra_models().get(model_id)
     if extra is not None:
         return _from_extra(extra, capabilities)
-    cls = _SUPPORTED.get(model_id)
-    if cls is None:
+    model_class = _SUPPORTED.get(model_id)
+    if model_class is None:
         raise ValueError(f"model_id '{model_id}' não suportado. Suportados: {supported_models()}")
-    if capabilities is not None and capabilities.extended_thinking and cls is Claude:
+    if capabilities is not None and capabilities.extended_thinking and model_class is Claude:
         return Claude(
             id=model_id,
             thinking=_thinking(model_id),
             timeout=PROVIDER_TIMEOUT_SECONDS,
             client_params={"max_retries": PROVIDER_SDK_RETRIES},
         )
-    if cls is Claude:
+    if model_class is Claude:
         return Claude(
             id=model_id,
             timeout=PROVIDER_TIMEOUT_SECONDS,
@@ -96,25 +97,27 @@ def resolve_model(model_id: str, capabilities: CapabilityFlags | None = None) ->
 
 def _from_extra(extra: ExtraModel, capabilities: CapabilityFlags | None) -> Model:
     """Modelo do EXTRA_MODELS, com o mesmo prazo e as mesmas tentativas da matriz (ARQ-02)."""
-    name = extra.model or extra.id
-    key = os.environ.get(extra.key_env)
+    provider_model = extra.model or extra.id
+    api_key = os.environ.get(extra.key_env)
     if extra.provider == "anthropic":
-        params: dict[str, object] = {"max_retries": PROVIDER_SDK_RETRIES}
+        client_params: dict[str, object] = {"max_retries": PROVIDER_SDK_RETRIES}
         if extra.base_url:
-            params["base_url"] = extra.base_url
+            client_params["base_url"] = extra.base_url
         thinking = (
-            _thinking(name) if capabilities is not None and capabilities.extended_thinking else None
+            _thinking(provider_model)
+            if capabilities is not None and capabilities.extended_thinking
+            else None
         )
         return Claude(
-            id=name,
-            api_key=key,
+            id=provider_model,
+            api_key=api_key,
             thinking=thinking,
             timeout=PROVIDER_TIMEOUT_SECONDS,
-            client_params=params,
+            client_params=client_params,
         )
     return OpenAIChat(
-        id=name,
-        api_key=key,
+        id=provider_model,
+        api_key=api_key,
         base_url=extra.base_url,
         timeout=PROVIDER_TIMEOUT_SECONDS,
         max_retries=PROVIDER_SDK_RETRIES,
@@ -138,4 +141,5 @@ def key_env_of(model_id: str) -> str:
 
 
 def supported_models() -> list[str]:
+    """Ids aceitos em `model_id`: a matriz fixa e os do EXTRA_MODELS."""
     return sorted({*_SUPPORTED, *extra_models()})

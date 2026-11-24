@@ -15,6 +15,7 @@ type Issued = components["schemas"]["AlertDestinationIssued"];
 const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none";
 
+// dia, mês e hora do último aviso; sem data, nada
 function when(iso: string | null | undefined): string {
   if (!iso) return "";
   return new Date(iso).toLocaleString("pt-BR", {
@@ -42,7 +43,11 @@ function EventPicker({
             type="checkbox"
             checked={value.includes(event)}
             onChange={(e) =>
-              onChange(e.target.checked ? [...value, event] : value.filter((v) => v !== event))
+              onChange(
+                e.target.checked
+                  ? [...value, event]
+                  : value.filter((selected) => selected !== event),
+              )
             }
           />
           {EVENT_LABELS[event]}
@@ -59,25 +64,27 @@ function DestinationRow({ dest }: { dest: Destination }) {
 
   const update = useMutation({
     mutationFn: async (events: AlertEvent[]) => {
-      const res = await client.PUT("/api/v1/alert-destinations/{destination_id}", {
+      const result = await client.PUT("/api/v1/alert-destinations/{destination_id}", {
         ...path,
         body: { name: dest.name, events },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar os eventos"));
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao salvar os eventos"));
     },
     onSuccess: refresh,
   });
   const test = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/alert-destinations/{destination_id}/test", path);
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao testar o destino"));
+      const result = await client.POST("/api/v1/alert-destinations/{destination_id}/test", path);
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao testar o destino"));
     },
     onSuccess: refresh,
   });
   const remove = useMutation({
     mutationFn: async () => {
-      const res = await client.DELETE("/api/v1/alert-destinations/{destination_id}", path);
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao remover o destino"));
+      const result = await client.DELETE("/api/v1/alert-destinations/{destination_id}", path);
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao remover o destino"));
     },
     onSuccess: refresh,
   });
@@ -146,14 +153,14 @@ export default function AlertsPage() {
   const { data: channels } = useQuery({
     queryKey: ["alert-destinations", "channels"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/alert-destinations/channels");
-      if (res.error) throw new Error("Falha ao carregar os canais");
-      return res.data;
+      const result = await client.GET("/api/v1/alert-destinations/channels");
+      if (result.error) throw new Error("Falha ao carregar os canais");
+      return result.data;
     },
   });
   const emailList = emails
     .split(/[\s,;]+/)
-    .map((e) => e.trim())
+    .map((email) => email.trim())
     .filter(Boolean);
   const [events, setEvents] = useState<AlertEvent[]>(["budget.warning", "budget.exceeded"]);
   const [issued, setIssued] = useState<Issued | null>(null);
@@ -161,22 +168,23 @@ export default function AlertsPage() {
   const { data, isPending, isError } = useQuery<Destination[]>({
     queryKey: ["alert-destinations"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/alert-destinations");
-      if (res.error) throw new Error("Falha ao carregar os destinos");
-      return res.data!;
+      const result = await client.GET("/api/v1/alert-destinations");
+      if (result.error) throw new Error("Falha ao carregar os destinos");
+      return result.data!;
     },
   });
 
   const create = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/alert-destinations", {
+      const result = await client.POST("/api/v1/alert-destinations", {
         body:
           kind === "email"
             ? { name: name.trim(), kind, emails: emailList, events }
             : { name: name.trim(), kind, url: url.trim(), events },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao cadastrar o destino"));
-      return res.data!;
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao cadastrar o destino"));
+      return result.data!;
     },
     onSuccess: (saved) => {
       // o destino por e-mail não tem segredo para mostrar
@@ -207,8 +215,8 @@ export default function AlertsPage() {
       <form
         aria-label="Novo destino"
         className="border-border bg-card flex flex-col gap-2 rounded border p-3"
-        onSubmit={(e) => {
-          e.preventDefault();
+        onSubmit={(event) => {
+          event.preventDefault();
           if (canCreate) create.mutate();
         }}
       >

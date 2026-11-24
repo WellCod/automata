@@ -30,12 +30,13 @@ logger = logging.getLogger(__name__)
 
 
 def _violation(text: str, settings: GuardrailSettings) -> dict[str, Any] | None:
+    """Detalhe da primeira regra de saída que o texto fere, ou None."""
     rule = settings.output
     if rule.pii:
         # os padrões próprios do agente valem também na saída (ADR-0032)
         matches = find_pii(text, rule.pii_types, settings.pii.custom_patterns())
         if matches:
-            return {"types": sorted({m.type for m in matches})}
+            return {"types": sorted({match.type for match in matches})}
     if rule.blocked_terms:
         normalized = normalize(text)
         for term in rule.blocked_terms:
@@ -45,6 +46,7 @@ def _violation(text: str, settings: GuardrailSettings) -> dict[str, Any] | None:
 
 
 def _content(run_output: Any) -> str | None:
+    """Resposta como texto para o exame; vazia ou de tipo sem texto dá None."""
     content = getattr(run_output, "content", None)
     # com saída estruturada a resposta é objeto (ADR-0027): o dado pessoal está nos valores
     if isinstance(content, dict | list):
@@ -58,13 +60,18 @@ def _replace(run_output: Any, message: str, hit: Callable[[str], bool]) -> None:
     """Troca a resposta e a mensagem do assistente que vai para a sessão, antes de levantar:
     o Agno só troca o conteúdo pelo texto da exceção quando ele está vazio."""
     run_output.content = message
-    for msg in getattr(run_output, "messages", None) or []:
-        role = getattr(msg, "role", None)
-        if role == "assistant" and isinstance(msg.content, str) and hit(msg.content):
-            msg.content = message
+    for session_message in getattr(run_output, "messages", None) or []:
+        role = getattr(session_message, "role", None)
+        if (
+            role == "assistant"
+            and isinstance(session_message.content, str)
+            and hit(session_message.content)
+        ):
+            session_message.content = message
 
 
 def _raise(log: BlockLog | None, rule: str, message: str, detail: dict[str, Any]) -> None:
+    """Anota o bloqueio no registro do run e levanta o OutputCheckError do Agno."""
     if log is not None:
         log.blocks.append(Block(rule, message, detail))
     raise OutputCheckError(
@@ -77,6 +84,7 @@ def _raise(log: BlockLog | None, rule: str, message: str, detail: dict[str, Any]
 def output_guardrail(
     settings: GuardrailSettings, log: BlockLog | None = None, config_id: UUID | None = None
 ) -> Callable[..., Any] | None:
+    """Post hook da saída com as regras ligadas; None quando nenhuma vale."""
     rule = settings.output
     classifier = rule.classifier
     if classifier is not None:
@@ -90,6 +98,7 @@ def output_guardrail(
     message = settings.blocked_message
 
     def check_rules(run_output: Any) -> None:
+        """Regras de dado pessoal e de termo, sem chamada de modelo."""
         content = _content(run_output)
         if content is None:
             return
@@ -135,6 +144,7 @@ class OutputClassifier:
         self.config_id = config_id
 
     def _record(self, usage: Any, run_context: Any) -> None:
+        """Grava o consumo do classificador no agente, ligado ao run e ao usuário."""
         if self.config_id is None:
             return
         caller = Caller(
@@ -159,17 +169,18 @@ class OutputClassifier:
         )
 
         usage = None
-        blocks = [
+        text_blocks = [
             text[i : i + MAX_CLASSIFIED_CHARS] for i in range(0, len(text), MAX_CLASSIFIED_CHARS)
         ]
         try:
-            if len(blocks) > MAX_OUTPUT_BLOCKS:
+            if len(text_blocks) > MAX_OUTPUT_BLOCKS:
                 # resposta grande demais para examinar inteira: vale a regra de falha
-                raise ClassifierUnavailable(f"resposta com mais de {len(blocks)} blocos")
+                raise ClassifierUnavailable(f"resposta com mais de {len(text_blocks)} blocos")
             model, usage = metered(resolve_model(self.rule.model_id))
             # a resposta inteira, em blocos: com começo e fim só, o vazamento ia no meio (Fase 43)
-            for block in blocks:
-                result = await aclassify(model, self.rule, block)
+            for text_block in text_blocks:
+                result = await aclassify(model, self.rule, text_block)
+
                 if result.block:
                     break
         except ClassifierBadOutput as exc:

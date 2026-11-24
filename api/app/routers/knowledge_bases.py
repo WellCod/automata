@@ -54,6 +54,7 @@ _WRITE = [Depends(require_scopes(Scope.KNOWLEDGE_WRITE))]
 
 
 def to_response(b: KnowledgeBase, usage: EmbeddingTotals | None = None) -> KnowledgeBaseResponse:
+    """Base com a estratégia de busca, o corte e o consumo de embedding somado."""
     return KnowledgeBaseResponse(
         id=b.id,
         name=b.name,
@@ -74,13 +75,14 @@ def to_response(b: KnowledgeBase, usage: EmbeddingTotals | None = None) -> Knowl
 
 
 def _check_retrieval(retrieval: RetrievalSettings | None) -> None:
+    """Recusa cross-encoder sem chave na instância e modelo do HyDE desconhecido."""
     if retrieval is None:
         return
-    cross = retrieval.cross_encoder
-    if cross is not None and not cross_encoder_available(cross.provider):
+    cross_encoder = retrieval.cross_encoder
+    if cross_encoder is not None and not cross_encoder_available(cross_encoder.provider):
         raise HTTPException(
             status_code=422,
-            detail=f"Cross-encoder {cross.provider} não configurado na instância",
+            detail=f"Cross-encoder {cross_encoder.provider} não configurado na instância",
         )
     if not retrieval.hyde or retrieval.hyde_model is None:
         return
@@ -91,11 +93,12 @@ def _check_retrieval(retrieval: RetrievalSettings | None) -> None:
 
 
 def _actor(request: Request) -> str:
+    """Quem fez a escrita; "panel" quando a requisição não traz usuário."""
     return str(getattr(request.state, "user_id", None) or "panel")
 
 
-def _get_or_404(repo: KnowledgeBaseRepository, base_id: UUID) -> KnowledgeBase:
-    base = repo.get(base_id)
+def _get_or_404(base_repo: KnowledgeBaseRepository, base_id: UUID) -> KnowledgeBase:
+    base = base_repo.get(base_id)
     if base is None:
         raise HTTPException(status_code=404, detail="Base de conhecimento não encontrada")
     return base
@@ -103,14 +106,15 @@ def _get_or_404(repo: KnowledgeBaseRepository, base_id: UUID) -> KnowledgeBase:
 
 @router.get("/embedders", response_model=list[EmbedderInfo])
 def list_embedders() -> list[EmbedderInfo]:
-    default = get_settings().knowledge_default_embedder
+    """Embedders conhecidos, se têm chave na instância e qual é o padrão."""
+    default_embedder = get_settings().knowledge_default_embedder
     return [
         EmbedderInfo(
             name=spec.name,
             model=spec.model,
             dimensions=spec.dimensions,
             configured=is_configured(spec),
-            default=spec.name == default,
+            default=spec.name == default_embedder,
         )
         for spec in EMBEDDERS.values()
     ]
@@ -125,12 +129,15 @@ def get_field_values(base_id: UUID, session: SessionDep) -> dict[str, list[str]]
 
 @router.get("/cross-encoders", response_model=list[CrossEncoderInfo])
 def list_cross_encoders() -> list[CrossEncoderInfo]:
+    """Cross-encoders por provedor, com os modelos e o preço de cada busca."""
     return [
         CrossEncoderInfo(
             provider=provider,
             models=list(models),
             configured=cross_encoder_available(provider),
-            price_per_search={m: CROSS_ENCODER_PRICES.get(f"{provider}:{m}", 0.0) for m in models},
+            price_per_search={
+                model: CROSS_ENCODER_PRICES.get(f"{provider}:{model}", 0.0) for model in models
+            },
         )
         for provider, models in CROSS_ENCODER_MODELS.items()
     ]
@@ -139,8 +146,8 @@ def list_cross_encoders() -> list[CrossEncoderInfo]:
 @router.get("", response_model=list[KnowledgeBaseResponse])
 def list_bases(session: SessionDep) -> list[KnowledgeBaseResponse]:
     bases = KnowledgeBaseRepository(session).list_all()
-    usage = EmbeddingUsageRepository(session).by_base([b.id for b in bases])
-    return [to_response(b, usage.get(b.id)) for b in bases]
+    usage = EmbeddingUsageRepository(session).by_base([base.id for base in bases])
+    return [to_response(base, usage.get(base.id)) for base in bases]
 
 
 @router.get("/{base_id}", response_model=KnowledgeBaseResponse)
@@ -154,9 +161,10 @@ def get_base(base_id: UUID, session: SessionDep) -> KnowledgeBaseResponse:
 def create_base(
     body: KnowledgeBaseCreate, session: SessionDep, request: Request
 ) -> KnowledgeBaseResponse:
+    """Cria a base com o embedder escolhido, que fica fixo: trocar exigiria reindexar."""
     _check_retrieval(body.retrieval)
-    repo = KnowledgeBaseRepository(session)
-    if repo.find_conflict(body.name, body.slug) is not None:
+    base_repo = KnowledgeBaseRepository(session)
+    if base_repo.find_conflict(body.name, body.slug) is not None:
         raise HTTPException(status_code=409, detail="Já existe base com esse nome ou slug")
     spec = EMBEDDERS[body.embedder or get_settings().knowledge_default_embedder]
     if not is_configured(spec):
@@ -179,7 +187,7 @@ def create_base(
         vector_table=f"kb_{base_id.hex}",
         updated_by=_actor(request),
     )
-    repo.add(base)
+    base_repo.add(base)
     session.commit()
     session.refresh(base)
     logger.info(
@@ -193,10 +201,11 @@ def create_base(
 def update_base(
     base_id: UUID, body: KnowledgeBaseUpdate, session: SessionDep, request: Request
 ) -> KnowledgeBaseResponse:
+    """Altera nome, descrição, corte e estratégia; o corte novo vale para o que entrar depois."""
     _check_retrieval(body.retrieval)
-    repo = KnowledgeBaseRepository(session)
-    base = _get_or_404(repo, base_id)
-    if repo.find_conflict(body.name, exclude=base_id) is not None:
+    base_repo = KnowledgeBaseRepository(session)
+    base = _get_or_404(base_repo, base_id)
+    if base_repo.find_conflict(body.name, exclude=base_id) is not None:
         raise HTTPException(status_code=409, detail="Já existe base com esse nome")
     base.name = body.name
     base.description = body.description
@@ -217,15 +226,16 @@ def update_base(
 
 @router.delete("/{base_id}", status_code=204, dependencies=_WRITE)
 def delete_base(base_id: UUID, session: SessionDep) -> None:
-    repo = KnowledgeBaseRepository(session)
-    base = _get_or_404(repo, base_id)
-    users = repo.used_by(base_id)
-    if users:
+    """Remove a base; recusa com 409 enquanto algum agente ou time usa ela."""
+    base_repo = KnowledgeBaseRepository(session)
+    base = _get_or_404(base_repo, base_id)
+    configs_using = base_repo.used_by(base_id)
+    if configs_using:
         raise HTTPException(
             status_code=409,
-            detail=f"Base usada por: {', '.join(users)}. Desligue antes de remover.",
+            detail=f"Base usada por: {', '.join(configs_using)}. Desligue antes de remover.",
         )
-    repo.delete(base)
+    base_repo.delete(base)
     session.commit()
     logger.info("base de conhecimento removida", extra={"base_id": str(base_id)})
 
@@ -236,10 +246,11 @@ _SEARCH_FAILED = "Busca falhou: confira a chave do embedder da base e o provedor
 
 
 def _limit_search(request: Request) -> None:
+    """Limita a busca de teste por usuário, ou por IP quando não há usuário."""
     limiter = getattr(request.app.state, "rate_limiter", None)
     if limiter is not None:
-        user = getattr(request.state, "user_id", None) or get_client_ip(request)
-        limiter.check(f"kb-search:{user}", limit=_SEARCH_LIMIT)
+        caller = getattr(request.state, "user_id", None) or get_client_ip(request)
+        limiter.check(f"kb-search:{caller}", limit=_SEARCH_LIMIT)
 
 
 @router.post("/{base_id}/search", response_model=list[SearchHit])
@@ -259,6 +270,7 @@ def search(
 
 
 def _result(outcome: SearchOutcome) -> SearchResult:
+    """Resultado da busca com o custo de HyDE e do cross-encoder e os filtros ignorados."""
     return SearchResult(
         hits=[SearchHit(**hit.__dict__) for hit in outcome.hits],
         searched=outcome.searched,
@@ -299,6 +311,7 @@ _REPROCESS_LIMIT = 1
 
 
 def _limit(request: Request, key: str, limit: int) -> None:
+    """Aplica o limitador da instância quando ele existe (no teste sem app pode faltar)."""
     limiter = getattr(request.app.state, "rate_limiter", None)
     if limiter is not None:
         limiter.check(key, limit=limit)
@@ -309,8 +322,8 @@ def chunk_preview(
     base_id: UUID, body: ChunkPreviewInput, session: SessionDep, request: Request
 ) -> ChunkPreview:
     """Trechos que um texto ou conteúdo daria com o corte escolhido, sem embedding (ADR-0029)."""
-    user = getattr(request.state, "user_id", None) or get_client_ip(request)
-    _limit(request, f"kb-preview:{user}", _PREVIEW_LIMIT)
+    caller = getattr(request.state, "user_id", None) or get_client_ip(request)
+    _limit(request, f"kb-preview:{caller}", _PREVIEW_LIMIT)
     base = _get_or_404(KnowledgeBaseRepository(session), base_id)
     chunk_size = body.chunk_size or base.chunk_size
     chunking = body.chunking or ChunkingSettings.model_validate(base.chunking or {})
@@ -318,7 +331,7 @@ def chunk_preview(
     if problem:
         raise HTTPException(status_code=422, detail=problem)
     if body.text is not None:
-        name, extension, data = "prévia", "txt", body.text.encode()
+        name, extension, raw_content = "prévia", "txt", body.text.encode()
     else:
         content = session.get(KnowledgeContent, body.content_id)
         if content is None or content.base_id != base_id:
@@ -338,14 +351,14 @@ def chunk_preview(
                 status_code=422,
                 detail="Prévia de conteúdo até 2 MB: cole um trecho do documento",
             )
-        name, extension, data = content.name, content.extension, original
+        name, extension, raw_content = content.name, content.extension, original
     try:
-        docs = read_documents(name, extension, data, chunk_size, chunking)
+        documents = read_documents(name, extension, raw_content, chunk_size, chunking)
     except (IngestError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return ChunkPreview(
-        chunks=[d.content for d in docs[:_PREVIEW_CHUNKS]],
-        total=len(docs),
+        chunks=[document.content for document in documents[:_PREVIEW_CHUNKS]],
+        total=len(documents),
         chunk_size=chunk_size,
         chunking=chunking,
     )
@@ -363,13 +376,18 @@ def reprocess_base(
     plan = plan_reprocess(session, base_id)
     session.commit()
     if plan.queued:
-        submit(background, "reprocess", base_id, {"content_ids": [str(i) for i in plan.queued]})
+        submit(
+            background,
+            "reprocess",
+            base_id,
+            {"content_ids": [str(content_id) for content_id in plan.queued]},
+        )
     logger.info(
         "base reprocessada",
         extra={"base_id": str(base_id), "queued": len(plan.queued), "skipped": plan.skipped},
     )
     return ReprocessResult(
         queued=len(plan.queued),
-        needs_upload=[content_response(c) for c in plan.needs_upload],
+        needs_upload=[content_response(content) for content in plan.needs_upload],
         skipped=plan.skipped,
     )

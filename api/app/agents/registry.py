@@ -39,6 +39,12 @@ def published_configs() -> list[tuple[UUID, str]]:
 
 
 class PublishedAgents:
+    """Listas de factories do AgentOS completadas com os configs publicados depois do boot.
+
+    Só acrescenta: config apagado ou sem versão continua na lista, e a factory recusa o
+    run ao montar.
+    """
+
     def __init__(
         self,
         entries: list[Any],
@@ -87,7 +93,8 @@ class PublishedAgents:
             return 0
         added = 0
         with self._lock:
-            known = {str(e.id) for e in [*self._entries, *self._teams, *self._workflows]}
+            registered = [*self._entries, *self._teams, *self._workflows]
+            known = {str(component.id) for component in registered}
             for config_id, kind in published:
                 if str(config_id) in known:
                     continue
@@ -110,4 +117,6 @@ class PublishedAgents:
         return added
 
     def is_stale(self) -> bool:
+        """Se o TTL venceu e a próxima request deve sincronizar de novo."""
+
         return self._synced_at is None or monotonic() - self._synced_at >= self._ttl

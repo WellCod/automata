@@ -56,21 +56,27 @@ INJECTION_TERMS: tuple[str, ...] = (
 
 
 def normalize(text: str) -> str:
+    """Texto em minúscula, sem acento, sem caractere invisível e com espaço único."""
     decomposed = unicodedata.normalize("NFKD", text.lower())
     # sem acento e sem caractere invisível (largura zero, marcas de direção), que
     # partiria o termo sem mudar o que o modelo lê (auditoria da Fase 33)
     stripped = "".join(
-        c for c in decomposed if not unicodedata.combining(c) and unicodedata.category(c) != "Cf"
+        char
+        for char in decomposed
+        if not unicodedata.combining(char) and unicodedata.category(char) != "Cf"
     )
     return " ".join(stripped.split())
 
 
 def _block(message: str, trigger: CheckTrigger, rule: str, **extra: Any) -> InputCheckError:
+    """Exceção de bloqueio: `message` é o que o usuário vê, o resto vai em additional_data."""
     return InputCheckError(message, check_trigger=trigger, additional_data={"rule": rule, **extra})
 
 
 @dataclass
 class Block:
+    """Um bloqueio do run: a regra (vai para agent_run.blocked_by), a mensagem e o detalhe."""
+
     rule: str
     message: str
     detail: dict[str, Any]
@@ -96,6 +102,9 @@ class BlockLog:
 
 
 class _Guardrail(BaseGuardrail):
+    """Base dos guardrails de entrada: as subclasses implementam `_check`, e o bloqueio
+    levantado é anotado no BlockLog antes de seguir para o Agno."""
+
     def __init__(self, blocked_message: str, log: BlockLog | None = None) -> None:
         self.blocked_message = blocked_message
         self.log = log
@@ -107,8 +116,11 @@ class _Guardrail(BaseGuardrail):
         self._check(run_input)
 
     def _note(self, exc: InputCheckError) -> None:
+        """Copia o bloqueio para o registro do run, que o tracking grava."""
         if self.log is not None:
-            detail = {k: v for k, v in (exc.additional_data or {}).items() if k != "rule"}
+            detail = {
+                key: value for key, value in (exc.additional_data or {}).items() if key != "rule"
+            }
             rule = (exc.additional_data or {}).get("rule", exc.error_id)
             self.log.blocks.append(Block(str(rule), exc.message, detail))
 
@@ -165,11 +177,13 @@ class PiiGuardrail(_Guardrail):
             return
         run_input.input_content = mask(run_input.input_content, matches)
         if self.block:
-            types = sorted({m.type for m in matches})
+            types = sorted({match.type for match in matches})
             raise _block(self.blocked_message, CheckTrigger.PII_DETECTED, RULE_PII, types=types)
 
 
 class TermsGuardrail(_Guardrail):
+    """Bloqueia quando um dos termos aparece no texto, os dois normalizados."""
+
     def __init__(
         self,
         blocked_message: str,
@@ -179,18 +193,21 @@ class TermsGuardrail(_Guardrail):
         log: BlockLog | None = None,
     ) -> None:
         super().__init__(blocked_message, log)
-        self.terms = [t for t in (normalize(t) for t in terms) if t]
+        normalized_terms = (normalize(term) for term in terms)
+        self.terms = [term for term in normalized_terms if term]
         self.trigger = trigger
         self.rule = rule
 
     def _check(self, run_input: AnyInput) -> None:
         text = normalize(run_input.input_content_string())
-        hit = next((t for t in self.terms if t in text), None)
+        hit = next((term for term in self.terms if term in text), None)
         if hit is not None:
             raise _block(self.blocked_message, self.trigger, self.rule, term=hit)
 
 
 class LengthGuardrail(_Guardrail):
+    """Bloqueia mensagem com mais caracteres que o limite do agente."""
+
     def __init__(self, blocked_message: str, max_chars: int, log: BlockLog | None = None) -> None:
         super().__init__(blocked_message, log)
         self.max_chars = max_chars
@@ -242,6 +259,7 @@ class ModerationGuardrail(_Guardrail):
 
 
 def moderation_available() -> bool:
+    """A moderação usa a API da OpenAI: sem a chave, não há como ligar."""
     return bool(os.environ.get("OPENAI_API_KEY"))
 
 
@@ -251,12 +269,12 @@ def input_guardrails(
     """Ordem: dados pessoais primeiro, para o input ficar mascarado mesmo quando
     outra regra bloqueia; depois as regras por termo, que não custam nada; o
     classificador e a moderação por último, porque saem da API."""
-    msg = settings.blocked_message
+    blocked_message = settings.blocked_message
     hooks: list[BaseGuardrail] = []
     if settings.pii.mode != "off" and (settings.pii.types or settings.pii.custom):
         hooks.append(
             PiiGuardrail(
-                msg,
+                blocked_message,
                 list(settings.pii.types),
                 settings.pii.mode == "block",
                 log,
@@ -264,19 +282,26 @@ def input_guardrails(
             )
         )
     if settings.max_input_chars is not None:
-        hooks.append(LengthGuardrail(msg, settings.max_input_chars, log))
+        hooks.append(LengthGuardrail(blocked_message, settings.max_input_chars, log))
     if settings.prompt_injection:
         terms = [*INJECTION_TERMS, *settings.injection_extra_terms]
-        hooks.append(TermsGuardrail(msg, terms, CheckTrigger.PROMPT_INJECTION, RULE_INJECTION, log))
+        hooks.append(
+            TermsGuardrail(
+                blocked_message, terms, CheckTrigger.PROMPT_INJECTION, RULE_INJECTION, log
+            )
+        )
     if settings.blocked_topics:
         hooks.append(
-            TermsGuardrail(msg, settings.blocked_topics, CheckTrigger.OFF_TOPIC, RULE_TOPIC, log)
+            TermsGuardrail(
+                blocked_message, settings.blocked_topics, CheckTrigger.OFF_TOPIC, RULE_TOPIC, log
+            )
         )
     if settings.classifier is not None:
         from app.guardrails.classifier import ClassifierGuardrail, classifier_enabled
 
         if classifier_enabled():
-            hooks.append(ClassifierGuardrail(settings.classifier, msg, log, config_id))
+            hooks.append(ClassifierGuardrail(settings.classifier, blocked_message, log, config_id))
     if settings.moderation:
-        hooks.append(ModerationGuardrail(msg, log))
+        hooks.append(ModerationGuardrail(blocked_message, log))
+
     return hooks

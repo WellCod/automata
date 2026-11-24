@@ -34,6 +34,7 @@ router = APIRouter(prefix="/api/v1/knowledge-connectors", tags=["knowledge-webho
 
 
 def signature_ok(secret: str, body: bytes, header: str | None) -> bool:
+    """Confere o HMAC-SHA256 do corpo no formato `sha256=<hex>`, em tempo constante."""
     if not header or not header.startswith("sha256="):
         return False
     expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest().encode()
@@ -92,6 +93,7 @@ def _claim(connector_id: UUID, body: bytes, header: str | None, limiter: Any) ->
 async def receive(
     connector_id: UUID, request: Request, background: BackgroundTasks
 ) -> dict[str, str]:
+    """Evento da origem com assinatura certa agenda uma sincronização do conector."""
     limiter = getattr(request.app.state, "rate_limiter", None)
     ip = known_client_ip(request)
     if limiter is not None and ip is not None:
@@ -101,8 +103,9 @@ async def receive(
     header = request.headers.get("x-hub-signature-256") or request.headers.get(
         "x-automata-signature"
     )
-    status = await asyncio.to_thread(_claim, connector_id, body, header, limiter)
-    if status == "running":
+    claim_status = await asyncio.to_thread(_claim, connector_id, body, header, limiter)
+    # sincronização já em curso pega a mudança nova quando listar a origem
+    if claim_status == "running":
         return {"status": "running"}
     logger.info(
         "sincronização pelo webhook da origem",

@@ -7,6 +7,8 @@ from app.models.mcp_server import McpServer
 
 
 class McpServerRepository:
+    """Cadastro dos servidores MCP externos."""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -22,6 +24,7 @@ class McpServerRepository:
         return list(self._session.scalars(select(McpServer).where(McpServer.id.in_(server_ids))))
 
     def find_conflict(self, name: str, slug: str, exclude: UUID | None = None) -> McpServer | None:
+        """Outro servidor com o mesmo nome ou slug; `exclude` tira o próprio na edição."""
         stmt = select(McpServer).where((McpServer.name == name) | (McpServer.slug == slug))
         if exclude is not None:
             stmt = stmt.where(McpServer.id != exclude)

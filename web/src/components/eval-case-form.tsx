@@ -28,7 +28,7 @@ function splitNames(raw: string): string[] {
     ...new Set(
       raw
         .split(",")
-        .map((t) => t.trim())
+        .map((item) => item.trim())
         .filter(Boolean),
     ),
   ];
@@ -41,7 +41,7 @@ function CheckFields({
   kind,
 }: {
   check: EvalCheck;
-  onChange: (c: EvalCheck) => void;
+  onChange: (check: EvalCheck) => void;
   index: number;
   kind: SuiteKind;
 }) {
@@ -68,9 +68,9 @@ function CheckFields({
           onChange={(e) => onChange({ ...check, kind: e.target.value as typeof check.kind })}
           className={`${inputCls} w-auto`}
         >
-          {TEXT_KINDS.map((k) => (
-            <option key={k.value} value={k.value}>
-              {k.label}
+          {TEXT_KINDS.map((textKind) => (
+            <option key={textKind.value} value={textKind.value}>
+              {textKind.label}
             </option>
           ))}
         </select>
@@ -151,7 +151,7 @@ function CheckFields({
                 ...new Set(
                   e.target.value
                     .split(",")
-                    .map((t) => t.trim())
+                    .map((item) => item.trim())
                     .filter(Boolean),
                 ),
               ],
@@ -243,10 +243,13 @@ export function EvalCaseForm({
     initial ?? { name: "", input: "", checks: [newCheck("text")] },
   );
   const errors = caseErrors(value);
-  const setCheck = (i: number, c: EvalCheck) =>
-    setValue((v) => ({ ...v, checks: v.checks.map((old, j) => (j === i ? c : old)) }));
+  const setCheck = (i: number, check: EvalCheck) =>
+    setValue((current) => ({
+      ...current,
+      checks: current.checks.map((old, j) => (j === i ? check : old)),
+    }));
   const context = value.context ?? [];
-  const setContext = (next: string[]) => setValue((v) => ({ ...v, context: next }));
+  const setContext = (next: string[]) => setValue((current) => ({ ...current, context: next }));
   const canSuggestJudge = !!judgeSuggestion && availableTypes(value.checks, kind).includes("judge");
 
   return (
@@ -279,8 +282,8 @@ export function EvalCaseForm({
       </div>
       {notes && notes.length > 0 && (
         <ul className="text-muted-foreground flex flex-col gap-0.5 text-[12px]" role="note">
-          {notes.map((n) => (
-            <li key={n}>{n}</li>
+          {notes.map((note) => (
+            <li key={note}>{note}</li>
           ))}
         </ul>
       )}
@@ -300,7 +303,9 @@ export function EvalCaseForm({
                 value={message}
                 rows={1}
                 maxLength={4000}
-                onChange={(e) => setContext(context.map((m, j) => (j === i ? e.target.value : m)))}
+                onChange={(e) =>
+                  setContext(context.map((turn, j) => (j === i ? e.target.value : turn)))
+                }
                 className={`${inputCls} resize-y`}
               />
               <Button
@@ -371,7 +376,12 @@ export function EvalCaseForm({
                   <Trash2 aria-hidden />
                 </Button>
               </div>
-              <CheckFields check={check} index={i} kind={kind} onChange={(c) => setCheck(i, c)} />
+              <CheckFields
+                check={check}
+                index={i}
+                kind={kind}
+                onChange={(updated) => setCheck(i, updated)}
+              />
             </li>
           ))}
         </ol>

@@ -34,14 +34,16 @@ class CreatedFromTemplate(BaseModel):
 
 
 def _key(name: str) -> str:
+    """Chave estável na URL a partir do nome: sem acento, minúscula, com hífen."""
     plain = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
     return re.sub(r"[^a-z0-9]+", "-", plain).strip("-")
 
 
 def _templates() -> dict[str, dict[str, Any]]:
+    """Agentes da demo indexados pela chave do nome."""
     from app.seed import _DEMO_AGENTS
 
-    return {_key(a["name"]): a for a in _DEMO_AGENTS}
+    return {_key(demo_agent["name"]): demo_agent for demo_agent in _DEMO_AGENTS}
 
 
 @router.get(
@@ -53,11 +55,11 @@ def list_templates() -> list[AgentTemplate]:
     return [
         AgentTemplate(
             key=key,
-            name=a["name"],
-            description=a["description"],
-            model_id=a["payload"].model_id or "",
+            name=template["name"],
+            description=template["description"],
+            model_id=template["payload"].model_id or "",
         )
-        for key, a in _templates().items()
+        for key, template in _templates().items()
     ]
 
 
@@ -68,6 +70,7 @@ def list_templates() -> list[AgentTemplate]:
     dependencies=[Depends(require_scopes(Scope.CONFIGS_WRITE))],
 )
 def create_from_template(key: str, session: SessionDep, request: Request) -> CreatedFromTemplate:
+    """Cria o agente com o exemplo como rascunho; publicar fica com quem testa."""
     template = _templates().get(key)
     if template is None:
         raise HTTPException(status_code=404, detail="Modelo de agente não encontrado")

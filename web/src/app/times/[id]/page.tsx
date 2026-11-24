@@ -160,11 +160,11 @@ export default function TeamEditPage() {
   const { data, isPending } = useQuery({
     queryKey: ["config", id],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/configs/{config_id}", {
+      const result = await client.GET("/api/v1/configs/{config_id}", {
         params: { path: { config_id: id } },
       });
-      if (res.error) throw new Error("Falha ao carregar time");
-      return res.data!;
+      if (result.error) throw new Error("Falha ao carregar time");
+      return result.data!;
     },
   });
 
@@ -195,48 +195,48 @@ export default function TeamEditPage() {
   const { reset } = form;
   useEffect(() => {
     if (!data) return;
-    const p = data.payload;
+    const payload = data.payload;
     // nunca salvo: o formulário abre com as defesas do ADR-0045 ligadas
     const fresh = !data.current_version && !data.draft_version;
     reset({
       name: data.name,
       description: data.description,
-      model_id: p?.model_id ?? "",
-      capabilities: p?.capabilities ?? EMPTY_CAPS,
+      model_id: payload?.model_id ?? "",
+      capabilities: payload?.capabilities ?? EMPTY_CAPS,
       instructions: {
-        persona: p?.instructions?.persona ?? "",
-        situation: p?.instructions?.situation ?? "",
-        tone: p?.instructions?.tone ?? "",
-        objective: p?.instructions?.objective ?? "",
-        guardrails: p?.instructions?.guardrails ?? "",
+        persona: payload?.instructions?.persona ?? "",
+        situation: payload?.instructions?.situation ?? "",
+        tone: payload?.instructions?.tone ?? "",
+        objective: payload?.instructions?.objective ?? "",
+        guardrails: payload?.instructions?.guardrails ?? "",
       },
-      mcp_servers: (p?.mcp_servers ?? []).map((b) => ({
-        server_id: b.server_id,
-        tools: b.tools ?? null,
-        require_confirmation: b.require_confirmation ?? [],
+      mcp_servers: (payload?.mcp_servers ?? []).map((binding) => ({
+        server_id: binding.server_id,
+        tools: binding.tools ?? null,
+        require_confirmation: binding.require_confirmation ?? [],
       })),
-      knowledge: (p?.knowledge ?? []).map((k) => ({
-        base_id: k.base_id,
-        max_results: k.max_results ?? 5,
+      knowledge: (payload?.knowledge ?? []).map((source) => ({
+        base_id: source.base_id,
+        max_results: source.max_results ?? 5,
       })),
-      guardrails: fresh ? SAFE_NEW_GUARDRAILS : withDefaults(p?.guardrails),
-      run: fresh ? SAFE_NEW_RUN : withRunDefaults(p?.run),
-      memory: withMemoryDefaults(p?.memory),
+      guardrails: fresh ? SAFE_NEW_GUARDRAILS : withDefaults(payload?.guardrails),
+      run: fresh ? SAFE_NEW_RUN : withRunDefaults(payload?.run),
+      memory: withMemoryDefaults(payload?.memory),
       team: {
-        mode: p?.team?.mode ?? "coordinate",
-        members: (p?.team?.members ?? []).map((m) => ({
-          agent_id: m.agent_id,
-          version_id: m.version_id ?? null,
+        mode: payload?.team?.mode ?? "coordinate",
+        members: (payload?.team?.members ?? []).map((member) => ({
+          agent_id: member.agent_id,
+          version_id: member.version_id ?? null,
         })),
-        max_iterations: p?.team?.max_iterations ?? 10,
-        share_member_interactions: p?.team?.share_member_interactions ?? false,
+        max_iterations: payload?.team?.max_iterations ?? 10,
+        share_member_interactions: payload?.team?.share_member_interactions ?? false,
       },
     });
   }, [data, reset]);
 
   const save = useMutation({
     mutationFn: async (values: FormValues) => {
-      const res = await client.PUT("/api/v1/configs/{config_id}/draft", {
+      const result = await client.PUT("/api/v1/configs/{config_id}/draft", {
         params: { path: { config_id: id } },
         body: {
           name: values.name,
@@ -258,8 +258,8 @@ export default function TeamEditPage() {
           },
         },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar rascunho"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao salvar rascunho"));
+      return result.data!;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
@@ -316,7 +316,7 @@ export default function TeamEditPage() {
         <div className="min-w-0 flex-1 px-6 py-6 lg:px-8">
           <form
             id="team-form"
-            onSubmit={form.handleSubmit((v) => save.mutate(v))}
+            onSubmit={form.handleSubmit((values) => save.mutate(values))}
             className="mx-auto flex max-w-2xl flex-col gap-5"
           >
             <div className="flex flex-col gap-1">
@@ -352,17 +352,17 @@ export default function TeamEditPage() {
               <legend className="text-foreground px-1 text-[13px] font-medium">
                 Como o líder coordena
               </legend>
-              {MODES.map((m) => (
-                <label key={m.value} className="flex items-start gap-2">
+              {MODES.map((mode) => (
+                <label key={mode.value} className="flex items-start gap-2">
                   <input
                     type="radio"
-                    value={m.value}
+                    value={mode.value}
                     {...form.register("team.mode")}
                     className="mt-0.5"
                   />
                   <span>
-                    <span className="text-foreground block text-[13px]">{m.label}</span>
-                    <span className="text-muted-foreground block text-[11px]">{m.hint}</span>
+                    <span className="text-foreground block text-[13px]">{mode.label}</span>
+                    <span className="text-muted-foreground block text-[11px]">{mode.hint}</span>
                   </span>
                 </label>
               ))}

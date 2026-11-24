@@ -10,14 +10,15 @@ export const FORWARDING_HEADERS = ["x-forwarded-for", "x-real-ip", "forwarded"];
 // - vazio: Next exposto direto, nenhum cabeçalho é confiável e nada é repassado.
 // Ler o primeiro hop ou o x-real-ip sem proxy deixava o cliente escolher o IP do
 // rate limit de login a cada tentativa.
-function source(): string {
+function trustedIpHeader(): string {
   const configured = process.env.CLIENT_IP_HEADER?.trim().toLowerCase();
   if (configured) return configured;
   return process.env.VERCEL ? "x-real-ip" : "";
 }
 
+// IP do cliente para o X-Forwarded-For que o BFF manda à API; null quando não há fonte confiável
 export function clientIp(req: NextRequest): string | null {
-  const header = source();
+  const header = trustedIpHeader();
   if (header === "x-real-ip") return req.headers.get("x-real-ip")?.trim() || null;
   if (header === "x-forwarded-for") {
     const hops = req.headers.get("x-forwarded-for")?.split(",") ?? [];

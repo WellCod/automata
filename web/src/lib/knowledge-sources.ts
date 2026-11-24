@@ -16,6 +16,7 @@ export function isKnowledgeTool(name: string | null | undefined): boolean {
   return typeof name === "string" && name.startsWith("buscar_");
 }
 
+// resultado fora do formato (outra tool, texto livre, JSON parcial) não cita nada
 export function sourcesFromTool(tool: ToolLike | undefined): KnowledgeSource[] {
   if (!tool || !isKnowledgeTool(tool.tool_name) || typeof tool.result !== "string") return [];
   let parsed: unknown;
@@ -27,32 +28,32 @@ export function sourcesFromTool(tool: ToolLike | undefined): KnowledgeSource[] {
   if (!parsed || typeof parsed !== "object") return [];
   const { base, trechos } = parsed as { base?: unknown; trechos?: unknown };
   if (!Array.isArray(trechos)) return [];
-  const out: KnowledgeSource[] = [];
-  for (const t of trechos) {
-    if (!t || typeof t !== "object") continue;
-    const { documento, fonte } = t as { documento?: unknown; fonte?: unknown };
+  const sources: KnowledgeSource[] = [];
+  for (const trecho of trechos) {
+    if (!trecho || typeof trecho !== "object") continue;
+    const { documento, fonte } = trecho as { documento?: unknown; fonte?: unknown };
     const nome =
       typeof documento === "string" ? documento : typeof fonte === "string" ? fonte : null;
     if (!nome) continue;
-    out.push({
+    sources.push({
       base: typeof base === "string" ? base : "",
       documento: nome,
       fonte: typeof fonte === "string" ? fonte : null,
     });
   }
-  return out;
+  return sources;
 }
 
 // Um documento aparece uma vez, mesmo que vários trechos dele tenham vindo
 export function mergeSources(prev: KnowledgeSource[], next: KnowledgeSource[]): KnowledgeSource[] {
-  const seen = new Set(prev.map((s) => `${s.base}|${s.documento}`));
-  const out = [...prev];
-  for (const s of next) {
-    const key = `${s.base}|${s.documento}`;
+  const seen = new Set(prev.map((source) => `${source.base}|${source.documento}`));
+  const merged = [...prev];
+  for (const source of next) {
+    const key = `${source.base}|${source.documento}`;
     if (!seen.has(key)) {
       seen.add(key);
-      out.push(s);
+      merged.push(source);
     }
   }
-  return out;
+  return merged;
 }

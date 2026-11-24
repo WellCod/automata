@@ -29,18 +29,19 @@ export function QueuePanel() {
   const { data, error, isLoading } = useQuery({
     queryKey: KEY,
     queryFn: async () => {
-      const res = await client.GET("/api/v1/queue");
-      if (res.error) throw new Error("Falha ao carregar a fila. Apenas owners têm acesso.");
-      return res.data;
+      const result = await client.GET("/api/v1/queue");
+      if (result.error) throw new Error("Falha ao carregar a fila. Apenas owners têm acesso.");
+      return result.data;
     },
     refetchInterval: 5000,
   });
   const requeue = useMutation({
     mutationFn: async (job: QueueJob) => {
-      const res = await client.POST("/api/v1/queue/jobs/{job_id}/requeue", {
+      const result = await client.POST("/api/v1/queue/jobs/{job_id}/requeue", {
         params: { path: { job_id: job.id } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao recolocar na fila"));
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao recolocar na fila"));
     },
     onSuccess: () => {
       toast.success("Job de volta na fila");

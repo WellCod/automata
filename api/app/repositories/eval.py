@@ -8,6 +8,8 @@ from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSchedule
 
 
 class EvalCaseRepository:
+    """Casos da suíte de um config; toda leitura confere que o caso é daquele config."""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -53,6 +55,8 @@ class EvalCaseRepository:
 
 
 class EvalRunRepository:
+    """Execuções da suíte e os resultados caso a caso."""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -66,6 +70,7 @@ class EvalRunRepository:
         return run if run is not None and run.agent_config_id == config_id else None
 
     def active(self, config_id: UUID) -> EvalRun | None:
+        """Execução na fila ou rodando; o config só roda uma suíte por vez."""
         stmt = select(EvalRun).where(
             EvalRun.agent_config_id == config_id, EvalRun.status.in_(("queued", "running"))
         )
@@ -88,6 +93,8 @@ class EvalRunRepository:
 
 
 class EvalScheduleRepository:
+    """Agendamento da suíte, um por config."""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 

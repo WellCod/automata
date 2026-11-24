@@ -43,8 +43,8 @@ export function missingCapabilities(
 ): string[] {
   if (!candidate) return [];
   return (Object.keys(CAP_NAMES) as (keyof CapabilityFlags)[])
-    .filter((k) => wanted[k] && !candidate[k])
-    .map((k) => CAP_NAMES[k]);
+    .filter((capability) => wanted[capability] && !candidate[capability])
+    .map((capability) => CAP_NAMES[capability]);
 }
 
 const inputCls =
@@ -64,9 +64,9 @@ export function RunControlsEditor({
   const { data: models } = useQuery({
     queryKey: ["models:capabilities"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/models/capabilities");
-      if (res.error) throw new Error("Falha ao carregar modelos");
-      return res.data as Record<string, CapabilityFlags>;
+      const result = await client.GET("/api/v1/models/capabilities");
+      if (result.error) throw new Error("Falha ao carregar modelos");
+      return result.data as Record<string, CapabilityFlags>;
     },
   });
   const fallbacks = value.fallback_models ?? [];

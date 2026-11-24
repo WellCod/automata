@@ -84,14 +84,14 @@ export function DocumentFieldsEditor({
   const { fields: parsed, problems } = parseFields(text);
   const save = useMutation({
     mutationFn: async () => {
-      const res = await client.PUT(
+      const result = await client.PUT(
         "/api/v1/knowledge-bases/{base_id}/contents/{content_id}/fields",
         {
           params: { path: { base_id: baseId, content_id: contentId } },
           body: { fields: Object.keys(parsed).length ? parsed : null },
         },
       );
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar os campos"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao salvar os campos"));
     },
     onSuccess: () => {
       toast.success(`Campos de ${name} salvos`);
@@ -112,9 +112,9 @@ export function DocumentFieldsEditor({
         onChange={(e) => setText(e.target.value)}
         className="border-border text-foreground w-full rounded border bg-[var(--input)] px-2 py-1 font-mono text-[12px] focus:outline-none"
       />
-      {problems.map((p) => (
-        <p key={p} className="text-destructive text-[11px]">
-          {p}
+      {problems.map((problem) => (
+        <p key={problem} className="text-destructive text-[11px]">
+          {problem}
         </p>
       ))}
       <div className="flex gap-2">

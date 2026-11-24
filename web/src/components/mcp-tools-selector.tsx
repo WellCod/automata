@@ -22,9 +22,9 @@ export function useMcpServers() {
   return useQuery({
     queryKey: ["mcp-servers"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/mcp-servers");
-      if (res.error) throw new Error("Falha ao carregar servidores MCP");
-      return res.data!;
+      const result = await client.GET("/api/v1/mcp-servers");
+      if (result.error) throw new Error("Falha ao carregar servidores MCP");
+      return result.data!;
     },
   });
 }
@@ -47,7 +47,7 @@ function ServerBinding({
   const allTools = binding?.tools === null;
   const selected = new Set(binding?.tools ?? []);
   const confirm = new Set(binding?.require_confirmation ?? []);
-  const liberadas = allTools ? tools.map((t) => t.name) : [...selected];
+  const liberadas = allTools ? tools.map((tool) => tool.name) : [...selected];
 
   function update(patch: Partial<McpBinding>) {
     if (!binding) return;
@@ -61,7 +61,7 @@ function ServerBinding({
     update({
       tools: [...next],
       // confirmação só vale para tool liberada
-      require_confirmation: binding!.require_confirmation.filter((t) => next.has(t)),
+      require_confirmation: binding!.require_confirmation.filter((toolName) => next.has(toolName)),
     });
   }
 
@@ -130,7 +130,7 @@ function ServerBinding({
                     checked={!allTools}
                     onChange={() =>
                       update({
-                        tools: tools.map((t) => t.name),
+                        tools: tools.map((tool) => tool.name),
                       })
                     }
                   />
@@ -191,7 +191,7 @@ export function McpToolsSelector({ value, onChange }: Props) {
   const { data: servers, isPending, isError } = useMcpServers();
 
   function setBinding(serverId: string, binding: McpBinding | undefined) {
-    const rest = value.filter((b) => b.server_id !== serverId);
+    const rest = value.filter((existing) => existing.server_id !== serverId);
     onChange(binding ? [...rest, binding] : rest);
   }
 
@@ -216,7 +216,7 @@ export function McpToolsSelector({ value, onChange }: Props) {
         <ServerBinding
           key={server.id}
           server={server}
-          binding={value.find((b) => b.server_id === server.id)}
+          binding={value.find((binding) => binding.server_id === server.id)}
           onChange={(binding) => setBinding(server.id, binding)}
         />
       ))}

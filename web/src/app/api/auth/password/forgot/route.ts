@@ -8,6 +8,7 @@ const API_URL = process.env.AUTOMATA_API_URL ?? "http://localhost:8000";
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as { email?: unknown };
   const headers: Record<string, string> = { "Content-Type": "application/json" };
+  // o rate limit do pedido é por IP do cliente, não do BFF
   const ip = clientIp(req);
   if (ip) headers["X-Forwarded-For"] = ip;
 

@@ -12,11 +12,13 @@ from agno.models.base import Model
 from agno.models.response import ModelResponse
 
 _FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
+# ciclo de respostas por modelo, compartilhado pelo processo: a demo repete a sequência
 _COUNTERS: dict[str, Iterator[str]] = {}
 _LOCK = threading.Lock()
 
 
 def _load_fixture(model_id: str) -> list[str]:
+    """Respostas gravadas do modelo; sem arquivo próprio, as do `default.json`."""
     path = _FIXTURES_DIR / f"{model_id}.json"
     if not path.exists():
         path = _FIXTURES_DIR / "default.json"
@@ -24,6 +26,7 @@ def _load_fixture(model_id: str) -> list[str]:
 
 
 def _next_response(model_id: str) -> str:
+    """Próxima resposta gravada do modelo, voltando ao começo depois da última."""
     with _LOCK:
         if model_id not in _COUNTERS:
             _COUNTERS[model_id] = itertools.cycle(_load_fixture(model_id))

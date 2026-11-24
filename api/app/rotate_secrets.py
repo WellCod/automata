@@ -42,6 +42,7 @@ class RotationError(RuntimeError):
 
 
 def _rows(session: Session, column: InstrumentedAttribute[Any]) -> list[Any]:
+    """Linhas do modelo da coluna que têm segredo gravado nela."""
     model = column.class_
     return list(session.scalars(select(model).where(column.is_not(None))))
 
@@ -59,7 +60,7 @@ def rotate_all(session: Session) -> dict[str, int]:
     """Recifra o que não está na chave atual; não faz commit."""
     changed: dict[str, int] = {}
     for table, column in ENCRYPTED.items():
-        count = 0
+        reencrypted = 0
         for row in _rows(session, column):
             value = getattr(row, column.key)
             if on_current_key(value):
@@ -68,8 +69,8 @@ def rotate_all(session: Session) -> dict[str, int]:
                 setattr(row, column.key, reencrypt(value))
             except SecretsKeyMissing as exc:
                 raise RotationError(f"{table} {row.id}: nenhuma chave decifra o segredo") from exc
-            count += 1
-        changed[table] = count
+            reencrypted += 1
+        changed[table] = reencrypted
     return changed
 
 

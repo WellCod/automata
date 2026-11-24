@@ -22,20 +22,23 @@ STOP_REVIEW_TIMEOUT = "review_timeout"
 
 
 def _expired(step: dict[str, Any], now: datetime) -> bool:
-    raw = step.get("timeout_at")
-    if not raw:
+    """Se o prazo da etapa pendente já passou; sem prazo ou com data ilegível, não."""
+    raw_timeout = step.get("timeout_at")
+    if not raw_timeout:
         return False
     try:
-        moment = datetime.fromisoformat(str(raw))
+        timeout_at = datetime.fromisoformat(str(raw_timeout))
     except ValueError:
         return False
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=UTC)
-    return moment <= now
+    # data sem fuso vale como UTC, para comparar com o `now` com fuso
+    if timeout_at.tzinfo is None:
+        timeout_at = timeout_at.replace(tzinfo=UTC)
+    return timeout_at <= now
 
 
 def expire_reviews(session: Session, now: datetime) -> list[str]:
     """Runs pausados com prazo de revisão vencido viram cancelados; devolve os run_ids."""
+    # skip locked: duas rodadas do poller (ou duas réplicas) não cancelam o mesmo run
     rows = session.scalars(
         select(AgentRun)
         .where(AgentRun.status == "paused", AgentRun.pending_steps.is_not(None))
@@ -43,12 +46,13 @@ def expire_reviews(session: Session, now: datetime) -> list[str]:
     ).all()
     expired: list[tuple[str, list[dict[str, Any]]]] = []
     for row in rows:
-        steps = [s for s in row.pending_steps or [] if _expired(s, now)]
-        if steps and row.run_id:
-            expired.append((row.run_id, steps))
+        expired_steps = [step for step in row.pending_steps or [] if _expired(step, now)]
+        if expired_steps and row.run_id:
+            expired.append((row.run_id, expired_steps))
     repo = RunRepository(session)
-    at = now.isoformat()
-    for run_id, steps in expired:
+    expired_at = now.isoformat()
+    for run_id, expired_steps in expired:
+        # o status no WHERE evita cancelar run que alguém continuou entre a leitura e aqui
         session.execute(
             update(AgentRun)
             .where(AgentRun.run_id == run_id, AgentRun.status == "paused")
@@ -58,13 +62,13 @@ def expire_reviews(session: Session, now: datetime) -> list[str]:
             run_id,
             [
                 {
-                    "step_id": str(s.get("step_id")),
-                    "step_name": s.get("step_name"),
+                    "step_id": str(step.get("step_id")),
+                    "step_name": step.get("step_name"),
                     "decision": "timeout",
                     "by": "prazo",
-                    "at": at,
+                    "at": expired_at,
                 }
-                for s in steps
+                for step in expired_steps
             ],
         )
     session.commit()

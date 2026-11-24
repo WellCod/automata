@@ -36,6 +36,7 @@ def worker_enabled() -> bool:
 
 
 def fail_content(content_id: UUID, message: str) -> None:
+    """Marca o conteúdo como falha antes de chegar à ingestão."""
     with Session(get_engine()) as session:
         session.execute(
             update(KnowledgeContent)
@@ -83,6 +84,7 @@ def ingest_original(content_id: UUID) -> None:
 
 
 def execute(kind: str, target_id: UUID, payload: dict[str, Any] | None = None) -> None:
+    """Roda o job do tipo dado, no worker ou no processo da API."""
     if kind == "ingest":
         ingest_original(target_id)
     elif kind == "url":
@@ -92,8 +94,8 @@ def execute(kind: str, target_id: UUID, payload: dict[str, Any] | None = None) -
     elif kind == "sync":
         sync(target_id)
     elif kind == "reprocess":
-        ids = (payload or {}).get("content_ids") or []
-        reprocess([UUID(str(i)) for i in ids])
+        content_ids = (payload or {}).get("content_ids") or []
+        reprocess([UUID(str(content_id)) for content_id in content_ids])
     else:
         raise ValueError(f"tipo de job desconhecido: {kind}")
 
@@ -101,6 +103,7 @@ def execute(kind: str, target_id: UUID, payload: dict[str, Any] | None = None) -
 def enqueue(
     session: Session, kind: Kind, target_id: UUID, payload: dict[str, Any] | None = None
 ) -> None:
+    """Põe o job na fila dentro da transação de quem chama, sem commit."""
     session.add(IngestJob(kind=kind, target_id=target_id, payload=payload, status="queued"))
 
 

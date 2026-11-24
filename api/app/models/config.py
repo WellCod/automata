@@ -26,6 +26,8 @@ class Base(DeclarativeBase):
 
 
 class AgentConfigVersion(Base):
+    """Versão imutável do payload de um config; rascunho e publicação viram linhas novas."""
+
     __tablename__ = "agent_config_version"
     __table_args__ = (
         Index(
@@ -57,6 +59,8 @@ class AgentConfigVersion(Base):
 
 
 class AgentConfig(Base):
+    """Agente, time ou workflow, com os ponteiros para a versão vigente, o rascunho e o canário."""
+
     __tablename__ = "agent_config"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

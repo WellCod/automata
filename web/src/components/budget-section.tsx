@@ -37,11 +37,11 @@ export function BudgetSection({ configId }: { configId: string }) {
   const { data, isError } = useQuery<Budget>({
     queryKey: ["budget", configId],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/configs/{config_id}/budget", {
+      const result = await client.GET("/api/v1/configs/{config_id}/budget", {
         params: { path: { config_id: configId } },
       });
-      if (res.error) throw new Error("Falha ao carregar o orçamento");
-      return res.data!;
+      if (result.error) throw new Error("Falha ao carregar o orçamento");
+      return result.data!;
     },
   });
   if (isError) {
@@ -67,12 +67,13 @@ function BudgetCard({ configId, data }: { configId: string; data: Budget }) {
   const save = useMutation({
     mutationFn: async () => {
       const value = limit.trim() ? Number(limit.replace(",", ".")) : null;
-      const res = await client.PUT("/api/v1/configs/{config_id}/budget", {
+      const result = await client.PUT("/api/v1/configs/{config_id}/budget", {
         params: { path: { config_id: configId } },
         body: { monthly_usd: value, alert_percent: alertPercent, hard_stop: hardStop },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar o orçamento"));
-      return res.data!;
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao salvar o orçamento"));
+      return result.data!;
     },
     onSuccess: (saved) => queryClient.setQueryData(["budget", configId], saved),
   });

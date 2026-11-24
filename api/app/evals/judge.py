@@ -15,6 +15,8 @@ from agno.models.base import Model
 
 @dataclass
 class JudgeUsage:
+    """Tokens e custo somados das chamadas do modelo medido."""
+
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
@@ -36,6 +38,7 @@ def metered(model: Model) -> tuple[Model, JudgeUsage]:
     invoke = model.invoke
 
     def count(response: Any) -> Any:
+        # devolve a resposta intacta: o medidor só observa
         if getattr(response, "response_usage", None) is not None:
             usage.add(response.response_usage)
         return response

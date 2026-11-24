@@ -11,11 +11,11 @@ export function useGuardrailFloor(configId: string | undefined) {
     enabled: !!configId,
     queryFn: async (): Promise<Guardrails | null> => {
       // sem rascunho, a API responde pela versão publicada
-      const res = await client.GET("/api/v1/configs/{config_id}/guardrails/effective", {
+      const result = await client.GET("/api/v1/configs/{config_id}/guardrails/effective", {
         params: { path: { config_id: configId! }, query: { draft: true } },
       });
-      if (res.error) return null;
-      return res.data.floor ?? null;
+      if (result.error) return null;
+      return result.data.floor ?? null;
     },
   });
 }

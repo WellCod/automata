@@ -29,12 +29,14 @@ EXPIRED_USER = "retencao-expirada"
 
 
 def _delete_in(conn: Connection, table: Table | None, column: str, values: list[Any]) -> int:
+    """Apaga as linhas com `column` em `values`; tabela do Agno ainda não criada conta zero."""
     if table is None or column not in table.c or not values:
         return 0
     return int(conn.execute(table.delete().where(table.c[column].in_(values))).rowcount or 0)
 
 
 def _older(table: Table, column: str, cutoff: datetime) -> Any:
+    """Condição de linha anterior ao corte, no formato em que o Agno grava a coluna."""
     # o Agno grava época em segundos nas sessões e ISO 8601 em UTC nos traces
     if str(table.c[column].type).upper().startswith("BIGINT"):
         return table.c[column] < int(cutoff.timestamp())
@@ -50,9 +52,11 @@ def purge(now: datetime, days: int) -> dict[str, int]:
         sessions = agno_table(conn, "sessions")
         session_ids: list[Any] = []
         if sessions is not None:
-            last = func.coalesce(sessions.c.updated_at, sessions.c.created_at)
+            last_activity = func.coalesce(sessions.c.updated_at, sessions.c.created_at)
             session_ids = list(
-                conn.scalars(select(sessions.c.session_id).where(last < int(cutoff.timestamp())))
+                conn.scalars(
+                    select(sessions.c.session_id).where(last_activity < int(cutoff.timestamp()))
+                )
             )
         for key in ("transcripts", "compactions", "runs", "approvals", "tool_results"):
             counts[key] = _delete_in(conn, agno_table(conn, key), "session_id", session_ids)
@@ -94,7 +98,7 @@ def purge(now: datetime, days: int) -> dict[str, int]:
             session.execute(delete(ChannelMessage).where(ChannelMessage.created_at < cutoff))
         )
         # conversa sem mensagem e parada há mais que o prazo some junto com o número
-        empty = (
+        has_no_messages = (
             ~select(ChannelMessage.id)
             .where(ChannelMessage.conversation_id == ChannelConversation.id)
             .exists()
@@ -102,7 +106,7 @@ def purge(now: datetime, days: int) -> dict[str, int]:
         counts["channel_conversations"] = _affected(
             session.execute(
                 delete(ChannelConversation).where(
-                    ChannelConversation.last_message_at < cutoff, empty
+                    ChannelConversation.last_message_at < cutoff, has_no_messages
                 )
             )
         )

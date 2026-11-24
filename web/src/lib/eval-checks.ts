@@ -59,6 +59,7 @@ export const BLOCK_RULES: BlockRule[] = [
   "output_not_allowed",
 ];
 
+// checagem nova com os valores iniciais do formulário; o juiz começa binário com nota 7
 export function newCheck(type: EvalCheck["type"]): EvalCheck {
   if (type === "text") return { type, kind: "contains", value: "" };
   if (type === "tools") return { type, tools: [], allow_additional: true };
@@ -69,7 +70,7 @@ export function newCheck(type: EvalCheck["type"]): EvalCheck {
 }
 
 export function textNeedsValue(kind: TextCheck["kind"]): boolean {
-  return TEXT_KINDS.find((k) => k.value === kind)?.needsValue ?? false;
+  return TEXT_KINDS.find((option) => option.value === kind)?.needsValue ?? false;
 }
 
 // tipos que ainda cabem: o Case do Agno tem um campo de tools e um de critério, e o
@@ -78,35 +79,38 @@ export function availableTypes(
   checks: EvalCheck[],
   kind: SuiteKind = "agent",
 ): EvalCheck["type"][] {
-  if (checks.length >= MAX_CHECKS || checks.some((c) => c.type === "blocked")) return [];
-  return TYPES_BY_KIND[kind].filter((t) => {
-    if (t === "blocked") return checks.length === 0;
-    return t === "text" || !checks.some((c) => c.type === t);
+  if (checks.length >= MAX_CHECKS || checks.some((check) => check.type === "blocked")) return [];
+  return TYPES_BY_KIND[kind].filter((candidate) => {
+    if (candidate === "blocked") return checks.length === 0;
+    // texto pode repetir (contém X e não contém Y); os outros tipos entram uma vez
+    return candidate === "text" || !checks.some((check) => check.type === candidate);
   });
 }
 
+// mesmas regras que a API aplica na escrita, para avisar antes de salvar
 export function caseErrors(input: EvalCaseInput): string[] {
   const errors: string[] = [];
   if (!input.name.trim()) errors.push("Dê um nome ao caso.");
   if (!input.input.trim()) errors.push("Escreva a mensagem de entrada.");
-  if ((input.context ?? []).some((m) => !m.trim()))
+  if ((input.context ?? []).some((message) => !message.trim()))
     errors.push("Preencha ou remova a mensagem anterior vazia.");
   if (input.checks.length === 0) errors.push("Adicione ao menos uma checagem.");
-  if (input.checks.length > 1 && input.checks.some((c) => c.type === "blocked"))
+  if (input.checks.length > 1 && input.checks.some((check) => check.type === "blocked"))
     errors.push("Caso que espera bloqueio não leva outras checagens.");
-  for (const c of input.checks) {
-    if (c.type === "text" && textNeedsValue(c.kind) && !c.value?.trim())
+  for (const check of input.checks) {
+    if (check.type === "text" && textNeedsValue(check.kind) && !check.value?.trim())
       errors.push("Preencha o texto da regra.");
-    if (c.type === "tools" && c.tools.length === 0) errors.push("Liste ao menos uma tool.");
-    if (c.type === "steps" && c.steps.length === 0) errors.push("Liste ao menos uma etapa.");
-    if (c.type === "judge" && c.criteria.trim().length < 10)
+    if (check.type === "tools" && check.tools.length === 0) errors.push("Liste ao menos uma tool.");
+    if (check.type === "steps" && check.steps.length === 0)
+      errors.push("Liste ao menos uma etapa.");
+    if (check.type === "judge" && check.criteria.trim().length < 10)
       errors.push("O critério do juiz precisa de ao menos 10 caracteres.");
   }
   return [...new Set(errors)];
 }
 
 export function hasJudge(cases: EvalCase[]): boolean {
-  return cases.some((c) => c.checks.some((check) => check.type === "judge"));
+  return cases.some((evalCase) => evalCase.checks.some((check) => check.type === "judge"));
 }
 
 export const RESULT_LABEL: Record<EvalResult["status"], string> = {

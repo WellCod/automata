@@ -18,6 +18,8 @@ from app.schemas.eval import EvalRunCreate, EvalTrigger
 
 
 class EvalRunRefused(Exception):
+    """Execução recusada, com o status HTTP que a rota devolve e o motivo legível."""
+
     def __init__(self, status_code: int, detail: str) -> None:
         super().__init__(detail)
         self.status_code = status_code
@@ -25,21 +27,24 @@ class EvalRunRefused(Exception):
 
 
 def check_judge(cases: list[EvalCase], judge_model: str | None) -> None:
+    """Recusa juiz sem saída estruturada e suíte com caso de juiz sem modelo escolhido."""
     if judge_model is not None:
         try:
-            caps = get_capabilities(judge_model)
+            capabilities = get_capabilities(judge_model)
         except ValueError as exc:
             raise EvalRunRefused(422, str(exc)) from exc
         # o juiz responde num schema (aprovado e motivo): sem saída estruturada ele não decide
-        if not caps.structured_output:
+        if not capabilities.structured_output:
             raise EvalRunRefused(422, f"'{judge_model}' não tem saída estruturada para julgar")
         return
-    has_judge = any(c.get("type") == "judge" for case in cases for c in case.checks)
+    has_judge = any(check.get("type") == "judge" for case in cases for check in case.checks)
+    # no modo demo o juiz não roda, então a falta de modelo não impede a execução
     if has_judge and not demo_replay():
         raise EvalRunRefused(422, "Escolha o modelo do juiz: há casos com juiz")
 
 
 def resolve_version(config: AgentConfig, body: EvalRunCreate) -> UUID:
+    """Versão testada pelo apelido do alvo; sem apelido, a pedida ou o rascunho ou a vigente."""
     if body.target == "draft":
         if config.draft_version_id is None:
             raise EvalRunRefused(422, "Config sem rascunho para testar")
@@ -85,15 +90,16 @@ def create_run(
             version_id=version_id,
             status="queued",
             total=len(cases),
+            # casos congelados na execução: editar a suíte depois não muda o que rodou
             cases=[
                 {
-                    "id": str(c.id),
-                    "name": c.name,
-                    "input": c.input,
-                    "context": c.context,
-                    "checks": c.checks,
+                    "id": str(case.id),
+                    "name": case.name,
+                    "input": case.input,
+                    "context": case.context,
+                    "checks": case.checks,
                 }
-                for c in cases
+                for case in cases
             ],
             judge_model=body.judge_model,
             started_by=actor,

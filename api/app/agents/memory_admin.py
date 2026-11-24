@@ -28,6 +28,7 @@ _last_purge: float | None = None
 def memories(
     agent_id: str | None = None, user_id: str | None = None, *, team_id: str | None = None
 ) -> list[UserMemory]:
+    """Memórias pelos filtros informados, da mais recente para a mais antiga."""
     rows = memory_db().get_user_memories(
         agent_id=agent_id,
         team_id=team_id,
@@ -35,10 +36,13 @@ def memories(
         sort_by="updated_at",
         sort_order="desc",
     )
-    return [m for m in rows if isinstance(m, UserMemory)] if isinstance(rows, list) else []
+    if not isinstance(rows, list):
+        return []
+    return [memory for memory in rows if isinstance(memory, UserMemory)]
 
 
 def delete(memory_ids: list[str], user_id: str | None = None) -> None:
+    """Apaga as memórias; com `user_id`, só as que forem desse usuário."""
     if memory_ids:
         memory_db().delete_user_memories(memory_ids=memory_ids, user_id=user_id)
 
@@ -57,24 +61,28 @@ def retention_by_agent(session: Session) -> dict[str, tuple[str, int]]:
         .join(AgentConfigVersion, AgentConfigVersion.id == AgentConfig.current_version_id)
         .where(AgentConfig.kind.in_(["agent", "team"]))
     ).all()
-    out: dict[str, tuple[str, int]] = {}
+    retention: dict[str, tuple[str, int]] = {}
     for config_id, kind, payload in rows:
         try:
             settings = ConfigPayload.model_validate(payload).memory
         except ValueError:
             settings = MemorySettings()
-        out[str(config_id)] = (str(kind), settings.retention_days)
-    return out
+        retention[str(config_id)] = (str(kind), settings.retention_days)
+    return retention
 
 
 def expired(rows: list[UserMemory], days: int, now: datetime) -> list[str]:
+    """Ids das memórias sem atualização há mais de `days` dias."""
     limit = (now - timedelta(days=days)).timestamp()
     return [
-        m.memory_id for m in rows if m.memory_id and (m.updated_at or m.created_at or 0) < limit
+        memory.memory_id
+        for memory in rows
+        if memory.memory_id and (memory.updated_at or memory.created_at or 0) < limit
     ]
 
 
 def purge_expired(now: datetime | None = None) -> int:
+    """Apaga as memórias vencidas pelo prazo de cada agente e time; devolve quantas saíram."""
     now = now or datetime.now(UTC)
     with Session(get_engine()) as session:
         retention = retention_by_agent(session)
@@ -114,13 +122,14 @@ def purge_if_due() -> int:
 
 
 def agent_name_map(session: Session, ids: set[str]) -> dict[str, str]:
-    valid = []
-    for i in ids:
+    """Nome de cada config pelo id; id que não é UUID fica de fora."""
+    config_ids = []
+    for raw_id in ids:
         try:
-            valid.append(UUID(i))
+            config_ids.append(UUID(raw_id))
         except ValueError:
             continue
     rows = session.execute(
-        select(AgentConfig.id, AgentConfig.name).where(AgentConfig.id.in_(valid))
+        select(AgentConfig.id, AgentConfig.name).where(AgentConfig.id.in_(config_ids))
     )
-    return {str(r.id): r.name for r in rows}
+    return {str(row.id): row.name for row in rows}

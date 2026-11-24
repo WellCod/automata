@@ -46,6 +46,7 @@ def _keys(subject: str) -> list[str]:
 
 
 def month_spend(session: Session, subject: str, period: str | None = None) -> float:
+    """Gasto de quem chama no mês, em todos os agentes, com o pseudônimo somado."""
     total = session.scalar(
         select(func.coalesce(func.sum(UsageEvent.cost), 0)).where(
             UsageEvent.user_id.in_(_keys(subject)),
@@ -57,30 +58,32 @@ def month_spend(session: Session, subject: str, period: str | None = None) -> fl
 
 def month_spends(session: Session, subjects: list[str], period: str) -> dict[str, float]:
     """Gasto do mês de vários titulares numa consulta, com o pseudônimo somado (Fase 44)."""
-    keys = {key: subject for subject in subjects for key in _keys(subject)}
-    if not keys:
+    subject_by_key = {key: subject for subject in subjects for key in _keys(subject)}
+    if not subject_by_key:
         return {}
-    out = dict.fromkeys(subjects, 0.0)
+    spend_by_subject = dict.fromkeys(subjects, 0.0)
     rows = session.execute(
         select(UsageEvent.user_id, func.coalesce(func.sum(UsageEvent.cost), 0))
-        .where(UsageEvent.user_id.in_(list(keys)), UsageEvent.period == period)
+        .where(UsageEvent.user_id.in_(list(subject_by_key)), UsageEvent.period == period)
         .group_by(UsageEvent.user_id)
     )
     for key, total in rows:
-        out[keys[key]] += float(total or 0)
-    return out
+        spend_by_subject[subject_by_key[key]] += float(total or 0)
+    return spend_by_subject
 
 
 def _cached_budget(subject: str) -> CallerBudget | None:
-    hit = _budgets.get(subject)
-    if hit is not None and monotonic() - hit[0] < CACHE_S:
-        return hit[1]
+    """Orçamento pelo id ou pelo pseudônimo, com cache de CACHE_S segundos."""
+    cached = _budgets.get(subject)
+    if cached is not None and monotonic() - cached[0] < CACHE_S:
+        return cached[1]
     with Session(get_engine()) as session:
         budget = None
         for key in _keys(subject):
             budget = session.get(CallerBudget, key)
             if budget is not None:
                 break
+        # fora da sessão, o objeto em cache segue legível depois que ela fecha
         if budget is not None:
             session.expunge(budget)
     _budgets[subject] = (monotonic(), budget)
@@ -88,9 +91,10 @@ def _cached_budget(subject: str) -> CallerBudget | None:
 
 
 def _cached_spend(subject: str) -> float:
-    hit = _spend.get(subject)
-    if hit is not None and monotonic() - hit[0] < CACHE_S:
-        return hit[1]
+    """Gasto do mês de quem chama, com cache de CACHE_S segundos."""
+    cached = _spend.get(subject)
+    if cached is not None and monotonic() - cached[0] < CACHE_S:
+        return cached[1]
     with Session(get_engine()) as session:
         spent = month_spend(session, subject)
     _spend[subject] = (monotonic(), spent)
@@ -112,10 +116,11 @@ class CallerState:
 
 
 def state_for(budget: CallerBudget, spent: float) -> CallerState:
-    limit = float(budget.monthly_usd)
-    percent = spent / limit * 100 if limit > 0 else 100.0
+    """Nível do orçamento de quem chama; limite zero conta como estourado."""
+    limit_usd = float(budget.monthly_usd)
+    percent = spent / limit_usd * 100 if limit_usd > 0 else 100.0
     level = "exceeded" if percent >= 100 else "warning" if percent >= budget.warn_percent else "ok"
-    return CallerState(spent, limit, percent, level)
+    return CallerState(spent, limit_usd, percent, level)
 
 
 class CallerBudgetGuardrail(_Guardrail):
@@ -142,6 +147,7 @@ class CallerBudgetGuardrail(_Guardrail):
             )
 
     def _guarded(self, subject: str | None) -> None:
+        """Confere e, se barrar, anota o bloqueio no registro do run antes de relançar."""
         try:
             self._verdict(subject)
         except InputCheckError as exc:

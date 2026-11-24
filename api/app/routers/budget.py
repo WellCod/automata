@@ -28,6 +28,7 @@ def _config_or_404(session: SessionDep, config_id: UUID) -> AgentConfig:
 
 
 def _response(session: SessionDep, config: AgentConfig) -> BudgetResponse:
+    """Orçamento do config com o gasto e o nível de alerta do mês corrente."""
     period = budget.current_period()
     state = budget.state_for(config, budget.month_spend(session, config.id, period))
     return BudgetResponse(
@@ -54,6 +55,7 @@ def read_budget(config_id: UUID, session: SessionDep) -> BudgetResponse:
 def update_budget(
     config_id: UUID, body: BudgetInput, session: SessionDep, request: Request
 ) -> BudgetResponse:
+    """Troca o orçamento do config, com o antes e o depois na trilha de auditoria."""
     config = _config_or_404(session, config_id)
     note(
         request,
@@ -73,5 +75,6 @@ def update_budget(
     config.budget_hard_stop = body.hard_stop
     session.commit()
     session.refresh(config)
+    # o estado do orçamento fica em cache; sem isso o run seguinte usaria o limite antigo
     budget.forget(config.id)
     return _response(session, config)

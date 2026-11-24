@@ -13,17 +13,17 @@ export function FirstAgent({ onNew }: { onNew: () => void }) {
   const { data: templates } = useQuery({
     queryKey: ["templates"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/templates");
-      if (res.error) return [];
-      return res.data!;
+      const result = await client.GET("/api/v1/templates");
+      if (result.error) return [];
+      return result.data!;
     },
   });
   const create = useMutation({
     mutationFn: async (key: string) => {
-      const res = await client.POST("/api/v1/templates/{key}", { params: { path: { key } } });
-      if (res.error)
-        throw new Error(apiErrorMessage(res.error, "Falha ao criar a partir do exemplo"));
-      return res.data!;
+      const result = await client.POST("/api/v1/templates/{key}", { params: { path: { key } } });
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao criar a partir do exemplo"));
+      return result.data!;
     },
     onSuccess: (data) => router.push(`/agents/${data.id}`),
     onError: (e) => toast.error(e.message),
@@ -46,20 +46,20 @@ export function FirstAgent({ onNew }: { onNew: () => void }) {
         <div className="flex flex-col gap-2">
           <h3 className="text-foreground text-[13px] font-medium">Ou comece de um exemplo</h3>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {templates.map((t) => (
+            {templates.map((template) => (
               <li
-                key={t.key}
+                key={template.key}
                 className="border-border bg-card flex flex-col gap-2 rounded border p-3"
               >
-                <span className="text-foreground text-[13px] font-medium">{t.name}</span>
-                <span className="text-muted-foreground text-[12px]">{t.description}</span>
+                <span className="text-foreground text-[13px] font-medium">{template.name}</span>
+                <span className="text-muted-foreground text-[12px]">{template.description}</span>
                 <Button
                   size="sm"
                   variant="muted"
                   className="mt-auto self-start"
                   disabled={create.isPending}
-                  onClick={() => create.mutate(t.key)}
-                  aria-label={`Criar a partir de ${t.name}`}
+                  onClick={() => create.mutate(template.key)}
+                  aria-label={`Criar a partir de ${template.name}`}
                 >
                   Usar este exemplo
                 </Button>

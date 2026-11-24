@@ -19,6 +19,7 @@ from app.agents.tracking import TrackedWorkflow
 
 
 def _deepest(output: StepOutput) -> str:
+    """Texto da última etapa aninhada: num contêiner, a saída que vale é a da etapa de dentro."""
     if output.steps:
         return _deepest(output.steps[-1])
     return "" if output.content is None else str(output.content)
@@ -64,6 +65,8 @@ def steps_run(output: WorkflowRunOutput, known: set[str]) -> list[str]:
 
 
 class WorkflowUnderTest:
+    """Workflow com a cara de agente que o `Case` do Agno espera."""
+
     def __init__(self, workflow: TrackedWorkflow, step_names: set[str]) -> None:
         self.workflow = workflow
         self.id = workflow.id
@@ -78,6 +81,7 @@ class WorkflowUnderTest:
         user_id: str | None = None,
         **_: Any,
     ) -> AsyncIterator[Any]:
+        """Roda o workflow sem stream e entrega um evento só, de saída ou de erro."""
         output: WorkflowRunOutput = await self.workflow.arun(
             input=input, session_id=session_id, user_id=user_id, stream=False
         )
