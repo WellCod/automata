@@ -91,6 +91,8 @@ class ChannelConversation(Base):
 
 
 class ChannelMessage(Base):
+    """Mensagem de uma conversa de canal, de entrada ou de saída."""
+
     __tablename__ = "channel_message"
     __table_args__ = (
         # o provedor reenvia o que não recebeu 200 a tempo: a mesma mensagem não roda duas vezes

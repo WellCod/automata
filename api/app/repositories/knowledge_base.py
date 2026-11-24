@@ -10,6 +10,8 @@ VECTOR_SCHEMA = "ai"
 
 
 class KnowledgeBaseRepository:
+    """Cadastro das bases de conhecimento; os trechos ficam na tabela vetorial de cada uma."""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -29,10 +31,11 @@ class KnowledgeBaseRepository:
     def find_conflict(
         self, name: str, slug: str | None = None, exclude: UUID | None = None
     ) -> KnowledgeBase | None:
-        cond = KnowledgeBase.name == name
+        """Outra base com o mesmo nome ou slug; `exclude` tira a própria base na edição."""
+        same_name_or_slug = KnowledgeBase.name == name
         if slug is not None:
-            cond = cond | (KnowledgeBase.slug == slug)
-        stmt = select(KnowledgeBase).where(cond)
+            same_name_or_slug = same_name_or_slug | (KnowledgeBase.slug == slug)
+        stmt = select(KnowledgeBase).where(same_name_or_slug)
         if exclude is not None:
             stmt = stmt.where(KnowledgeBase.id != exclude)
         return self._session.scalars(stmt).first()
@@ -60,6 +63,7 @@ class KnowledgeBaseRepository:
         return base
 
     def delete(self, base: KnowledgeBase) -> None:
+        """Apaga a base e a tabela vetorial dela."""
         # vector_table é gerado pela API (kb_<hex do id>), nunca vem do usuário
         self._session.execute(text(f'DROP TABLE IF EXISTS "{VECTOR_SCHEMA}"."{base.vector_table}"'))
         self._session.delete(base)

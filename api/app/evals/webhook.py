@@ -33,6 +33,8 @@ EVENT_HEADER = "X-Automata-Event"
 
 @dataclass(frozen=True)
 class Webhook:
+    """URL e segredo de assinatura do webhook, já decifrados."""
+
     url: str
     secret: str
 
@@ -49,11 +51,12 @@ def seal(url: str) -> tuple[str, str, str]:
 
 
 def unseal(encrypted: str) -> Webhook:
-    data = decrypt_json(encrypted)
-    return Webhook(url=data["url"], secret=data["secret"])
+    sealed = decrypt_json(encrypted)
+    return Webhook(url=sealed["url"], secret=sealed["secret"])
 
 
 def sign(secret: str, body: bytes) -> str:
+    """HMAC-SHA256 do corpo, no formato `sha256=<hex>` que o destino confere."""
     return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
 
@@ -83,6 +86,7 @@ def deliver(webhook: Webhook, event: str, body: bytes, *, attempts: int = 3) -> 
     result = "sem tentativa"
     for attempt in range(attempts):
         if attempt:
+            # tentativa além da tabela de esperas repete a última
             time.sleep(RETRY_WAITS_S[min(attempt - 1, len(RETRY_WAITS_S) - 1)])
         try:
             # sem seguir redirect, com o IP conferido de novo na conexão

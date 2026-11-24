@@ -41,6 +41,7 @@ def transition(previous: EvalRun | None, current: EvalRun, regressions: list[str
 
 
 def _previous(session: Session, run: EvalRun) -> EvalRun | None:
+    """Execução agendada terminada imediatamente antes desta, para comparar o estado."""
     stmt = (
         select(EvalRun)
         .where(
@@ -56,6 +57,7 @@ def _previous(session: Session, run: EvalRun) -> EvalRun | None:
 
 
 def _text(event: str, name: str, run: EvalRun, regressions: list[str]) -> str:
+    """Mensagem legível do aviso; no máximo cinco casos citados pelo nome."""
     score = f"{run.passed} de {run.total} casos passaram"
     if event == "suite.regressed":
         cases = ", ".join(regressions[:5]) + ("…" if len(regressions) > 5 else "")
@@ -82,6 +84,7 @@ def notify_after(run_id: UUID) -> str | None:
 
 
 def _notify(run_id: UUID) -> str | None:
+    """Corpo de `notify_after`: manda aos destinos da instância e ao webhook do agendamento."""
     with Session(get_engine()) as session:
         run = session.get(EvalRun, run_id)
         if run is None or run.trigger != "schedule":
@@ -93,13 +96,17 @@ def _notify(run_id: UUID) -> str | None:
         regressions: list[str] = []
         if previous is not None and previous.status == "completed" and run.status == "completed":
             changes = compare(EvalRunRepository(session), previous, run)
-            regressions = [c.case_name for c in changes if c.change == "regression"]
+            regressions = [
+                case_change.case_name
+                for case_change in changes
+                if case_change.change == "regression"
+            ]
         event = transition(previous, run, regressions)
         if event is None:
             return None
         config = session.get(AgentConfig, run.agent_config_id)
         name = config.name if config is not None else str(run.agent_config_id)
-        data = {
+        payload = {
             "config_id": str(run.agent_config_id),
             "config_name": name,
             "run_id": str(run.id),
@@ -109,11 +116,11 @@ def _notify(run_id: UUID) -> str | None:
             "regressions": regressions,
         }
         text = _text(event, name, run, regressions)
-        sent = alerts.broadcast(session, event, data, text) > 0
+        sent = alerts.broadcast(session, event, payload, text) > 0
         if schedule.webhook_encrypted is not None:
             try:
                 target = webhook.unseal(schedule.webhook_encrypted)
-                status = webhook.deliver(target, event, webhook.body_for(event, data, text))
+                status = webhook.deliver(target, event, webhook.body_for(event, payload, text))
                 sent = True
             except SecretsKeyMissing as exc:
                 status = f"recusado: {exc}"

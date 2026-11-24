@@ -20,9 +20,10 @@ class PathFilters(BaseModel):
     @field_validator("include", "exclude")
     @classmethod
     def padroes_validos(cls, value: list[str]) -> list[str]:
+        """Descarta padrão em branco e recusa o que o filtro por nome não aceita."""
         from app.knowledge.path_filter import pattern_problem
 
-        cleaned = [p.strip() for p in value if p.strip()]
+        cleaned = [pattern.strip() for pattern in value if pattern.strip()]
         for pattern in cleaned:
             problem = pattern_problem(pattern)
             if problem:

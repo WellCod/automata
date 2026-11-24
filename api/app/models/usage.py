@@ -9,6 +9,8 @@ from app.models.config import Base
 
 
 class UsageEvent(Base):
+    """Consumo de uma chamada de modelo: tokens e custo, por config, quem chamou e mês."""
+
     __tablename__ = "usage_event"
     __table_args__ = (
         # com o custo: a soma do orçamento sai só do índice (Fase 44)

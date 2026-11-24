@@ -10,6 +10,11 @@ from app.models.config import Base
 
 
 class AgentRun(Base):
+    """Run registrado pelo tracking: status, pendências, bloqueios e a versão que respondeu.
+
+    Runs da suíte têm `eval_run_id` e ficam fora das métricas e da lista de execuções.
+    """
+
     __tablename__ = "agent_run"
     __table_args__ = (
         Index("ix_agent_run_config_created", "agent_config_id", "created_at"),

@@ -30,6 +30,11 @@ class AlertDestination(Base):
 
 
 class AlertSent(Base):
+    """Aviso já mandado por config, evento e janela (mês do orçamento, hora do pico de erro).
+
+    A chave primária é a trava: com mais de uma réplica, só quem insere a linha avisa.
+    """
+
     __tablename__ = "alert_sent"
 
     agent_config_id: Mapped[uuid.UUID] = mapped_column(

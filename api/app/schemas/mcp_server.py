@@ -19,12 +19,12 @@ class McpServerInput(BaseModel):
 
     @field_validator("headers")
     @classmethod
-    def header_names_validos(cls, v: dict[str, str] | None) -> dict[str, str] | None:
-        if v is not None:
-            for name in v:
+    def header_names_validos(cls, headers: dict[str, str] | None) -> dict[str, str] | None:
+        if headers is not None:
+            for name in headers:
                 if not _HEADER.match(name):
                     raise ValueError(f"nome de header inválido: {name}")
-        return v
+        return headers
 
 
 class McpToolInfo(BaseModel):

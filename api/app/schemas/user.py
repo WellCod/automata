@@ -45,12 +45,13 @@ class LoginInput(BaseModel):
     password: str = Field(min_length=1)
 
 
-def _password_complexity(v: str) -> str:
-    if not any(c.isupper() for c in v):
+def _password_complexity(password: str) -> str:
+    """Regra comum a toda senha nova; o tamanho mínimo fica no `Field` de cada schema."""
+    if not any(char.isupper() for char in password):
         raise ValueError("a senha deve conter ao menos uma letra maiúscula")
-    if not any(c.isdigit() for c in v):
+    if not any(char.isdigit() for char in password):
         raise ValueError("a senha deve conter ao menos um dígito")
-    return v
+    return password
 
 
 class CreateUserInput(BaseModel):
@@ -58,8 +59,8 @@ class CreateUserInput(BaseModel):
 
     @field_validator("email")
     @classmethod
-    def email_minusculo(cls, v: str) -> str:
-        return v.lower()
+    def email_minusculo(cls, email: str) -> str:
+        return email.lower()
 
     password: str = Field(min_length=12)
     role: UserRole = UserRole.viewer

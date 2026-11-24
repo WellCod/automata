@@ -46,6 +46,7 @@ _SAMPLES = 48
 
 
 def next_run(cron_expr: str, timezone: str, after: datetime) -> datetime:
+    """Próximo horário do cron depois de `after`, em UTC."""
     epoch = compute_next_run(cron_expr, timezone, after_epoch=int(after.timestamp()))
     return datetime.fromtimestamp(epoch, tz=UTC)
 
@@ -67,6 +68,11 @@ def validate(cron_expr: str, timezone: str) -> str | None:
 
 
 def _fire(session: Session, schedule: EvalSchedule, now: datetime) -> UUID | None:
+    """Cria a execução do agendamento vencido e avança o próximo horário, sem commit.
+
+    O horário avança mesmo quando a execução é recusada ou o config sumiu: o
+    agendamento não fica vencido para sempre.
+    """
     schedule.next_run_at = next_run(schedule.cron_expr, schedule.timezone, now)
     schedule.last_attempt_at = now
     config = ConfigRepository(session).get_config(schedule.agent_config_id)
@@ -101,17 +107,19 @@ def poll_once(now: datetime | None = None) -> list[UUID]:
 
 
 async def _run_and_notify(run_id: UUID) -> None:
+    """Roda a suíte agendada e manda o aviso de mudança de estado."""
     await execute(run_id)
     # o aviso só sai em mudança de estado e nunca levanta (ADR-0018)
     await asyncio.to_thread(notify_after, run_id)
 
 
 def _enqueue_due(connectors: list[UUID], urls: list[UUID]) -> None:
+    """Põe na fila do worker de ingestão os conectores e URLs vencidos."""
     with Session(get_engine()) as session:
-        for cid in connectors:
-            knowledge_jobs.enqueue(session, "sync", cid)
-        for uid in urls:
-            knowledge_jobs.enqueue(session, "refresh", uid)
+        for connector_id in connectors:
+            knowledge_jobs.enqueue(session, "sync", connector_id)
+        for content_id in urls:
+            knowledge_jobs.enqueue(session, "refresh", content_id)
         session.commit()
 
 
@@ -121,15 +129,21 @@ SYNC_WORKERS = 2
 _SYNC_EXECUTOR = ThreadPoolExecutor(max_workers=SYNC_WORKERS, thread_name_prefix="kb-sync")
 
 
-async def _in_thread(fn: Callable[[UUID], object], item: UUID) -> None:
+async def _in_thread(job: Callable[[UUID], object], item: UUID) -> None:
+    """Roda a sincronização ou reindexação no executor próprio."""
     # cada um grava o próprio resultado; aqui só não deixa a exceção sumir no loop
     try:
-        await asyncio.get_running_loop().run_in_executor(_SYNC_EXECUTOR, fn, item)
+        await asyncio.get_running_loop().run_in_executor(_SYNC_EXECUTOR, job, item)
     except Exception as exc:
         logger.warning("reindexação agendada falhou", extra={"id": str(item), "error": str(exc)})
 
 
 async def run_forever(poll_seconds: int = POLL_SECONDS) -> None:
+    """Laço do poller no lifespan: suíte agendada, avisos, canais, memórias e reindexação.
+
+    Cada tarefa tem o próprio try: uma falha não impede as outras no mesmo minuto.
+    """
+    # referência forte às tasks em andamento: o asyncio só guarda referência fraca
     tasks: set[asyncio.Task[None]] = set()
     while True:
         try:
@@ -159,8 +173,8 @@ async def run_forever(poll_seconds: int = POLL_SECONDS) -> None:
                 # com o worker separado (ADR-0039) a API só enfileira
                 await asyncio.to_thread(_enqueue_due, connectors, urls)
                 connectors, urls = [], []
-            jobs = [_in_thread(sync, cid) for cid in connectors]
-            jobs += [_in_thread(knowledge_schedule.refresh_url, uid) for uid in urls]
+            jobs = [_in_thread(sync, connector_id) for connector_id in connectors]
+            jobs += [_in_thread(knowledge_schedule.refresh_url, content_id) for content_id in urls]
             for job in jobs:
                 task = asyncio.create_task(job)
                 tasks.add(task)
