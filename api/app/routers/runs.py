@@ -14,9 +14,10 @@ def masked_user(user_id: str | None) -> str | None:
     """Quem não é owner vê só o canal e o fim do id: telefone e e-mail são dado pessoal."""
     if not user_id:
         return user_id
-    prefix, sep, rest = user_id.rpartition(":")
-    tail = rest[-4:] if len(rest) > 4 else ""
-    return f"{prefix}{sep}•••{tail}"
+    # `whatsapp:5511999990000` vira `whatsapp:•••0000`; id curto não mostra nem o fim
+    channel_prefix, separator, identifier = user_id.rpartition(":")
+    tail = identifier[-4:] if len(identifier) > 4 else ""
+    return f"{channel_prefix}{separator}•••{tail}"
 
 
 router = APIRouter(
@@ -71,17 +72,20 @@ class AgentMetricsResponse(BaseModel):
 
 
 def _parse_period(period: str) -> int:
+    """Dias de um período como `30d`; o formato já vem conferido pelo pattern da query."""
     return int(period[:-1])
 
 
-def _to_metrics_response(m: RunMetrics, blocked_by: dict[str, int]) -> AgentMetricsResponse:
+def _to_metrics_response(
+    run_metrics: RunMetrics, blocked_by: dict[str, int]
+) -> AgentMetricsResponse:
     return AgentMetricsResponse(
-        total_runs=m.total_runs,
-        error_rate=m.error_rate,
-        p50_ms=m.p50_ms,
-        p95_ms=m.p95_ms,
-        period_days=m.period_days,
-        blocked_runs=m.blocked_runs,
+        total_runs=run_metrics.total_runs,
+        error_rate=run_metrics.error_rate,
+        p50_ms=run_metrics.p50_ms,
+        p95_ms=run_metrics.p95_ms,
+        period_days=run_metrics.period_days,
+        blocked_runs=run_metrics.blocked_runs,
         blocked_by=blocked_by,
     )
 
@@ -92,6 +96,7 @@ def get_metrics(
     session: SessionDep,
     period: str = Query(default="30d", pattern=r"^\d+d$"),  # noqa: B008
 ) -> AgentMetricsResponse:
+    """Latência, taxa de erro e bloqueios por regra do agente no período."""
     config_repo = ConfigRepository(session)
     if config_repo.get_config(config_id) is None:
         raise HTTPException(status_code=404, detail="Config não encontrada")
@@ -118,6 +123,7 @@ def list_runs(
     since: datetime | None = Query(default=None),  # noqa: B008
     until: datetime | None = Query(default=None),  # noqa: B008
 ) -> RunsPage:
+    """Execuções paginadas do config; quem não é owner vê o usuário mascarado."""
     config = ConfigRepository(session).get_config(config_id)
     if config is None:
         raise HTTPException(status_code=404, detail="Config não encontrada")
@@ -128,29 +134,34 @@ def list_runs(
     )
     everyone = sees_everyone(request)
     # consumo do workflow é o das etapas, gravado nos agentes e times que rodaram
-    consumo: dict[str, tuple[int | None, int | None, float | None]] = {}
+    # por run_id: (etapas, tokens, custo)
+    step_consumption: dict[str, tuple[int | None, int | None, float | None]] = {}
     if config.kind == "workflow":
-        found = run_repo.child_consumption([r.run_id for r in runs if r.run_id])
-        consumo = {r.run_id or "": found.get(r.run_id or "", (0, 0, None)) for r in runs}
+        consumption_by_run = run_repo.child_consumption([run.run_id for run in runs if run.run_id])
+        step_consumption = {
+            run.run_id or "": consumption_by_run.get(run.run_id or "", (0, 0, None)) for run in runs
+        }
     return RunsPage(
         items=[
             AgentRunResponse(
-                id=r.id,
-                agent_config_id=r.agent_config_id,
-                user_id=r.user_id if everyone else masked_user(r.user_id),
-                run_id=r.run_id,
-                status=r.status,
-                duration_ms=r.duration_ms,
-                error=r.error,
-                blocked_by=r.blocked_by,
-                screened_tools=[ScreenedTool.model_validate(s) for s in r.screened_tools or []],
-                stop_reason=r.stop_reason,
-                steps=consumo.get(r.run_id or "", (None, None, None))[0],
-                total_tokens=consumo.get(r.run_id or "", (None, None, None))[1],
-                cost=consumo.get(r.run_id or "", (None, None, None))[2],
-                created_at=r.created_at,
+                id=run.id,
+                agent_config_id=run.agent_config_id,
+                user_id=run.user_id if everyone else masked_user(run.user_id),
+                run_id=run.run_id,
+                status=run.status,
+                duration_ms=run.duration_ms,
+                error=run.error,
+                blocked_by=run.blocked_by,
+                screened_tools=[
+                    ScreenedTool.model_validate(screened) for screened in run.screened_tools or []
+                ],
+                stop_reason=run.stop_reason,
+                steps=step_consumption.get(run.run_id or "", (None, None, None))[0],
+                total_tokens=step_consumption.get(run.run_id or "", (None, None, None))[1],
+                cost=step_consumption.get(run.run_id or "", (None, None, None))[2],
+                created_at=run.created_at,
             )
-            for r in runs
+            for run in runs
         ],
         total=total,
         page=page,

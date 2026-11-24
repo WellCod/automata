@@ -16,17 +16,22 @@ POLLER_STALE_S = 600
 
 
 def _redis(request: Request) -> str:
+    """Estado do Redis do limitador de chamadas; "off" quando a instância roda sem ele."""
     limiter = getattr(request.app.state, "rate_limiter", None)
     return str(limiter.state()) if limiter is not None else "off"
 
 
-def _migration(conn: Connection) -> str | None:
+def _migration(connection: Connection) -> str | None:
+    """Revisão do Alembic aplicada no banco, ou None sem a tabela.
+
+    O savepoint isola a falha: sem ele, a consulta errada invalidaria a conexão do health.
+    """
     try:
-        with conn.begin_nested():
-            value = conn.scalar(text("SELECT version_num FROM alembic_version"))
+        with connection.begin_nested():
+            revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
     except Exception:
         return None
-    return None if value is None else str(value)
+    return None if revision is None else str(revision)
 
 
 @router.get("/health")
@@ -45,16 +50,18 @@ def health_check(request: Request) -> JSONResponse:
         "revision": os.environ.get("AUTOMATA_REVISION", ""),
     }
     try:
-        with get_engine().connect() as conn:
-            conn.execute(text("SELECT 1"))
-            body["migration"] = _migration(conn)
+        with get_engine().connect() as connection:
+            connection.execute(text("SELECT 1"))
+            body["migration"] = _migration(connection)
     except Exception as exc:
         logger.error("health check: db unreachable", extra={"error": str(exc)})
         return JSONResponse({**body, "status": "degraded", "db": "unreachable"}, status_code=503)
     body["db"] = "ok"
     body["redis"] = _redis(request)
-    age = last_cycle_age(time.monotonic())
-    body["poller_age_s"] = None if age is None else round(age)
-    if body["redis"] == "unreachable" or (age is not None and age > POLLER_STALE_S):
+    poller_age_s = last_cycle_age(time.monotonic())
+    body["poller_age_s"] = None if poller_age_s is None else round(poller_age_s)
+    if body["redis"] == "unreachable" or (
+        poller_age_s is not None and poller_age_s > POLLER_STALE_S
+    ):
         body["status"] = "degraded"
     return JSONResponse(body)

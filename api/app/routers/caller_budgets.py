@@ -64,6 +64,7 @@ def _label(session: Session, subject: str) -> tuple[str, str] | None:
 
 
 def _response(session: Session, budget: CallerBudget) -> CallerBudgetResponse:
+    """Orçamento com o gasto do mês; sujeito apagado aparece como "removido"."""
     label, kind = _label(session, budget.subject) or (budget.subject, "removido")
     state = state_for(budget, month_spend(session, budget.subject, current_period()))
     return CallerBudgetResponse(
@@ -83,13 +84,14 @@ def _response(session: Session, budget: CallerBudget) -> CallerBudgetResponse:
 @router.get("", response_model=list[CallerBudgetResponse])
 def list_budgets(session: SessionDep) -> list[CallerBudgetResponse]:
     budgets = session.scalars(select(CallerBudget).order_by(CallerBudget.subject)).all()
-    return [_response(session, b) for b in budgets]
+    return [_response(session, budget) for budget in budgets]
 
 
 @router.put("/{subject}", response_model=CallerBudgetResponse)
 def put_budget(
     subject: str, body: CallerBudgetInput, session: SessionDep, request: Request
 ) -> CallerBudgetResponse:
+    """Cria ou troca o orçamento do usuário ou token, com o antes e o depois na trilha."""
     if _label(session, subject) is None:
         raise HTTPException(status_code=404, detail="Usuário ou token de integração não encontrado")
     budget = session.get(CallerBudget, subject)
@@ -113,6 +115,7 @@ def put_budget(
     budget.updated_by = str(getattr(request.state, "user_id", None) or "panel")
     session.commit()
     session.refresh(budget)
+    # o estado do orçamento fica em cache; sem isso o run seguinte usaria o limite antigo
     forget(subject)
     return _response(session, budget)
 

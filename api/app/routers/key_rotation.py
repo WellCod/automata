@@ -50,34 +50,38 @@ class KeyRotationStatus(BaseModel):
 
 @router.get("", response_model=KeyRotationStatus)
 def rotation_status(session: SessionDep) -> KeyRotationStatus:
+    """Quantos tokens e segredos ainda dependem das chaves anteriores."""
     settings = get_settings()
-    kid = current_kid()
-    active = (IntegrationToken.revoked_at.is_(None)) & (
+    current_key_id = current_kid()
+    active_filter = (IntegrationToken.revoked_at.is_(None)) & (
         IntegrationToken.expires_at > datetime.now(UTC)
     )
-    active_count = select(func.count()).select_from(IntegrationToken).where(active)
-    other_key = active_count.where(IntegrationToken.signing_kid.is_not(None))
-    if kid is not None:
-        other_key = other_key.where(IntegrationToken.signing_kid != kid)
-    on_previous = session.scalar(other_key)
-    without_kid = session.scalar(active_count.where(IntegrationToken.signing_kid.is_(None)))
-    jwt = JwtRotation(
-        current_kid=kid,
+    active_count_query = select(func.count()).select_from(IntegrationToken).where(active_filter)
+    # token com kid diferente do atual foi assinado com a chave anterior
+    other_key_query = active_count_query.where(IntegrationToken.signing_kid.is_not(None))
+    if current_key_id is not None:
+        other_key_query = other_key_query.where(IntegrationToken.signing_kid != current_key_id)
+    on_previous_count = session.scalar(other_key_query)
+    without_kid_count = session.scalar(
+        active_count_query.where(IntegrationToken.signing_kid.is_(None))
+    )
+    jwt_rotation = JwtRotation(
+        current_kid=current_key_id,
         previous_kid=(
             safe_kid(settings.jwt_previous_public_key) if settings.jwt_previous_public_key else None
         ),
-        tokens_on_previous=on_previous or 0,
-        tokens_without_kid=without_kid or 0,
+        tokens_on_previous=on_previous_count or 0,
+        tokens_without_kid=without_kid_count or 0,
     )
     configured = bool(settings.mcp_secrets_key)
-    secrets = SecretsRotation(
+    secrets_rotation = SecretsRotation(
         configured=configured,
         previous_configured=bool(settings.mcp_secrets_previous_key),
         pending=pending(session) if configured else {},
     )
     done = (
-        jwt.tokens_on_previous == 0
-        and jwt.tokens_without_kid == 0
-        and not any(secrets.pending.values())
+        jwt_rotation.tokens_on_previous == 0
+        and jwt_rotation.tokens_without_kid == 0
+        and not any(secrets_rotation.pending.values())
     )
-    return KeyRotationStatus(jwt=jwt, secrets=secrets, done=done)
+    return KeyRotationStatus(jwt=jwt_rotation, secrets=secrets_rotation, done=done)

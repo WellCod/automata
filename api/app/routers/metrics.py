@@ -68,23 +68,23 @@ def build_series(
     usage: list[DailyUsage],
 ) -> list[DailyMetricsPoint]:
     """Um ponto por dia de first a last; dia sem dado vem zerado (latência e custo nulos)."""
-    runs_by_day = {r.day: r for r in runs}
-    usage_by_day = {u.day: u for u in usage}
+    runs_by_day = {day_runs.day: day_runs for day_runs in runs}
+    usage_by_day = {day_usage.day: day_usage for day_usage in usage}
     points = []
     day = first
     while day <= last:
-        run = runs_by_day.get(day)
-        use = usage_by_day.get(day)
+        day_runs = runs_by_day.get(day)
+        day_usage = usage_by_day.get(day)
         points.append(
             DailyMetricsPoint(
                 date=day,
-                total_runs=run.total_runs if run else 0,
-                error_count=run.error_count if run else 0,
-                blocked_count=run.blocked_count if run else 0,
-                p50_ms=run.p50_ms if run else None,
-                p95_ms=run.p95_ms if run else None,
-                total_tokens=use.total_tokens if use else 0,
-                total_cost=use.total_cost if use else None,
+                total_runs=day_runs.total_runs if day_runs else 0,
+                error_count=day_runs.error_count if day_runs else 0,
+                blocked_count=day_runs.blocked_count if day_runs else 0,
+                p50_ms=day_runs.p50_ms if day_runs else None,
+                p95_ms=day_runs.p95_ms if day_runs else None,
+                total_tokens=day_usage.total_tokens if day_usage else 0,
+                total_cost=day_usage.total_cost if day_usage else None,
             )
         )
         day += timedelta(days=1)
@@ -92,6 +92,7 @@ def build_series(
 
 
 def _parse_period(period: str) -> int:
+    """Dias de um período como `30d`, entre 1 e o teto da série."""
     # `99999d` varria a tabela inteira, e um número enorme estourava a data (Fase 44)
     return max(1, min(int(period[:-1][:6]), MAX_SERIES_DAYS))
 
@@ -101,6 +102,10 @@ def _resolve_range(
     start: date | None,
     end: date | None,
 ) -> tuple[datetime, datetime | None, int]:
+    """Início, fim e número de dias: datas explícitas valem mais que o período relativo.
+
+    Sem `end`, o intervalo fica aberto até agora e o número de dias vem zero.
+    """
     if start is not None:
         since = datetime(start.year, start.month, start.day, tzinfo=UTC)
         until = (
@@ -121,6 +126,7 @@ def get_summary(
     start: date | None = Query(default=None),  # noqa: B008
     end: date | None = Query(default=None),  # noqa: B008
 ) -> GlobalMetricsSummary:
+    """Totais da instância no período: runs, latência, bloqueios e custo por origem."""
     since, until, period_days = _resolve_range(period, start, end)
 
     run_repo = RunRepository(session)
@@ -155,26 +161,29 @@ def get_by_agent(
     start: date | None = Query(default=None),  # noqa: B008
     end: date | None = Query(default=None),  # noqa: B008
 ) -> list[AgentBreakdownItem]:
+    """Runs e custo por agente no período, do que mais rodou para o que menos rodou."""
     since, until, period_days = _resolve_range(period, start, end)
 
     runs_by_id: dict[UUID, AgentRunSummary] = {
-        r.agent_config_id: r
-        for r in RunRepository(session).runs_by_agent(
+        run_summary.agent_config_id: run_summary
+        for run_summary in RunRepository(session).runs_by_agent(
             since=since, until=until, period_days=period_days
         )
     }
     usage_by_id: dict[UUID, AgentUsageSummary] = {
-        u.agent_config_id: u
-        for u in UsageRepository(session).usage_by_agent(
+        usage_summary.agent_config_id: usage_summary
+        for usage_summary in UsageRepository(session).usage_by_agent(
             since=since, until=until, period_days=period_days
         )
     }
 
+    # agente com consumo e sem run (ou o contrário) também entra na lista
     all_ids = runs_by_id.keys() | usage_by_id.keys()
     names = ConfigRepository(session).names_by_ids(list(all_ids))
 
-    def _run_count(i: UUID) -> int:
-        return -(runs_by_id.get(i, AgentRunSummary(i, 0, 0)).total_runs)
+    def _run_count(config_id: UUID) -> int:
+        """Chave de ordenação: negativo para o que mais rodou vir primeiro."""
+        return -(runs_by_id.get(config_id, AgentRunSummary(config_id, 0, 0)).total_runs)
 
     items = []
     for agent_id in sorted(all_ids, key=_run_count):
@@ -202,13 +211,14 @@ def get_timeseries(
     end: date | None = Query(default=None),  # noqa: B008
     agent_id: UUID | None = Query(default=None),  # noqa: B008
 ) -> list[DailyMetricsPoint]:
+    """Série diária da instância ou de um agente, com no máximo um ano de dias."""
     since, until, _ = _resolve_range(period, start, end)
-    last = (until or datetime.now(UTC)).date()
-    if (last - since.date()).days > MAX_SERIES_DAYS:
+    last_day = (until or datetime.now(UTC)).date()
+    if (last_day - since.date()).days > MAX_SERIES_DAYS:
         raise HTTPException(status_code=422, detail=f"Série limitada a {MAX_SERIES_DAYS} dias")
     runs = RunRepository(session).daily(since=since, until=until, config_id=agent_id)
     usage = UsageRepository(session).daily(since=since, until=until, agent_config_id=agent_id)
-    return build_series(since.date(), last, runs, usage)
+    return build_series(since.date(), last_day, runs, usage)
 
 
 class ReconciliationRow(BaseModel):
@@ -241,5 +251,8 @@ def get_reconciliation(
     return Reconciliation(
         providers=sorted(reconciliation.configured()),
         alert_percent=reconciliation.alert_percent(),
-        rows=[ReconciliationRow(**r) for r in reconciliation.report(session, days, today)],
+        rows=[
+            ReconciliationRow(**report_row)
+            for report_row in reconciliation.report(session, days, today)
+        ],
     )

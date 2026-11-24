@@ -46,28 +46,30 @@ def to_response(u: User) -> UserResponse:
 
 
 def _actor(request: Request) -> str | None:
+    """Id de quem fez a requisição, ou None sem usuário no token."""
     user_id = getattr(request.state, "user_id", None)
     return str(user_id) if user_id else None
 
 
-def _cut(request: Request, user: User, at: datetime | None) -> None:
+def _cut(request: Request, user: User, cutoff: datetime | None) -> None:
+    """Recusa os tokens do usuário emitidos antes de `cutoff`."""
     # vale já neste processo; os outros workers pegam no próximo refresh (30 s)
-    revoked = getattr(request.app.state, "revoked_tokens", None)
-    if at is not None and revoked is not None:
-        revoked.cut_now(str(user.id), at.timestamp())
+    revoked_tokens = getattr(request.app.state, "revoked_tokens", None)
+    if cutoff is not None and revoked_tokens is not None:
+        revoked_tokens.cut_now(str(user.id), cutoff.timestamp())
 
 
 @me_router.get("", response_model=MeResponse)
 def me(request: Request, session: SessionDep) -> MeResponse:
     """Quem está logado. Token de integração não tem usuário: volta só o sub."""
-    sub = _actor(request) or ""
+    subject = _actor(request) or ""
     try:
-        user = UserRepository(session).get(UUID(sub))
+        user = UserRepository(session).get(UUID(subject))
     except ValueError:
         user = None
-    scopes = [str(s) for s in getattr(request.state, "scopes", None) or []]
+    scopes = [str(scope) for scope in getattr(request.state, "scopes", None) or []]
     if user is None:
-        return MeResponse(id=sub, email=None, role=None, scopes=scopes)
+        return MeResponse(id=subject, email=None, role=None, scopes=scopes)
     return MeResponse(id=str(user.id), email=user.email, role=user.role, scopes=scopes)
 
 
@@ -76,14 +78,15 @@ def change_own_password(
     body: ChangePasswordInput, session: SessionDep, request: Request
 ) -> TokenResponse:
     """Troca pela própria pessoa. Corta as outras sessões e devolve o token novo."""
-    sub = _actor(request) or ""
+    subject = _actor(request) or ""
+    # token de integração tem sujeito `integration:<id>`, que não é UUID
     try:
-        user_id = UUID(sub)
+        user_id = UUID(subject)
     except ValueError as exc:
         raise HTTPException(status_code=403, detail="Só usuário do painel troca senha") from exc
-    request.app.state.rate_limiter.check(f"password-change:{sub}", limit=5)
+    request.app.state.rate_limiter.check(f"password-change:{subject}", limit=5)
     try:
-        user, cut = UserService(UserRepository(session)).change_own_password(
+        user, sessions_cutoff = UserService(UserRepository(session)).change_own_password(
             user_id, body.current_password, body.new_password
         )
     except LookupError as exc:
@@ -93,22 +96,23 @@ def change_own_password(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     # o corte vale até o fim do segundo; o token novo sai no mesmo segundo
-    cut = cut.replace(microsecond=0)
-    user.tokens_valid_after = cut
+    sessions_cutoff = sessions_cutoff.replace(microsecond=0)
+    user.tokens_valid_after = sessions_cutoff
     role = user.role
     session.commit()
-    _cut(request, user, cut)
-    logger.info("senha trocada pelo usuário", extra={"user_id": sub})
-    return TokenResponse(access_token=issue_token(sub, ROLE_SCOPES[role]))
+    _cut(request, user, sessions_cutoff)
+    logger.info("senha trocada pelo usuário", extra={"user_id": subject})
+    return TokenResponse(access_token=issue_token(subject, ROLE_SCOPES[role]))
 
 
 @router.get("", response_model=list[UserResponse])
 def list_users(session: SessionDep) -> list[UserResponse]:
-    return [to_response(u) for u in UserRepository(session).list_all()]
+    return [to_response(user) for user in UserRepository(session).list_all()]
 
 
 @router.post("", response_model=UserResponse, status_code=201)
 def create_user(body: CreateUserInput, session: SessionDep, request: Request) -> UserResponse:
+    """Cria usuário com senha provisória, que precisa ser trocada no primeiro acesso."""
     try:
         user = UserService(UserRepository(session)).create_user(
             email=body.email, password=body.password, role=body.role, must_change=True
@@ -128,10 +132,11 @@ def create_user(body: CreateUserInput, session: SessionDep, request: Request) ->
 def update_user(
     user_id: UUID, body: UpdateUserInput, session: SessionDep, request: Request
 ) -> UserResponse:
+    """Troca papel ou ativa e desativa; a mudança corta as sessões abertas do usuário."""
     previous = UserRepository(session).get(user_id)
     before = {"role": previous.role, "is_active": previous.is_active} if previous else None
     try:
-        user, cut = UserService(UserRepository(session)).update(
+        user, sessions_cutoff = UserService(UserRepository(session)).update(
             user_id, role=body.role, is_active=body.is_active
         )
     except LookupError as exc:
@@ -140,7 +145,7 @@ def update_user(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     session.commit()
     note(request, before=before, after={"role": user.role, "is_active": user.is_active})
-    _cut(request, user, cut)
+    _cut(request, user, sessions_cutoff)
     logger.info(
         "usuário alterado",
         extra={
@@ -157,18 +162,22 @@ def update_user(
 def reset_password(
     user_id: UUID, body: ResetPasswordInput, session: SessionDep, request: Request
 ) -> UserResponse:
+    """Owner define senha nova para o usuário e corta as sessões abertas dele."""
     try:
-        user, cut = UserService(UserRepository(session)).reset_password(user_id, body.password)
+        user, sessions_cutoff = UserService(UserRepository(session)).reset_password(
+            user_id, body.password
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     session.commit()
-    _cut(request, user, cut)
+    _cut(request, user, sessions_cutoff)
     logger.info("senha redefinida", extra={"user_id": str(user.id), "by": _actor(request)})
     return to_response(user)
 
 
 @router.delete("/{user_id}", status_code=204)
 def delete_user(user_id: UUID, session: SessionDep, request: Request) -> Response:
+    """Remove o usuário; o serviço recusa apagar a si mesmo e o último owner."""
     try:
         UserService(UserRepository(session)).delete(user_id, actor_id=_actor(request))
     except LookupError as exc:

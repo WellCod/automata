@@ -6,7 +6,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Channels */
+    /**
+     * Channels
+     * @description Canais disponíveis na instância: e-mail só aparece com SMTP configurado.
+     */
     get: operations["channels_api_v1_alert_destinations_channels_get"];
     put?: never;
     post?: never;
@@ -82,7 +85,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Pending */
+    /**
+     * List Pending
+     * @description Runs pausados à espera de decisão humana, com as tools e etapas pendentes.
+     */
     get: operations["list_pending_api_v1_approvals_get"];
     put?: never;
     post?: never;
@@ -99,7 +105,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Events */
+    /**
+     * List Events
+     * @description Página da trilha, mais recente primeiro, com quem fez e configs e versões por nome.
+     */
     get: operations["list_events_api_v1_audit_get"];
     put?: never;
     post?: never;
@@ -138,7 +147,10 @@ export interface paths {
     };
     /** Read Budget */
     get: operations["read_budget_api_v1_configs__config_id__budget_get"];
-    /** Update Budget */
+    /**
+     * Update Budget
+     * @description Troca o orçamento do config, com o antes e o depois na trilha de auditoria.
+     */
     put: operations["update_budget_api_v1_configs__config_id__budget_put"];
     post?: never;
     delete?: never;
@@ -157,9 +169,15 @@ export interface paths {
     /** Get Canary */
     get: operations["get_canary_api_v1_configs__config_id__canary_get"];
     put?: never;
-    /** Start Canary */
+    /**
+     * Start Canary
+     * @description Liga o canário com uma versão publicada ou com o rascunho publicado na hora.
+     */
     post: operations["start_canary_api_v1_configs__config_id__canary_post"];
-    /** Stop */
+    /**
+     * Stop
+     * @description Desliga o canário; a vigente volta a receber todas as conversas.
+     */
     delete: operations["stop_api_v1_configs__config_id__canary_delete"];
     options?: never;
     head?: never;
@@ -176,7 +194,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Promote */
+    /**
+     * Promote
+     * @description Torna o canário a versão vigente e desliga o canário.
+     */
     post: operations["promote_api_v1_configs__config_id__canary_promote_post"];
     delete?: never;
     options?: never;
@@ -265,7 +286,10 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /** Put Budget */
+    /**
+     * Put Budget
+     * @description Cria ou troca o orçamento do usuário ou token, com o antes e o depois na trilha.
+     */
     put: operations["put_budget_api_v1_caller_budgets__subject__put"];
     post?: never;
     /** Delete Budget */
@@ -282,10 +306,16 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Configs */
+    /**
+     * List Configs
+     * @description Lista paginada de configs com busca por nome ou id, status e tipo.
+     */
     get: operations["list_configs_api_v1_configs_get"];
     put?: never;
-    /** Create Config */
+    /**
+     * Create Config
+     * @description Cria o config vazio, respeitando o limite de plano da instância.
+     */
     post: operations["create_config_api_v1_configs_post"];
     delete?: never;
     options?: never;
@@ -300,7 +330,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get Config */
+    /**
+     * Get Config
+     * @description Config com a versão vigente, o rascunho e o payload que o editor mostra.
+     */
     get: operations["get_config_api_v1_configs__config_id__get"];
     put?: never;
     post?: never;
@@ -317,7 +350,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get Effective Guardrails */
+    /**
+     * Get Effective Guardrails
+     * @description Guardrails próprios da versão, o piso da instância e a combinação que vale no run.
+     */
     get: operations["get_effective_guardrails_api_v1_configs__config_id__guardrails_effective_get"];
     put?: never;
     post?: never;
@@ -354,7 +390,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Versions */
+    /**
+     * List Versions
+     * @description Todas as versões do config com o payload de cada uma, para o diff.
+     */
     get: operations["list_versions_api_v1_configs__config_id__versions_get"];
     put?: never;
     post?: never;
@@ -373,7 +412,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Publish Draft */
+    /**
+     * Publish Draft
+     * @description Publica o rascunho como vigente; com o gate ligado, só com a suíte verde.
+     */
     post: operations["publish_draft_api_v1_configs__config_id__publish_post"];
     delete?: never;
     options?: never;
@@ -390,7 +432,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Rollback */
+    /**
+     * Rollback
+     * @description Volta a vigente para uma versão já publicada, sem passar pelo gate da suíte.
+     */
     post: operations["rollback_api_v1_configs__config_id__rollback_post"];
     delete?: never;
     options?: never;
@@ -406,7 +451,10 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /** Save Draft */
+    /**
+     * Save Draft
+     * @description Grava o rascunho; o payload é validado contra modelo, tools e bases na escrita.
+     */
     put: operations["save_draft_api_v1_configs__config_id__draft_put"];
     post?: never;
     delete?: never;
@@ -422,7 +470,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Conversations */
+    /**
+     * List Conversations
+     * @description Conversas mais recentes primeiro, com filtro por status e canal.
+     */
     get: operations["list_conversations_api_v1_conversations_get"];
     put?: never;
     post?: never;
@@ -458,7 +509,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Take */
+    /**
+     * Take
+     * @description O atendente assume: o agente para de responder até a conversa ser devolvida.
+     */
     post: operations["take_api_v1_conversations__conversation_id__take_post"];
     delete?: never;
     options?: never;
@@ -495,7 +549,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Close */
+    /**
+     * Close
+     * @description Encerra a conversa, registrando o status anterior na trilha.
+     */
     post: operations["close_api_v1_conversations__conversation_id__close_post"];
     delete?: never;
     options?: never;
@@ -512,7 +569,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Reply */
+    /**
+     * Reply
+     * @description Resposta do atendente ao cliente pelo canal; só com a conversa assumida.
+     */
     post: operations["reply_api_v1_conversations__conversation_id__reply_post"];
     delete?: never;
     options?: never;
@@ -527,7 +587,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get Subject */
+    /**
+     * Get Subject
+     * @description Quanto de cada tipo de dado existe do titular, sem o conteúdo.
+     */
     get: operations["get_subject_api_v1_data_subjects__user_id__get"];
     put?: never;
     post?: never;
@@ -578,7 +641,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Requests */
+    /**
+     * List Requests
+     * @description Últimos 100 pedidos, depois de apagar os arquivos de exportação vencidos.
+     */
     get: operations["list_requests_api_v1_data_subject_requests_get"];
     put?: never;
     post?: never;
@@ -595,7 +661,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Download */
+    /**
+     * Download
+     * @description Baixa a exportação; pedido de outro autor responde como inexistente.
+     */
     get: operations["download_api_v1_data_subject_requests__request_id__download_get"];
     put?: never;
     post?: never;
@@ -680,7 +749,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** My Download */
+    /**
+     * My Download
+     * @description Baixa a exportação que o próprio usuário pediu; a de outro responde como inexistente.
+     */
     get: operations["my_download_api_v1_me_data_requests__request_id__download_get"];
     put?: never;
     post?: never;
@@ -697,9 +769,15 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get Floor */
+    /**
+     * Get Floor
+     * @description Piso atual; a tabela tem no máximo uma linha, sempre com id 1.
+     */
     get: operations["get_floor_api_v1_instance_guardrails_get"];
-    /** Put Floor */
+    /**
+     * Put Floor
+     * @description Grava ou tira o piso, com o antes e o depois na trilha de auditoria.
+     */
     put: operations["put_floor_api_v1_instance_guardrails_put"];
     post?: never;
     delete?: never;
@@ -715,7 +793,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get Queue */
+    /**
+     * Get Queue
+     * @description Contagem por status e os jobs recentes da fila durável do Agno.
+     */
     get: operations["get_queue_api_v1_queue_get"];
     put?: never;
     post?: never;
@@ -734,7 +815,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Requeue Job */
+    /**
+     * Requeue Job
+     * @description Põe de volta na fila um job que falhou ou foi cancelado.
+     */
     post: operations["requeue_job_api_v1_queue_jobs__job_id__requeue_post"];
     delete?: never;
     options?: never;
@@ -752,7 +836,10 @@ export interface paths {
     /** List Cases */
     get: operations["list_cases_api_v1_configs__config_id__eval_cases_get"];
     put?: never;
-    /** Create Case */
+    /**
+     * Create Case
+     * @description Cria o caso no fim da suíte, respeitando o teto de casos e o nome único.
+     */
     post: operations["create_case_api_v1_configs__config_id__eval_cases_post"];
     delete?: never;
     options?: never;
@@ -871,7 +958,10 @@ export interface paths {
     /** List Runs */
     get: operations["list_runs_api_v1_configs__config_id__eval_runs_get"];
     put?: never;
-    /** Start Run */
+    /**
+     * Start Run
+     * @description Enfileira a execução da suíte e responde 202; os casos rodam em background.
+     */
     post: operations["start_run_api_v1_configs__config_id__eval_runs_post"];
     delete?: never;
     options?: never;
@@ -928,7 +1018,10 @@ export interface paths {
      * @description `null` quando a suíte não tem agendamento: é o estado normal, não um erro.
      */
     get: operations["read_schedule_api_v1_configs__config_id__eval_schedule_get"];
-    /** Save Schedule */
+    /**
+     * Save Schedule
+     * @description Cria ou troca o agendamento da suíte e calcula o próximo horário.
+     */
     put: operations["save_schedule_api_v1_configs__config_id__eval_schedule_put"];
     post?: never;
     /** Delete Schedule */
@@ -952,7 +1045,10 @@ export interface paths {
      */
     put: operations["save_webhook_api_v1_configs__config_id__eval_schedule_webhook_put"];
     post?: never;
-    /** Delete Webhook */
+    /**
+     * Delete Webhook
+     * @description Tira o webhook do agendamento; o agendamento continua.
+     */
     delete: operations["delete_webhook_api_v1_configs__config_id__eval_schedule_webhook_delete"];
     options?: never;
     head?: never;
@@ -1027,7 +1123,10 @@ export interface paths {
     /** List Integrations */
     get: operations["list_integrations_api_v1_integrations_get"];
     put?: never;
-    /** Issue */
+    /**
+     * Issue
+     * @description Emite o token com os scopes dos agentes, times e suítes escolhidos; mostrado uma vez.
+     */
     post: operations["issue_api_v1_integrations_post"];
     delete?: never;
     options?: never;
@@ -1045,7 +1144,10 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Revoke */
+    /**
+     * Revoke
+     * @description Revoga o token pelo jti; revogar de novo não muda nada.
+     */
     delete: operations["revoke_api_v1_integrations__integration_id__delete"];
     options?: never;
     head?: never;
@@ -1059,7 +1161,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Rotation Status */
+    /**
+     * Rotation Status
+     * @description Quantos tokens e segredos ainda dependem das chaves anteriores.
+     */
     get: operations["rotation_status_api_v1_key_rotation_get"];
     put?: never;
     post?: never;
@@ -1076,7 +1181,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Embedders */
+    /**
+     * List Embedders
+     * @description Embedders conhecidos, se têm chave na instância e qual é o padrão.
+     */
     get: operations["list_embedders_api_v1_knowledge_bases_embedders_get"];
     put?: never;
     post?: never;
@@ -1113,7 +1221,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Cross Encoders */
+    /**
+     * List Cross Encoders
+     * @description Cross-encoders por provedor, com os modelos e o preço de cada busca.
+     */
     get: operations["list_cross_encoders_api_v1_knowledge_bases_cross_encoders_get"];
     put?: never;
     post?: never;
@@ -1133,7 +1244,10 @@ export interface paths {
     /** List Bases */
     get: operations["list_bases_api_v1_knowledge_bases_get"];
     put?: never;
-    /** Create Base */
+    /**
+     * Create Base
+     * @description Cria a base com o embedder escolhido, que fica fixo: trocar exigiria reindexar.
+     */
     post: operations["create_base_api_v1_knowledge_bases_post"];
     delete?: never;
     options?: never;
@@ -1150,10 +1264,16 @@ export interface paths {
     };
     /** Get Base */
     get: operations["get_base_api_v1_knowledge_bases__base_id__get"];
-    /** Update Base */
+    /**
+     * Update Base
+     * @description Altera nome, descrição, corte e estratégia; o corte novo vale para o que entrar depois.
+     */
     put: operations["update_base_api_v1_knowledge_bases__base_id__put"];
     post?: never;
-    /** Delete Base */
+    /**
+     * Delete Base
+     * @description Remove a base; recusa com 409 enquanto algum agente ou time usa ela.
+     */
     delete: operations["delete_base_api_v1_knowledge_bases__base_id__delete"];
     options?: never;
     head?: never;
@@ -1250,7 +1370,10 @@ export interface paths {
     /** List Connectors */
     get: operations["list_connectors_api_v1_knowledge_bases__base_id__connectors_get"];
     put?: never;
-    /** Create Connector */
+    /**
+     * Create Connector
+     * @description Cadastra o conector com a credencial cifrada e o próximo horário de sincronização.
+     */
     post: operations["create_connector_api_v1_knowledge_bases__base_id__connectors_post"];
     delete?: never;
     options?: never;
@@ -1313,7 +1436,10 @@ export interface paths {
      * @description Gera o segredo do webhook da origem; trocar invalida o anterior (ADR-0039).
      */
     post: operations["create_webhook_api_v1_knowledge_bases__base_id__connectors__connector_id__webhook_post"];
-    /** Delete Webhook */
+    /**
+     * Delete Webhook
+     * @description Desliga o webhook da origem: a rota pública passa a responder 404.
+     */
     delete: operations["delete_webhook_api_v1_knowledge_bases__base_id__connectors__connector_id__webhook_delete"];
     options?: never;
     head?: never;
@@ -1329,7 +1455,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Sync Connector */
+    /**
+     * Sync Connector
+     * @description Marca o conector como em sincronização e dispara a sincronização em background.
+     */
     post: operations["sync_connector_api_v1_knowledge_bases__base_id__connectors__connector_id__sync_post"];
     delete?: never;
     options?: never;
@@ -1365,7 +1494,10 @@ export interface paths {
     get: operations["get_content_api_v1_knowledge_bases__base_id__contents__content_id__get"];
     put?: never;
     post?: never;
-    /** Delete Content */
+    /**
+     * Delete Content
+     * @description Apaga os trechos do vetor e depois o registro do conteúdo.
+     */
     delete: operations["delete_content_api_v1_knowledge_bases__base_id__contents__content_id__delete"];
     options?: never;
     head?: never;
@@ -1381,7 +1513,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Upload File */
+    /**
+     * Upload File
+     * @description Recebe o arquivo, guarda o original para reprocessar e manda para a ingestão.
+     */
     post: operations["upload_file_api_v1_knowledge_bases__base_id__contents_file_post"];
     delete?: never;
     options?: never;
@@ -1398,7 +1533,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Add Url */
+    /**
+     * Add Url
+     * @description Cadastra uma URL para baixar e indexar, com reindexação opcional no intervalo.
+     */
     post: operations["add_url_api_v1_knowledge_bases__base_id__contents_url_post"];
     delete?: never;
     options?: never;
@@ -1415,7 +1553,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Add Text */
+    /**
+     * Add Text
+     * @description Indexa um texto colado, guardando o original para reprocessar.
+     */
     post: operations["add_text_api_v1_knowledge_bases__base_id__contents_text_post"];
     delete?: never;
     options?: never;
@@ -1510,7 +1651,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Capabilities */
+    /**
+     * List Capabilities
+     * @description O que cada modelo aceita; muda só com deploy, por isso o cache longo e público.
+     */
     get: operations["list_capabilities_api_v1_models_capabilities_get"];
     put?: never;
     post?: never;
@@ -1624,7 +1768,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Agent Memories */
+    /**
+     * List Agent Memories
+     * @description Memórias que o agente ou time guardou, de todos os usuários ou de um só.
+     */
     get: operations["list_agent_memories_api_v1_configs__config_id__memories_get"];
     put?: never;
     post?: never;
@@ -1648,7 +1795,10 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Delete Agent Memory */
+    /**
+     * Delete Agent Memory
+     * @description Apaga uma memória, só se ela pertence a este agente ou time.
+     */
     delete: operations["delete_agent_memory_api_v1_configs__config_id__memories__memory_id__delete"];
     options?: never;
     head?: never;
@@ -1662,11 +1812,17 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List My Memories */
+    /**
+     * List My Memories
+     * @description Memórias do próprio usuário em todos os agentes e times, com o nome de cada um.
+     */
     get: operations["list_my_memories_api_v1_me_memories_get"];
     put?: never;
     post?: never;
-    /** Forget Me */
+    /**
+     * Forget Me
+     * @description Apaga todas as memórias do próprio usuário.
+     */
     delete: operations["forget_me_api_v1_me_memories_delete"];
     options?: never;
     head?: never;
@@ -1683,7 +1839,10 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Delete My Memory */
+    /**
+     * Delete My Memory
+     * @description Apaga uma memória do próprio usuário; a de outro responde como inexistente.
+     */
     delete: operations["delete_my_memory_api_v1_me_memories__memory_id__delete"];
     options?: never;
     head?: never;
@@ -1697,7 +1856,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get Summary */
+    /**
+     * Get Summary
+     * @description Totais da instância no período: runs, latência, bloqueios e custo por origem.
+     */
     get: operations["get_summary_api_v1_metrics_summary_get"];
     put?: never;
     post?: never;
@@ -1714,7 +1876,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get By Agent */
+    /**
+     * Get By Agent
+     * @description Runs e custo por agente no período, do que mais rodou para o que menos rodou.
+     */
     get: operations["get_by_agent_api_v1_metrics_by_agent_get"];
     put?: never;
     post?: never;
@@ -1731,7 +1896,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get Timeseries */
+    /**
+     * Get Timeseries
+     * @description Série diária da instância ou de um agente, com no máximo um ano de dias.
+     */
     get: operations["get_timeseries_api_v1_metrics_timeseries_get"];
     put?: never;
     post?: never;
@@ -1768,7 +1936,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get Metrics */
+    /**
+     * Get Metrics
+     * @description Latência, taxa de erro e bloqueios por regra do agente no período.
+     */
     get: operations["get_metrics_api_v1_configs__config_id__metrics_get"];
     put?: never;
     post?: never;
@@ -1785,7 +1956,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Runs */
+    /**
+     * List Runs
+     * @description Execuções paginadas do config; quem não é owner vê o usuário mascarado.
+     */
     get: operations["list_runs_api_v1_configs__config_id__runs_get"];
     put?: never;
     post?: never;
@@ -1821,7 +1995,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Create From Template */
+    /**
+     * Create From Template
+     * @description Cria o agente com o exemplo como rascunho; publicar fica com quem testa.
+     */
     post: operations["create_from_template_api_v1_templates__key__post"];
     delete?: never;
     options?: never;
@@ -1836,7 +2013,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get Run Trace */
+    /**
+     * Get Run Trace
+     * @description Árvore de execução do run para o painel; 404 com o tracing desligado.
+     */
     get: operations["get_run_trace_api_v1_runs__run_id__trace_get"];
     put?: never;
     post?: never;
@@ -1876,7 +2056,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get Rollup */
+    /**
+     * Get Rollup
+     * @description Consumo do mês por agente, com o embedding das buscas em base à parte.
+     */
     get: operations["get_rollup_api_v1_usage_rollup_get"];
     put?: never;
     post?: never;
@@ -1916,7 +2099,10 @@ export interface paths {
     /** List Users */
     get: operations["list_users_api_v1_users_get"];
     put?: never;
-    /** Create User */
+    /**
+     * Create User
+     * @description Cria usuário com senha provisória, que precisa ser trocada no primeiro acesso.
+     */
     post: operations["create_user_api_v1_users_post"];
     delete?: never;
     options?: never;
@@ -1934,11 +2120,17 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Delete User */
+    /**
+     * Delete User
+     * @description Remove o usuário; o serviço recusa apagar a si mesmo e o último owner.
+     */
     delete: operations["delete_user_api_v1_users__user_id__delete"];
     options?: never;
     head?: never;
-    /** Update User */
+    /**
+     * Update User
+     * @description Troca papel ou ativa e desativa; a mudança corta as sessões abertas do usuário.
+     */
     patch: operations["update_user_api_v1_users__user_id__patch"];
     trace?: never;
   };
@@ -1951,7 +2143,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Reset Password */
+    /**
+     * Reset Password
+     * @description Owner define senha nova para o usuário e corta as sessões abertas dele.
+     */
     post: operations["reset_password_api_v1_users__user_id__password_post"];
     delete?: never;
     options?: never;
@@ -2008,7 +2203,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Login */
+    /**
+     * Login
+     * @description Login por e-mail e senha, com limite por IP e por e-mail e registro na trilha.
+     */
     post: operations["login_api_v1_auth_login_post"];
     delete?: never;
     options?: never;
@@ -2045,7 +2243,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Reset Password With Token */
+    /**
+     * Reset Password With Token
+     * @description Troca a senha pelo link do e-mail e corta as sessões abertas antes da troca.
+     */
     post: operations["reset_password_with_token_api_v1_auth_password_reset_post"];
     delete?: never;
     options?: never;
@@ -2082,7 +2283,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Create User */
+    /**
+     * Create User
+     * @description Cria usuário com senha provisória, que precisa ser trocada no primeiro acesso.
+     */
     post: operations["create_user_api_v1_auth_users_post"];
     delete?: never;
     options?: never;
@@ -2119,7 +2323,10 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Oidc Start */
+    /**
+     * Oidc Start
+     * @description Devolve a URL do provedor, com o state preso ao segredo do navegador.
+     */
     post: operations["oidc_start_api_v1_auth_oidc_start_post"];
     delete?: never;
     options?: never;
@@ -2136,8 +2343,31 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Oidc Callback */
+    /**
+     * Oidc Callback
+     * @description Fecha o login por SSO: troca o código, confere papel e domínio e emite o token.
+     */
     post: operations["oidc_callback_api_v1_auth_oidc_callback_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/instance": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Instance Info
+     * @description Nome, logo e cotação da instância; logo fora de data URI cai no padrão.
+     */
+    get: operations["instance_info_api_v1_auth_instance_get"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -3925,6 +4155,18 @@ export interface components {
       updated_by?: string | null;
       /** Updated At */
       updated_at?: string | null;
+    };
+    /**
+     * InstanceInfo
+     * @description Marca e moeda da instância, públicas para a tela de login (COM-12, UX-08).
+     */
+    InstanceInfo: {
+      /** App Name */
+      app_name: string;
+      /** App Logo */
+      app_logo: string | null;
+      /** Brl Per Usd */
+      brl_per_usd: number | null;
     };
     /** InstructionSections */
     InstructionSections: {
@@ -9960,6 +10202,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  instance_info_api_v1_auth_instance_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["InstanceInfo"];
         };
       };
     };
