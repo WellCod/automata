@@ -162,23 +162,23 @@ export function VersionsPanel({
   } = useQuery<AgentConfigVersionDetail[]>({
     queryKey: ["versions", agentId],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/configs/{config_id}/versions", {
+      const result = await client.GET("/api/v1/configs/{config_id}/versions", {
         params: { path: { config_id: agentId } },
       });
-      if (response.error) throw new Error("Falha ao carregar versões");
-      return response.data!;
+      if (result.error) throw new Error("Falha ao carregar versões");
+      return result.data!;
     },
   });
 
   const publishMutation = useMutation({
     mutationFn: async () => {
-      const response = await client.POST("/api/v1/configs/{config_id}/publish", {
+      const result = await client.POST("/api/v1/configs/{config_id}/publish", {
         params: { path: { config_id: agentId } },
       });
       // o 409 do gate explica por que não publicou
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Erro ao publicar. Tente novamente."));
-      return response.data!;
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Erro ao publicar. Tente novamente."));
+      return result.data!;
     },
     onError: (error) => toast.error(error.message),
     onSuccess: (version) => {
@@ -194,12 +194,12 @@ export function VersionsPanel({
 
   const rollbackMutation = useMutation({
     mutationFn: async (versionId: string) => {
-      const response = await client.POST("/api/v1/configs/{config_id}/rollback", {
+      const result = await client.POST("/api/v1/configs/{config_id}/rollback", {
         params: { path: { config_id: agentId } },
         body: { version_id: versionId },
       });
-      if (response.error) throw new Error("Falha ao reverter");
-      return response.data!;
+      if (result.error) throw new Error("Falha ao reverter");
+      return result.data!;
     },
     onError: () => toast.error("Erro ao reverter. Tente novamente."),
     onSuccess: (version) => {

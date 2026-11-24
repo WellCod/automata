@@ -67,11 +67,11 @@ export function MetricsPanel({ agentId }: Props) {
   const { data, isPending, isError } = useQuery<AgentMetricsResponse>({
     queryKey: ["metrics", agentId, period],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/configs/{config_id}/metrics", {
+      const result = await client.GET("/api/v1/configs/{config_id}/metrics", {
         params: { path: { config_id: agentId }, query: { period } },
       });
-      if (response.error) throw new Error("Falha ao carregar métricas");
-      return response.data!;
+      if (result.error) throw new Error("Falha ao carregar métricas");
+      return result.data!;
     },
   });
 

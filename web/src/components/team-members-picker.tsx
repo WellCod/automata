@@ -20,11 +20,11 @@ export function usePublishedAgents() {
   return useQuery({
     queryKey: ["configs", "published-agents"],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/configs", {
+      const result = await client.GET("/api/v1/configs", {
         params: { query: { kind: "agent", status: "published", page_size: 100 } },
       });
-      if (response.error) throw new Error("Falha ao carregar agentes");
-      return response.data!.items;
+      if (result.error) throw new Error("Falha ao carregar agentes");
+      return result.data!.items;
     },
   });
 }
@@ -43,11 +43,11 @@ function PinnedVersion({
   const { data: versions } = useQuery({
     queryKey: ["versions", agentId],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/configs/{config_id}/versions", {
+      const result = await client.GET("/api/v1/configs/{config_id}/versions", {
         params: { path: { config_id: agentId } },
       });
-      if (response.error) throw new Error("Falha ao carregar versões");
-      return response.data!;
+      if (result.error) throw new Error("Falha ao carregar versões");
+      return result.data!;
     },
   });
   const published = (versions ?? []).filter((version) => version.status === "published");

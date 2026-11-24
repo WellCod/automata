@@ -31,11 +31,11 @@ export function CostPanel({ agentId }: Props) {
   const { data, isPending, isError } = useQuery<RollupItem | null>({
     queryKey: ["usage:rollup", agentId, period],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/usage/rollup", {
+      const result = await client.GET("/api/v1/usage/rollup", {
         params: { query: { agent_id: agentId, period } },
       });
-      if (response.error) throw new Error("Falha ao carregar uso");
-      return response.data?.[0] ?? null;
+      if (result.error) throw new Error("Falha ao carregar uso");
+      return result.data?.[0] ?? null;
     },
   });
 

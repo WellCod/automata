@@ -13,17 +13,17 @@ export function FirstAgent({ onNew }: { onNew: () => void }) {
   const { data: templates } = useQuery({
     queryKey: ["templates"],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/templates");
-      if (response.error) return [];
-      return response.data!;
+      const result = await client.GET("/api/v1/templates");
+      if (result.error) return [];
+      return result.data!;
     },
   });
   const create = useMutation({
     mutationFn: async (key: string) => {
-      const response = await client.POST("/api/v1/templates/{key}", { params: { path: { key } } });
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Falha ao criar a partir do exemplo"));
-      return response.data!;
+      const result = await client.POST("/api/v1/templates/{key}", { params: { path: { key } } });
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao criar a partir do exemplo"));
+      return result.data!;
     },
     onSuccess: (data) => router.push(`/agents/${data.id}`),
     onError: (e) => toast.error(e.message),

@@ -20,10 +20,10 @@ export function useInstanceGuardrails() {
   return useQuery({
     queryKey: KEY,
     queryFn: async () => {
-      const response = await client.GET("/api/v1/instance-guardrails");
-      if (response.error)
+      const result = await client.GET("/api/v1/instance-guardrails");
+      if (result.error)
         throw new Error("Falha ao carregar o piso de guardrails. Apenas owners têm acesso.");
-      return response.data;
+      return result.data;
     },
   });
 }
@@ -42,10 +42,9 @@ function FloorForm({
   const problems = guardrailProblems(withDefaults(value));
   const put = useMutation({
     mutationFn: async (settings: Guardrails | null) => {
-      const response = await client.PUT("/api/v1/instance-guardrails", { body: { settings } });
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Falha ao salvar o piso"));
-      return response.data;
+      const result = await client.PUT("/api/v1/instance-guardrails", { body: { settings } });
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao salvar o piso"));
+      return result.data;
     },
     onSuccess: (data) => {
       toast.success(data.settings ? "Piso salvo. Vale no próximo run." : "Piso removido.");

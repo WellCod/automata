@@ -140,12 +140,12 @@ export function ChunkPreviewPanel({
   const [text, setText] = useState("");
   const preview = useMutation({
     mutationFn: async (): Promise<ChunkPreview> => {
-      const response = await client.POST("/api/v1/knowledge-bases/{base_id}/chunk-preview", {
+      const result = await client.POST("/api/v1/knowledge-bases/{base_id}/chunk-preview", {
         params: { path: { base_id: baseId } },
         body: { text, chunk_size: chunkSize, chunking },
       });
-      if (response.error) throw new Error(apiErrorMessage(response.error, "Falha na prévia"));
-      return response.data;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha na prévia"));
+      return result.data;
     },
   });
   const blocked = overlapProblem(chunkSize, chunking) !== null;
@@ -208,11 +208,11 @@ export function ReprocessBase({ baseId, dirty }: { baseId: string; dirty: boolea
   const [confirm, setConfirm] = useState(false);
   const run = useMutation({
     mutationFn: async (): Promise<ReprocessResult> => {
-      const response = await client.POST("/api/v1/knowledge-bases/{base_id}/reprocess", {
+      const result = await client.POST("/api/v1/knowledge-bases/{base_id}/reprocess", {
         params: { path: { base_id: baseId } },
       });
-      if (response.error) throw new Error(apiErrorMessage(response.error, "Falha ao reprocessar"));
-      return response.data;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao reprocessar"));
+      return result.data;
     },
     onSuccess: (result) => {
       setConfirm(false);

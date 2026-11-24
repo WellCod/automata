@@ -46,7 +46,7 @@ export function AuditLog({ configId }: Props) {
     queryKey: ["audit", configId ?? null, action, period, actor?.id ?? null],
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }): Promise<AuditPage> => {
-      const response = await client.GET("/api/v1/audit", {
+      const result = await client.GET("/api/v1/audit", {
         params: {
           query: {
             config_id: configId,
@@ -58,8 +58,8 @@ export function AuditLog({ configId }: Props) {
           },
         },
       });
-      if (response.error) throw new Error("Falha ao carregar a trilha. Apenas owners têm acesso.");
-      return response.data!;
+      if (result.error) throw new Error("Falha ao carregar a trilha. Apenas owners têm acesso.");
+      return result.data!;
     },
     getNextPageParam: (lastPage) => lastPage.next_cursor ?? null,
   });

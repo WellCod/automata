@@ -94,7 +94,7 @@ function ConnectorForm({
         secret: typed || !initial ? secret : null,
         sync_every_hours: hours ? Number(hours) : null,
       };
-      const response = initial
+      const result = initial
         ? await client.PUT("/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}", {
             params: { path: { base_id: baseId, connector_id: initial.id } },
             body,
@@ -103,8 +103,8 @@ function ConnectorForm({
             params: { path: { base_id: baseId } },
             body,
           });
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Falha ao salvar o conector"));
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao salvar o conector"));
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["knowledge-bases", baseId, "connectors"] });
@@ -267,33 +267,33 @@ function ConnectorRow({
 
   const test = useMutation({
     mutationFn: async () => {
-      const response = await client.POST(
+      const result = await client.POST(
         "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/test",
         path,
       );
-      if (response.error) throw new Error(apiErrorMessage(response.error, "Falha ao testar"));
-      return response.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao testar"));
+      return result.data!;
     },
     onSuccess: setTested,
   });
   const sync = useMutation({
     mutationFn: async () => {
-      const response = await client.POST(
+      const result = await client.POST(
         "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/sync",
         path,
       );
-      if (response.error) throw new Error(apiErrorMessage(response.error, "Falha ao sincronizar"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao sincronizar"));
     },
     onSuccess: refresh,
     onError: (e) => toast.error(e.message),
   });
   const remove = useMutation({
     mutationFn: async () => {
-      const response = await client.DELETE(
+      const result = await client.DELETE(
         "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}",
         path,
       );
-      if (response.error) throw new Error(apiErrorMessage(response.error, "Falha ao remover"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao remover"));
     },
     onSuccess: () => {
       toast.success(`${connector.name} removido, com os documentos dele`);
@@ -304,13 +304,12 @@ function ConnectorRow({
 
   const createHook = useMutation({
     mutationFn: async () => {
-      const response = await client.POST(
+      const result = await client.POST(
         "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/webhook",
         path,
       );
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Falha ao gerar o webhook"));
-      return response.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao gerar o webhook"));
+      return result.data!;
     },
     onSuccess: (data) => {
       setHook(data);
@@ -320,12 +319,12 @@ function ConnectorRow({
   });
   const removeHook = useMutation({
     mutationFn: async () => {
-      const response = await client.DELETE(
+      const result = await client.DELETE(
         "/api/v1/knowledge-bases/{base_id}/connectors/{connector_id}/webhook",
         path,
       );
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Falha ao desligar o webhook"));
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao desligar o webhook"));
     },
     onSuccess: () => {
       setHook(null);

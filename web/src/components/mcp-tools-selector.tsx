@@ -22,9 +22,9 @@ export function useMcpServers() {
   return useQuery({
     queryKey: ["mcp-servers"],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/mcp-servers");
-      if (response.error) throw new Error("Falha ao carregar servidores MCP");
-      return response.data!;
+      const result = await client.GET("/api/v1/mcp-servers");
+      if (result.error) throw new Error("Falha ao carregar servidores MCP");
+      return result.data!;
     },
   });
 }

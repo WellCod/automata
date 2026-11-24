@@ -37,11 +37,11 @@ export function useCanary(configId: string, enabled = true) {
     queryKey: ["canary", configId],
     enabled,
     queryFn: async () => {
-      const response = await client.GET("/api/v1/configs/{config_id}/canary", {
+      const result = await client.GET("/api/v1/configs/{config_id}/canary", {
         params: { path: { config_id: configId } },
       });
-      if (response.error) throw new Error("Falha ao carregar o canário");
-      return response.data!;
+      if (result.error) throw new Error("Falha ao carregar o canário");
+      return result.data!;
     },
   });
 }
@@ -123,13 +123,12 @@ export function CanaryPanel({
 
   const start = useMutation({
     mutationFn: async () => {
-      const response = await client.POST("/api/v1/configs/{config_id}/canary", {
+      const result = await client.POST("/api/v1/configs/{config_id}/canary", {
         params: { path: { config_id: configId } },
         body: { percent, version_id: chosen === DRAFT ? null : chosen },
       });
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Erro ao ligar o canário."));
-      return response.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Erro ao ligar o canário."));
+      return result.data!;
     },
     onError: (e) => toast.error(e.message),
     onSuccess: (canary) => {
@@ -141,13 +140,13 @@ export function CanaryPanel({
 
   const change = useMutation({
     mutationFn: async (value: number) => {
-      const response = await client.PATCH("/api/v1/configs/{config_id}/canary", {
+      const result = await client.PATCH("/api/v1/configs/{config_id}/canary", {
         params: { path: { config_id: configId } },
         body: { percent: value },
       });
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Erro ao mudar o percentual."));
-      return response.data!;
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Erro ao mudar o percentual."));
+      return result.data!;
     },
     onError: (e) => toast.error(e.message),
     onSuccess: (canary) => {
@@ -159,7 +158,7 @@ export function CanaryPanel({
 
   const finish = useMutation({
     mutationFn: async (kind: "promote" | "stop") => {
-      const response =
+      const result =
         kind === "promote"
           ? await client.POST("/api/v1/configs/{config_id}/canary/promote", {
               params: { path: { config_id: configId } },
@@ -167,8 +166,8 @@ export function CanaryPanel({
           : await client.DELETE("/api/v1/configs/{config_id}/canary", {
               params: { path: { config_id: configId } },
             });
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Erro ao encerrar o canário."));
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Erro ao encerrar o canário."));
       return kind;
     },
     onError: (e) => toast.error(e.message),

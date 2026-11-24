@@ -23,9 +23,9 @@ export function useCallerBudgets() {
   return useQuery({
     queryKey: KEY,
     queryFn: async (): Promise<Record<string, CallerBudget>> => {
-      const response = await client.GET("/api/v1/caller-budgets");
-      if (response.error) throw new Error("Falha ao carregar os orçamentos");
-      return Object.fromEntries(response.data.map((budget) => [budget.subject, budget]));
+      const result = await client.GET("/api/v1/caller-budgets");
+      if (result.error) throw new Error("Falha ao carregar os orçamentos");
+      return Object.fromEntries(result.data.map((budget) => [budget.subject, budget]));
     },
   });
 }
@@ -49,12 +49,12 @@ export function CallerBudgetEditor({ subject, label }: { subject: string; label:
 
   const save = useMutation({
     mutationFn: async () => {
-      const response = await client.PUT("/api/v1/caller-budgets/{subject}", {
+      const result = await client.PUT("/api/v1/caller-budgets/{subject}", {
         params: { path: { subject } },
         body: { monthly_usd: Number(limit), warn_percent: warn, hard_stop: hardStop },
       });
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Falha ao salvar o orçamento"));
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao salvar o orçamento"));
     },
     onSuccess: () => {
       toast.success(`Orçamento de ${label} salvo`);
@@ -66,11 +66,11 @@ export function CallerBudgetEditor({ subject, label }: { subject: string; label:
 
   const remove = useMutation({
     mutationFn: async () => {
-      const response = await client.DELETE("/api/v1/caller-budgets/{subject}", {
+      const result = await client.DELETE("/api/v1/caller-budgets/{subject}", {
         params: { path: { subject } },
       });
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Falha ao remover o orçamento"));
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao remover o orçamento"));
     },
     onSuccess: () => {
       toast.success(`Orçamento de ${label} removido`);

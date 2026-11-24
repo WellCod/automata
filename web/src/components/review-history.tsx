@@ -54,12 +54,12 @@ export function ReviewHistory({ runId }: { runId: string }) {
   const { data } = useQuery({
     queryKey: ["run-reviews", runId],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/runs/{run_id}/reviews", {
+      const result = await client.GET("/api/v1/runs/{run_id}/reviews", {
         params: { path: { run_id: runId } },
       });
       // run de agente, ou de outro usuário: sem histórico para mostrar
-      if (response.error) return [];
-      return response.data ?? [];
+      if (result.error) return [];
+      return result.data ?? [];
     },
   });
   if (!data || data.length === 0) return null;

@@ -31,9 +31,9 @@ export function useCrossEncoders() {
   return useQuery({
     queryKey: ["knowledge-bases", "cross-encoders"],
     queryFn: async (): Promise<CrossEncoderInfo[]> => {
-      const response = await client.GET("/api/v1/knowledge-bases/cross-encoders");
-      if (response.error) throw new Error("Falha ao carregar os cross-encoders");
-      return response.data;
+      const result = await client.GET("/api/v1/knowledge-bases/cross-encoders");
+      if (result.error) throw new Error("Falha ao carregar os cross-encoders");
+      return result.data;
     },
   });
 }
@@ -128,9 +128,9 @@ function useModels() {
   return useQuery({
     queryKey: ["models:capabilities"],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/models/capabilities");
-      if (response.error) throw new Error("Falha ao carregar modelos");
-      return response.data as Record<string, unknown>;
+      const result = await client.GET("/api/v1/models/capabilities");
+      if (result.error) throw new Error("Falha ao carregar modelos");
+      return result.data as Record<string, unknown>;
     },
     select: (models) => Object.keys(models),
   });

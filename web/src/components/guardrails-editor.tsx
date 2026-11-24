@@ -218,9 +218,9 @@ function useModelIds() {
   return useQuery({
     queryKey: ["models:capabilities"],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/models/capabilities");
-      if (response.error) throw new Error("Falha ao carregar modelos");
-      return response.data as Record<string, unknown>;
+      const result = await client.GET("/api/v1/models/capabilities");
+      if (result.error) throw new Error("Falha ao carregar modelos");
+      return result.data as Record<string, unknown>;
     },
     select: (models) => Object.keys(models),
   });

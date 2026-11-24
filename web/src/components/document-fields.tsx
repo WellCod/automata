@@ -84,15 +84,14 @@ export function DocumentFieldsEditor({
   const { fields: parsed, problems } = parseFields(text);
   const save = useMutation({
     mutationFn: async () => {
-      const response = await client.PUT(
+      const result = await client.PUT(
         "/api/v1/knowledge-bases/{base_id}/contents/{content_id}/fields",
         {
           params: { path: { base_id: baseId, content_id: contentId } },
           body: { fields: Object.keys(parsed).length ? parsed : null },
         },
       );
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Falha ao salvar os campos"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao salvar os campos"));
     },
     onSuccess: () => {
       toast.success(`Campos de ${name} salvos`);

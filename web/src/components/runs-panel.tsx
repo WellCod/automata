@@ -185,14 +185,14 @@ export function RunsPanel({ agentId, onMakeCase }: Props) {
       const since = days
         ? new Date(Date.now() - Number(days) * 86_400_000).toISOString()
         : undefined;
-      const response = await client.GET("/api/v1/configs/{config_id}/runs", {
+      const result = await client.GET("/api/v1/configs/{config_id}/runs", {
         params: {
           path: { config_id: agentId },
           query: { page, page_size: PAGE_SIZE, status: status || undefined, since },
         },
       });
-      if (response.error) throw new Error("Falha ao carregar execuções");
-      return response.data!;
+      if (result.error) throw new Error("Falha ao carregar execuções");
+      return result.data!;
     },
     refetchInterval: 5_000,
   });

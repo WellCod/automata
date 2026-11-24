@@ -65,10 +65,9 @@ export function useDataSubjectRequests() {
   return useQuery({
     queryKey: REQUESTS,
     queryFn: async () => {
-      const response = await client.GET("/api/v1/data-subject-requests");
-      if (response.error)
-        throw new Error("Falha ao carregar os pedidos. Apenas owners têm acesso.");
-      return response.data;
+      const result = await client.GET("/api/v1/data-subject-requests");
+      if (result.error) throw new Error("Falha ao carregar os pedidos. Apenas owners têm acesso.");
+      return result.data;
     },
     // pedido em background: atualiza até terminar
     refetchInterval: (query) =>
@@ -114,11 +113,11 @@ export function SubjectActions({
 
   const exportData = useMutation({
     mutationFn: async () => {
-      const response = await client.POST("/api/v1/data-subjects/{user_id}/export", {
+      const result = await client.POST("/api/v1/data-subjects/{user_id}/export", {
         params: { path: { user_id: userId } },
       });
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Falha ao pedir a exportação"));
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao pedir a exportação"));
     },
     onSuccess: () => {
       toast.success("Exportação pedida. O arquivo aparece nos pedidos abaixo.");
@@ -129,13 +128,12 @@ export function SubjectActions({
 
   const erase = useMutation({
     mutationFn: async () => {
-      const response = await client.POST("/api/v1/data-subjects/{user_id}/erase", {
+      const result = await client.POST("/api/v1/data-subjects/{user_id}/erase", {
         params: { path: { user_id: userId } },
         body: { confirm: typed },
       });
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Falha ao pedir a exclusão"));
-      return response.data.id;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao pedir a exclusão"));
+      return result.data.id;
     },
     onSuccess: (requestId) => {
       toast.success("Exclusão pedida.");
@@ -309,12 +307,11 @@ export function DataSubjectsPanel() {
     queryKey: ["data-subject", userId],
     enabled: userId !== null,
     queryFn: async () => {
-      const response = await client.GET("/api/v1/data-subjects/{user_id}", {
+      const result = await client.GET("/api/v1/data-subjects/{user_id}", {
         params: { path: { user_id: userId ?? "" } },
       });
-      if (response.error)
-        throw new Error("Falha ao consultar o titular. Apenas owners têm acesso.");
-      return response.data;
+      if (result.error) throw new Error("Falha ao consultar o titular. Apenas owners têm acesso.");
+      return result.data;
     },
   });
   const requests = useDataSubjectRequests();

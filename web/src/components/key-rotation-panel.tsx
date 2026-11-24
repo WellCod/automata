@@ -20,10 +20,10 @@ export function useKeyRotation() {
   return useQuery({
     queryKey: ["key-rotation"],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/key-rotation");
-      if (response.error)
+      const result = await client.GET("/api/v1/key-rotation");
+      if (result.error)
         throw new Error("Falha ao carregar o estado das chaves. Apenas owners têm acesso.");
-      return response.data!;
+      return result.data!;
     },
   });
 }

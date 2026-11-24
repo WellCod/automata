@@ -65,11 +65,11 @@ export function usePublishedExecutors() {
     queryKey: ["configs", "published-executors"],
     queryFn: async (): Promise<Executor[]> => {
       const load = async (kind: "agent" | "team") => {
-        const response = await client.GET("/api/v1/configs", {
+        const result = await client.GET("/api/v1/configs", {
           params: { query: { kind, status: "published", page_size: 100 } },
         });
-        if (response.error) throw new Error("Falha ao carregar agentes e times");
-        return response.data!.items.map((config) => ({
+        if (result.error) throw new Error("Falha ao carregar agentes e times");
+        return result.data!.items.map((config) => ({
           key: `${kind}:${config.id}`,
           name: config.name,
           kind,
@@ -111,11 +111,11 @@ function StepVersion({
   const { data: versions } = useQuery({
     queryKey: ["versions", configId],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/configs/{config_id}/versions", {
+      const result = await client.GET("/api/v1/configs/{config_id}/versions", {
         params: { path: { config_id: configId } },
       });
-      if (response.error) throw new Error("Falha ao carregar versões");
-      return response.data!;
+      if (result.error) throw new Error("Falha ao carregar versões");
+      return result.data!;
     },
   });
   const published = (versions ?? []).filter((version) => version.status === "published");

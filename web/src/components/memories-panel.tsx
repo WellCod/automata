@@ -34,31 +34,31 @@ export function MemoriesPanel({ agentId }: { agentId: string }) {
   const { data, isPending, isError } = useQuery({
     queryKey: key,
     queryFn: async () => {
-      const response = await client.GET("/api/v1/configs/{config_id}/memories", {
+      const result = await client.GET("/api/v1/configs/{config_id}/memories", {
         params: { path: { config_id: agentId }, query: user ? { user_id: user } : {} },
       });
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Falha ao carregar memórias"));
-      return response.data!;
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao carregar memórias"));
+      return result.data!;
     },
   });
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["memories", agentId] });
   const removeOne = useMutation({
     mutationFn: async (memoryId: string) => {
-      const response = await client.DELETE("/api/v1/configs/{config_id}/memories/{memory_id}", {
+      const result = await client.DELETE("/api/v1/configs/{config_id}/memories/{memory_id}", {
         params: { path: { config_id: agentId, memory_id: memoryId } },
       });
-      if (response.error) throw new Error(apiErrorMessage(response.error, "Falha ao apagar"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao apagar"));
     },
     onSuccess: refresh,
     onError: (e) => toast.error(e.message),
   });
   const forget = useMutation({
     mutationFn: async (userId: string) => {
-      const response = await client.DELETE("/api/v1/configs/{config_id}/memories", {
+      const result = await client.DELETE("/api/v1/configs/{config_id}/memories", {
         params: { path: { config_id: agentId }, query: { user_id: userId } },
       });
-      if (response.error) throw new Error(apiErrorMessage(response.error, "Falha ao apagar"));
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao apagar"));
     },
     onSuccess: (_, userId) => {
       toast.success(`Memórias de ${userId} apagadas`);

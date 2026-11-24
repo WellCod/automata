@@ -24,17 +24,17 @@ export function MyDataPanel() {
   const inventory = useQuery({
     queryKey: [...KEY, "inventory"],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/me/data");
-      if (response.error) throw new Error("Falha ao carregar os seus dados");
-      return response.data;
+      const result = await client.GET("/api/v1/me/data");
+      if (result.error) throw new Error("Falha ao carregar os seus dados");
+      return result.data;
     },
   });
   const requests = useQuery({
     queryKey: [...KEY, "requests"],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/me/data/requests");
-      if (response.error) throw new Error("Falha ao carregar os pedidos");
-      return response.data;
+      const result = await client.GET("/api/v1/me/data/requests");
+      if (result.error) throw new Error("Falha ao carregar os pedidos");
+      return result.data;
     },
     refetchInterval: (query) =>
       query.state.data?.some(
@@ -47,9 +47,9 @@ export function MyDataPanel() {
   const refresh = () => void queryClient.invalidateQueries({ queryKey: KEY });
   const exportData = useMutation({
     mutationFn: async () => {
-      const response = await client.POST("/api/v1/me/data/export");
+      const result = await client.POST("/api/v1/me/data/export");
       // a rota não declara erro no OpenAPI: só falha de rede ou de sessão chega aqui
-      if (response.response.status >= 400) throw new Error("Falha ao pedir a cópia");
+      if (result.response.status >= 400) throw new Error("Falha ao pedir a cópia");
     },
     onSuccess: () => {
       toast.success("Cópia pedida. O arquivo aparece abaixo em instantes.");
@@ -59,9 +59,8 @@ export function MyDataPanel() {
   });
   const erase = useMutation({
     mutationFn: async () => {
-      const response = await client.POST("/api/v1/me/data/erase", { body: { confirm: typed } });
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Falha ao pedir a exclusão"));
+      const result = await client.POST("/api/v1/me/data/erase", { body: { confirm: typed } });
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao pedir a exclusão"));
     },
     onSuccess: () => {
       toast.success("Exclusão pedida.");

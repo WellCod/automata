@@ -135,9 +135,9 @@ export function MetricsCharts({ range, agentId }: Props) {
   const { data, isPending, isError, refetch } = useQuery<DailyMetricsPoint[]>({
     queryKey: ["metrics:timeseries", query],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/metrics/timeseries", { params: { query } });
-      if (response.error) throw new Error("Falha ao carregar série");
-      return response.data!;
+      const result = await client.GET("/api/v1/metrics/timeseries", { params: { query } });
+      if (result.error) throw new Error("Falha ao carregar série");
+      return result.data!;
     },
   });
 

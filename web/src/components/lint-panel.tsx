@@ -18,9 +18,9 @@ export function LintPanel({ getPayload }: Props) {
     mutationFn: async () => {
       const payload = getPayload();
       if (!payload) throw new Error("Sem payload para verificar");
-      const response = await client.POST("/api/v1/linter", { body: payload });
-      if (response.error) throw new Error("Falha ao executar linter");
-      return response.data!;
+      const result = await client.POST("/api/v1/linter", { body: payload });
+      if (result.error) throw new Error("Falha ao executar linter");
+      return result.data!;
     },
   });
 

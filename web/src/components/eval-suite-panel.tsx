@@ -231,9 +231,9 @@ function useJudgeModels() {
   return useQuery({
     queryKey: ["models:capabilities"],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/models/capabilities");
-      if (response.error) throw new Error("Falha ao carregar modelos");
-      return response.data as Record<string, { structured_output: boolean }>;
+      const result = await client.GET("/api/v1/models/capabilities");
+      if (result.error) throw new Error("Falha ao carregar modelos");
+      return result.data as Record<string, { structured_output: boolean }>;
     },
     // o juiz responde num schema: só modelos com saída estruturada
     select: (models) =>
@@ -319,12 +319,11 @@ function BatchSuggestions({
   } = useQuery({
     queryKey: key,
     queryFn: async (): Promise<Suggestion[]> => {
-      const response = await client.GET("/api/v1/configs/{config_id}/eval-cases/suggestions", {
+      const result = await client.GET("/api/v1/configs/{config_id}/eval-cases/suggestions", {
         params: { path: { config_id: configId }, query: { limit: 10 } },
       });
-      if (response.error)
-        throw new Error(apiErrorMessage(response.error, "Falha ao sugerir casos"));
-      return response.data;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao sugerir casos"));
+      return result.data;
     },
   });
   return (

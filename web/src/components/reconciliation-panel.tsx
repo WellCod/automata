@@ -11,11 +11,11 @@ export function ReconciliationPanel() {
   const { data } = useQuery({
     queryKey: ["metrics", "reconciliation"],
     queryFn: async () => {
-      const response = await client.GET("/api/v1/metrics/reconciliation", {
+      const result = await client.GET("/api/v1/metrics/reconciliation", {
         params: { query: { days: 14 } },
       });
-      if (response.error) throw new Error("Falha ao carregar a conciliação");
-      return response.data;
+      if (result.error) throw new Error("Falha ao carregar a conciliação");
+      return result.data;
     },
   });
   // sem chave admin de nenhum provedor, a seção não aparece
