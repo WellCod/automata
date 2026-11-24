@@ -30,6 +30,7 @@ CROSS_ENCODER_PRICES: dict[str, float] = {
 
 
 def cross_encoder_available(provider: str) -> bool:
+    """O provedor de cross-encoder tem o que precisa no ambiente para ser chamado."""
     if provider == "cohere":
         return bool(os.environ.get("COHERE_API_KEY"))
     if provider == "bedrock":
@@ -47,6 +48,7 @@ COHERE_TIMEOUT_SECONDS = 30.0
 
 
 def _timed_cohere(model: str) -> CohereReranker:
+    """Reranker da Cohere do Agno com o cliente criado com timeout."""
     from agno.knowledge.reranker.cohere import CohereReranker
     from cohere import Client as CohereClient
 
@@ -93,6 +95,7 @@ def candidate_limit(base: KnowledgeBase, limit: int) -> int:
 
 
 def reranker_for(base: KnowledgeBase) -> Reranker | None:
+    """Reordenação local (MMR ou recência) da base; None quando não há."""
     settings = RetrievalSettings.model_validate(base.retrieval or {})
     if settings.reranker == "mmr":
         return MMRReranker(lambda_mult=settings.mmr_lambda)

@@ -28,13 +28,16 @@ logger = logging.getLogger(__name__)
 
 
 def save_original(session: Session, content_id: UUID, data: bytes) -> None:
+    """Guarda (ou troca) os bytes enviados, para o reprocessamento reler depois."""
     session.merge(KnowledgeContentOriginal(content_id=content_id, data=data))
 
 
 @dataclass
 class ReprocessPlan:
     queued: list[UUID] = field(default_factory=list)
+    # arquivo ou texto sem original guardado: só reenviando
     needs_upload: list[KnowledgeContent] = field(default_factory=list)
+    # já em processing, ou reivindicado por outra chamada ao mesmo tempo
     skipped: int = 0
 
 
@@ -77,12 +80,13 @@ def plan_reprocess(session: Session, base_id: UUID) -> ReprocessPlan:
                 .returning(KnowledgeContent.id)
             )
         )
-        result.queued = [c for c in candidates if c in claimed]
+        result.queued = [content_id for content_id in candidates if content_id in claimed]
         result.skipped += len(candidates) - len(result.queued)
     return result
 
 
 def _fail(content_id: UUID, message: str) -> None:
+    """Marca o conteúdo como falha e zera a contagem de trechos."""
     with Session(get_engine()) as session:
         session.execute(
             update(KnowledgeContent)
@@ -93,6 +97,7 @@ def _fail(content_id: UUID, message: str) -> None:
 
 
 def _replace(base: KnowledgeBase, content_id: UUID, data: bytes, extension: str | None) -> None:
+    """Reindexa com os bytes novos; `extension` só vem quando a URL mudou de tipo."""
     if extension is not None:
         with Session(get_engine()) as session:
             session.execute(
@@ -106,6 +111,7 @@ def _replace(base: KnowledgeBase, content_id: UUID, data: bytes, extension: str 
 
 
 def original_of(content_id: UUID) -> bytes | None:
+    """Bytes originais do conteúdo, ou None quando não foram guardados."""
     # um por vez: a base inteira de originais não cabe na memória da API
     with Session(get_engine()) as session:
         return session.scalar(
@@ -118,10 +124,17 @@ def original_of(content_id: UUID) -> bytes | None:
 def reprocess(content_ids: list[UUID]) -> None:
     """Reprocessa em sequência; uma falha marca só o conteúdo dela."""
     with Session(get_engine()) as session:
-        contents = [c for c in (session.get(KnowledgeContent, i) for i in content_ids) if c]
-        bases = {c.base_id: session.get(KnowledgeBase, c.base_id) for c in contents}
+        contents = [
+            content
+            for content in (session.get(KnowledgeContent, content_id) for content_id in content_ids)
+            if content
+        ]
+        bases = {
+            content.base_id: session.get(KnowledgeBase, content.base_id) for content in contents
+        }
         session.expunge_all()
     max_bytes = get_settings().knowledge_max_upload_mb * 1024 * 1024
+    # conector é relido de uma vez no fim: uma listagem da origem por conector
     by_connector: dict[UUID, list[KnowledgeContent]] = defaultdict(list)
     for content in contents:
         base = bases[content.base_id]
@@ -145,31 +158,32 @@ def reprocess(content_ids: list[UUID]) -> None:
         except (FetchFailed, EgressDenied, OSError) as exc:
             # a origem falhou antes da troca: os trechos anteriores continuam valendo
             keep_previous(content.id, str(exc))
-    for connector_id, items in by_connector.items():
-        _reprocess_connector(connector_id, items, bases)
+    for connector_id, connector_contents in by_connector.items():
+        _reprocess_connector(connector_id, connector_contents, bases)
 
 
 def _reprocess_connector(
     connector_id: UUID,
-    items: list[KnowledgeContent],
+    connector_contents: list[KnowledgeContent],
     bases: dict[UUID, KnowledgeBase | None],
 ) -> None:
+    """Lista a origem de novo e reindexa cada conteúdo do conector pelo arquivo atual."""
     with Session(get_engine()) as session:
         connector = session.get(KnowledgeConnector, connector_id)
         if connector is not None:
             session.expunge(connector)
     if connector is None:
-        for content in items:
+        for content in connector_contents:
             _fail(content.id, "conector removido")
         return
     try:
         source = source_of(connector)
-        listed = {f.path: f for f in source.list_files()}
+        listed = {remote_file.path: remote_file for remote_file in source.list_files()}
     except (SourceError, EgressDenied, OSError) as exc:
-        for content in items:
+        for content in connector_contents:
             keep_previous(content.id, f"conector: {exc}")
         return
-    for content in items:
+    for content in connector_contents:
         base = bases[content.base_id]
         remote = listed.get(content.external_path or "")
         if base is None or remote is None:

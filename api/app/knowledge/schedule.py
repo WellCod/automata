@@ -33,6 +33,7 @@ STUCK_AFTER = timedelta(hours=2)
 
 
 def next_at(hours: int | None, now: datetime | None = None) -> datetime | None:
+    """Próximo horário do agendamento; None quando o agendamento está desligado."""
     return (now or datetime.now(UTC)) + timedelta(hours=hours) if hours else None
 
 
@@ -77,11 +78,12 @@ def claim_due(now: datetime | None = None) -> tuple[list[UUID], list[UUID]]:
             .limit(BATCH)
             .with_for_update(skip_locked=True)
         ).all()
-        for c in connectors:
-            c.next_sync_at = next_at(c.sync_every_hours, now)
-            c.last_status = "running"
-            c.last_message = None
-            c.sync_heartbeat_at = now
+        for connector in connectors:
+            connector.next_sync_at = next_at(connector.sync_every_hours, now)
+            connector.last_status = "running"
+            connector.last_message = None
+            # batimento inicial: sem ele o release_stuck liberaria o conector na hora
+            connector.sync_heartbeat_at = now
         contents = session.scalars(
             select(KnowledgeContent)
             .where(
@@ -97,10 +99,14 @@ def claim_due(now: datetime | None = None) -> tuple[list[UUID], list[UUID]]:
         for content in contents:
             content.next_refresh_at = next_at(content.refresh_every_hours, now)
         session.commit()
-        return [c.id for c in connectors], [c.id for c in contents]
+        return (
+            [connector.id for connector in connectors],
+            [content.id for content in contents],
+        )
 
 
 def _fail(content_id: UUID, message: str) -> None:
+    """Marca o conteúdo como falha."""
     with Session(get_engine()) as session:
         session.execute(
             update(KnowledgeContent)
@@ -132,6 +138,7 @@ def refresh_url(content_id: UUID) -> bool:
         if content.status != "completed":
             _fail(content_id, str(exc))
         return False
+    # mesmo hash da última ingestão boa: nada mudou na página, não paga embedding de novo
     digest = hashlib.sha256(fetched.data).hexdigest()
     if content.status == "completed" and digest == content.content_hash:
         return False

@@ -43,6 +43,8 @@ class TooLarge(SourceError):
 
 
 def max_download() -> int:
+    """Teto de bytes por arquivo baixado, o mesmo do upload."""
+    # import tardio: o Settings só é montado quando há download, não no import do módulo
     from app.settings import get_settings
 
     return get_settings().knowledge_max_upload_mb * 1024 * 1024
@@ -58,14 +60,14 @@ def capped_get(
 ) -> bytes:
     """Baixa contando bytes: o tamanho da listagem pode mudar até o download (Fase 43)."""
     limit = max_download()
-    with client.stream("GET", url, params=params, headers=headers) as resp:
-        _raise_for(resp, what)
-        declared = resp.headers.get("content-length", "")
+    with client.stream("GET", url, params=params, headers=headers) as response:
+        _raise_for(response, what)
+        declared = response.headers.get("content-length", "")
         if declared.isdigit() and int(declared) > limit:
             raise TooLarge(f"{what}: acima do limite de upload")
         chunks: list[bytes] = []
         size = 0
-        for chunk in resp.iter_bytes():
+        for chunk in response.iter_bytes():
             size += len(chunk)
             if size > limit:
                 raise TooLarge(f"{what}: acima do limite de upload")
@@ -96,6 +98,8 @@ class RemoteFile:
 
 
 class Source(Protocol):
+    """O que a sincronização espera de cada origem."""
+
     label: str
     # a origem cortou a listagem (árvore grande demais do GitHub): pode faltar arquivo
     truncated: bool
@@ -115,29 +119,35 @@ def _inside(path: str, folder: str) -> str | None:
     return path[len(folder) + 1 :]
 
 
-def _raise_for(resp: httpx.Response, what: str) -> None:
-    if resp.is_redirect:
+def _raise_for(response: httpx.Response, what: str) -> None:
+    """Traduz a resposta de erro da origem numa SourceError legível no painel."""
+    if response.is_redirect:
         raise SourceError(f"{what}: redirect recusado")
     # limite da origem não é credencial errada: o GitHub sem token responde 403 depois de
     # 60 chamadas por hora, com x-ratelimit-remaining zerado (Fase 43)
-    limited = resp.status_code == 429 or (
-        resp.status_code == 403
-        and (resp.headers.get("x-ratelimit-remaining") == "0" or "retry-after" in resp.headers)
+    limited = response.status_code == 429 or (
+        response.status_code == 403
+        and (
+            response.headers.get("x-ratelimit-remaining") == "0"
+            or "retry-after" in response.headers
+        )
     )
     if limited:
         raise SourceError(
-            f"{what}: limite de chamadas da origem atingido (HTTP {resp.status_code}); "
+            f"{what}: limite de chamadas da origem atingido (HTTP {response.status_code}); "
             "tente mais tarde ou use um token"
         )
-    if resp.status_code in (401, 403):
-        raise SourceError(f"{what}: credencial recusada (HTTP {resp.status_code})")
-    if resp.status_code == 404:
+    if response.status_code in (401, 403):
+        raise SourceError(f"{what}: credencial recusada (HTTP {response.status_code})")
+    if response.status_code == 404:
         raise SourceError(f"{what}: não encontrado")
-    if resp.status_code >= 400:
-        raise SourceError(f"{what}: HTTP {resp.status_code}")
+    if response.status_code >= 400:
+        raise SourceError(f"{what}: HTTP {response.status_code}")
 
 
 class GitHubSource:
+    """Pasta de um repositório do GitHub (ou GitHub Enterprise) num branch."""
+
     def __init__(self, settings: GitHubSettings, secret: dict[str, str]) -> None:
         self.settings = settings
         self.label = f"github:{settings.repo}@{settings.branch}"
@@ -154,9 +164,9 @@ class GitHubSource:
     def _get(self, url: str, **headers: str) -> httpx.Response:
         check_url(url)
         with guarded_client(timeout=TIMEOUT_S) as client:
-            resp = client.get(url, headers={**self._headers, **headers})
-        _raise_for(resp, f"GitHub {self.settings.repo}")
-        return resp
+            response = client.get(url, headers={**self._headers, **headers})
+        _raise_for(response, f"GitHub {self.settings.repo}")
+        return response
 
     def _download(self, url: str, **headers: str) -> bytes:
         check_url(url)
@@ -166,15 +176,16 @@ class GitHubSource:
             )
 
     def list_files(self) -> list[RemoteFile]:
-        s = self.settings
+        github = self.settings
+        # a árvore recursiva vem numa chamada só; o GitHub corta e marca `truncated` se for enorme
         tree = self._get(
-            f"{self._api}/repos/{s.repo}/git/trees/{quote(s.branch, safe='')}?recursive=1"
+            f"{self._api}/repos/{github.repo}/git/trees/{quote(github.branch, safe='')}?recursive=1"
         ).json()
         files: list[RemoteFile] = []
         for item in tree.get("tree", []):
             if item.get("type") != "blob":
                 continue
-            relative = _inside(str(item["path"]), s.path)
+            relative = _inside(str(item["path"]), github.path)
             if relative is None:
                 continue
             files.append(
@@ -189,14 +200,17 @@ class GitHubSource:
         return files
 
     def download(self, file: RemoteFile) -> bytes:
-        s = self.settings
+        github = self.settings
         url = (
-            f"{self._api}/repos/{s.repo}/contents/{quote(file.ref)}?ref={quote(s.branch, safe='')}"
+            f"{self._api}/repos/{github.repo}/contents/{quote(file.ref)}"
+            f"?ref={quote(github.branch, safe='')}"
         )
         return self._download(url, Accept="application/vnd.github.raw")
 
 
 class S3Source:
+    """Bucket S3 (ou compatível, com endpoint próprio), opcionalmente com prefixo."""
+
     def __init__(self, settings: S3Settings, secret: dict[str, str]) -> None:
         self.settings = settings
         self.label = f"s3:{settings.bucket}"
@@ -204,6 +218,7 @@ class S3Source:
         self._secret = secret
 
     def _client(self) -> Any:
+        """Cliente boto3 com prazo curto; endpoint próprio passa pelo filtro de saída."""
         import boto3
 
         if self.settings.endpoint_url:
@@ -214,16 +229,16 @@ class S3Source:
                 raise SourceError("S3 com endpoint próprio precisa de access key no conector")
         from botocore.config import Config
 
-        kwargs: dict[str, Any] = {
+        client_options: dict[str, Any] = {
             "region_name": self.settings.region or None,
             "endpoint_url": self.settings.endpoint_url or None,
             # prazo explícito e poucas tentativas: a sincronização segura o executor (OPS-03)
             "config": Config(connect_timeout=10, read_timeout=60, retries={"max_attempts": 2}),
         }
         if self._secret.get("access_key_id"):
-            kwargs["aws_access_key_id"] = self._secret["access_key_id"]
-            kwargs["aws_secret_access_key"] = self._secret.get("secret_access_key", "")
-        return boto3.client("s3", **kwargs)
+            client_options["aws_access_key_id"] = self._secret["access_key_id"]
+            client_options["aws_secret_access_key"] = self._secret.get("secret_access_key", "")
+        return boto3.client("s3", **client_options)
 
     def list_files(self) -> list[RemoteFile]:
         prefix = self.settings.prefix.strip("/")
@@ -233,16 +248,17 @@ class S3Source:
             for page in pages.paginate(
                 Bucket=self.settings.bucket, Prefix=f"{prefix}/" if prefix else ""
             ):
-                for obj in page.get("Contents", []):
-                    key = str(obj["Key"])
+                for s3_object in page.get("Contents", []):
+                    key = str(s3_object["Key"])
                     relative = _inside(key, prefix)
+                    # chave terminada em barra é o marcador de pasta, sem conteúdo
                     if relative is None or key.endswith("/"):
                         continue
                     files.append(
                         RemoteFile(
                             path=relative,
-                            version=str(obj.get("ETag", "")).strip('"'),
-                            size=int(obj.get("Size") or 0),
+                            version=str(s3_object.get("ETag", "")).strip('"'),
+                            size=int(s3_object.get("Size") or 0),
                             ref=key,
                         )
                     )
@@ -254,9 +270,10 @@ class S3Source:
 
     def download(self, file: RemoteFile) -> bytes:
         try:
-            obj = self._client().get_object(Bucket=self.settings.bucket, Key=file.ref)
+            s3_object = self._client().get_object(Bucket=self.settings.bucket, Key=file.ref)
             limit = max_download()
-            data: bytes = obj["Body"].read(limit + 1)
+            # um byte além do teto basta para saber que passou, sem ler o resto
+            data: bytes = s3_object["Body"].read(limit + 1)
         except Exception as exc:
             raise SourceError(f"S3 {file.ref}: {type(exc).__name__}: {exc}") from exc
         if len(data) > limit:
@@ -265,6 +282,8 @@ class S3Source:
 
 
 class SharePointSource:
+    """Pasta da biblioteca de documentos de um site do SharePoint, pelo Microsoft Graph."""
+
     def __init__(
         self,
         settings: SharePointSettings,
@@ -280,33 +299,35 @@ class SharePointSource:
         self._token: str | None = None
 
     def _auth(self) -> dict[str, str]:
+        """Cabeçalho com o token de client credentials, pedido uma vez por instância."""
         if self._token is None:
-            s = self.settings
-            resp = self._http.post(
-                f"{LOGIN}/{quote(s.tenant_id, safe='')}/oauth2/v2.0/token",
+            sharepoint = self.settings
+            response = self._http.post(
+                f"{LOGIN}/{quote(sharepoint.tenant_id, safe='')}/oauth2/v2.0/token",
                 data={
                     "grant_type": "client_credentials",
-                    "client_id": s.client_id,
+                    "client_id": sharepoint.client_id,
                     "client_secret": self._secret.get("client_secret", ""),
                     "scope": "https://graph.microsoft.com/.default",
                 },
             )
-            _raise_for(resp, "SharePoint (login)")
-            self._token = str(resp.json()["access_token"])
+            _raise_for(response, "SharePoint (login)")
+            self._token = str(response.json()["access_token"])
         return {"Authorization": f"Bearer {self._token}"}
 
     def _get(self, url: str) -> dict[str, Any]:
-        resp = self._http.get(url, headers=self._auth())
-        _raise_for(resp, "SharePoint")
-        result: dict[str, Any] = resp.json()
+        response = self._http.get(url, headers=self._auth())
+        _raise_for(response, "SharePoint")
+        result: dict[str, Any] = response.json()
         return result
 
     def _site_id(self) -> str:
-        s = self.settings
-        site = self._get(f"{GRAPH}/sites/{s.hostname}:/{s.site_path.strip('/')}")
+        sharepoint = self.settings
+        site = self._get(f"{GRAPH}/sites/{sharepoint.hostname}:/{sharepoint.site_path.strip('/')}")
         return str(site["id"])
 
     def _children(self, site: str, folder: str) -> Iterator[dict[str, Any]]:
+        """Itens diretos da pasta (a raiz do drive quando vazia), seguindo a paginação."""
         url: str | None = (
             f"{GRAPH}/sites/{site}/drive/root:/{quote(folder)}:/children"
             if folder
@@ -325,6 +346,7 @@ class SharePointSource:
         seen = 0
 
         def walk(folder: str, relative: str, depth: int) -> None:
+            """Lista a pasta e desce nas subpastas até `MAX_DEPTH`."""
             nonlocal seen
             for item in self._children(site, folder):
                 seen += 1
@@ -355,6 +377,7 @@ class SharePointSource:
 
 
 def source_for(kind: str, settings: dict[str, Any], secret: dict[str, str]) -> Source:
+    """Origem do conector pelo tipo, com as configurações validadas pelo schema dele."""
     if kind == "github":
         return GitHubSource(GitHubSettings.model_validate(settings), secret)
     if kind == "s3":

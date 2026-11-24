@@ -20,6 +20,7 @@ from app.models.knowledge_content import KnowledgeContent
 
 # valores listados por campo na descrição da tool
 MAX_VALUES = 20
+# segundos de validade do cache de valores por base
 _TTL = 60.0
 _cache: dict[UUID, tuple[float, dict[str, list[str]]]] = {}
 
@@ -43,6 +44,7 @@ def field_values(base_id: UUID) -> dict[str, list[str]]:
             .distinct()
             .order_by(pairs.c.key, pairs.c.value)
         ).all()
+    # as linhas vêm ordenadas por campo e valor, então ficam os primeiros em ordem alfabética
     values: dict[str, list[str]] = {}
     for key, value in rows:
         bucket = values.setdefault(str(key), [])
@@ -93,11 +95,12 @@ def clean_filters(
 
 
 def describe(values: dict[str, list[str]]) -> str:
+    """Trecho da descrição da tool que ensina o modelo a usar os filtros da base."""
     if not values:
         return ""
     parts = [
-        f"{k}: " + ", ".join(json.dumps(v, ensure_ascii=False) for v in vs)
-        for k, vs in values.items()
+        f"{field_name}: " + ", ".join(json.dumps(option, ensure_ascii=False) for option in options)
+        for field_name, options in values.items()
     ]
     return (
         " Para restringir a busca, passe `filtros` com campo e valor exatos, só quando a conversa"

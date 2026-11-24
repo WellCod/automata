@@ -22,6 +22,7 @@ MAX_TITLE_CHARS = 200
 
 
 def overlap_for(chunk_size: int, settings: ChunkingSettings) -> int:
+    """Sobreposição escolhida na base ou, sem escolha, 10% do tamanho do trecho."""
     return chunk_size // 10 if settings.overlap is None else settings.overlap
 
 
@@ -39,18 +40,22 @@ class HeadingChunking(ChunkingStrategy):
         self._heading = re.compile(rf"^#{{1,{level}}}[ \t]+\S.*$", re.MULTILINE)
 
     def sections(self, text: str) -> list[tuple[str | None, str]]:
-        starts = [m.start() for m in self._heading.finditer(text)]
+        """Divide o texto em (título, seção); o texto antes do primeiro título vai sem título.
+
+        Título acima de `MAX_TITLE_CHARS` vira None para não ser repetido nos pedaços.
+        """
+        starts = [match.start() for match in self._heading.finditer(text)]
         if not starts:
             return [(None, text)]
-        out: list[tuple[str | None, str]] = []
+        sections: list[tuple[str | None, str]] = []
         if text[: starts[0]].strip():
-            out.append((None, text[: starts[0]]))
+            sections.append((None, text[: starts[0]]))
         for i, start in enumerate(starts):
             end = starts[i + 1] if i + 1 < len(starts) else len(text)
             section = text[start:end]
             title = section.split("\n", 1)[0].strip()
-            out.append((title if len(title) <= MAX_TITLE_CHARS else None, section))
-        return out
+            sections.append((title if len(title) <= MAX_TITLE_CHARS else None, section))
+        return sections
 
     def chunk(self, document: Document) -> list[Document]:
         chunks: list[Document] = []
@@ -61,12 +66,17 @@ class HeadingChunking(ChunkingStrategy):
             pieces = [body]
             if len(body) > self.chunk_size:
                 pieces = [
-                    p.content
-                    for p in self._fallback.chunk(Document(name=document.name, content=body))
+                    sub_chunk.content
+                    for sub_chunk in self._fallback.chunk(
+                        Document(name=document.name, content=body)
+                    )
                 ]
                 # o título só entra se couber sem passar muito do tamanho do trecho
                 if title and len(title) <= self.chunk_size // 4:
-                    pieces = [p if p.startswith(title) else f"{title}\n{p}" for p in pieces]
+                    pieces = [
+                        piece if piece.startswith(title) else f"{title}\n{piece}"
+                        for piece in pieces
+                    ]
             for piece in pieces:
                 number = len(chunks) + 1
                 meta: dict[str, Any] = {
@@ -86,6 +96,7 @@ class HeadingChunking(ChunkingStrategy):
 
 
 def strategy_for(chunk_size: int, settings: ChunkingSettings) -> ChunkingStrategy:
+    """Estratégia de corte do Agno (ou a própria por títulos) conforme a base."""
     overlap = overlap_for(chunk_size, settings)
     if settings.strategy == "headings":
         return HeadingChunking(chunk_size, overlap, settings.heading_level)
