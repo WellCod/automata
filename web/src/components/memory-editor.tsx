@@ -62,9 +62,9 @@ export function MemoryEditor({
               onChange={(e) => onChange({ ...value, retention_days: Number(e.target.value) })}
               className={inputCls}
             >
-              {RETENTION.map((d) => (
-                <option key={d} value={d}>
-                  {d} dias sem uso
+              {RETENTION.map((days) => (
+                <option key={days} value={days}>
+                  {days} dias sem uso
                 </option>
               ))}
             </select>

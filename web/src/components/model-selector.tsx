@@ -35,9 +35,9 @@ export function ModelSelector({ value, capabilities, onChange, error }: Props) {
   const { data: models, isPending } = useQuery({
     queryKey: ["models:capabilities"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/models/capabilities");
-      if (res.error) throw new Error("Falha ao carregar modelos");
-      return res.data as Record<string, CapabilityFlags>;
+      const result = await client.GET("/api/v1/models/capabilities");
+      if (result.error) throw new Error("Falha ao carregar modelos");
+      return result.data as Record<string, CapabilityFlags>;
     },
   });
 
@@ -45,9 +45,9 @@ export function ModelSelector({ value, capabilities, onChange, error }: Props) {
   const { data: available } = useQuery({
     queryKey: ["models:availability"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/models/availability");
-      if (res.error) return {} as Record<string, boolean>;
-      return res.data as Record<string, boolean>;
+      const result = await client.GET("/api/v1/models/availability");
+      if (result.error) return {} as Record<string, boolean>;
+      return result.data as Record<string, boolean>;
     },
   });
   const ready = (id: string) => available?.[id] !== false;

@@ -38,7 +38,7 @@ export function EvalScheduleSection({ configId, needsJudge, judgeModels, lastRun
   const [judge, setJudge] = useState<string | null>(null);
 
   const savedCron = schedule?.cron_expr ?? "";
-  const savedPreset = SCHEDULE_PRESETS.some((p) => p.cron === savedCron)
+  const savedPreset = SCHEDULE_PRESETS.some((option) => option.cron === savedCron)
     ? savedCron
     : savedCron
       ? CUSTOM
@@ -63,9 +63,9 @@ export function EvalScheduleSection({ configId, needsJudge, judgeModels, lastRun
           onChange={(e) => setPreset(e.target.value)}
           className={selectCls}
         >
-          {SCHEDULE_PRESETS.map((p) => (
-            <option key={p.cron} value={p.cron}>
-              {p.label}
+          {SCHEDULE_PRESETS.map((option) => (
+            <option key={option.cron} value={option.cron}>
+              {option.label}
             </option>
           ))}
           <option value={CUSTOM}>Cron personalizado</option>
@@ -87,9 +87,9 @@ export function EvalScheduleSection({ configId, needsJudge, judgeModels, lastRun
             className={selectCls}
           >
             <option value="">Modelo do juiz</option>
-            {judgeModels.map((m) => (
-              <option key={m} value={m}>
-                {m}
+            {judgeModels.map((modelId) => (
+              <option key={modelId} value={modelId}>
+                {modelId}
               </option>
             ))}
           </select>

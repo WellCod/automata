@@ -46,7 +46,7 @@ export function AuditLog({ configId }: Props) {
     queryKey: ["audit", configId ?? null, action, period, actor?.id ?? null],
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }): Promise<AuditPage> => {
-      const res = await client.GET("/api/v1/audit", {
+      const result = await client.GET("/api/v1/audit", {
         params: {
           query: {
             config_id: configId,
@@ -58,16 +58,19 @@ export function AuditLog({ configId }: Props) {
           },
         },
       });
-      if (res.error) throw new Error("Falha ao carregar a trilha. Apenas owners têm acesso.");
-      return res.data!;
+      if (result.error) throw new Error("Falha ao carregar a trilha. Apenas owners têm acesso.");
+      return result.data!;
     },
-    getNextPageParam: (last) => last.next_cursor ?? null,
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? null,
   });
 
   const pages = query.data?.pages ?? [];
-  const items = pages.flatMap((p) => p.items);
-  const configs = Object.assign({}, ...pages.map((p) => p.configs)) as AuditPage["configs"];
-  const versions = Object.assign({}, ...pages.map((p) => p.versions)) as AuditPage["versions"];
+  const items = pages.flatMap((page) => page.items);
+  const configs = Object.assign({}, ...pages.map((page) => page.configs)) as AuditPage["configs"];
+  const versions = Object.assign(
+    {},
+    ...pages.map((page) => page.versions),
+  ) as AuditPage["versions"];
 
   return (
     <div className="flex flex-col gap-3">
@@ -81,9 +84,9 @@ export function AuditLog({ configId }: Props) {
               className={selectCls}
             >
               <option value="">Todas</option>
-              {ACTION_FILTERS.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
+              {ACTION_FILTERS.map((filter) => (
+                <option key={filter.value} value={filter.value}>
+                  {filter.label}
                 </option>
               ))}
             </select>
@@ -95,9 +98,9 @@ export function AuditLog({ configId }: Props) {
               onChange={(e) => setPeriod(e.target.value)}
               className={selectCls}
             >
-              {PERIODS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
+              {PERIODS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </select>

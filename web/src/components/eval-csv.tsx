@@ -62,7 +62,7 @@ export function useEvalCsv({ configId, hasCases }: Props) {
     }
   }
 
-  const failing = report?.rows.filter((r) => r.errors.length > 0) ?? [];
+  const failing = report?.rows.filter((row) => row.errors.length > 0) ?? [];
 
   const actions = (
     <>
@@ -114,13 +114,13 @@ export function useEvalCsv({ configId, hasCases }: Props) {
             passarem.
           </p>
           <ul className="flex flex-col gap-1 text-[12px]">
-            {failing.map((r) => (
-              <li key={r.line}>
+            {failing.map((row) => (
+              <li key={row.line}>
                 <span className="text-foreground font-medium">
-                  Linha {r.line}
-                  {r.name ? ` (${r.name})` : ""}:
+                  Linha {row.line}
+                  {row.name ? ` (${row.name})` : ""}:
                 </span>{" "}
-                <span className="text-muted-foreground">{r.errors.join("; ")}</span>
+                <span className="text-muted-foreground">{row.errors.join("; ")}</span>
               </li>
             ))}
           </ul>

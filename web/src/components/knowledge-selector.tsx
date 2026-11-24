@@ -67,12 +67,14 @@ function BaseRow({
 
 export function KnowledgeSelector({ value, onChange }: Props) {
   const { data: bases, isPending, isError } = useKnowledgeBases();
-  const byId = new Map(value.map((b) => [b.base_id, b]));
+  const byId = new Map(value.map((binding) => [binding.base_id, binding]));
   // ligação a base removida some da lista, mas segue no valor até salvar
-  const missing = value.filter((b) => bases && !bases.some((base) => base.id === b.base_id));
+  const missing = value.filter(
+    (binding) => bases && !bases.some((base) => base.id === binding.base_id),
+  );
 
   function set(baseId: string, binding: KnowledgeBinding | undefined) {
-    const rest = value.filter((b) => b.base_id !== baseId);
+    const rest = value.filter((existing) => existing.base_id !== baseId);
     onChange(binding ? [...rest, binding] : rest);
   }
 
@@ -101,7 +103,7 @@ export function KnowledgeSelector({ value, onChange }: Props) {
           key={base.id}
           base={base}
           binding={byId.get(base.id)}
-          onChange={(b) => set(base.id, b)}
+          onChange={(binding) => set(base.id, binding)}
         />
       ))}
       {missing.length > 0 && (
@@ -110,7 +112,7 @@ export function KnowledgeSelector({ value, onChange }: Props) {
           <button
             type="button"
             className="underline"
-            onClick={() => onChange(value.filter((b) => !missing.includes(b)))}
+            onClick={() => onChange(value.filter((binding) => !missing.includes(binding)))}
           >
             Remover
           </button>

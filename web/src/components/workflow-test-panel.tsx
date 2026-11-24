@@ -67,6 +67,7 @@ export function WorkflowTestPanel({ workflowId, draftVersionId, hasCurrentVersio
   const running = progress.status === "running";
   const [deciding, setDeciding] = useState(false);
 
+  // decisão da revisão humana retoma o run pausado; a resposta do continue vem inteira, sem stream
   async function decide(decision: StepDecision) {
     if (!progress.runId) return;
     setDeciding(true);
@@ -78,7 +79,7 @@ export function WorkflowTestPanel({ workflowId, draftVersionId, hasCurrentVersio
         progress.sessionId,
         decision,
       );
-      setProgress((p) => applyContinue(p, output));
+      setProgress((current) => applyContinue(current, output));
     } catch (e) {
       setFailure(e instanceof Error ? e.message : "Falha ao registrar a decisão.");
     } finally {
@@ -96,6 +97,7 @@ export function WorkflowTestPanel({ workflowId, draftVersionId, hasCurrentVersio
     setFailure(null);
     // cada mensagem é um run novo; a sessão segue para o histórico do workflow
     const sessionId = progress.sessionId;
+    // cópia local do progresso: o setProgress é assíncrono e cada evento precisa do estado anterior
     let state: WorkflowProgress = { ...EMPTY_PROGRESS, status: "running", sessionId };
     setProgress(state);
 
@@ -107,17 +109,20 @@ export function WorkflowTestPanel({ workflowId, draftVersionId, hasCurrentVersio
       form.append("factory_input", JSON.stringify({ version_id: draftVersionId }));
     }
     try {
-      const res = await fetch(`/api/workflows/${workflowId}/runs`, { method: "POST", body: form });
-      if (!res.ok || !res.body) throw new Error(await failureText(res));
-      for await (const ev of readSse(res.body)) {
-        state = applyEvent(state, ev);
+      const response = await fetch(`/api/workflows/${workflowId}/runs`, {
+        method: "POST",
+        body: form,
+      });
+      if (!response.ok || !response.body) throw new Error(await failureText(response));
+      for await (const sseEvent of readSse(response.body)) {
+        state = applyEvent(state, sseEvent);
         setProgress(state);
       }
       // stream que fecha sem WorkflowCompleted nem WorkflowError
       if (state.status === "running") setProgress({ ...state, status: "done" });
     } catch (e) {
       setFailure(e instanceof Error && e.message ? e.message : "Erro ao executar o workflow.");
-      setProgress((p) => ({ ...p, status: "error" }));
+      setProgress((current) => ({ ...current, status: "error" }));
     } finally {
       void queryClient.invalidateQueries({ queryKey: ["runs", workflowId] });
     }
@@ -169,40 +174,42 @@ export function WorkflowTestPanel({ workflowId, draftVersionId, hasCurrentVersio
 
       {progress.steps.length > 0 && (
         <ol aria-label="Progresso das etapas" aria-busy={running} className="flex flex-col gap-1">
-          {progress.steps.map((s) => {
-            const Icon = KIND_ICON[s.kind];
+          {progress.steps.map((step) => {
+            const Icon = KIND_ICON[step.kind];
             return (
               <li
-                key={s.id}
-                aria-label={`${s.name}: ${STATUS_LABEL[s.status]}`}
+                key={step.id}
+                aria-label={`${step.name}: ${STATUS_LABEL[step.status]}`}
                 className="border-border bg-card flex flex-col gap-0.5 rounded border px-2.5 py-1.5"
-                style={{ marginLeft: `${s.depth * 12}px` }}
+                style={{ marginLeft: `${step.depth * 12}px` }}
               >
                 <div className="flex items-center gap-1.5 text-[12px]">
-                  {STATUS_ICON[s.status]}
+                  {STATUS_ICON[step.status]}
                   <Icon className="text-muted-foreground h-3 w-3 shrink-0" aria-hidden />
-                  <span className="text-foreground font-medium">{s.name}</span>
-                  {s.who && <span className="text-muted-foreground truncate">· {s.who}</span>}
+                  <span className="text-foreground font-medium">{step.name}</span>
+                  {step.who && <span className="text-muted-foreground truncate">· {step.who}</span>}
                 </div>
-                {s.detail && (
+                {step.detail && (
                   <span
                     className={`text-[11px] ${
-                      s.status === "error"
+                      step.status === "error"
                         ? "text-destructive"
-                        : s.status === "blocked"
+                        : step.status === "blocked"
                           ? "text-amber-400"
                           : "text-muted-foreground"
                     }`}
                   >
-                    {s.status === "blocked" ? `bloqueada · ${blockLabel(s.detail)}` : s.detail}
+                    {step.status === "blocked"
+                      ? `bloqueada · ${blockLabel(step.detail)}`
+                      : step.detail}
                   </span>
                 )}
-                {s.output && (
+                {step.output && (
                   <p
-                    title={s.output}
+                    title={step.output}
                     className="text-muted-foreground line-clamp-2 text-[11px] whitespace-pre-wrap"
                   >
-                    {s.output}
+                    {step.output}
                   </p>
                 )}
               </li>

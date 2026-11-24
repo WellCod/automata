@@ -90,7 +90,7 @@ function RunItem({
     <li className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen((wasOpen) => !wasOpen)}
         disabled={!run.run_id}
         aria-expanded={open}
         className="flex min-h-8 w-full items-center justify-between gap-2 text-left disabled:cursor-default"
@@ -185,14 +185,14 @@ export function RunsPanel({ agentId, onMakeCase }: Props) {
       const since = days
         ? new Date(Date.now() - Number(days) * 86_400_000).toISOString()
         : undefined;
-      const res = await client.GET("/api/v1/configs/{config_id}/runs", {
+      const result = await client.GET("/api/v1/configs/{config_id}/runs", {
         params: {
           path: { config_id: agentId },
           query: { page, page_size: PAGE_SIZE, status: status || undefined, since },
         },
       });
-      if (res.error) throw new Error("Falha ao carregar execuções");
-      return res.data!;
+      if (result.error) throw new Error("Falha ao carregar execuções");
+      return result.data!;
     },
     refetchInterval: 5_000,
   });
@@ -262,7 +262,7 @@ export function RunsPanel({ agentId, onMakeCase }: Props) {
         <div className="text-muted-foreground flex items-center justify-end gap-2 text-[12px]">
           <button
             type="button"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
             disabled={page === 1}
             className="hover:text-foreground disabled:opacity-40"
           >
@@ -273,7 +273,7 @@ export function RunsPanel({ agentId, onMakeCase }: Props) {
           </span>
           <button
             type="button"
-            onClick={() => setPage((p) => Math.min(pages, p + 1))}
+            onClick={() => setPage((current) => Math.min(pages, current + 1))}
             disabled={page >= pages}
             className="hover:text-foreground disabled:opacity-40"
           >

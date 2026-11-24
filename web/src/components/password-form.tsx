@@ -24,7 +24,7 @@ function schemaFor(askCurrent: boolean) {
       new_password: newPassword,
       confirm: z.string(),
     })
-    .refine((v) => v.new_password === v.confirm, {
+    .refine((values) => values.new_password === values.confirm, {
       path: ["confirm"],
       message: "As senhas não conferem",
     });
@@ -116,12 +116,12 @@ export function PasswordForm({ askCurrent, submitLabel, onSubmit }: Props) {
   );
 }
 
-export async function detailOf(res: Response, fallback: string): Promise<string> {
+export async function detailOf(response: Response, fallback: string): Promise<string> {
   try {
-    const body = (await res.json()) as { detail?: unknown };
+    const body = (await response.json()) as { detail?: unknown };
     if (typeof body.detail === "string") return body.detail;
   } catch {
     // corpo vazio
   }
-  return res.status === 429 ? "Muitas tentativas. Aguarde um minuto." : fallback;
+  return response.status === 429 ? "Muitas tentativas. Aguarde um minuto." : fallback;
 }

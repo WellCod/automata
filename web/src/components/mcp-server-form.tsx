@@ -85,7 +85,7 @@ export function McpServerForm({ server, pending, error, onSubmit, onCancel }: Pr
       url: values.url,
       timeout_seconds: values.timeout_seconds,
       headers: replaceHeaders
-        ? Object.fromEntries(values.headers.map((h) => [h.name, h.value]))
+        ? Object.fromEntries(values.headers.map((header) => [header.name, header.value]))
         : null,
     });
   }

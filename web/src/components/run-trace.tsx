@@ -72,17 +72,17 @@ export function RunTrace({ runId }: { runId: string }) {
   const { data, isPending, isError, error } = useQuery({
     queryKey: ["trace", runId],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/runs/{run_id}/trace", {
+      const result = await client.GET("/api/v1/runs/{run_id}/trace", {
         params: { path: { run_id: runId } },
       });
-      if (res.error) {
+      if (result.error) {
         throw new Error(
-          res.response.status === 404
+          result.response.status === 404
             ? "Sem árvore para esta execução (tracing desligado ou run anterior a ele)."
             : "Não foi possível carregar a árvore.",
         );
       }
-      return res.data!;
+      return result.data!;
     },
     retry: false,
   });
