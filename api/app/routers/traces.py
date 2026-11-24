@@ -42,9 +42,9 @@ class TraceSpan(BaseModel):
 
     @field_validator("spans", mode="before")
     @classmethod
-    def folha_sem_filhos(cls, v: Any) -> Any:
+    def folha_sem_filhos(cls, child_spans: Any) -> Any:
         # o Agno manda None nas folhas
-        return v or []
+        return child_spans or []
 
 
 class RunTrace(BaseModel):
@@ -58,6 +58,7 @@ class RunTrace(BaseModel):
 
 
 def _load(db: Any, run_id: str) -> TraceDetail | None:
+    """Trace do run com os spans montados em árvore; roda em thread (o banco do Agno é síncrono)."""
     trace = db.get_trace(run_id=run_id)
     if trace is None:
         return None
@@ -66,6 +67,7 @@ def _load(db: Any, run_id: str) -> TraceDetail | None:
 
 @router.get("/{run_id}/trace", response_model=RunTrace)
 async def get_run_trace(run_id: str, request: Request) -> RunTrace:
+    """Árvore de execução do run para o painel; 404 com o tracing desligado."""
     db = getattr(request.app.state, "agno_db", None)
     if db is None:
         raise HTTPException(status_code=404, detail="Tracing desligado")
@@ -76,15 +78,15 @@ async def get_run_trace(run_id: str, request: Request) -> RunTrace:
     owner = detail.user_id == getattr(request.state, "user_id", None)
     if not sees_everyone(request) and not owner:
         raise HTTPException(status_code=403, detail="Permissão insuficiente")
-    data = detail.model_dump()
+    trace_data = detail.model_dump()
     return RunTrace(
-        trace_id=data["trace_id"],
-        run_id=data.get("run_id"),
-        status=data["status"],
-        duration=data["duration"],
-        total_spans=data["total_spans"],
-        error_count=data["error_count"],
-        tree=[TraceSpan.model_validate(node) for node in data["tree"]],
+        trace_id=trace_data["trace_id"],
+        run_id=trace_data.get("run_id"),
+        status=trace_data["status"],
+        duration=trace_data["duration"],
+        total_spans=trace_data["total_spans"],
+        error_count=trace_data["error_count"],
+        tree=[TraceSpan.model_validate(node) for node in trace_data["tree"]],
     )
 
 
@@ -107,17 +109,19 @@ def get_run_reviews(run_id: str, request: Request) -> list[ReviewEntry]:
     dono do run ou o owner.
     """
     with Session(get_engine()) as session:
-        found = RunRepository(session).reviews(run_id)
-        if found is None:
+        run_reviews = RunRepository(session).reviews(run_id)
+        if run_reviews is None:
             raise HTTPException(status_code=404, detail="Run não encontrado")
-        owner_id, entries = found
+        owner_id, entries = run_reviews
         if not sees_everyone(request) and owner_id != getattr(request.state, "user_id", None):
             raise HTTPException(status_code=403, detail="Permissão insuficiente")
         # o registro guarda o id, que não muda; o painel mostra o e-mail de agora
-        emails = _emails(session, {str(e.get("by")) for e in entries})
+        emails = _emails(session, {str(entry.get("by")) for entry in entries})
     return [
-        ReviewEntry.model_validate({**e, "by": emails.get(str(e.get("by")), e.get("by"))})
-        for e in entries
+        ReviewEntry.model_validate(
+            {**entry, "by": emails.get(str(entry.get("by")), entry.get("by"))}
+        )
+        for entry in entries
     ]
 
 

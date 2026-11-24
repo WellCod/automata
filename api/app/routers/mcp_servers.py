@@ -25,8 +25,9 @@ _WRITE = [Depends(require_scopes(Scope.MCP_SERVERS_WRITE))]
 
 
 def to_response(s: McpServer) -> McpServerResponse:
+    """Servidor com o nome dos headers, nunca os valores, e o retrato das tools."""
     tools = (
-        [McpToolInfo.model_validate(t) for t in s.tools_snapshot]
+        [McpToolInfo.model_validate(tool) for tool in s.tools_snapshot]
         if s.tools_snapshot is not None
         else None
     )
@@ -46,10 +47,15 @@ def to_response(s: McpServer) -> McpServerResponse:
 
 
 def actor(request: Request) -> str:
+    """Quem fez a escrita; "panel" quando a requisição não traz usuário."""
     return str(getattr(request.state, "user_id", None) or "panel")
 
 
 def _apply(server: McpServer, body: McpServerInput, author: str) -> None:
+    """Copia o corpo para o servidor, conferindo a URL e cifrando os headers.
+
+    `headers` ausente mantém os gravados; vazio apaga.
+    """
     url = str(body.url)
     try:
         check_url(url)
@@ -69,8 +75,8 @@ def _apply(server: McpServer, body: McpServerInput, author: str) -> None:
     server.updated_by = author
 
 
-def _get_or_404(repo: McpServerRepository, server_id: UUID) -> McpServer:
-    server = repo.get(server_id)
+def _get_or_404(server_repo: McpServerRepository, server_id: UUID) -> McpServer:
+    server = server_repo.get(server_id)
     if server is None:
         raise HTTPException(status_code=404, detail="Servidor MCP não encontrado")
     return server
@@ -78,7 +84,7 @@ def _get_or_404(repo: McpServerRepository, server_id: UUID) -> McpServer:
 
 @router.get("", response_model=list[McpServerResponse])
 def list_servers(session: SessionDep) -> list[McpServerResponse]:
-    return [to_response(s) for s in McpServerRepository(session).list_all()]
+    return [to_response(server) for server in McpServerRepository(session).list_all()]
 
 
 @router.get("/{server_id}", response_model=McpServerResponse)
@@ -88,12 +94,12 @@ def get_server(server_id: UUID, session: SessionDep) -> McpServerResponse:
 
 @router.post("", response_model=McpServerResponse, status_code=201, dependencies=_WRITE)
 def create_server(body: McpServerInput, session: SessionDep, request: Request) -> McpServerResponse:
-    repo = McpServerRepository(session)
-    if repo.find_conflict(body.name, body.slug) is not None:
+    server_repo = McpServerRepository(session)
+    if server_repo.find_conflict(body.name, body.slug) is not None:
         raise HTTPException(status_code=409, detail="Já existe servidor com esse nome ou slug")
     server = McpServer(header_names=[], url="")
     _apply(server, body, actor(request))
-    repo.add(server)
+    server_repo.add(server)
     session.commit()
     session.refresh(server)
     logger.info("mcp server criado", extra={"server_id": str(server.id), "slug": server.slug})
@@ -104,9 +110,9 @@ def create_server(body: McpServerInput, session: SessionDep, request: Request) -
 def update_server(
     server_id: UUID, body: McpServerInput, session: SessionDep, request: Request
 ) -> McpServerResponse:
-    repo = McpServerRepository(session)
-    server = _get_or_404(repo, server_id)
-    if repo.find_conflict(body.name, body.slug, exclude=server_id) is not None:
+    server_repo = McpServerRepository(session)
+    server = _get_or_404(server_repo, server_id)
+    if server_repo.find_conflict(body.name, body.slug, exclude=server_id) is not None:
         raise HTTPException(status_code=409, detail="Já existe servidor com esse nome ou slug")
     _apply(server, body, actor(request))
     session.commit()
@@ -117,8 +123,8 @@ def update_server(
 
 @router.delete("/{server_id}", status_code=204, dependencies=_WRITE)
 def delete_server(server_id: UUID, session: SessionDep) -> None:
-    repo = McpServerRepository(session)
-    repo.delete(_get_or_404(repo, server_id))
+    server_repo = McpServerRepository(session)
+    server_repo.delete(_get_or_404(server_repo, server_id))
     session.commit()
     logger.info("mcp server removido", extra={"server_id": str(server_id)})
 
@@ -134,14 +140,14 @@ async def discover(server_id: UUID, session: SessionDep) -> McpServerResponse:
     Liberado para quem edita agentes (não só owner): não muda URL nem
     credencial, só atualiza a lista de tools que o painel oferece.
     """
-    repo = McpServerRepository(session)
-    server = await run_in_threadpool(_get_or_404, repo, server_id)
+    server_repo = McpServerRepository(session)
+    server = await run_in_threadpool(_get_or_404, server_repo, server_id)
     try:
         tools = await discover_tools(server)
     except (McpUnavailable, EgressDenied, SecretsKeyMissing) as exc:
         logger.warning("descoberta mcp falhou", extra={"server_id": str(server_id)})
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    server.tools_snapshot = [t.model_dump(mode="json") for t in tools]
+    server.tools_snapshot = [tool.model_dump(mode="json") for tool in tools]
     server.tools_discovered_at = datetime.now(UTC)
     await run_in_threadpool(session.commit)
     await run_in_threadpool(session.refresh, server)

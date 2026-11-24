@@ -89,7 +89,7 @@ def version_stats(
     session: Session, config_id: UUID, version: AgentConfigVersion, since: datetime | None
 ) -> VersionStats:
     """Conversas da versão desde o início do canário; testes da suíte ficam fora."""
-    where: list[Any] = [
+    run_filters: list[Any] = [
         AgentRun.agent_config_id == config_id,
         AgentRun.version_id == version.id,
         AgentRun.eval_run_id.is_(None),
@@ -97,22 +97,22 @@ def version_stats(
         AgentRun.parent_run_id.is_(None),
     ]
     if since is not None:
-        where.append(AgentRun.created_at >= since)
-    row = session.execute(
+        run_filters.append(AgentRun.created_at >= since)
+    run_totals = session.execute(
         select(
             func.count(AgentRun.id),
             func.coalesce(func.sum(case((AgentRun.status == "error", 1), else_=0)), 0),
             func.percentile_cont(0.5).within_group(AgentRun.duration_ms),
             func.percentile_cont(0.95).within_group(AgentRun.duration_ms),
-        ).where(*where)
+        ).where(*run_filters)
     ).one()
-    runs, errors = int(row[0]), int(row[1])
-    cost = session.scalar(
+    runs, errors = int(run_totals[0]), int(run_totals[1])
+    total_cost = session.scalar(
         select(func.sum(UsageEvent.cost)).where(
-            UsageEvent.run_id.in_(select(AgentRun.run_id).where(*where))
+            UsageEvent.run_id.in_(select(AgentRun.run_id).where(*run_filters))
         )
     )
-    latest = session.scalars(
+    latest_suite_run = session.scalars(
         select(EvalRun)
         .where(EvalRun.version_id == version.id)
         .order_by(EvalRun.created_at.desc())
@@ -124,26 +124,29 @@ def version_stats(
         runs=runs,
         errors=errors,
         error_rate=errors / runs if runs else 0.0,
-        p50_ms=float(row[2]) if row[2] is not None else None,
-        p95_ms=float(row[3]) if row[3] is not None else None,
-        avg_cost=float(cost) / runs if cost is not None and runs else None,
+        p50_ms=float(run_totals[2]) if run_totals[2] is not None else None,
+        p95_ms=float(run_totals[3]) if run_totals[3] is not None else None,
+        avg_cost=float(total_cost) / runs if total_cost is not None and runs else None,
         suite=SuiteResult(
-            status=latest.status,
-            total=latest.total,
-            passed=latest.passed,
-            failed=latest.failed,
-            created_at=latest.created_at,
+            status=latest_suite_run.status,
+            total=latest_suite_run.total,
+            passed=latest_suite_run.passed,
+            failed=latest_suite_run.failed,
+            created_at=latest_suite_run.created_at,
         )
-        if latest is not None
+        if latest_suite_run is not None
         else None,
     )
 
 
 def _state(session: Session, config: AgentConfig) -> CanaryState:
-    repo = ConfigRepository(session)
+    """Estado do canário com os números da vigente e do canário no mesmo intervalo."""
+    config_repo = ConfigRepository(session)
     since = config.canary_started_at
-    current = repo.get_version(config.current_version_id) if config.current_version_id else None
-    canary = repo.get_version(config.canary_version_id) if config.canary_version_id else None
+    current = (
+        config_repo.get_version(config.current_version_id) if config.current_version_id else None
+    )
+    canary = config_repo.get_version(config.canary_version_id) if config.canary_version_id else None
     return CanaryState(
         active=canary is not None,
         percent=config.canary_percent,
@@ -162,12 +165,13 @@ def get_canary(config_id: UUID, session: SessionDep) -> CanaryState:
 def start_canary(
     config_id: UUID, body: CanaryStart, session: SessionDep, request: Request
 ) -> CanaryState:
+    """Liga o canário com uma versão publicada ou com o rascunho publicado na hora."""
     config = _config_or_404(session, config_id, lock=True)
     if config.canary_version_id is not None:
         raise HTTPException(status_code=409, detail="Já há um canário; promova ou desligue antes")
     if config.current_version_id is None:
         raise HTTPException(status_code=409, detail="Publique uma primeira versão antes")
-    repo = ConfigRepository(session)
+    config_repo = ConfigRepository(session)
     if body.version_id is None:
         # mesmo gate da publicação: o canário recebe conversa de verdade
         if config.require_passing_evals:
@@ -177,25 +181,25 @@ def start_canary(
                     status_code=409, detail=f"Canário exige a suíte verde: {verdict.reason}"
                 )
         service = ConfigService(
-            repo, McpServerRepository(session), KnowledgeBaseRepository(session)
+            config_repo, McpServerRepository(session), KnowledgeBaseRepository(session)
         )
         try:
             version = service.publish_canary(config_id, author="panel")
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     else:
-        found = repo.get_version(body.version_id)
+        chosen_version = config_repo.get_version(body.version_id)
         if (
-            found is None
-            or found.config_id != config_id
-            or found.status != ConfigPayloadStatus.published
+            chosen_version is None
+            or chosen_version.config_id != config_id
+            or chosen_version.status != ConfigPayloadStatus.published
         ):
             raise HTTPException(
                 status_code=422, detail="Versão publicada deste config não encontrada"
             )
-        if found.id == config.current_version_id:
+        if chosen_version.id == config.current_version_id:
             raise HTTPException(status_code=422, detail="Essa já é a versão vigente")
-        version = found
+        version = chosen_version
     config.canary_version_id = version.id
     config.canary_percent = body.percent
     config.canary_started_at = datetime.now(UTC)
@@ -225,6 +229,7 @@ def change_percent(
 
 @router.post("/promote", response_model=CanaryState, dependencies=_PUBLISH)
 def promote(config_id: UUID, session: SessionDep, request: Request) -> CanaryState:
+    """Torna o canário a versão vigente e desliga o canário."""
     config = _config_or_404(session, config_id, lock=True)
     if config.canary_version_id is None:
         raise HTTPException(status_code=409, detail="Não há canário ligado")
@@ -241,6 +246,7 @@ def promote(config_id: UUID, session: SessionDep, request: Request) -> CanarySta
 
 @router.delete("", response_model=CanaryState, dependencies=_PUBLISH)
 def stop(config_id: UUID, session: SessionDep, request: Request) -> CanaryState:
+    """Desliga o canário; a vigente volta a receber todas as conversas."""
     config = _config_or_404(session, config_id, lock=True)
     if config.canary_version_id is None:
         raise HTTPException(status_code=409, detail="Não há canário ligado")

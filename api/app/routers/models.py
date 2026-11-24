@@ -22,8 +22,9 @@ def list_prices(response: Response) -> dict[str, dict[str, float]]:
 
 @router.get("/capabilities")
 def list_capabilities(response: Response) -> dict[str, dict[str, bool]]:
+    """O que cada modelo aceita; muda só com deploy, por isso o cache longo e público."""
     response.headers["Cache-Control"] = "public, max-age=86400"
-    return {model_id: asdict(caps) for model_id, caps in all_capabilities().items()}
+    return {model_id: asdict(capabilities) for model_id, capabilities in all_capabilities().items()}
 
 
 @router.get("/availability")

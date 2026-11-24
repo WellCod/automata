@@ -58,57 +58,60 @@ def _connector_or_404(session: Session, base_id: UUID, connector_id: UUID) -> Kn
     return connector
 
 
-def _response(session: Session, c: KnowledgeConnector) -> ConnectorResponse:
-    count = session.scalar(
+def _response(session: Session, connector: KnowledgeConnector) -> ConnectorResponse:
+    """Conector sem a credencial (só se existe) e com quantos conteúdos trouxe."""
+    content_count = session.scalar(
         select(func.count())
         .select_from(KnowledgeContent)
-        .where(KnowledgeContent.connector_id == c.id)
+        .where(KnowledgeContent.connector_id == connector.id)
     )
     return ConnectorResponse(
-        id=c.id,
-        base_id=c.base_id,
-        kind=c.kind,
-        name=c.name,
-        settings=c.settings,
-        has_secret=c.secret_encrypted is not None,
-        has_webhook=c.webhook_secret_encrypted is not None,
-        last_status=c.last_status,
-        last_message=c.last_message,
-        last_summary=c.last_summary,
-        last_sync_at=c.last_sync_at,
-        sync_every_hours=c.sync_every_hours,
-        next_sync_at=c.next_sync_at,
-        content_count=int(count or 0),
-        created_by=c.created_by,
-        created_at=c.created_at,
+        id=connector.id,
+        base_id=connector.base_id,
+        kind=connector.kind,
+        name=connector.name,
+        settings=connector.settings,
+        has_secret=connector.secret_encrypted is not None,
+        has_webhook=connector.webhook_secret_encrypted is not None,
+        last_status=connector.last_status,
+        last_message=connector.last_message,
+        last_summary=connector.last_summary,
+        last_sync_at=connector.last_sync_at,
+        sync_every_hours=connector.sync_every_hours,
+        next_sync_at=connector.next_sync_at,
+        content_count=int(content_count or 0),
+        created_by=connector.created_by,
+        created_at=connector.created_at,
     )
 
 
 def _settings(body: ConnectorInput) -> dict[str, Any]:
+    """Valida as configurações pelo schema do tipo do conector e confere as URLs."""
     try:
         settings = SETTINGS_BY_KIND[body.kind].model_validate(body.settings)
     except ValidationError as exc:
         raise HTTPException(status_code=422, detail=exc.errors(include_url=False)) from exc
-    data = settings.model_dump()
+    validated_settings = settings.model_dump()
     # URL configurável sai pelo mesmo filtro dos servidores MCP
     for key in ("api_url", "endpoint_url"):
-        if data.get(key):
+        if validated_settings.get(key):
             try:
-                check_url(data[key])
+                check_url(validated_settings[key])
             except EgressDenied as exc:
                 raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return data
+    return validated_settings
 
 
 def _sealed(kind: str, secret: dict[str, str]) -> str | None:
+    """Cifra os campos preenchidos do segredo; None quando nenhum veio preenchido."""
     unknown = sorted(set(secret) - set(SECRET_FIELDS[kind]))
     if unknown:
         raise HTTPException(status_code=422, detail=f"segredo com campo desconhecido: {unknown}")
-    values = {k: v for k, v in secret.items() if v}
-    if not values:
+    filled_fields = {field: value for field, value in secret.items() if value}
+    if not filled_fields:
         return None
     try:
-        return encrypt_json(values)
+        return encrypt_json(filled_fields)
     except SecretsKeyMissing as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -126,13 +129,14 @@ def list_connectors(base_id: UUID, session: SessionDep) -> list[ConnectorRespons
         .where(KnowledgeConnector.base_id == base_id)
         .order_by(KnowledgeConnector.created_at)
     ).all()
-    return [_response(session, c) for c in rows]
+    return [_response(session, connector) for connector in rows]
 
 
 @router.post("", response_model=ConnectorResponse, status_code=201, dependencies=_OWNER)
 def create_connector(
     base_id: UUID, body: ConnectorInput, request: Request, session: SessionDep
 ) -> ConnectorResponse:
+    """Cadastra o conector com a credencial cifrada e o próximo horário de sincronização."""
     _base_or_404(session, base_id)
     settings = _settings(body)
     sealed = _sealed(body.kind, body.secret or {})
@@ -161,6 +165,7 @@ def update_connector(
     if body.kind != connector.kind:
         raise HTTPException(status_code=422, detail="o tipo do conector não muda; crie outro")
     settings = _settings(body)
+    # segredo ausente mantém o gravado; presente troca inteiro
     if body.secret is not None:
         sealed = _sealed(body.kind, body.secret)
         _require_secret(body.kind, sealed)
@@ -180,10 +185,10 @@ def delete_connector(base_id: UUID, connector_id: UUID, session: SessionDep) -> 
     """Os conteúdos do conector saem com ele, e os trechos antes."""
     base = _base_or_404(session, base_id)
     connector = _connector_or_404(session, base_id, connector_id)
-    contents = session.scalars(
+    content_ids = session.scalars(
         select(KnowledgeContent.id).where(KnowledgeContent.connector_id == connector_id)
     ).all()
-    for content_id in contents:
+    for content_id in content_ids:
         remove_chunks(base, content_id)
     session.delete(connector)
     session.commit()
@@ -201,7 +206,7 @@ def test_connector(base_id: UUID, connector_id: UUID, session: SessionDep) -> Co
     max_bytes = get_settings().knowledge_max_upload_mb * 1024 * 1024
     files, _ = selectable(listed, max_bytes, connector.settings)
     return ConnectorTestResult(
-        ok=True, files=len(files), sample=[f.path for f in files[:5]], error=None
+        ok=True, files=len(files), sample=[file.path for file in files[:5]], error=None
     )
 
 
@@ -216,12 +221,15 @@ def create_webhook(base_id: UUID, connector_id: UUID, session: SessionDep) -> Co
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     session.commit()
     path = f"/api/v1/knowledge-connectors/{connector.id}/webhook"
-    base = (get_settings().public_base_url or "").rstrip("/")
-    return ConnectorWebhook(secret=secret, url=f"{base}{path}" if base else "", path=path)
+    public_base_url = (get_settings().public_base_url or "").rstrip("/")
+    return ConnectorWebhook(
+        secret=secret, url=f"{public_base_url}{path}" if public_base_url else "", path=path
+    )
 
 
 @router.delete("/{connector_id}/webhook", status_code=204, dependencies=_OWNER)
 def delete_webhook(base_id: UUID, connector_id: UUID, session: SessionDep) -> Response:
+    """Desliga o webhook da origem: a rota pública passa a responder 404."""
     connector = _connector_or_404(session, base_id, connector_id)
     connector.webhook_secret_encrypted = None
     session.commit()
@@ -234,6 +242,7 @@ def delete_webhook(base_id: UUID, connector_id: UUID, session: SessionDep) -> Re
 def sync_connector(
     base_id: UUID, connector_id: UUID, session: SessionDep, background: BackgroundTasks
 ) -> ConnectorResponse:
+    """Marca o conector como em sincronização e dispara a sincronização em background."""
     connector = _connector_or_404(session, base_id, connector_id)
     if connector.last_status == "running":
         raise HTTPException(status_code=409, detail="Sincronização em andamento")

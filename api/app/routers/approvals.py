@@ -68,34 +68,46 @@ def list_pending(
     session: SessionDep,
     agent_id: UUID | None = Query(default=None),  # noqa: B008
 ) -> list[ApprovalItem]:
+    """Runs pausados à espera de decisão humana, com as tools e etapas pendentes."""
     # a pendência traz argumentos de tool e saída de etapa, que são dados da conversa:
     # cada um vê as suas, o owner vê todas (o continue do Agno também exige o dono)
     user_id = None if sees_everyone(request) else str(getattr(request.state, "user_id", ""))
     runs = RunRepository(session).list_paused([agent_id] if agent_id else None, user_id=user_id)
-    ids = list({r.agent_config_id for r in runs})
-    configs = {c.id: c for c in session.scalars(select(AgentConfig).where(AgentConfig.id.in_(ids)))}
-    emails = emails_by_id(session, {r.user_id for r in runs})
+    config_ids = list({run.agent_config_id for run in runs})
+    configs = {
+        config.id: config
+        for config in session.scalars(select(AgentConfig).where(AgentConfig.id.in_(config_ids)))
+    }
+    emails = emails_by_id(session, {run.user_id for run in runs})
     return [
         ApprovalItem(
-            run_id=r.run_id or "",
-            agent_id=r.agent_config_id,
-            agent_name=configs[r.agent_config_id].name if r.agent_config_id in configs else "",
-            kind=configs[r.agent_config_id].kind if r.agent_config_id in configs else "agent",
-            session_id=r.session_id,
-            user_id=r.user_id,
-            requested_by=emails.get(r.user_id, r.user_id),
-            created_at=r.created_at,
+            run_id=paused_run.run_id or "",
+            agent_id=paused_run.agent_config_id,
+            agent_name=(
+                configs[paused_run.agent_config_id].name
+                if paused_run.agent_config_id in configs
+                else ""
+            ),
+            kind=(
+                configs[paused_run.agent_config_id].kind
+                if paused_run.agent_config_id in configs
+                else "agent"
+            ),
+            session_id=paused_run.session_id,
+            user_id=paused_run.user_id,
+            requested_by=emails.get(paused_run.user_id, paused_run.user_id),
+            created_at=paused_run.created_at,
             tools=[
                 PendingTool(
-                    tool_call_id=t.get("tool_call_id"),
-                    tool_name=t.get("tool_name"),
-                    tool_args=t.get("tool_args"),
-                    tool_execution=t,
+                    tool_call_id=pending_tool.get("tool_call_id"),
+                    tool_name=pending_tool.get("tool_name"),
+                    tool_args=pending_tool.get("tool_args"),
+                    tool_execution=pending_tool,
                 )
-                for t in r.pending_tools or []
+                for pending_tool in paused_run.pending_tools or []
             ],
-            steps=[PendingStep.model_validate(step) for step in r.pending_steps or []],
+            steps=[PendingStep.model_validate(step) for step in paused_run.pending_steps or []],
         )
-        for r in runs
-        if r.run_id
+        for paused_run in runs
+        if paused_run.run_id
     ]

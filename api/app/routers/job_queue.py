@@ -43,14 +43,16 @@ class QueueSummary(BaseModel):
 
 @router.get("", response_model=QueueSummary)
 def get_queue(session: SessionDep) -> QueueSummary:
+    """Contagem por status e os jobs recentes da fila durável do Agno."""
     if not job_queue.durable():
         return QueueSummary(durable=False, counts={}, oldest_queued_at=None, jobs=[])
-    data = job_queue.summary(session)
-    return QueueSummary(durable=True, **data)
+    queue_summary = job_queue.summary(session)
+    return QueueSummary(durable=True, **queue_summary)
 
 
 @router.post("/jobs/{job_id}/requeue", status_code=202)
 def requeue_job(job_id: str, request: Request) -> dict[str, str]:
+    """Põe de volta na fila um job que falhou ou foi cancelado."""
     if not job_queue.durable():
         raise HTTPException(status_code=409, detail="Fila durável desligada")
     if not job_queue.requeue(job_id):

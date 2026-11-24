@@ -43,11 +43,12 @@ def _email_ref(email: str) -> str:
 
 
 def _require_admin(authorization: str = Header(...)) -> None:
+    """Só deixa passar token com `agent_os:admin` (criação de usuário pela rota antiga)."""
     token = bearer_token(authorization)
     try:
         payload = decode_token(token)
-    except jwt.InvalidTokenError as e:
-        raise HTTPException(status_code=401, detail="Token inválido") from e
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(status_code=401, detail="Token inválido") from exc
     if "agent_os:admin" not in payload.get("scopes", []):
         raise HTTPException(status_code=403, detail="Permissão insuficiente")
 
@@ -75,6 +76,7 @@ def _audit_login(
 
 @router.post("/login", response_model=TokenResponse)
 def login(request: Request, body: LoginInput, session: SessionDep) -> TokenResponse:
+    """Login por e-mail e senha, com limite por IP e por e-mail e registro na trilha."""
     ip = known_client_ip(request)
     email_ref = _email_ref(body.email)
     logger.info("login attempt", extra={"ip": ip or "desconhecido", "email_ref": email_ref})
@@ -87,23 +89,25 @@ def login(request: Request, body: LoginInput, session: SessionDep) -> TokenRespo
         limiter.check(f"login:ip:{ip}", limit=_LOGIN_LIMIT_PER_IP)
         limiter.check(f"login:email:{email}:{ip}")
     limiter.check(f"login:email:{email}", limit=_LOGIN_LIMIT_PER_EMAIL)
-    svc = UserService(UserRepository(session))
+    user_service = UserService(UserRepository(session))
+    # A resposta de falha é a mesma para e-mail inexistente e senha errada; o
+    # authenticate roda o argon2 nos dois casos para o tempo não denunciar a conta
     try:
-        user = svc.authenticate(body.email, body.password)
+        user = user_service.authenticate(body.email, body.password)
         user_id = str(user.id)
         user_role = user.role
-        must_change = user.must_change_password
+        must_change_password = user.must_change_password
         # sem login por senha, só o owner de emergência entra assim (ADR-0042)
         if not get_settings().password_login and user_role != UserRole.owner:
             raise ValueError("login por senha desligado")
         session.commit()
-    except ValueError as e:
+    except ValueError as exc:
         logger.warning("login failed", extra={"ip": ip, "email_ref": email_ref})
         _audit_login(request, None, 401, {"email_ref": email_ref, "via": "senha"})
-        raise HTTPException(status_code=401, detail="Credenciais inválidas") from e
+        raise HTTPException(status_code=401, detail="Credenciais inválidas") from exc
     logger.info("login ok", extra={"ip": ip, "user_id": user_id, "role": user_role})
     _audit_login(request, user_id, 200, {"via": "senha"})
-    if must_change:
+    if must_change_password:
         # senha provisória: o token não tem scope, só serve para /me e /me/password
         return TokenResponse(
             access_token=issue_token(user_id, [], extra={"must_change_password": True}),
@@ -149,23 +153,26 @@ def forgot_password(request: Request, body: ForgotPasswordInput, session: Sessio
 def reset_password_with_token(
     request: Request, body: ResetWithTokenInput, session: SessionDep
 ) -> TokenResponse:
+    """Troca a senha pelo link do e-mail e corta as sessões abertas antes da troca."""
     ip = known_client_ip(request)
     if ip is not None:
         request.app.state.rate_limiter.check(f"password-reset:ip:{ip}", limit=_LOGIN_LIMIT_PER_IP)
     try:
-        user, cut = UserService(UserRepository(session)).reset_with_token(
+        user, sessions_cutoff = UserService(UserRepository(session)).reset_with_token(
             body.token, body.new_password, datetime.now(UTC)
         )
     except (ValueError, LookupError) as exc:
         session.rollback()
         raise HTTPException(status_code=400, detail=_BAD_LINK) from exc
-    cut = cut.replace(microsecond=0)
-    user.tokens_valid_after = cut
+    # o corte vale até o fim do segundo; o token novo sai no mesmo segundo
+    sessions_cutoff = sessions_cutoff.replace(microsecond=0)
+    user.tokens_valid_after = sessions_cutoff
     user_id, role = str(user.id), user.role
     session.commit()
-    revoked = getattr(request.app.state, "revoked_tokens", None)
-    if revoked is not None:
-        revoked.cut_now(user_id, cut.timestamp())
+    # avisa o cache de revogação deste processo na hora, sem esperar a recarga
+    revoked_tokens = getattr(request.app.state, "revoked_tokens", None)
+    if revoked_tokens is not None:
+        revoked_tokens.cut_now(user_id, sessions_cutoff.timestamp())
     logger.info("senha redefinida pelo link", extra={"user_id": user_id})
     if not get_settings().password_login and role != UserRole.owner:
         # sem login por senha, só o owner entra assim (ADR-0042)
@@ -179,12 +186,13 @@ def logout(request: Request, session: SessionDep, authorization: str = Header(..
     token = bearer_token(authorization)
     try:
         payload = decode_token(token)
-    except jwt.InvalidTokenError as e:
-        raise HTTPException(status_code=401, detail="Token inválido") from e
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(status_code=401, detail="Token inválido") from exc
     jti = payload.get("jti")
     # token emitido antes do jti existir: não há o que revogar, expira sozinho
     if isinstance(jti, str):
         now = datetime.now(UTC)
+        # grava a revogação e aproveita para limpar as que já expiraram
         session.execute(
             insert(RevokedToken)
             .values(
@@ -207,12 +215,13 @@ def create_user(
     session: SessionDep,
     _: None = Depends(_require_admin),
 ) -> UserResponse:
-    svc = UserService(UserRepository(session))
+    """Cria usuário com senha provisória, que precisa ser trocada no primeiro acesso."""
+    user_service = UserService(UserRepository(session))
     try:
-        user = svc.create_user(
+        user = user_service.create_user(
             email=body.email, password=body.password, role=body.role, must_change=True
         )
-        result = UserResponse(
+        created_user = UserResponse(
             id=user.id,
             email=user.email,
             role=user.role,
@@ -220,9 +229,9 @@ def create_user(
             created_at=user.created_at,
         )
         session.commit()
-    except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e)) from e
-    return result
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return created_user
 
 
 class OidcInfo(BaseModel):
@@ -249,12 +258,15 @@ class OidcCallback(BaseModel):
 @router.get("/oidc", response_model=OidcInfo)
 def oidc_info() -> OidcInfo:
     """O que a tela de login mostra; público, sem nada do provedor além do rótulo."""
-    s = get_settings()
-    return OidcInfo(enabled=oidc.enabled(), label=s.oidc_label, password_login=s.password_login)
+    settings = get_settings()
+    return OidcInfo(
+        enabled=oidc.enabled(), label=settings.oidc_label, password_login=settings.password_login
+    )
 
 
 @router.post("/oidc/start", response_model=OidcStart)
 def oidc_start(request: Request, body: OidcStartInput, session: SessionDep) -> OidcStart:
+    """Devolve a URL do provedor, com o state preso ao segredo do navegador."""
     if not oidc.enabled():
         raise HTTPException(status_code=404, detail="SSO não configurado")
     ip = known_client_ip(request)
@@ -262,12 +274,13 @@ def oidc_start(request: Request, body: OidcStartInput, session: SessionDep) -> O
         request.app.state.rate_limiter.check(f"oidc:start:{ip}", limit=_LOGIN_LIMIT_PER_IP)
     try:
         return OidcStart(url=oidc.start(session, body.browser_key))
-    except oidc.OidcError as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+    except oidc.OidcError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.post("/oidc/callback", response_model=TokenResponse)
 def oidc_callback(request: Request, body: OidcCallback, session: SessionDep) -> TokenResponse:
+    """Fecha o login por SSO: troca o código, confere papel e domínio e emite o token."""
     if not oidc.enabled():
         raise HTTPException(status_code=404, detail="SSO não configurado")
     ip = known_client_ip(request)
@@ -275,9 +288,9 @@ def oidc_callback(request: Request, body: OidcCallback, session: SessionDep) -> 
         request.app.state.rate_limiter.check(f"oidc:callback:{ip}", limit=_LOGIN_LIMIT_PER_IP)
     try:
         identity = oidc.finish(session, body.code, body.state, body.browser_key)
-    except oidc.OidcError as e:
-        logger.warning("sso failed", extra={"ip": ip, "reason": str(e)})
-        raise HTTPException(status_code=401, detail=str(e)) from e
+    except oidc.OidcError as exc:
+        logger.warning("sso failed", extra={"ip": ip, "reason": str(exc)})
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
     role = oidc.role_for(identity)
     if role is None:
         logger.warning("sso sem papel", extra={"ip": ip})
@@ -288,28 +301,29 @@ def oidc_callback(request: Request, body: OidcCallback, session: SessionDep) -> 
         identity.email and identity.email_verified and oidc.domain_allowed(identity.email)
     ):
         raise HTTPException(status_code=403, detail="Domínio de e-mail não autorizado")
-    svc = UserService(UserRepository(session))
+    user_service = UserService(UserRepository(session))
     try:
-        user, cut = svc.sso_login(
+        # sessions_cutoff vem preenchido quando o papel mudou: as sessões antigas caem
+        user, sessions_cutoff = user_service.sso_login(
             issuer=str(oidc.discovery()["issuer"]),
             subject=identity.subject,
             email=identity.email,
             email_verified=identity.email_verified,
             role=role,
         )
-    except PermissionError as e:
+    except PermissionError as exc:
         session.rollback()
-        logger.warning("sso recusado", extra={"ip": ip, "reason": str(e)})
-        raise HTTPException(status_code=403, detail=str(e)) from e
-    if cut is not None:
+        logger.warning("sso recusado", extra={"ip": ip, "reason": str(exc)})
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    if sessions_cutoff is not None:
         # o corte vale até o fim do segundo; o token novo sai no mesmo segundo
-        cut = cut.replace(microsecond=0)
-        user.tokens_valid_after = cut
+        sessions_cutoff = sessions_cutoff.replace(microsecond=0)
+        user.tokens_valid_after = sessions_cutoff
     user_id, user_role = str(user.id), user.role
     session.commit()
-    revoked = getattr(request.app.state, "revoked_tokens", None)
-    if cut is not None and revoked is not None:
-        revoked.cut_now(user_id, cut.timestamp())
+    revoked_tokens = getattr(request.app.state, "revoked_tokens", None)
+    if sessions_cutoff is not None and revoked_tokens is not None:
+        revoked_tokens.cut_now(user_id, sessions_cutoff.timestamp())
     logger.info("sso ok", extra={"ip": ip, "user_id": user_id, "role": user_role})
     _audit_login(request, user_id, 200, {"via": "sso"})
     return TokenResponse(access_token=issue_token(user_id, ROLE_SCOPES[user_role]))
@@ -326,6 +340,7 @@ class InstanceInfo(BaseModel):
 
 @router.get("/instance", response_model=InstanceInfo)
 def instance_info() -> InstanceInfo:
+    """Nome, logo e cotação da instância; logo fora de data URI cai no padrão."""
     settings = get_settings()
     logo = settings.app_logo_url.strip()
     if logo and not logo.startswith("data:image/"):
