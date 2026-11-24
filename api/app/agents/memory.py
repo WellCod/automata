@@ -31,6 +31,7 @@ _custom_by_agent: dict[str, tuple[CustomPattern, ...]] = {}
 
 
 def _masked(text: str | None, custom: tuple[CustomPattern, ...] = ()) -> str | None:
+    """Texto com os dados pessoais trocados pelo rótulo, incluindo os padrões do agente."""
     if not text:
         return text
     # o input cru que o Agno grava junto da memória pode ser enorme: acima do teto do
@@ -49,6 +50,7 @@ class MaskingDb(PostgresDb):
     """PostgresDb que mascara PII de toda memória antes de gravar."""
 
     def upsert_user_memory(self, memory: UserMemory, *args: Any, **kwargs: Any) -> Any:
+        # as escritas do MemoryManager do Agno, da captura e das tools de memória, chegam aqui
         custom = _custom_by_agent.get(owner_of(memory) or "", ())
         memory.memory = _masked(memory.memory, custom) or ""
         memory.input = _masked(memory.input, custom)
@@ -62,6 +64,7 @@ def _memory_db(db_url: str) -> MaskingDb:
 
 
 def memory_db() -> MaskingDb:
+    """Banco de memória da instância, compartilhado por todos os agentes e times."""
     return _memory_db(get_settings().database_url)
 
 
@@ -74,6 +77,7 @@ class AgentMemoryManager(MemoryManager):
         self.team = team
 
     def _read(self, user_id: str | None) -> dict[str, list[UserMemory]] | None:
+        """Memórias do usuário filtradas pelo dono, no formato que o MemoryManager guarda."""
         if self.db is None:
             return None
         if self.team:
@@ -89,6 +93,7 @@ class AgentMemoryManager(MemoryManager):
                 memories.setdefault(memory.user_id, []).append(memory)
         return memories
 
+    # as duas leituras do MemoryManager filtram só por usuário: aqui passam pelo `_read`
     def read_from_db(self, user_id: str | None = None) -> dict[str, list[UserMemory]] | None:
         return self._read(user_id)
 

@@ -8,6 +8,7 @@ import hashlib
 import secrets
 from uuid import UUID
 
+# acima disso o canário deixa de ser a minoria das conversas: aí é publicar
 MAX_PERCENT = 50
 
 
@@ -20,6 +21,7 @@ def bucket(config_id: UUID, session_id: str | None) -> int:
 
 
 def in_canary(config_id: UUID, session_id: str | None, percent: int | None) -> bool:
+    """Se a conversa cai na versão canário, com o percentual limitado a `MAX_PERCENT`."""
     if not percent:
         return False
     return bucket(config_id, session_id) < min(percent, MAX_PERCENT)

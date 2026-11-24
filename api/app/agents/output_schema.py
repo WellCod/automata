@@ -28,23 +28,25 @@ _NESTED_QUANTIFIER = re.compile(r"\((?:[^()\\]|\\.)*[+*}|](?:[^()\\]|\\.)*\)\s*[
 
 
 class _TooBig(Exception):
-    pass
+    """Schema recusado na expansão; a mensagem é o motivo mostrado na escrita."""
 
 
 def _pointer(root: Any, ref: str) -> Any:
+    """Nó apontado por um `$ref` local (`#/...`), com o escape `~0`/`~1` do JSON Pointer."""
     node = root
-    for raw in ref[2:].split("/") if ref != "#" else []:
-        part = raw.replace("~1", "/").replace("~0", "~")
-        if isinstance(node, dict) and part in node:
-            node = node[part]
-        elif isinstance(node, list) and part.isdigit() and int(part) < len(node):
-            node = node[int(part)]
+    for escaped_segment in ref[2:].split("/") if ref != "#" else []:
+        segment = escaped_segment.replace("~1", "/").replace("~0", "~")
+        if isinstance(node, dict) and segment in node:
+            node = node[segment]
+        elif isinstance(node, list) and segment.isdigit() and int(segment) < len(node):
+            node = node[int(segment)]
         else:
             raise _TooBig(f"$ref não encontrado: {ref}")
     return node
 
 
 def _pattern_problem(pattern: Any) -> str | None:
+    """Motivo para recusar uma regex do schema: longa demais ou com risco de backtracking."""
     if not isinstance(pattern, str):
         return None
     if len(pattern) > MAX_PATTERN_CHARS:
@@ -55,18 +57,23 @@ def _pattern_problem(pattern: Any) -> str | None:
 
 
 def _expansion_problem(schema: dict[str, Any]) -> str | None:
-    count = 0
+    """Percorre o schema com os `$ref` expandidos e devolve o primeiro limite estourado.
 
-    def visit(node: Any, depth: int, refs: frozenset[str]) -> None:
-        nonlocal count
-        count += 1
-        if count > MAX_EXPANDED_NODES:
+    Conta cada nó onde ele é usado, não onde é definido: é esse o trabalho que a
+    validação faz por resposta.
+    """
+    visited_nodes = 0
+
+    def visit(node: Any, depth: int, refs_on_path: frozenset[str]) -> None:
+        nonlocal visited_nodes
+        visited_nodes += 1
+        if visited_nodes > MAX_EXPANDED_NODES:
             raise _TooBig(f"schema expandido com mais de {MAX_EXPANDED_NODES} nós")
         if depth > MAX_SCHEMA_DEPTH:
             raise _TooBig(f"schema com mais de {MAX_SCHEMA_DEPTH} níveis")
         if isinstance(node, list):
             for item in node:
-                visit(item, depth + 1, refs)
+                visit(item, depth + 1, refs_on_path)
             return
         if not isinstance(node, dict):
             return
@@ -76,9 +83,10 @@ def _expansion_problem(schema: dict[str, Any]) -> str | None:
         if ref is not None:
             if not isinstance(ref, str) or not (ref == "#" or ref.startswith("#/")):
                 raise _TooBig(f"$ref só para dentro do schema (#/...): {str(ref)[:60]}")
-            if ref in refs:
+            # o mesmo $ref já aberto no caminho até aqui é recursão: a expansão não acabaria
+            if ref in refs_on_path:
                 raise _TooBig(f"$ref recursivo: {ref}")
-            visit(_pointer(schema, ref), depth + 1, refs | {ref})
+            visit(_pointer(schema, ref), depth + 1, refs_on_path | {ref})
         for key, value in node.items():
             if key in ("$ref", "$defs", "definitions"):
                 # as definições contam onde são usadas, pela expansão do $ref
@@ -92,7 +100,7 @@ def _expansion_problem(schema: dict[str, Any]) -> str | None:
                     problem = _pattern_problem(pattern)
                     if problem:
                         raise _TooBig(problem)
-            visit(value, depth + 1, refs)
+            visit(value, depth + 1, refs_on_path)
 
     try:
         visit(schema, 0, frozenset())
@@ -131,17 +139,21 @@ def as_json(content: Any) -> Any:
 
 
 def schema_verdict(schema: dict[str, Any], content: Any) -> dict[str, Any]:
-    data = as_json(content)
-    if data is None:
+    """Confere a resposta contra o schema; devolve `passed` e até 5 erros com o caminho."""
+    parsed = as_json(content)
+    if parsed is None:
         return {"passed": False, "errors": ["a resposta não é JSON"]}
-    if len(json.dumps(data, ensure_ascii=False)) > MAX_VALIDATED_CHARS:
+    if len(json.dumps(parsed, ensure_ascii=False)) > MAX_VALIDATED_CHARS:
         return {"passed": False, "errors": ["resposta grande demais para conferir"]}
     errors = sorted(
-        Draft202012Validator(schema).iter_errors(data), key=lambda e: list(e.absolute_path)
+        Draft202012Validator(schema).iter_errors(parsed),
+        key=lambda error: list(error.absolute_path),
     )
     messages = [
-        f"{'/'.join(str(p) for p in e.absolute_path) or '(raiz)'}: {e.message}" for e in errors[:5]
+        f"{'/'.join(str(part) for part in error.absolute_path) or '(raiz)'}: {error.message}"
+        for error in errors[:5]
     ]
+
     return {"passed": not errors, "errors": messages}
 
 

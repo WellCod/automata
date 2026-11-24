@@ -40,6 +40,8 @@ class Match:
 
 @dataclass(frozen=True)
 class CustomPattern:
+    """Padrão próprio do agente: prefixo literal opcional seguido de N a M dígitos."""
+
     label: str
     prefix: str
     min_digits: int
@@ -52,6 +54,8 @@ _SEP = r"[./ -]?"
 
 @lru_cache(maxsize=256)
 def compile_custom(pattern: CustomPattern) -> re.Pattern[str]:
+    """Regex do padrão próprio; o último dígito fica fora do grupo para não haver separador
+    no fim da ocorrência."""
     digits = rf"(?:\d{_SEP}){{{pattern.min_digits - 1},{pattern.max_digits - 1}}}\d(?!\d)"
     if not pattern.prefix:
         return re.compile(rf"(?<!\d){digits}")
@@ -65,41 +69,47 @@ def _digits(text: str) -> str:
 
 
 def cpf_valido(text: str) -> bool:
-    d = _digits(text)
-    if len(d) != 11 or d == d[0] * 11:
+    """Confere os dois dígitos verificadores; dígitos todos iguais não valem."""
+    digits = _digits(text)
+    if len(digits) != 11 or digits == digits[0] * 11:
         return False
+    # cada verificador é o módulo 11 dos dígitos anteriores com pesos decrescentes
     for size in (9, 10):
-        total = sum(int(d[i]) * (size + 1 - i) for i in range(size))
-        if int(d[size]) != (total * 10 % 11) % 10:
+        total = sum(int(digits[i]) * (size + 1 - i) for i in range(size))
+        if int(digits[size]) != (total * 10 % 11) % 10:
             return False
     return True
 
 
 def cnpj_valido(text: str) -> bool:
-    d = _digits(text)
-    if len(d) != 14 or d == d[0] * 14:
+    """Confere os dois dígitos verificadores; dígitos todos iguais não valem."""
+    digits = _digits(text)
+    if len(digits) != 14 or digits == digits[0] * 14:
         return False
     for size in (12, 13):
+        # pesos de 5 (ou 6) a 2 e depois de 9 a 2, pela regra da Receita
         weights = list(range(size - 7, 1, -1)) + list(range(9, 1, -1))
-        total = sum(int(d[i]) * weights[i] for i in range(size))
+        total = sum(int(digits[i]) * weights[i] for i in range(size))
         rest = total % 11
-        if int(d[size]) != (0 if rest < 2 else 11 - rest):
+        if int(digits[size]) != (0 if rest < 2 else 11 - rest):
             return False
     return True
 
 
 def luhn_valido(text: str) -> bool:
-    d = _digits(text)
-    if not 13 <= len(d) <= 19:
+    """Número de cartão de 13 a 19 dígitos que passa no algoritmo de Luhn."""
+    digits = _digits(text)
+    if not 13 <= len(digits) <= 19:
         return False
     total = 0
-    for i, ch in enumerate(reversed(d)):
-        n = int(ch)
-        if i % 2 == 1:
-            n *= 2
-            if n > 9:
-                n -= 9
-        total += n
+    # da direita para a esquerda, dobra um dígito sim e outro não
+    for position, char in enumerate(reversed(digits)):
+        digit = int(char)
+        if position % 2 == 1:
+            digit *= 2
+            if digit > 9:
+                digit -= 9
+        total += digit
     return total % 10 == 0
 
 
@@ -140,35 +150,39 @@ def find_pii(
     starts: list[int] = []
     ends: list[int] = []
 
-    def take(kind: str, m: re.Match[str], label: str | None = None) -> None:
-        start, end = m.span()
-        i = bisect.bisect_right(starts, start)
-        if i > 0 and ends[i - 1] > start:
+    def take(kind: str, regex_match: re.Match[str], label: str | None = None) -> None:
+        """Guarda a ocorrência se ela não se sobrepõe a nenhuma já guardada."""
+        start, end = regex_match.span()
+        insert_at = bisect.bisect_right(starts, start)
+        # o vizinho da esquerda termina depois do início desta
+        if insert_at > 0 and ends[insert_at - 1] > start:
             return
-        if i < len(starts) and starts[i] < end:
+        # o vizinho da direita começa antes do fim desta
+        if insert_at < len(starts) and starts[insert_at] < end:
             return
         found.append(Match(kind, start, end, label))
-        starts.insert(i, start)
-        ends.insert(i, end)
+        starts.insert(insert_at, start)
+        ends.insert(insert_at, end)
 
     for kind, (pattern, valid) in _PATTERNS.items():
         if kind not in types:
             continue
-        for m in pattern.finditer(text):
-            if valid is None or valid(m.group(0)):
-                take(kind, m)
-    for item in custom:
-        for m in compile_custom(item).finditer(text):
-            take(f"custom:{item.label}", m, item.label)
-    return sorted(found, key=lambda m: m.start)
+        for regex_match in pattern.finditer(text):
+            if valid is None or valid(regex_match.group(0)):
+                take(kind, regex_match)
+    for custom_pattern in custom:
+        for regex_match in compile_custom(custom_pattern).finditer(text):
+            take(f"custom:{custom_pattern.label}", regex_match, custom_pattern.label)
+    return sorted(found, key=lambda pii_match: pii_match.start)
 
 
 def mask(text: str, matches: list[Match]) -> str:
-    out = []
-    last = 0
-    for m in matches:
-        out.append(text[last : m.start])
-        out.append(f"[{m.label} removido]" if m.label else _LABEL[m.type])
-        last = m.end
-    out.append(text[last:])
-    return "".join(out)
+    """Troca cada ocorrência pelo rótulo; `matches` precisa vir ordenado e sem sobreposição."""
+    parts = []
+    copied_until = 0
+    for match in matches:
+        parts.append(text[copied_until : match.start])
+        parts.append(f"[{match.label} removido]" if match.label else _LABEL[match.type])
+        copied_until = match.end
+    parts.append(text[copied_until:])
+    return "".join(parts)

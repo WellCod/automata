@@ -22,10 +22,12 @@ from app.schemas.config import (
 
 _TTL = 5.0
 _cache: tuple[float, GuardrailSettings | None] | None = None
+# do mais brando ao mais duro: a combinação fica com o maior
 _PII_ORDER = {"off": 0, "mask": 1, "block": 2}
 
 
 def _union[T](*lists: list[T]) -> list[T]:
+    """União das listas sem repetição, na ordem em que cada item aparece primeiro."""
     return list(dict.fromkeys(item for items in lists for item in items))
 
 
@@ -42,16 +44,22 @@ def floor() -> GuardrailSettings | None:
 
 
 def forget() -> None:
+    """Descarta o piso em cache; a escrita do piso chama para valer já neste worker."""
     global _cache
     _cache = None
 
 
 def _pii(base: PiiRule, own: PiiRule) -> PiiRule:
-    mode = max(base.mode, own.mode, key=lambda m: _PII_ORDER[m])
+    """Modo mais duro, tipos somados e padrões próprios do piso antes dos do agente."""
+    mode = max(base.mode, own.mode, key=lambda pii_mode: _PII_ORDER[pii_mode])
     # tipos de um lado desligado não contam: o padrão do agente é "todos os tipos"
-    types = _union(*(r.types for r in (base, own) if r.mode != "off"))
-    labels = {p.label.lower() for p in base.custom}
-    custom = [*base.custom, *(p for p in own.custom if p.label.lower() not in labels)]
+    types = _union(*(side.types for side in (base, own) if side.mode != "off"))
+    # mesmo rótulo nos dois: fica o do piso
+    floor_labels = {pattern.label.lower() for pattern in base.custom}
+    custom = [
+        *base.custom,
+        *(pattern for pattern in own.custom if pattern.label.lower() not in floor_labels),
+    ]
     return own.model_copy(update={"mode": mode, "types": types, "custom": custom})
 
 
@@ -79,6 +87,7 @@ def merge_classifier[R: (ClassifierRule, OutputClassifierRule)](
 def _tool_results(
     base: ToolResultScreening | None, own: ToolResultScreening | None
 ) -> ToolResultScreening | None:
+    """Exame de tool ligado se um dos lados liga; termos e classificador valem se um pedir."""
     if base is None or own is None:
         return own if base is None else base
     return own.model_copy(
@@ -87,10 +96,11 @@ def _tool_results(
 
 
 def _output(base: OutputRule, own: OutputRule) -> OutputRule:
+    """Regras de saída somadas: a máscara, os termos e o classificador de qualquer lado."""
     return own.model_copy(
         update={
             "pii": base.pii or own.pii,
-            "pii_types": _union(*(r.pii_types for r in (base, own) if r.pii)),
+            "pii_types": _union(*(side.pii_types for side in (base, own) if side.pii)),
             "blocked_terms": _union(base.blocked_terms, own.blocked_terms),
             "classifier": merge_classifier(base.classifier, own.classifier),
         }
@@ -98,9 +108,11 @@ def _output(base: OutputRule, own: OutputRule) -> OutputRule:
 
 
 def effective(base: GuardrailSettings | None, own: GuardrailSettings) -> GuardrailSettings:
+    """Guardrails do agente endurecidos pelo piso `base`; sem piso, os do agente."""
     if base is None:
         return own
-    limits = [v for v in (base.max_input_chars, own.max_input_chars) if v is not None]
+    limits = [limit for limit in (base.max_input_chars, own.max_input_chars) if limit is not None]
+
     return own.model_copy(
         update={
             "pii": _pii(base.pii, own.pii),
