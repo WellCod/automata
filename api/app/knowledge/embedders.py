@@ -33,6 +33,7 @@ EMBEDDERS: dict[EmbedderName, EmbedderSpec] = {
 
 
 def embedding_cost(model: str, tokens: int) -> float | None:
+    """Custo em USD dos tokens embedados; None quando o modelo não está na tabela."""
     for spec in EMBEDDERS.values():
         if spec.model == model:
             return tokens * spec.price_per_mtok / 1_000_000
@@ -63,11 +64,12 @@ class HashEmbedder(Embedder):
 
     def get_embedding(self, text: str) -> list[float]:
         size = self.dimensions or 256
-        vec = [0.0] * size
+        vector = [0.0] * size
+        # cada palavra soma 1 na posição dada pelo hash dela; o vetor sai normalizado
         for word in re.findall(r"\w+", text.lower()):
-            vec[int(hashlib.sha256(word.encode()).hexdigest(), 16) % size] += 1.0
-        norm = math.sqrt(sum(v * v for v in vec)) or 1.0
-        return [v / norm for v in vec]
+            vector[int(hashlib.sha256(word.encode()).hexdigest(), 16) % size] += 1.0
+        norm = math.sqrt(sum(component * component for component in vector)) or 1.0
+        return [component / norm for component in vector]
 
     def get_embedding_and_usage(self, text: str) -> tuple[list[float], dict[str, Any] | None]:
         return self.get_embedding(text), None
@@ -121,6 +123,7 @@ class EmbeddingFailed(RuntimeError):
 
 
 def _tokens(usage: dict[str, Any] | None) -> int:
+    """Tokens do uso devolvido pelo embedder; o nome do campo muda conforme o provedor."""
     if not usage:
         return 0
     return int(usage.get("total_tokens") or usage.get("prompt_tokens") or 0)

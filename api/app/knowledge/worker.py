@@ -27,7 +27,9 @@ from app.models.knowledge_connector import KnowledgeConnector
 logger = logging.getLogger(__name__)
 
 STALE_AFTER = timedelta(minutes=30)
+# a primeira queda devolve o job à fila; a segunda falha de vez
 MAX_ATTEMPTS = 2
+# jobs concluídos ou falhos ficam na tabela por este tempo, para consulta
 KEEP_FINISHED = timedelta(days=7)
 POLL_SECONDS = 2.0
 # bem abaixo do STALE_AFTER: um batimento perdido não devolve o job à fila
@@ -43,6 +45,7 @@ class Claimed:
 
 
 def _fail_target(kind: str, target_id: UUID, message: str) -> None:
+    """Leva a falha do job ao alvo (conteúdo ou conector), onde o painel mostra."""
     if kind in CONTENT_KINDS:
         fail_content(target_id, message)
     elif kind == "sync":
@@ -86,6 +89,7 @@ def recover_stale(now: datetime | None = None) -> tuple[int, int]:
 
 
 def claim(now: datetime | None = None) -> Claimed | None:
+    """Reivindica o job mais antigo da fila; None quando a fila está vazia."""
     with Session(get_engine()) as session:
         job = session.scalars(
             select(IngestJob)
@@ -104,6 +108,7 @@ def claim(now: datetime | None = None) -> Claimed | None:
 
 
 def _finish(job_id: UUID, status: str, error: str | None = None) -> None:
+    """Grava o fim do job."""
     with Session(get_engine()) as session:
         session.execute(
             update(IngestJob)
@@ -133,26 +138,29 @@ def run_once() -> bool:
     job = claim()
     if job is None:
         return False
-    extra = {"job_id": str(job.id), "kind": job.kind, "target_id": str(job.target_id)}
-    stop = threading.Event()
-    beat = threading.Thread(target=_heartbeat, args=(job.id, stop), daemon=True)
-    beat.start()
+    log_extra = {"job_id": str(job.id), "kind": job.kind, "target_id": str(job.target_id)}
+    stop_heartbeat = threading.Event()
+    heartbeat_thread = threading.Thread(
+        target=_heartbeat, args=(job.id, stop_heartbeat), daemon=True
+    )
+    heartbeat_thread.start()
     try:
         execute(job.kind, job.target_id, job.payload)
     except Exception as exc:
         # os caminhos gravam a própria falha; aqui fica o que escapou deles
-        logger.exception("job de ingestão falhou", extra=extra)
+        logger.exception("job de ingestão falhou", extra=log_extra)
         _finish(job.id, "failed", str(exc)[:500])
         _fail_target(job.kind, job.target_id, f"falha na ingestão: {exc}")
         return True
     finally:
-        stop.set()
+        stop_heartbeat.set()
     _finish(job.id, "done")
-    logger.info("job de ingestão concluído", extra=extra)
+    logger.info("job de ingestão concluído", extra=log_extra)
     return True
 
 
 def purge_finished(now: datetime | None = None) -> int:
+    """Apaga os jobs terminados há mais de `KEEP_FINISHED`; devolve quantos saíram."""
     limit = (now or datetime.now(UTC)) - KEEP_FINISHED
     with Session(get_engine()) as session:
         result = session.execute(
@@ -165,6 +173,8 @@ def purge_finished(now: datetime | None = None) -> int:
 
 
 class _Stop:
+    """Tratador de SIGTERM e SIGINT que só pede a parada ao laço principal."""
+
     requested = False
 
     def __call__(self, signum: int, frame: FrameType | None) -> None:
@@ -173,6 +183,7 @@ class _Stop:
 
 
 def main() -> None:
+    """Laço do worker: manutenção da fila a cada minuto e um job por volta."""
     configure_logging()
     stop = _Stop()
     signal.signal(signal.SIGTERM, stop)

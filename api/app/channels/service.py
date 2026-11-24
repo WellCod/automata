@@ -26,6 +26,7 @@ from app.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
+# respostas e motivos gravados nas mensagens e nas conversas do canal
 ONLY_TEXT = "Por enquanto eu só entendo mensagens de texto."
 REASON_KEYWORD = "pedido do cliente"
 REASON_PAUSED = "confirmação de tool pendente"
@@ -39,6 +40,8 @@ PER_SENDER_LIMIT = 20
 
 @dataclass(frozen=True)
 class Saved:
+    """Mensagem recebida já gravada, com o estado da conversa no momento da gravação."""
+
     conversation_id: UUID
     user_id: str
     status: str
@@ -47,34 +50,34 @@ class Saved:
     first: bool = False
 
 
-def _save_inbound(channel_id: UUID, kind: str, msg: providers.Inbound) -> Saved | None:
+def _save_inbound(channel_id: UUID, kind: str, inbound: providers.Inbound) -> Saved | None:
     """Grava a mensagem; None quando é reenvio do provedor."""
     with Session(get_engine()) as session:
-        conv = session.scalars(
+        conversation = session.scalars(
             select(ChannelConversation)
             .where(
                 ChannelConversation.channel_id == channel_id,
-                ChannelConversation.external_id == msg.conversation_key,
+                ChannelConversation.external_id == inbound.conversation_key,
             )
             .with_for_update()
         ).first()
-        if conv is None:
+        if conversation is None:
             # duas mensagens da mesma pessoa nova ao mesmo tempo: a segunda acha a conversa
             session.execute(
                 insert(ChannelConversation)
                 .values(
                     channel_id=channel_id,
-                    external_id=msg.conversation_key,
-                    user_id=providers.user_id(kind, msg.sender),
+                    external_id=inbound.conversation_key,
+                    user_id=providers.user_id(kind, inbound.sender),
                     status="bot",
                 )
                 .on_conflict_do_nothing(index_elements=["channel_id", "external_id"])
             )
-            conv = session.scalars(
+            conversation = session.scalars(
                 select(ChannelConversation)
                 .where(
                     ChannelConversation.channel_id == channel_id,
-                    ChannelConversation.external_id == msg.conversation_key,
+                    ChannelConversation.external_id == inbound.conversation_key,
                 )
                 .with_for_update()
             ).one()
@@ -82,14 +85,17 @@ def _save_inbound(channel_id: UUID, kind: str, msg: providers.Inbound) -> Saved 
             insert(ChannelMessage)
             .values(
                 channel_id=channel_id,
-                conversation_id=conv.id,
-                external_id=msg.external_id,
+                conversation_id=conversation.id,
+                external_id=inbound.external_id,
                 direction="in",
                 author="customer",
-                text=msg.text or "",
+                text=inbound.text or "",
                 status="received",
                 # em thread do Slack quem fala pode não ser quem abriu a conversa (LLM-04)
-                meta={"reply_to": msg.reply_to, "sender": providers.user_id(kind, msg.sender)},
+                meta={
+                    "reply_to": inbound.reply_to,
+                    "sender": providers.user_id(kind, inbound.sender),
+                },
             )
             .on_conflict_do_nothing(
                 index_elements=["channel_id", "external_id"],
@@ -101,17 +107,17 @@ def _save_inbound(channel_id: UUID, kind: str, msg: providers.Inbound) -> Saved 
             session.rollback()
             return None
         # conversa encerrada volta ao bot na mensagem nova
-        if conv.status == "closed":
-            conv.status = "bot"
-            conv.assigned_to = None
-            conv.handoff_reason = None
+        if conversation.status == "closed":
+            conversation.status = "bot"
+            conversation.assigned_to = None
+            conversation.handoff_reason = None
         now = datetime.now(UTC)
-        conv.last_message_at = now
-        first = conv.welcomed_at is None
+        conversation.last_message_at = now
+        first = conversation.welcomed_at is None
         if first:
-            conv.welcomed_at = now
+            conversation.welcomed_at = now
         session.commit()
-        return Saved(conv.id, conv.user_id, conv.status, inserted, first)
+        return Saved(conversation.id, conversation.user_id, conversation.status, inserted, first)
 
 
 def record_outbound(
@@ -125,8 +131,10 @@ def record_outbound(
     external_id: str | None = None,
     run_id: str | None = None,
 ) -> UUID:
+    """Grava a mensagem de saída e atualiza a última atividade da conversa."""
     with Session(get_engine()) as session:
-        msg = ChannelMessage(
+        # o prefixo separa o id do provedor na saída do id da mensagem recebida
+        outbound = ChannelMessage(
             channel_id=channel_id,
             conversation_id=conversation_id,
             external_id=f"out:{external_id}" if external_id else None,
@@ -137,20 +145,21 @@ def record_outbound(
             error=error,
             run_id=run_id,
         )
-        session.add(msg)
-        conv = session.get(ChannelConversation, conversation_id)
-        if conv is not None:
-            conv.last_message_at = datetime.now(UTC)
+        session.add(outbound)
+        conversation = session.get(ChannelConversation, conversation_id)
+        if conversation is not None:
+            conversation.last_message_at = datetime.now(UTC)
         session.commit()
-        return msg.id
+        return outbound.id
 
 
 def _mark(message_id: UUID, status: str, error: str | None = None) -> None:
+    """Atualiza o status da mensagem recebida, com o motivo quando há."""
     with Session(get_engine()) as session:
-        msg = session.get(ChannelMessage, message_id)
-        if msg is not None:
-            msg.status = status
-            msg.error = error
+        message = session.get(ChannelMessage, message_id)
+        if message is not None:
+            message.status = status
+            message.error = error
             session.commit()
 
 
@@ -165,7 +174,7 @@ def deliver(
     """Manda pelo provedor e grava a mensagem de saída, enviada ou com o motivo da falha."""
     creds = decrypt_json(channel.credentials_encrypted)
     try:
-        external = providers.send(channel.kind, creds, reply_to, text)
+        external_message_id = providers.send(channel.kind, creds, reply_to, text)
     except providers.SendError as exc:
         record_outbound(
             channel.id,
@@ -183,27 +192,28 @@ def deliver(
         author,
         text,
         status="sent",
-        external_id=external,
+        external_id=external_message_id,
         run_id=run_id,
     )
     return True, None
 
 
 def _status(conversation_id: UUID) -> str | None:
+    """Status atual da conversa (bot, human ou closed); None quando ela sumiu."""
     with Session(get_engine()) as session:
-        conv = session.get(ChannelConversation, conversation_id)
-        return conv.status if conv is not None else None
+        conversation = session.get(ChannelConversation, conversation_id)
+        return conversation.status if conversation is not None else None
 
 
 def handoff(conversation_id: UUID, reason: str, assigned_to: str | None = None) -> bool:
     """Passa a conversa para uma pessoa; False quando ela já estava com uma."""
     with Session(get_engine()) as session:
-        conv = session.get(ChannelConversation, conversation_id, with_for_update=True)
-        if conv is None or conv.status == "human":
+        conversation = session.get(ChannelConversation, conversation_id, with_for_update=True)
+        if conversation is None or conversation.status == "human":
             return False
-        conv.status = "human"
-        conv.handoff_reason = reason[:255]
-        conv.assigned_to = assigned_to
+        conversation.status = "human"
+        conversation.handoff_reason = reason[:255]
+        conversation.assigned_to = assigned_to
         session.commit()
         return True
 
@@ -211,7 +221,9 @@ def handoff(conversation_id: UUID, reason: str, assigned_to: str | None = None) 
 def wants_out(channel: Channel, text: str) -> bool:
     """Mensagem que é só a palavra de saída: "sair" no meio de uma frase não encerra."""
     folded = " ".join(_fold(text).split())
-    return any(folded == " ".join(_fold(k).split()) for k in channel.exit_keywords or [])
+    return any(
+        folded == " ".join(_fold(keyword).split()) for keyword in channel.exit_keywords or []
+    )
 
 
 def _close_and_erase(channel_id: UUID, conversation_id: UUID, user_id: str) -> None:
@@ -219,10 +231,10 @@ def _close_and_erase(channel_id: UUID, conversation_id: UUID, user_id: str) -> N
     from app.data_subjects import new_erase_request, run_erase
 
     with Session(get_engine()) as session:
-        conv = session.get(ChannelConversation, conversation_id)
-        if conv is not None:
-            conv.status = "closed"
-            conv.assigned_to = None
+        conversation = session.get(ChannelConversation, conversation_id)
+        if conversation is not None:
+            conversation.status = "closed"
+            conversation.assigned_to = None
         session.commit()
         request_id = new_erase_request(session, user_id, f"channel:{channel_id}", "channel")
     run_erase(request_id, user_id)
@@ -241,14 +253,18 @@ def wants_human(channel: Channel, text: str) -> bool:
 
 
 def _fold(text: str) -> str:
+    """Minúsculo, sem acento e com pontuação trocada por espaço, para comparar palavras."""
     import unicodedata
 
     plain = unicodedata.normalize("NFKD", text.lower())
-    plain = "".join(c for c in plain if not unicodedata.combining(c))
-    return "".join(c if c.isalnum() or c.isspace() else " " for c in plain)
+    plain = "".join(char for char in plain if not unicodedata.combining(char))
+    return "".join(char if char.isalnum() or char.isspace() else " " for char in plain)
 
 
 def _handoff_tool(asked: list[str]) -> Any:
+    """Tool de passagem para atendente; o motivo pedido pelo modelo vai para `asked`."""
+
+    # o nome e o parâmetro `motivo` são lidos pelo Agno e descritos ao modelo: não renomear
     def transferir_para_atendente(motivo: str) -> str:
         """Passa a conversa para uma pessoa da equipe. Use quando o cliente pedir para
         falar com alguém, quando você não puder resolver ou quando o assunto pedir uma
@@ -281,6 +297,7 @@ def _responder(config: AgentConfig, session_id: str, user_id: str) -> Any:
 
 
 def _text(run: Any) -> str:
+    """Conteúdo da resposta do run como texto, vazio quando não houve."""
     content = getattr(run, "content", None)
     if content is None:
         return ""
@@ -295,6 +312,7 @@ async def answer(
     reply: dict[str, str],
     sender: str | None = None,
 ) -> None:
+    """Roda o agente na sessão da conversa e manda a resposta, ou passa para atendente."""
     session_id = str(saved.conversation_id)
     # quem mandou esta mensagem: na thread do Slack não é sempre quem abriu (LLM-04)
     user_id = sender or saved.user_id
@@ -342,6 +360,7 @@ async def answer(
 
 
 def _load(channel_id: UUID) -> tuple[Channel, AgentConfig] | None:
+    """Canal ligado e o config que responde por ele, fora da sessão."""
     with Session(get_engine()) as session:
         channel = session.get(Channel, channel_id)
         if channel is None or not channel.enabled:
@@ -360,36 +379,36 @@ async def handle(channel_id: UUID, messages: list[providers.Inbound], limiter: A
     if loaded is None:
         return
     channel, config = loaded
-    for msg in messages:
-        saved = await asyncio.to_thread(_save_inbound, channel.id, channel.kind, msg)
+    for inbound in messages:
+        saved = await asyncio.to_thread(_save_inbound, channel.id, channel.kind, inbound)
         if saved is None:
             continue
         if limiter is not None:
             try:
-                limiter.check(f"channel:{channel.id}:{msg.sender}", limit=PER_SENDER_LIMIT)
+                limiter.check(f"channel:{channel.id}:{inbound.sender}", limit=PER_SENDER_LIMIT)
                 daily = get_settings().channel_daily_limit_per_sender
                 if daily > 0:
                     # 20 por minuto ainda davam 28.800 por dia a um número só (LLM-05)
                     limiter.check(
-                        f"channel-day:{channel.id}:{msg.sender}", limit=daily, window=86400
+                        f"channel-day:{channel.id}:{inbound.sender}", limit=daily, window=86400
                     )
             except HTTPException:
                 # só o 429 é limite; outra falha marcava a mensagem com motivo falso (OPS-06)
                 await asyncio.to_thread(_mark, saved.message_id, "ignored", "limite por minuto")
                 continue
-        if msg.text is None:
+        if inbound.text is None:
             await asyncio.to_thread(_mark, saved.message_id, "ignored", "não é texto")
             await asyncio.to_thread(
-                deliver, channel, saved.conversation_id, msg.reply_to, ONLY_TEXT, "system"
+                deliver, channel, saved.conversation_id, inbound.reply_to, ONLY_TEXT, "system"
             )
             continue
-        if wants_out(channel, msg.text):
+        if wants_out(channel, inbound.text):
             # a saída vale também com uma pessoa atendendo (ADR-0045)
             await asyncio.to_thread(_mark, saved.message_id, "answered")
             await asyncio.to_thread(
-                deliver, channel, saved.conversation_id, msg.reply_to, EXIT_MESSAGE, "system"
+                deliver, channel, saved.conversation_id, inbound.reply_to, EXIT_MESSAGE, "system"
             )
-            sender = providers.user_id(channel.kind, msg.sender)
+            sender = providers.user_id(channel.kind, inbound.sender)
             await asyncio.to_thread(_close_and_erase, channel.id, saved.conversation_id, sender)
             continue
         if saved.status != "bot":
@@ -400,17 +419,17 @@ async def handle(channel_id: UUID, messages: list[providers.Inbound], limiter: A
                 deliver,
                 channel,
                 saved.conversation_id,
-                msg.reply_to,
+                inbound.reply_to,
                 channel.welcome_message.strip(),
                 "system",
             )
-        if wants_human(channel, msg.text):
+        if wants_human(channel, inbound.text):
             if await asyncio.to_thread(handoff, saved.conversation_id, REASON_KEYWORD):
                 await asyncio.to_thread(
                     deliver,
                     channel,
                     saved.conversation_id,
-                    msg.reply_to,
+                    inbound.reply_to,
                     channel.handoff_message,
                     "system",
                 )
@@ -419,9 +438,9 @@ async def handle(channel_id: UUID, messages: list[providers.Inbound], limiter: A
             channel,
             config,
             saved,
-            msg.text,
-            msg.reply_to,
-            sender=providers.user_id(channel.kind, msg.sender),
+            inbound.text,
+            inbound.reply_to,
+            sender=providers.user_id(channel.kind, inbound.sender),
         )
 
 
@@ -444,9 +463,10 @@ def _claim_stuck(now: datetime) -> list[UUID]:
                 ChannelConversation.status == "bot",
             )
             .with_for_update(of=ChannelMessage, skip_locked=True)
+            # lote por rodada do poller: o resto fica para a próxima
             .limit(20)
         ).all()
-        retry: list[UUID] = []
+        retry_ids: list[UUID] = []
         for message_id, created_at in rows:
             message = session.get(ChannelMessage, message_id)
             if message is None:
@@ -456,27 +476,29 @@ def _claim_stuck(now: datetime) -> list[UUID]:
                 message.error = "interrompida antes da resposta"
             else:
                 message.status = RETRYING
-                retry.append(message_id)
+                retry_ids.append(message_id)
         session.commit()
-        return retry
+        return retry_ids
 
 
+# canal, config, mensagem gravada, texto, destino da resposta e remetente
 _Stuck = tuple[Channel, AgentConfig, Saved, str, dict[str, str], str]
 
 
 def _stuck_context(message_id: UUID) -> _Stuck | None:
+    """Remonta o que o `answer` precisa a partir da mensagem gravada."""
     with Session(get_engine()) as session:
         message = session.get(ChannelMessage, message_id)
         if message is None:
             return None
-        conv = session.get(ChannelConversation, message.conversation_id)
-        if conv is None:
+        conversation = session.get(ChannelConversation, message.conversation_id)
+        if conversation is None:
             return None
-        meta = message.meta or {}
-        sender = str(meta.get("sender") or conv.user_id)
-        reply = dict(meta.get("reply_to") or {})
-        saved = Saved(conv.id, conv.user_id, conv.status, message.id)
-        channel_id = conv.channel_id
+        message_meta = message.meta or {}
+        sender = str(message_meta.get("sender") or conversation.user_id)
+        reply = dict(message_meta.get("reply_to") or {})
+        saved = Saved(conversation.id, conversation.user_id, conversation.status, message.id)
+        channel_id = conversation.channel_id
         text = message.text
     loaded = _load(channel_id)
     if loaded is None:

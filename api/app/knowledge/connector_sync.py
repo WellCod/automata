@@ -36,7 +36,9 @@ from app.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
+# teto de arquivos por sincronização; o excedente conta como pulado
 MAX_FILES = 500
+# tamanho máximo da mensagem de erro gravada no conector
 _MAX_MESSAGE = 500
 
 
@@ -71,16 +73,17 @@ def selectable(
     """
     include = list((settings or {}).get("include") or [])
     exclude = list((settings or {}).get("exclude") or [])
-    files = [f for f in files if allowed(f.path, include, exclude)]
+    files = [file for file in files if allowed(file.path, include, exclude)]
     chosen = [
-        f
-        for f in files
-        if f.extension in SUPPORTED and (f.size == UNKNOWN_SIZE or 0 < f.size <= max_bytes)
+        file
+        for file in files
+        if file.extension in SUPPORTED and (file.size == UNKNOWN_SIZE or 0 < file.size <= max_bytes)
     ]
     skipped = len(files) - len(chosen)
     if len(chosen) > MAX_FILES:
         skipped += len(chosen) - MAX_FILES
-        chosen = sorted(chosen, key=lambda f: f.path)[:MAX_FILES]
+        # ordem por caminho para o corte ser o mesmo a cada sincronização
+        chosen = sorted(chosen, key=lambda file: file.path)[:MAX_FILES]
     return chosen, skipped
 
 
@@ -112,11 +115,12 @@ def plan(known: Known, files: list[RemoteFile]) -> SyncPlan:
             unchanged += 1
             continue
         fetch.append((file, current[0] if current else None))
-    gone = [cid for path, (cid, _, _) in known.items() if path not in seen]
+    gone = [content_id for path, (content_id, _, _) in known.items() if path not in seen]
     return SyncPlan(fetch=fetch, unchanged=unchanged, gone=gone)
 
 
 def _finish(connector_id: UUID, status: str, message: str | None, summary: SyncSummary) -> None:
+    """Grava no conector o resultado da sincronização."""
     with Session(get_engine()) as session:
         session.execute(
             update(KnowledgeConnector)
@@ -132,6 +136,7 @@ def _finish(connector_id: UUID, status: str, message: str | None, summary: SyncS
 
 
 def _beat(connector_id: UUID) -> None:
+    """Renova o batimento da sincronização, que separa conector ativo de conector preso."""
     with Session(get_engine()) as session:
         session.execute(
             update(KnowledgeConnector)
@@ -142,6 +147,7 @@ def _beat(connector_id: UUID) -> None:
 
 
 def _status_of(content_id: UUID) -> str:
+    """Status do conteúdo depois da ingestão; apagado no meio do caminho conta como falha."""
     with Session(get_engine()) as session:
         content = session.get(KnowledgeContent, content_id)
         return content.status if content is not None else "failed"
@@ -190,6 +196,7 @@ def _upsert(
 
 
 def sync(connector_id: UUID) -> SyncSummary:
+    """Sincroniza o conector com a base e grava o resumo nele; nunca levanta."""
     summary = SyncSummary()
     try:
         with Session(get_engine()) as session:
@@ -198,23 +205,24 @@ def sync(connector_id: UUID) -> SyncSummary:
             if connector is None or base is None:
                 return summary
             known: Known = {
-                c.external_path: (c.id, c.external_version, c.status)
-                for c in session.scalars(
+                content.external_path: (content.id, content.external_version, content.status)
+                for content in session.scalars(
                     select(KnowledgeContent).where(KnowledgeContent.connector_id == connector_id)
                 )
-                if c.external_path is not None
+                if content.external_path is not None
             }
+            # conector e base seguem em uso depois que a sessão fecha
             session.expunge_all()
         source = source_of(connector)
         listed = source.list_files()
         summary.truncated = source.truncated
         max_bytes = get_settings().knowledge_max_upload_mb * 1024 * 1024
         files, summary.skipped = selectable(listed, max_bytes, connector.settings)
-        todo = plan(known, files)
-        summary.unchanged = todo.unchanged
-        for file, existing in todo.fetch:
+        sync_plan = plan(known, files)
+        summary.unchanged = sync_plan.unchanged
+        for file, existing in sync_plan.fetch:
             try:
-                data = source.download(file)
+                file_bytes = source.download(file)
             except TooLarge:
                 summary.skipped += 1
                 continue
@@ -222,13 +230,13 @@ def sync(connector_id: UUID) -> SyncSummary:
                 summary.failed += 1
                 summary.errors.append(f"{file.path}: {exc}"[:200])
                 continue
-            if not data or len(data) > max_bytes:
+            if not file_bytes or len(file_bytes) > max_bytes:
                 # tamanho desconhecido na listagem: conferido agora (ADR-0039)
                 summary.skipped += 1
                 continue
             _beat(connector_id)
-            content_id = _upsert(connector, base, file, existing, len(data))
-            ingest(content_id, data)
+            content_id = _upsert(connector, base, file, existing, len(file_bytes))
+            ingest(content_id, file_bytes)
             if _status_of(content_id) != "completed":
                 summary.failed += 1
             elif existing is None:
@@ -236,15 +244,15 @@ def sync(connector_id: UUID) -> SyncSummary:
             else:
                 summary.updated += 1
         # sumiu da origem: sai da base, com os trechos
-        gone = todo.gone
+        gone = sync_plan.gone
         if gone:
-            for cid in gone:
-                remove_chunks(base, cid)
+            for gone_id in gone:
+                remove_chunks(base, gone_id)
             with Session(get_engine()) as session:
-                for cid in gone:
-                    row = session.get(KnowledgeContent, cid)
-                    if row is not None:
-                        session.delete(row)
+                for gone_id in gone:
+                    gone_content = session.get(KnowledgeContent, gone_id)
+                    if gone_content is not None:
+                        session.delete(gone_content)
                 session.commit()
             summary.removed = len(gone)
     except (SourceError, EgressDenied, SecretsKeyMissing) as exc:
@@ -257,6 +265,7 @@ def sync(connector_id: UUID) -> SyncSummary:
         logger.exception("sincronização falhou", extra={"connector_id": str(connector_id)})
         _finish(connector_id, "failed", f"{type(exc).__name__}: {exc}", summary)
         return summary
+    # falha só quando nada entrou: um arquivo ruim não marca a sincronização inteira
     status = "failed" if summary.failed and not (summary.added or summary.updated) else "ok"
     _finish(connector_id, status, None, summary)
     logger.info(

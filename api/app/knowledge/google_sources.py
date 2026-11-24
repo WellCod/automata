@@ -60,8 +60,11 @@ class ServiceAccount:
         self._expires = 0.0
 
     def headers(self) -> dict[str, str]:
+        """Cabeçalho de autorização, trocando o JWT por um token novo quando preciso."""
+        # renova um minuto antes de vencer para o token não expirar no meio da requisição
         if self._token is None or time.time() > self._expires - 60:
             now = int(time.time())
+            # uma hora é a validade máxima que o Google aceita na asserção
             claims = {
                 "iss": self.email,
                 "scope": self._scope,
@@ -75,21 +78,22 @@ class ServiceAccount:
                 )
             except Exception as exc:
                 raise SourceError("chave privada da conta de serviço inválida") from exc
-            resp = self._http.post(
+            response = self._http.post(
                 TOKEN_URI,
                 data={
                     "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
                     "assertion": assertion,
                 },
             )
-            _raise_for(resp, "Google (login da conta de serviço)")
-            body = resp.json()
+            _raise_for(response, "Google (login da conta de serviço)")
+            body = response.json()
             self._token = str(body["access_token"])
             self._expires = time.time() + int(body.get("expires_in") or 3600)
         return {"Authorization": f"Bearer {self._token}"}
 
 
 def _account(secret: dict[str, str], scope: str, http: httpx.Client) -> ServiceAccount:
+    """Conta de serviço do segredo do conector, com erro legível quando o JSON falta."""
     raw = secret.get("service_account_json", "")
     if not raw.strip():
         raise SourceError("o conector do Google precisa do JSON da conta de serviço")
@@ -97,6 +101,8 @@ def _account(secret: dict[str, str], scope: str, http: httpx.Client) -> ServiceA
 
 
 class GDriveSource:
+    """Pasta do Google Drive (ou de um drive compartilhado) com as subpastas."""
+
     def __init__(
         self, settings: GDriveSettings, secret: dict[str, str], client: httpx.Client | None = None
     ) -> None:
@@ -107,9 +113,9 @@ class GDriveSource:
         self._auth = _account(secret, DRIVE_SCOPE, self._http)
 
     def _get(self, url: str, params: dict[str, Any] | None = None) -> httpx.Response:
-        resp = self._http.get(url, params=params, headers=self._auth.headers())
-        _raise_for(resp, "Google Drive")
-        return resp
+        response = self._http.get(url, params=params, headers=self._auth.headers())
+        _raise_for(response, "Google Drive")
+        return response
 
     def _download(self, url: str, params: dict[str, Any]) -> bytes:
         return capped_get(
@@ -117,6 +123,7 @@ class GDriveSource:
         )
 
     def _children(self, folder: str) -> Iterator[dict[str, Any]]:
+        """Itens diretos da pasta, fora da lixeira, seguindo a paginação."""
         params: dict[str, Any] = {
             "q": f"'{folder}' in parents and trashed=false",
             "fields": "nextPageToken,files(id,name,mimeType,md5Checksum,modifiedTime,size)",
@@ -138,6 +145,7 @@ class GDriveSource:
         seen = 0
 
         def walk(folder: str, relative: str, depth: int) -> None:
+            """Lista a pasta e desce nas subpastas até `MAX_DEPTH`."""
             nonlocal seen
             for item in self._children(folder):
                 seen += 1
@@ -147,14 +155,14 @@ class GDriveSource:
                     return
                 name = str(item["name"])
                 path = f"{relative}/{name}" if relative else name
-                mime = str(item.get("mimeType") or "")
-                if mime == FOLDER:
+                mime_type = str(item.get("mimeType") or "")
+                if mime_type == FOLDER:
                     if depth < MAX_DEPTH:
                         walk(str(item["id"]), path, depth + 1)
                     continue
-                if mime in EXPORTS:
+                if mime_type in EXPORTS:
                     # o nativo não tem md5: a versão é a data da última edição
-                    path = f"{path}.{EXPORTS[mime][1]}"
+                    path = f"{path}.{EXPORTS[mime_type][1]}"
                     version = str(item.get("modifiedTime") or "")
                     # o Drive não devolve `size` do nativo
                     size = UNKNOWN_SIZE
@@ -166,18 +174,19 @@ class GDriveSource:
                         path=path,
                         version=version,
                         size=size,
-                        ref=f"{item['id']}|{mime}",
+                        # o tipo vai junto do id para o download saber se exporta
+                        ref=f"{item['id']}|{mime_type}",
                     )
                 )
 
         walk(self.settings.folder_id, "", 0)
-        return [f for f in files if f.extension in SUPPORTED]
+        return [file for file in files if file.extension in SUPPORTED]
 
     def download(self, file: RemoteFile) -> bytes:
-        file_id, _, mime = file.ref.partition("|")
-        if mime in EXPORTS:
+        file_id, _, mime_type = file.ref.partition("|")
+        if mime_type in EXPORTS:
             url = f"{DRIVE}/files/{quote(file_id, safe='')}/export"
-            return self._download(url, {"mimeType": EXPORTS[mime][0]})
+            return self._download(url, {"mimeType": EXPORTS[mime_type][0]})
         params: dict[str, Any] = {"alt": "media"}
         if self.settings.shared_drive:
             params["supportsAllDrives"] = "true"
@@ -185,6 +194,8 @@ class GDriveSource:
 
 
 class GCSSource:
+    """Bucket do Cloud Storage, opcionalmente restrito a um prefixo."""
+
     def __init__(
         self, settings: GCSSettings, secret: dict[str, str], client: httpx.Client | None = None
     ) -> None:
@@ -195,13 +206,15 @@ class GCSSource:
         self._auth = _account(secret, STORAGE_SCOPE, self._http)
 
     def _get(self, url: str, params: dict[str, Any] | None = None) -> httpx.Response:
-        resp = self._http.get(url, params=params, headers=self._auth.headers())
-        _raise_for(resp, f"Cloud Storage {self.settings.bucket}")
-        return resp
+        response = self._http.get(url, params=params, headers=self._auth.headers())
+        _raise_for(response, f"Cloud Storage {self.settings.bucket}")
+        return response
 
     def _download(self, url: str, params: dict[str, Any]) -> bytes:
-        what = f"Cloud Storage {self.settings.bucket}"
-        return capped_get(self._http, url, what, params=params, headers=self._auth.headers())
+        source_label = f"Cloud Storage {self.settings.bucket}"
+        return capped_get(
+            self._http, url, source_label, params=params, headers=self._auth.headers()
+        )
 
     def list_files(self) -> list[RemoteFile]:
         prefix = self.settings.prefix.strip("/")
@@ -211,20 +224,21 @@ class GCSSource:
         seen = 0
         while True:
             page = self._get(f"{STORAGE}/b/{bucket}/o", params).json()
-            for obj in page.get("items", []):
+            for blob in page.get("items", []):
                 seen += 1
                 if seen > MAX_LISTED:
                     self.truncated = True
                     return files
-                key = str(obj["name"])
+                key = str(blob["name"])
                 relative = _inside(key, prefix)
+                # chave terminada em barra é o marcador de pasta, sem conteúdo
                 if relative is None or key.endswith("/"):
                     continue
                 files.append(
                     RemoteFile(
                         path=relative,
-                        version=str(obj.get("generation") or obj.get("md5Hash") or ""),
-                        size=int(obj.get("size") or 0),
+                        version=str(blob.get("generation") or blob.get("md5Hash") or ""),
+                        size=int(blob.get("size") or 0),
                         ref=key,
                     )
                 )
