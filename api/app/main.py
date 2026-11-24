@@ -54,6 +54,8 @@ logger = logging.getLogger(__name__)
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Cabeçalhos de segurança em toda resposta; HSTS só quando o cliente chegou por HTTPS."""
+
     async def dispatch(self, request: Request, call_next: object) -> Response:
         response: Response = await call_next(request)  # type: ignore[operator]
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -69,17 +71,21 @@ _REQUEST_ID = re.compile(r"[A-Za-z0-9-]{1,64}")
 
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Id da request no contexto do log e no cabeçalho da resposta; uma linha de log por request."""
+
     async def dispatch(self, request: Request, call_next: object) -> Response:
         # o cliente pode mandar o próprio id para correlacionar, mas só num formato curto:
         # ele entra no log e na trilha de auditoria (Fase 49)
-        given = request.headers.get("X-Request-ID", "")
-        request_id = given if _REQUEST_ID.fullmatch(given) else str(uuid.uuid4())
-        token = request_id_var.set(request_id)
+        client_request_id = request.headers.get("X-Request-ID", "")
+        request_id = (
+            client_request_id if _REQUEST_ID.fullmatch(client_request_id) else str(uuid.uuid4())
+        )
+        request_id_token = request_id_var.set(request_id)
         try:
             response: Response = await call_next(request)  # type: ignore[operator]
             response.headers["X-Request-ID"] = request_id
         finally:
-            request_id_var.reset(token)
+            request_id_var.reset(request_id_token)
         logger.info(
             "request",
             extra={
@@ -137,6 +143,7 @@ def _lifespan_for(protected: FastAPI) -> Callable[[FastAPI], AbstractAsyncContex
 
 
 def _fail_stale_evals() -> None:
+    """Marca como falha as suítes interrompidas; banco fora do ar não impede o boot."""
     try:
         failed = fail_stale_evals()
     except Exception as exc:
@@ -147,6 +154,7 @@ def _fail_stale_evals() -> None:
 
 
 def _fail_stale_ingestions() -> None:
+    """Marca como falha as ingestões que ficaram em processamento quando a API caiu."""
     # com o worker separado (ADR-0039), o conteúdo parado está na fila: o worker cuida
     if get_settings().ingest_worker:
         return
@@ -165,17 +173,18 @@ def create_app(
     enable_auth: bool = True,
     enable_mcp_server: bool = True,
 ) -> FastAPI:
+    """App externo com as rotas públicas e o AgentOS, com as rotas protegidas, montado em `/`."""
     settings = get_settings()
     configure_logging(settings.log_level)
     # o engine da API: um pool só para o Automata e o Agno, dentro do DB_POOL_SIZE (OPS-09)
-    db = PostgresDb(db_engine=get_engine())
+    agno_db = PostgresDb(db_engine=get_engine())
 
     # Fora de dev o schema e as páginas de docs não são servidos; o export do
     # OpenAPI para o painel usa app.openapi() direto (scripts/export_openapi.py)
-    docs: dict[str, str | None] = (
+    docs_routes: dict[str, str | None] = (
         {} if settings.docs_enabled else {"docs_url": None, "redoc_url": None, "openapi_url": None}
     )
-    base = FastAPI(title="automata", **docs)  # type: ignore[arg-type]
+    base = FastAPI(title="automata", **docs_routes)  # type: ignore[arg-type]
     for router in PROTECTED_ROUTERS:
         base.include_router(router)
     base.state.enforce_scopes = enable_auth
@@ -195,17 +204,17 @@ def create_app(
     workflows: list[Workflow | RemoteWorkflow | WorkflowFactory] = []
     published = PublishedAgents(
         factories,
-        lambda config_id: make_agent_factory(config_id, db),
+        lambda config_id: make_agent_factory(config_id, agno_db),
         teams=teams,
-        make_team_factory=lambda config_id: make_team_factory(config_id, db),
+        make_team_factory=lambda config_id: make_team_factory(config_id, agno_db),
         workflows=workflows,
-        make_workflow_factory=lambda config_id: make_workflow_factory(config_id, db),
+        make_workflow_factory=lambda config_id: make_workflow_factory(config_id, agno_db),
     )
     published.sync()
     _fail_stale_ingestions()
     _fail_stale_evals()
     base.state.published_agents = published
-    base.state.agno_db = db if settings.tracing_enabled else None
+    base.state.agno_db = agno_db if settings.tracing_enabled else None
     revoked = RevokedTokens()
     base.state.revoked_tokens = revoked
 
@@ -213,7 +222,7 @@ def create_app(
 
     protected = AgentOS(
         id="automata",
-        db=db,
+        db=agno_db,
         agents=factories,
         teams=teams,
         workflows=workflows,
@@ -236,11 +245,12 @@ def create_app(
     # auth_router fica fora do middleware do Agno: /login precisa ser público
     # (não tem como exigir JWT para obter JWT). O /users tem proteção própria
     # via _require_admin que verifica JWT + scope agent_os:admin.
-    outer: FastAPI = FastAPI(title="automata", lifespan=_lifespan_for(protected), **docs)  # type: ignore[arg-type]
+    outer: FastAPI = FastAPI(title="automata", lifespan=_lifespan_for(protected), **docs_routes)  # type: ignore[arg-type]
     outer.state.rate_limiter = make_rate_limiter(settings.redis_url, limit=5, window=60)
     outer.state.revoked_tokens = revoked
     # as rotas protegidas rodam no app do AgentOS e limitam a busca na base com o mesmo
     protected.state.rate_limiter = outer.state.rate_limiter
+    # cada add_middleware põe o novo por fora: o último adicionado é o primeiro a rodar
     outer.add_middleware(SyncPublishedAgentsMiddleware, published=published)
     # conversa nova ganha sessão antes da factory: o canário escolhe pela sessão (Fase 49)
     outer.add_middleware(SessionIdMiddleware)

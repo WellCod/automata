@@ -19,15 +19,20 @@ _RUN = re.compile(r"^/(agents|teams|workflows)/[^/]+/runs(/[^/]+/continue)?/?$")
 
 
 class RunRateLimitMiddleware(BaseHTTPMiddleware):
+    """Recusa com 429 o run de quem passou do limite por minuto.
+
+    Sem token (sem `current_actor`), com o limite em zero ou sem limitador no app, segue.
+    """
+
     async def dispatch(self, request: Request, call_next: object) -> Response:
         path = request.url.path
-        limited = request.method == "POST" and (_RUN.match(path) or path.startswith("/mcp"))
-        limit = get_settings().run_rate_limit_per_minute
+        is_run_route = request.method == "POST" and (_RUN.match(path) or path.startswith("/mcp"))
+        runs_per_minute = get_settings().run_rate_limit_per_minute
         actor = current_actor.get()
         limiter = getattr(request.app.state, "rate_limiter", None)
-        if limited and limit > 0 and actor and limiter is not None:
+        if is_run_route and runs_per_minute > 0 and actor and limiter is not None:
             try:
-                await run_in_threadpool(limiter.check, f"runs:{actor}", limit)
+                await run_in_threadpool(limiter.check, f"runs:{actor}", runs_per_minute)
             except HTTPException as exc:
                 return JSONResponse(
                     {"detail": "Limite de execuções por minuto atingido. Tente em instantes."},

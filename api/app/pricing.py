@@ -44,13 +44,14 @@ _PRICES: dict[str, ModelPrice] = {
 
 @lru_cache(maxsize=1)
 def _overrides(raw: str) -> dict[str, ModelPrice]:
+    """Preços do `MODEL_PRICES`, em cache pelo texto cru da variável."""
     if not raw.strip():
         return {}
     try:
-        data = json.loads(raw)
+        prices_by_model = json.loads(raw)
         return {
-            model: ModelPrice(input=float(p["input"]), output=float(p["output"]))
-            for model, p in data.items()
+            model: ModelPrice(input=float(price["input"]), output=float(price["output"]))
+            for model, price in prices_by_model.items()
         }
     except (ValueError, KeyError, TypeError, AttributeError) as exc:
         # preço errado não pode derrubar o run: vale a tabela e fica o aviso
@@ -67,12 +68,13 @@ def _raw_overrides() -> str:
 
 
 def prices() -> dict[str, ModelPrice]:
+    """Tabela fixa, modelos extras com preço e por fim o `MODEL_PRICES`: o último ganha."""
     from app.agents.extra_models import extra_models
 
     extras = {
-        m.id: ModelPrice(input=m.input_price, output=m.output_price)
-        for m in extra_models().values()
-        if m.input_price is not None and m.output_price is not None
+        model.id: ModelPrice(input=model.input_price, output=model.output_price)
+        for model in extra_models().values()
+        if model.input_price is not None and model.output_price is not None
     }
     return {**_PRICES, **extras, **_overrides(_raw_overrides())}
 
@@ -88,6 +90,7 @@ def estimate_cost(model_id: str | None, input_tokens: int, output_tokens: int) -
 
 
 def _field(entry: Any, name: str) -> Any:
+    """Campo da métrica, venha como objeto do Agno ou como dict."""
     return entry.get(name) if isinstance(entry, dict) else getattr(entry, name, None)
 
 
@@ -128,8 +131,8 @@ def run_cost(metrics: Any, default_model_id: str | None) -> float | None:
 def answered_by(metrics: Any, default_model_id: str) -> str:
     """Modelo que deu a resposta: o último principal usado no run, que é a reserva se ela entrou."""
     details = (_field(metrics, "details") if metrics is not None else None) or {}
-    main = details.get("model") or []
-    model_id = _field(main[-1], "id") if main else None
+    main_model_calls = details.get("model") or []
+    model_id = _field(main_model_calls[-1], "id") if main_model_calls else None
     return str(model_id) if model_id else default_model_id
 
 

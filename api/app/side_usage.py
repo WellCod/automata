@@ -29,6 +29,7 @@ def record_side_cost(caller: Caller, model_id: str, cost: float) -> None:
     """Chamada cobrada por unidade e não por token, como a busca do cross-encoder (ADR-0033)."""
     from app.agents.tracking import current_eval_run
 
+    # dentro de uma execução da suíte, o consumo fica com quem a disparou e ligado ao eval_run
     evaluation = current_eval_run.get()
     with Session(get_engine()) as session:
         UsageRepository(session).record_event(
@@ -46,6 +47,10 @@ def record_side_cost(caller: Caller, model_id: str, cost: float) -> None:
 
 
 def record_side_usage(caller: Caller, model_id: str, usage: JudgeUsage) -> None:
+    """Grava tokens e custo de uma chamada fora do run; sem token consumido, não grava.
+
+    O custo informado pelo provedor vale; sem ele, a estimativa pela tabela de preços.
+    """
     if not usage.total_tokens:
         return
     from app.agents.tracking import current_eval_run

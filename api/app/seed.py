@@ -188,6 +188,7 @@ _WORKFLOW_STEPS: list[dict[str, Any]] = [
     },
 ]
 
+# dólar por mil tokens (entrada, saída), só para o histórico sintético do analytics
 _MODEL_PRICING: dict[str, tuple[float, float]] = {
     "claude-opus-4-7": (0.015, 0.075),
     "claude-sonnet-4-6": (0.003, 0.015),
@@ -256,11 +257,13 @@ _USERS = [
 
 
 def _random_ts(days_back: int) -> datetime:
+    """Instante aleatório nos últimos `days_back` dias."""
     offset = random.uniform(0, days_back * 24 * 3600)
     return datetime.now(UTC) - timedelta(seconds=offset)
 
 
 def seed_minimal(session: Session) -> None:
+    """Cria o owner de `SEED_OWNER_EMAIL` e `SEED_OWNER_PASSWORD` se ele ainda não existe."""
     email = os.environ["SEED_OWNER_EMAIL"]
     password = os.environ["SEED_OWNER_PASSWORD"]
 
@@ -275,6 +278,7 @@ def seed_minimal(session: Session) -> None:
 
 
 def seed_demo(session: Session) -> None:
+    """Owner, agentes da demo publicados, base, workflow e suítes; pula o que já existe."""
     seed_minimal(session)
 
     email = os.environ["SEED_OWNER_EMAIL"]
@@ -302,6 +306,7 @@ def seed_demo(session: Session) -> None:
 
 
 def _resolve_agents(node: dict[str, Any], ids: dict[str, uuid.UUID]) -> dict[str, Any]:
+    """Troca o nome do agente de cada etapa pelo id, descendo em `steps` e `branches`."""
     if node["type"] == "step":
         return {
             "type": "step",
@@ -309,11 +314,11 @@ def _resolve_agents(node: dict[str, Any], ids: dict[str, uuid.UUID]) -> dict[str
             "agent_id": ids[node["agent"]],
             "on_error": "stop",
         }
-    out = {k: v for k, v in node.items() if k not in ("steps", "branches")}
+    resolved = {key: value for key, value in node.items() if key not in ("steps", "branches")}
     for key in ("steps", "branches"):
         if key in node:
-            out[key] = [_resolve_agents(child, ids) for child in node[key]]
-    return out
+            resolved[key] = [_resolve_agents(child, ids) for child in node[key]]
+    return resolved
 
 
 def seed_workflow(session: Session) -> None:
@@ -325,7 +330,7 @@ def seed_workflow(session: Session) -> None:
         logger.info("workflow já existe: %s", _WORKFLOW_NAME)
         return
     agents, _ = config_svc.list_configs(kind=ConfigKind.agent, page_size=100)
-    ids = {a.name: a.id for a in agents if a.current_version_id is not None}
+    ids = {agent.name: agent.id for agent in agents if agent.current_version_id is not None}
     steps = [_resolve_agents(node, ids) for node in _WORKFLOW_STEPS]
     config = config_svc.create_config(
         name=_WORKFLOW_NAME, description=_WORKFLOW_DESCRIPTION, kind=ConfigKind.workflow
@@ -405,27 +410,29 @@ def seed_evals(session: Session) -> None:
 
 
 def _seed_suite(session: Session, config_name: str, cases: list[dict[str, Any]]) -> None:
+    """Casos de exemplo no config pelo nome; não mexe em suíte que já tem caso."""
     from app.models.eval import EvalCase
     from app.repositories.eval import EvalCaseRepository
     from app.schemas.eval import EvalCaseInput
 
     configs, _ = ConfigService(ConfigRepository(session)).list_configs(q=config_name)
-    agent = next((a for a in configs if a.name == config_name), None)
-    if agent is None:
+    target_config = next((config for config in configs if config.name == config_name), None)
+    if target_config is None:
         return
-    repo = EvalCaseRepository(session)
-    if repo.count(agent.id) > 0:
+    case_repo = EvalCaseRepository(session)
+    if case_repo.count(target_config.id) > 0:
         logger.info("suíte de exemplo já existe em %s", config_name)
         return
     email = os.environ["SEED_OWNER_EMAIL"]
-    for position, raw in enumerate(cases):
-        case = EvalCaseInput.model_validate(raw)
-        repo.add(
+    for position, case_definition in enumerate(cases):
+        # validado pelo mesmo schema da API, para o exemplo não gravar caso inválido
+        case = EvalCaseInput.model_validate(case_definition)
+        case_repo.add(
             EvalCase(
-                agent_config_id=agent.id,
+                agent_config_id=target_config.id,
                 name=case.name,
                 input=case.input,
-                checks=[c.model_dump() for c in case.checks],
+                checks=[check.model_dump() for check in case.checks],
                 position=position,
                 updated_by=email,
             )
@@ -444,13 +451,13 @@ def seed_knowledge(session: Session) -> None:
     if not is_configured(spec):
         logger.info("base de exemplo pulada: embedder %s sem chave", spec.name)
         return
-    repo = KnowledgeBaseRepository(session)
-    if repo.find_conflict(demo_content.BASE_NAME, demo_content.BASE_SLUG) is not None:
+    base_repo = KnowledgeBaseRepository(session)
+    if base_repo.find_conflict(demo_content.BASE_NAME, demo_content.BASE_SLUG) is not None:
         logger.info("base de exemplo já existe")
         return
     email = os.environ["SEED_OWNER_EMAIL"]
     base_id = uuid.uuid4()
-    base = repo.add(
+    base = base_repo.add(
         KnowledgeBase(
             id=base_id,
             name=demo_content.BASE_NAME,
@@ -487,17 +494,18 @@ def seed_knowledge(session: Session) -> None:
         ingest(content.id, demo_content.DOCUMENTS[content.name].encode())
 
     agents, _ = ConfigService(ConfigRepository(session)).list_configs(q=_KNOWLEDGE_AGENT)
-    agent = next((a for a in agents if a.name == _KNOWLEDGE_AGENT), None)
+    agent = next((config for config in agents if config.name == _KNOWLEDGE_AGENT), None)
     if agent is None or agent.current_version_id is None:
         return
+    # nova versão do agente com a base ligada, sobre a publicada
     config_repo = ConfigRepository(session)
-    current = config_repo.get_version(agent.current_version_id)
-    assert current is not None
-    payload = ConfigPayload.model_validate(current.payload)
+    published_version = config_repo.get_version(agent.current_version_id)
+    assert published_version is not None
+    payload = ConfigPayload.model_validate(published_version.payload)
     payload.knowledge = [KnowledgeBinding(base_id=base.id, max_results=3)]
-    svc = ConfigService(config_repo, bases=repo)
-    svc.save_draft(agent.id, payload, author=email)
-    svc.publish(agent.id, author=email)
+    config_service = ConfigService(config_repo, bases=base_repo)
+    config_service.save_draft(agent.id, payload, author=email)
+    config_service.publish(agent.id, author=email)
     session.commit()
     logger.info("base de exemplo criada e ligada a %s", _KNOWLEDGE_AGENT)
 
@@ -529,15 +537,15 @@ def seed_analytics(session: Session, n_runs: int = 500) -> None:
         logger.warning("nenhum agente com versão publicada — execute seed_demo primeiro")
         return
 
-    weights = [_AGENT_PROFILE.get(a["name"], {}).get("weight", 2) for a in agent_info]
+    weights = [_AGENT_PROFILE.get(agent["name"], {}).get("weight", 2) for agent in agent_info]
     agent_choices = random.choices(agent_info, weights=weights, k=n_runs)
 
     runs: list[AgentRun] = []
     events: list[UsageEvent] = []
 
     for agent in agent_choices:
-        ts = _random_ts(days_back=90)
-        period = ts.strftime("%Y%m")
+        created_at = _random_ts(days_back=90)
+        period = created_at.strftime("%Y%m")
         name = agent["name"]
         model_id = agent["model_id"]
         price_in, price_out = _MODEL_PRICING.get(model_id, (0.001, 0.005))
@@ -563,16 +571,16 @@ def seed_analytics(session: Session, n_runs: int = 500) -> None:
             status=status,
             duration_ms=duration_ms if status == "success" else None,
             error=random.choice(_ERRORS) if status == "error" else None,
-            created_at=ts,
+            created_at=created_at,
         )
         runs.append(run)
 
         if status == "success":
             in_min, in_max = profile["in_tok"]
             out_min, out_max = profile["out_tok"]
-            in_tok = random.randint(in_min, in_max)
-            out_tok = random.randint(out_min, out_max)
-            cost = round((in_tok / 1000) * price_in + (out_tok / 1000) * price_out, 8)
+            input_tokens = random.randint(in_min, in_max)
+            output_tokens = random.randint(out_min, out_max)
+            cost = round((input_tokens / 1000) * price_in + (output_tokens / 1000) * price_out, 8)
             events.append(
                 UsageEvent(
                     id=uuid.uuid4(),
@@ -581,11 +589,11 @@ def seed_analytics(session: Session, n_runs: int = 500) -> None:
                     run_id=run.run_id,
                     model_id=model_id,
                     period=period,
-                    input_tokens=in_tok,
-                    output_tokens=out_tok,
-                    total_tokens=in_tok + out_tok,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    total_tokens=input_tokens + output_tokens,
                     cost=cost,
-                    created_at=ts,
+                    created_at=created_at,
                 )
             )
 

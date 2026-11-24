@@ -25,6 +25,7 @@ def key_id(public_key_pem: str) -> str:
 
 
 def safe_kid(public_key_pem: str) -> str | None:
+    """kid da chave, ou None quando o texto não é uma chave pública PEM."""
     try:
         return key_id(public_key_pem)
     except ValueError:
@@ -54,8 +55,9 @@ def decode_token(token: str, *, audience: str = _AUDIENCE) -> dict[str, Any]:
     keys = verification_keys()
     kid = jwt.get_unverified_header(token).get("kid")
     if kid:
-        keys.sort(key=lambda k: safe_kid(k) != kid)
-    last: jwt.InvalidTokenError = jwt.InvalidSignatureError("nenhuma chave verificou o token")
+        # só ordena: a chave do kid vai para a frente e as outras continuam na lista
+        keys.sort(key=lambda public_key: safe_kid(public_key) != kid)
+    last_error: jwt.InvalidTokenError = jwt.InvalidSignatureError("nenhuma chave verificou o token")
     for key in keys:
         try:
             payload: dict[str, Any] = jwt.decode(
@@ -63,8 +65,8 @@ def decode_token(token: str, *, audience: str = _AUDIENCE) -> dict[str, Any]:
             )
             return payload
         except jwt.InvalidSignatureError as exc:
-            last = exc
-    raise last
+            last_error = exc
+    raise last_error
 
 
 def issue_token(

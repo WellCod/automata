@@ -60,12 +60,13 @@ def _load_cutoffs() -> dict[str, float]:
         rows = session.execute(
             select(User.id, User.tokens_valid_after).where(User.tokens_valid_after.is_not(None))
         )
-        return {str(r.id): r.tokens_valid_after.timestamp() for r in rows}
+        return {str(row.id): row.tokens_valid_after.timestamp() for row in rows}
 
 
 def _load_users() -> set[str]:
+    """Ids de todos os usuários do painel, para reconhecer token de usuário removido."""
     with Session(get_engine()) as session:
-        return {str(i) for i in session.scalars(select(User.id))}
+        return {str(user_id) for user_id in session.scalars(select(User.id))}
 
 
 def _user_exists(sub: str) -> bool:
@@ -83,16 +84,22 @@ def _panel_user(sub: str) -> bool:
 
 
 def _load_revoked() -> set[str]:
+    """jti revogados que ainda não venceram: tokens de integração e sessões do logout.
+
+    Token vencido já cai na validação de expiração, então não precisa ficar na lista.
+    """
     now = datetime.now(UTC)
     with Session(get_engine()) as session:
-        integrations = select(IntegrationToken.jti).where(
+        revoked_integrations = select(IntegrationToken.jti).where(
             IntegrationToken.revoked_at.is_not(None), IntegrationToken.expires_at > now
         )
-        sessions = select(RevokedToken.jti).where(RevokedToken.expires_at > now)
-        return set(session.scalars(integrations)) | set(session.scalars(sessions))
+        revoked_sessions = select(RevokedToken.jti).where(RevokedToken.expires_at > now)
+        return set(session.scalars(revoked_integrations)) | set(session.scalars(revoked_sessions))
 
 
 class RevokedTokens:
+    """Cache dos jti revogados, dos cortes de sessão e dos usuários, relido a cada TTL."""
+
     def __init__(self, ttl_seconds: float = 30.0) -> None:
         self._ttl = ttl_seconds
         self._lock = threading.Lock()
@@ -104,6 +111,7 @@ class RevokedTokens:
         self._loaded_at: float | None = None
 
     def is_revoked(self, jti: str | None, sub: str | None = None, iat: float | None = None) -> bool:
+        """Recusa por jti revogado, token anterior ao corte do usuário ou usuário removido."""
         with self._lock:
             stale = self._loaded_at is None or monotonic() - self._loaded_at >= self._ttl
         if stale:
@@ -140,6 +148,7 @@ class RevokedTokens:
         return not exists
 
     def refresh(self) -> None:
+        """Relê as três listas do banco de uma vez; falha mantém as anteriores."""
         try:
             revoked = _load_revoked()
             cutoffs = _load_cutoffs()
@@ -159,10 +168,12 @@ class RevokedTokens:
             self._loaded_at = monotonic()
 
     def revoke_now(self, jti: str) -> None:
+        """Vale já neste processo, sem esperar a próxima recarga; as outras réplicas, no TTL."""
         with self._lock:
             self._revoked.add(jti)
 
     def cut_now(self, sub: str, at: float) -> None:
+        """Corte de sessão do usuário valendo já neste processo, como em `revoke_now`."""
         with self._lock:
             self._cutoffs[sub] = at
 
@@ -181,6 +192,8 @@ def bearer_token(authorization: str) -> str:
 
 
 class RevocationMiddleware(BaseHTTPMiddleware):
+    """Recusa com 401 o token revogado e põe o sub em `current_actor` durante a request."""
+
     def __init__(self, app: object, revoked: RevokedTokens) -> None:
         super().__init__(app)  # type: ignore[arg-type]
         self._revoked = revoked
@@ -205,11 +218,11 @@ class RevocationMiddleware(BaseHTTPMiddleware):
             if revoked:
                 return JSONResponse({"detail": "Token revogado"}, status_code=401)
             if isinstance(sub, str):
-                actor = current_actor.set(sub)
+                actor_token = current_actor.set(sub)
                 try:
                     response: Response = await call_next(request)  # type: ignore[operator]
                 finally:
-                    current_actor.reset(actor)
+                    current_actor.reset(actor_token)
                 return response
         response = await call_next(request)  # type: ignore[operator]
         return response

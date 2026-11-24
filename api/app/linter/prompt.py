@@ -41,6 +41,7 @@ class LintWarning:
 
 
 def lint_payload(payload: ConfigPayload) -> list[LintWarning]:
+    """Avisos: acoplamento a provedor, tool citada sem estar liberada e base sem guardrail."""
     warnings: list[LintWarning] = []
     _check_provider_coupling(payload, warnings)
     _check_tool_citations(payload, warnings)
@@ -49,13 +50,13 @@ def lint_payload(payload: ConfigPayload) -> list[LintWarning]:
 
 
 def _instruction_sections(payload: ConfigPayload) -> dict[str, str]:
-    ins = payload.instructions
+    instructions = payload.instructions
     return {
-        "persona": ins.persona,
-        "situation": ins.situation,
-        "tone": ins.tone,
-        "objective": ins.objective,
-        "guardrails": ins.guardrails,
+        "persona": instructions.persona,
+        "situation": instructions.situation,
+        "tone": instructions.tone,
+        "objective": instructions.objective,
+        "guardrails": instructions.guardrails,
     }
 
 
@@ -63,9 +64,9 @@ def _check_provider_coupling(payload: ConfigPayload, out: list[LintWarning]) -> 
     for section_name, text in _instruction_sections(payload).items():
         if not text:
             continue
-        lower = text.lower()
+        lowered_text = text.lower()
         for term in PROVIDER_TERMS:
-            if term.lower() in lower:
+            if term.lower() in lowered_text:
                 out.append(
                     LintWarning(
                         section=section_name,
@@ -80,9 +81,9 @@ def _check_provider_coupling(payload: ConfigPayload, out: list[LintWarning]) -> 
 
 def _check_tool_citations(payload: ConfigPayload, out: list[LintWarning]) -> None:
     # Servidor com tools=None libera tudo dele: sem a lista não dá para afirmar que falta
-    if any(b.tools is None for b in payload.mcp_servers):
+    if any(binding.tools is None for binding in payload.mcp_servers):
         return
-    enabled = {t for b in payload.mcp_servers for t in b.tools or []}
+    enabled = {tool for binding in payload.mcp_servers for tool in binding.tools or []}
     all_text = " ".join(_instruction_sections(payload).values()).lower()
     for tool in KNOWN_TOOLS:
         if tool in all_text and tool not in enabled:

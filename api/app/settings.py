@@ -96,10 +96,11 @@ class Settings(BaseSettings):
 
     @property
     def knowledge_extensions(self) -> frozenset[str]:
+        """Extensões aceitas no envio à base, minúsculas e sem ponto."""
         return frozenset(
-            e.strip().lower().lstrip(".")
-            for e in self.knowledge_allowed_extensions.split(",")
-            if e.strip()
+            extension.strip().lower().lstrip(".")
+            for extension in self.knowledge_allowed_extensions.split(",")
+            if extension.strip()
         )
 
     @property

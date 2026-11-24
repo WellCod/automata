@@ -99,6 +99,8 @@ def sees_everyone(request: Request) -> bool:
 
 
 def require_scopes(*required: str) -> Callable[[Request], None]:
+    """Dependência que exige os scopes globais dados, conferidos pelo `has_required_scopes`."""
+
     def dependency(request: Request) -> None:
         # Sem auth (testes e create_app(enable_auth=False)) o app não marca a flag
         if not scopes_enforced(request):

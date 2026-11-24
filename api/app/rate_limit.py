@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 class MemoryRateLimiter:
+    """Janela deslizante por chave, na memória do processo: cada réplica conta a sua."""
+
     def __init__(self, limit: int = 10, window: int = 60) -> None:
         self._limit = limit
         self._window = window
@@ -19,10 +21,14 @@ class MemoryRateLimiter:
 
     def check(self, key: str, limit: int | None = None, window: int | None = None) -> None:
         limit = limit or self._limit
-        span = window or self._window
+        window_seconds = window or self._window
         now = time.time()
         with self._lock:
-            self._attempts[key] = [t for t in self._attempts[key] if now - t < span]
+            self._attempts[key] = [
+                attempted_at
+                for attempted_at in self._attempts[key]
+                if now - attempted_at < window_seconds
+            ]
             if len(self._attempts[key]) >= limit:
                 raise HTTPException(
                     status_code=429, detail="Muitas tentativas. Tente novamente em breve."
@@ -35,6 +41,8 @@ class MemoryRateLimiter:
 
 
 class RedisRateLimiter:
+    """Contador por chave no Redis, válido entre réplicas, com janela fixa."""
+
     def __init__(self, redis_url: str, limit: int = 10, window: int = 60) -> None:
         # Redis travado não pendura o login (Fase 44)
         self._client: Redis = Redis.from_url(
@@ -54,13 +62,14 @@ class RedisRateLimiter:
 
     def _check(self, key: str, limit: int | None, window: int | None) -> None:
         limit = limit or self._limit
-        pipe = self._client.pipeline()
-        pipe.incr(key)
+        pipeline = self._client.pipeline()
+        pipeline.incr(key)
         # NX: a janela começa na primeira tentativa; renovar a cada tentativa
         # manteria a chave bloqueada para sempre sob tentativas contínuas
-        pipe.expire(key, window or self._window, nx=True)
-        results = pipe.execute()
-        if int(results[0]) > limit:
+        pipeline.expire(key, window or self._window, nx=True)
+        pipeline_results = pipeline.execute()
+        attempts_in_window = int(pipeline_results[0])
+        if attempts_in_window > limit:
             raise HTTPException(
                 status_code=429, detail="Muitas tentativas. Tente novamente em breve."
             )
@@ -77,6 +86,7 @@ class RedisRateLimiter:
 def make_rate_limiter(
     redis_url: str | None, limit: int = 10, window: int = 60
 ) -> MemoryRateLimiter | RedisRateLimiter:
+    """Com Redis o limite vale entre réplicas; sem ele, por processo."""
     if redis_url:
         return RedisRateLimiter(redis_url, limit=limit, window=window)
     return MemoryRateLimiter(limit=limit, window=window)

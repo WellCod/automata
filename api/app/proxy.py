@@ -10,19 +10,21 @@ Networks = list[IPv4Network | IPv6Network]
 
 
 def trusted_networks() -> Networks:
+    """Redes de `TRUSTED_PROXIES`; IP sem máscara vira rede de um endereço só."""
     return [
-        ip_network(p.strip(), strict=False)
-        for p in get_settings().trusted_proxies.split(",")
-        if p.strip()
+        ip_network(entry.strip(), strict=False)
+        for entry in get_settings().trusted_proxies.split(",")
+        if entry.strip()
     ]
 
 
 def is_trusted(ip: str, networks: Networks) -> bool:
+    """Se o IP está numa das redes de proxy confiável; texto que não é IP nunca está."""
     try:
-        addr = ip_address(ip)
+        address = ip_address(ip)
     except ValueError:
         return False
-    return any(addr in net for net in networks)
+    return any(address in network for network in networks)
 
 
 def _peer(request: Request) -> str:
@@ -40,7 +42,8 @@ def get_client_ip(request: Request) -> str:
     networks = trusted_networks()
     if not is_trusted(peer, networks):
         return peer
-    hops = [h.strip() for h in request.headers.get("X-Forwarded-For", "").split(",") if h.strip()]
+    forwarded_for = request.headers.get("X-Forwarded-For", "")
+    hops = [hop.strip() for hop in forwarded_for.split(",") if hop.strip()]
     for hop in reversed(hops):
         if not is_trusted(hop, networks):
             return hop
@@ -64,5 +67,6 @@ def is_https(request: Request) -> bool:
         return True
     if not is_trusted(_peer(request), trusted_networks()):
         return False
-    proto = request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip().lower()
-    return proto == "https"
+    # com vários proxies no caminho, o primeiro valor é o do proxy que falou com o cliente
+    forwarded_proto = request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip().lower()
+    return forwarded_proto == "https"
