@@ -258,3 +258,44 @@ def test_id_estranho_e_parametro_e_nao_vaza_na_exportacao(client: TestClient) ->
     assert resp.status_code == 202
     assert client.get(f"/api/v1/data-subjects/{path}").json()["total"] == 0
     assert client.get(f"/api/v1/data-subjects/{BIA}").json()["total"] > 0
+
+
+def test_exportacao_traz_os_resumos_da_compactacao_so_do_titular(
+    client: TestClient, db_url: str
+) -> None:
+    """O resumo da compactação é a conversa da pessoa, guardado por sessão e sem `user_id`
+    obrigatório: entra na contagem e na exportação dela, e nunca na de outra pessoa."""
+    from app.data_subjects import _subject_session_ids, build_export, inventory
+    from app.db import get_engine
+
+    cau, duda = "cau@cliente.com", "duda@cliente.com"
+    agent_id = _agent(client)
+    _talk(client, agent_id, cau, "meu pedido é o 4471")
+    _talk(client, agent_id, duda, "meu pedido é o 9902")
+    with get_engine().connect() as conn:
+        [cau_session] = _subject_session_ids(conn, cau)
+        [duda_session] = _subject_session_ids(conn, duda)
+    agno = PostgresDb(db_url=db_url)
+    for compaction_id, session_id, summary in (
+        ("compactacao-cau", cau_session, "cliente quer trocar o pedido 4471"),
+        ("compactacao-duda", duda_session, "cliente quer cancelar o pedido 9902"),
+    ):
+        agno.upsert_compaction(
+            {
+                "compaction_id": compaction_id,
+                "session_id": session_id,
+                "summary": summary,
+                "created_at": int(time.time()),
+            }
+        )
+
+    exported = build_export(cau)
+    summaries = [row["summary"] for row in exported["agno"]["compactions"]]
+    assert summaries == ["cliente quer trocar o pedido 4471"]
+    assert "9902" not in json.dumps(exported, ensure_ascii=False, default=str)
+    assert inventory(cau)["compactions"] == 1
+
+    # a exclusão já apagava pela sessão: a contagem volta a zero só para a Cau
+    client.post(f"/api/v1/data-subjects/{cau}/erase", json={"confirm": cau}).raise_for_status()
+    assert inventory(cau)["compactions"] == 0
+    assert inventory(duda)["compactions"] == 1

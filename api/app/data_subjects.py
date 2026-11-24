@@ -79,6 +79,25 @@ def _count(conn: Connection, table: Table | None, column: str, value: Any) -> in
     return int(conn.scalar(select(func.count()).where(table.c[column] == value)) or 0)
 
 
+def _subject_session_ids(conn: Connection, user_id: str) -> list[Any]:
+    """Sessões do titular no Agno.
+
+    Transcrições e compactações não têm `user_id`: são da pessoa por pertencerem a uma
+    sessão dela. Consulta, exportação e exclusão usam a mesma lista.
+    """
+    sessions = agno_table(conn, "sessions")
+    if sessions is None:
+        return []
+    return list(conn.scalars(select(sessions.c.session_id).where(sessions.c.user_id == user_id)))
+
+
+def _count_in(conn: Connection, table: Table | None, column: str, values: list[Any]) -> int:
+    """Linhas com `column` em `values`; tabela ou coluna ausente, ou lista vazia, conta zero."""
+    if table is None or column not in table.c or not values:
+        return 0
+    return int(conn.scalar(select(func.count()).where(table.c[column].in_(values))) or 0)
+
+
 def inventory(user_id: str) -> dict[str, int]:
     """Quantas linhas de cada lugar são do titular."""
     counts: dict[str, int] = {}
@@ -86,6 +105,9 @@ def inventory(user_id: str) -> dict[str, int]:
     with engine.connect() as conn:
         for key in AGNO_BY_USER:
             counts[key] = _count(conn, agno_table(conn, key), "user_id", user_id)
+        session_ids = _subject_session_ids(conn, user_id)
+        for key in ("transcripts", "compactions"):
+            counts[key] = _count_in(conn, agno_table(conn, key), "session_id", session_ids)
     with Session(engine) as session:
         counts["agent_runs"] = int(
             session.scalar(select(func.count()).where(AgentRun.user_id == user_id)) or 0
@@ -126,6 +148,10 @@ def build_export(user_id: str) -> dict[str, Any]:
             trace["trace_id"] for trace in export_data["agno"]["traces"] if trace.get("trace_id")
         ]
         export_data["agno"]["spans"] = _rows(conn, agno_table(conn, "spans"), "trace_id", trace_ids)
+        # o resumo da compactação e a transcrição são a conversa dela, guardados por sessão
+        session_ids = _subject_session_ids(conn, user_id)
+        for key in ("transcripts", "compactions"):
+            export_data["agno"][key] = _rows(conn, agno_table(conn, key), "session_id", session_ids)
     with Session(engine) as session:
         export_data["agent_runs"] = [
             {
@@ -270,12 +296,7 @@ def erase(user_id: str) -> dict[str, int]:
     counts: dict[str, int] = {}
     engine = get_engine()
     with engine.begin() as conn:
-        sessions = agno_table(conn, "sessions")
-        session_ids: list[Any] = []
-        if sessions is not None:
-            session_ids = list(
-                conn.scalars(select(sessions.c.session_id).where(sessions.c.user_id == user_id))
-            )
+        session_ids = _subject_session_ids(conn, user_id)
         counts["transcripts"] = _delete(
             conn, agno_table(conn, "transcripts"), "session_id", session_ids
         )
