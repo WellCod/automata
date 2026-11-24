@@ -20,11 +20,11 @@ export function usePublishedAgents() {
   return useQuery({
     queryKey: ["configs", "published-agents"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/configs", {
+      const response = await client.GET("/api/v1/configs", {
         params: { query: { kind: "agent", status: "published", page_size: 100 } },
       });
-      if (res.error) throw new Error("Falha ao carregar agentes");
-      return res.data!.items;
+      if (response.error) throw new Error("Falha ao carregar agentes");
+      return response.data!.items;
     },
   });
 }
@@ -43,14 +43,14 @@ function PinnedVersion({
   const { data: versions } = useQuery({
     queryKey: ["versions", agentId],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/configs/{config_id}/versions", {
+      const response = await client.GET("/api/v1/configs/{config_id}/versions", {
         params: { path: { config_id: agentId } },
       });
-      if (res.error) throw new Error("Falha ao carregar versões");
-      return res.data!;
+      if (response.error) throw new Error("Falha ao carregar versões");
+      return response.data!;
     },
   });
-  const published = (versions ?? []).filter((v) => v.status === "published");
+  const published = (versions ?? []).filter((version) => version.status === "published");
   return (
     <select
       value={value ?? ""}
@@ -59,9 +59,9 @@ function PinnedVersion({
       aria-label={`Versão de ${label}`}
     >
       <option value="">Versão vigente</option>
-      {published.map((v) => (
-        <option key={v.id} value={v.id}>
-          Fixar v{v.version_number}
+      {published.map((version) => (
+        <option key={version.id} value={version.id}>
+          Fixar v{version.version_number}
         </option>
       ))}
     </select>
@@ -70,18 +70,22 @@ function PinnedVersion({
 
 export function TeamMembersPicker({ value, onChange, error }: Props) {
   const { data: agents, isPending, isError } = usePublishedAgents();
-  const selected = new Map(value.map((m) => [m.agent_id, m]));
+  const selected = new Map(value.map((member) => [member.agent_id, member]));
 
   function toggle(agentId: string, checked: boolean) {
     onChange(
       checked
         ? [...value, { agent_id: agentId, version_id: null }]
-        : value.filter((m) => m.agent_id !== agentId),
+        : value.filter((member) => member.agent_id !== agentId),
     );
   }
 
   function pin(agentId: string, versionId: string | null) {
-    onChange(value.map((m) => (m.agent_id === agentId ? { ...m, version_id: versionId } : m)));
+    onChange(
+      value.map((member) =>
+        member.agent_id === agentId ? { ...member, version_id: versionId } : member,
+      ),
+    );
   }
 
   return (
@@ -132,7 +136,7 @@ export function TeamMembersPicker({ value, onChange, error }: Props) {
                 <PinnedVersion
                   agentId={agent.id}
                   value={member.version_id}
-                  onChange={(v) => pin(agent.id, v)}
+                  onChange={(versionId) => pin(agent.id, versionId)}
                   label={agent.name}
                 />
               )}

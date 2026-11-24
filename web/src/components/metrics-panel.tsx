@@ -14,7 +14,7 @@ import type { components } from "@/lib/api/schema.d.ts";
 
 // Recharts (449 KB) só quando a aba Desempenho abre (Fase 44)
 const MetricsCharts = dynamic(
-  () => import("@/components/metrics-charts").then((m) => m.MetricsCharts),
+  () => import("@/components/metrics-charts").then((module) => module.MetricsCharts),
   {
     ssr: false,
   },
@@ -67,11 +67,11 @@ export function MetricsPanel({ agentId }: Props) {
   const { data, isPending, isError } = useQuery<AgentMetricsResponse>({
     queryKey: ["metrics", agentId, period],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/configs/{config_id}/metrics", {
+      const response = await client.GET("/api/v1/configs/{config_id}/metrics", {
         params: { path: { config_id: agentId }, query: { period } },
       });
-      if (res.error) throw new Error("Falha ao carregar métricas");
-      return res.data!;
+      if (response.error) throw new Error("Falha ao carregar métricas");
+      return response.data!;
     },
   });
 
@@ -79,15 +79,15 @@ export function MetricsPanel({ agentId }: Props) {
     <div className="flex flex-col gap-3">
       <BudgetSection configId={agentId} />
       <div className="flex gap-1">
-        {PERIODS.map((p) => (
+        {PERIODS.map((option) => (
           <Button
-            key={p.value}
+            key={option.value}
             size="sm"
-            variant={period === p.value ? "accent" : "muted"}
-            aria-pressed={period === p.value}
-            onClick={() => setPeriod(p.value)}
+            variant={period === option.value ? "accent" : "muted"}
+            aria-pressed={period === option.value}
+            onClick={() => setPeriod(option.value)}
           >
-            {p.label}
+            {option.label}
           </Button>
         ))}
       </div>

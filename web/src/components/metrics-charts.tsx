@@ -93,33 +93,33 @@ function SeriesTable({ points }: { points: DailyMetricsPoint[] }) {
           <thead>
             <tr className="border-border bg-card border-b">
               {["Dia", "Conversas", "Erros", "Bloqueios", "p50", "p95", "Tokens", "Custo"].map(
-                (h) => (
+                (heading) => (
                   <th
-                    key={h}
+                    key={heading}
                     className="text-muted-foreground px-3 py-1.5 text-right font-medium first:text-left"
                   >
-                    {h}
+                    {heading}
                   </th>
                 ),
               )}
             </tr>
           </thead>
           <tbody>
-            {points.map((p) => (
-              <tr key={p.date} className="border-border border-b last:border-0">
-                <td className="text-foreground px-3 py-1 text-left">{dayLabel(p.date)}</td>
-                <td className="text-foreground px-3 py-1 text-right">{p.total_runs}</td>
-                <td className="text-foreground px-3 py-1 text-right">{p.error_count}</td>
-                <td className="text-foreground px-3 py-1 text-right">{p.blocked_count ?? 0}</td>
+            {points.map((point) => (
+              <tr key={point.date} className="border-border border-b last:border-0">
+                <td className="text-foreground px-3 py-1 text-left">{dayLabel(point.date)}</td>
+                <td className="text-foreground px-3 py-1 text-right">{point.total_runs}</td>
+                <td className="text-foreground px-3 py-1 text-right">{point.error_count}</td>
+                <td className="text-foreground px-3 py-1 text-right">{point.blocked_count ?? 0}</td>
                 <td className="text-foreground px-3 py-1 text-right">
-                  {p.p50_ms === null ? "—" : formatDuration(p.p50_ms)}
+                  {point.p50_ms === null ? "—" : formatDuration(point.p50_ms)}
                 </td>
                 <td className="text-foreground px-3 py-1 text-right">
-                  {p.p95_ms === null ? "—" : formatDuration(p.p95_ms)}
+                  {point.p95_ms === null ? "—" : formatDuration(point.p95_ms)}
                 </td>
-                <td className="text-foreground px-3 py-1 text-right">{p.total_tokens}</td>
+                <td className="text-foreground px-3 py-1 text-right">{point.total_tokens}</td>
                 <td className="text-foreground px-3 py-1 text-right">
-                  {p.total_cost === null ? "—" : formatUsd(p.total_cost)}
+                  {point.total_cost === null ? "—" : formatUsd(point.total_cost)}
                 </td>
               </tr>
             ))}
@@ -135,9 +135,9 @@ export function MetricsCharts({ range, agentId }: Props) {
   const { data, isPending, isError, refetch } = useQuery<DailyMetricsPoint[]>({
     queryKey: ["metrics:timeseries", query],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/metrics/timeseries", { params: { query } });
-      if (res.error) throw new Error("Falha ao carregar série");
-      return res.data!;
+      const response = await client.GET("/api/v1/metrics/timeseries", { params: { query } });
+      if (response.error) throw new Error("Falha ao carregar série");
+      return response.data!;
     },
   });
 
@@ -165,18 +165,18 @@ export function MetricsCharts({ range, agentId }: Props) {
     );
   }
 
-  if (!data.some((p) => p.total_runs > 0 || p.total_tokens > 0)) {
+  if (!data.some((point) => point.total_runs > 0 || point.total_tokens > 0)) {
     return <p className="text-muted-foreground text-[13px]">Nenhuma execução no período.</p>;
   }
 
-  const rows = data.map((p) => ({
-    date: p.date,
-    success: p.total_runs - p.error_count - (p.blocked_count ?? 0),
-    blocked: p.blocked_count ?? 0,
-    errors: p.error_count,
-    p50: p.p50_ms,
-    p95: p.p95_ms,
-    cost: p.total_cost ?? 0,
+  const rows = data.map((point) => ({
+    date: point.date,
+    success: point.total_runs - point.error_count - (point.blocked_count ?? 0),
+    blocked: point.blocked_count ?? 0,
+    errors: point.error_count,
+    p50: point.p50_ms,
+    p95: point.p95_ms,
+    cost: point.total_cost ?? 0,
   }));
 
   return (
@@ -190,7 +190,9 @@ export function MetricsCharts({ range, agentId }: Props) {
               <YAxis allowDecimals={false} width={32} {...axisProps} />
               <ChartTooltip
                 cursor={false}
-                content={<ChartTooltipContent labelFormatter={(v) => dayLabel(String(v))} />}
+                content={
+                  <ChartTooltipContent labelFormatter={(label) => dayLabel(String(label))} />
+                }
               />
               <ChartLegend content={<ChartLegendContent />} />
               <Bar
@@ -237,7 +239,7 @@ export function MetricsCharts({ range, agentId }: Props) {
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    labelFormatter={(v) => dayLabel(String(v))}
+                    labelFormatter={(label) => dayLabel(String(label))}
                     formatter={(value, name) => (
                       <span className="flex w-full justify-between gap-3">
                         <span className="text-muted-foreground">
@@ -283,7 +285,7 @@ export function MetricsCharts({ range, agentId }: Props) {
                 content={
                   <ChartTooltipContent
                     hideIndicator
-                    labelFormatter={(v) => dayLabel(String(v))}
+                    labelFormatter={(label) => dayLabel(String(label))}
                     formatter={(value) => (
                       <span className="text-foreground font-medium">
                         {formatUsd(Number(value))}

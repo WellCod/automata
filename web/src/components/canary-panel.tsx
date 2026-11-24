@@ -37,29 +37,29 @@ export function useCanary(configId: string, enabled = true) {
     queryKey: ["canary", configId],
     enabled,
     queryFn: async () => {
-      const res = await client.GET("/api/v1/configs/{config_id}/canary", {
+      const response = await client.GET("/api/v1/configs/{config_id}/canary", {
         params: { path: { config_id: configId } },
       });
-      if (res.error) throw new Error("Falha ao carregar o canário");
-      return res.data!;
+      if (response.error) throw new Error("Falha ao carregar o canário");
+      return response.data!;
     },
   });
 }
 
 function suiteText(stats: VersionStats): string {
-  const s = stats.suite;
-  if (!s) return "—";
-  if (s.status === "failed") return "falhou";
-  if (s.status !== "completed") return "rodando";
-  return `${s.passed} de ${s.total}`;
+  const suite = stats.suite;
+  if (!suite) return "—";
+  if (suite.status === "failed") return "falhou";
+  if (suite.status !== "completed") return "rodando";
+  return `${suite.passed} de ${suite.total}`;
 }
 
-const ROWS: { label: string; value: (s: VersionStats) => string }[] = [
-  { label: "Conversas", value: (s) => s.runs.toLocaleString("pt-BR") },
-  { label: "Taxa de erro", value: (s) => (s.runs ? pctFmt.format(s.error_rate) : "—") },
-  { label: "p50", value: (s) => formatDuration(s.p50_ms) },
-  { label: "p95", value: (s) => formatDuration(s.p95_ms) },
-  { label: "Custo médio", value: (s) => formatTotalUsd(s.avg_cost) },
+const ROWS: { label: string; value: (stats: VersionStats) => string }[] = [
+  { label: "Conversas", value: (stats) => stats.runs.toLocaleString("pt-BR") },
+  { label: "Taxa de erro", value: (stats) => (stats.runs ? pctFmt.format(stats.error_rate) : "—") },
+  { label: "p50", value: (stats) => formatDuration(stats.p50_ms) },
+  { label: "p95", value: (stats) => formatDuration(stats.p95_ms) },
+  { label: "Custo médio", value: (stats) => formatTotalUsd(stats.avg_cost) },
   { label: "Última suíte", value: suiteText },
 ];
 
@@ -97,10 +97,14 @@ export function CanaryPanel({
 }: Props) {
   const queryClient = useQueryClient();
   const { data: state, isError } = useCanary(configId);
-  const draft = draftVersionId ? versions.find((v) => v.id === draftVersionId) : undefined;
+  const draft = draftVersionId
+    ? versions.find((version) => version.id === draftVersionId)
+    : undefined;
   // o rascunho publicado ganha o próximo número, não o dele
-  const next = Math.max(0, ...versions.map((v) => v.version_number)) + 1;
-  const others = versions.filter((v) => v.status === "published" && v.id !== currentVersionId);
+  const next = Math.max(0, ...versions.map((version) => version.version_number)) + 1;
+  const others = versions.filter(
+    (version) => version.status === "published" && version.id !== currentVersionId,
+  );
   const [source, setSource] = useState<string>("");
   const [percent, setPercent] = useState(10);
   const [newPercent, setNewPercent] = useState<number | null>(null);
@@ -119,16 +123,17 @@ export function CanaryPanel({
 
   const start = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/configs/{config_id}/canary", {
+      const response = await client.POST("/api/v1/configs/{config_id}/canary", {
         params: { path: { config_id: configId } },
         body: { percent, version_id: chosen === DRAFT ? null : chosen },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Erro ao ligar o canário."));
-      return res.data!;
+      if (response.error)
+        throw new Error(apiErrorMessage(response.error, "Erro ao ligar o canário."));
+      return response.data!;
     },
     onError: (e) => toast.error(e.message),
-    onSuccess: (s) => {
-      toast.success(`v${s.canary?.version_number} em ${s.percent}% das conversas`);
+    onSuccess: (canary) => {
+      toast.success(`v${canary.canary?.version_number} em ${canary.percent}% das conversas`);
       setSource("");
       refresh();
     },
@@ -136,16 +141,17 @@ export function CanaryPanel({
 
   const change = useMutation({
     mutationFn: async (value: number) => {
-      const res = await client.PATCH("/api/v1/configs/{config_id}/canary", {
+      const response = await client.PATCH("/api/v1/configs/{config_id}/canary", {
         params: { path: { config_id: configId } },
         body: { percent: value },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Erro ao mudar o percentual."));
-      return res.data!;
+      if (response.error)
+        throw new Error(apiErrorMessage(response.error, "Erro ao mudar o percentual."));
+      return response.data!;
     },
     onError: (e) => toast.error(e.message),
-    onSuccess: (s) => {
-      toast.success(`Canário em ${s.percent}% das conversas`);
+    onSuccess: (canary) => {
+      toast.success(`Canário em ${canary.percent}% das conversas`);
       setNewPercent(null);
       refresh();
     },
@@ -153,7 +159,7 @@ export function CanaryPanel({
 
   const finish = useMutation({
     mutationFn: async (kind: "promote" | "stop") => {
-      const res =
+      const response =
         kind === "promote"
           ? await client.POST("/api/v1/configs/{config_id}/canary/promote", {
               params: { path: { config_id: configId } },
@@ -161,7 +167,8 @@ export function CanaryPanel({
           : await client.DELETE("/api/v1/configs/{config_id}/canary", {
               params: { path: { config_id: configId } },
             });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Erro ao encerrar o canário."));
+      if (response.error)
+        throw new Error(apiErrorMessage(response.error, "Erro ao encerrar o canário."));
       return kind;
     },
     onError: (e) => toast.error(e.message),
@@ -281,9 +288,9 @@ export function CanaryPanel({
           Versão
           <select value={chosen} onChange={(e) => setSource(e.target.value)} className={selectCls}>
             {draft && <option value={DRAFT}>Rascunho (vira v{next})</option>}
-            {others.map((v) => (
-              <option key={v.id} value={v.id}>
-                v{v.version_number}
+            {others.map((version) => (
+              <option key={version.id} value={version.id}>
+                v{version.version_number}
               </option>
             ))}
           </select>

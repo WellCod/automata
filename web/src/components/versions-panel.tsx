@@ -81,31 +81,34 @@ const STATUS_CLS: Record<string, string> = {
 };
 
 function compressionText(
-  c: NonNullable<ConfigPayload["run"]>["compress_tool_results"] | undefined,
+  compression: NonNullable<ConfigPayload["run"]>["compress_tool_results"] | undefined,
 ): string {
-  if (!c) return "desligada";
-  const parts = [`após ${c.after_results ?? 3}`];
-  if (c.token_limit) parts.push(`${c.token_limit} tokens`);
-  if (c.model_id) parts.push(c.model_id);
+  if (!compression) return "desligada";
+  const parts = [`após ${compression.after_results ?? 3}`];
+  if (compression.token_limit) parts.push(`${compression.token_limit} tokens`);
+  if (compression.model_id) parts.push(compression.model_id);
   return parts.join(", ");
 }
 
-function diffPayload(a: ConfigPayload, b: ConfigPayload): string[] {
+/** Campos que mudam do payload vigente para o do rascunho, em frases curtas para a lista de versões. */
+function diffPayload(current: ConfigPayload, draft: ConfigPayload): string[] {
   const diffs: string[] = [];
-  if (a.model_id !== b.model_id) diffs.push(`modelo: ${a.model_id} → ${b.model_id}`);
+  if (current.model_id !== draft.model_id)
+    diffs.push(`modelo: ${current.model_id} → ${draft.model_id}`);
   const instrKeys = ["persona", "situation", "tone", "objective", "guardrails"] as const;
-  for (const k of instrKeys) {
-    if ((a.instructions?.[k] ?? "") !== (b.instructions?.[k] ?? "")) diffs.push(`instruções.${k}`);
+  for (const key of instrKeys) {
+    if ((current.instructions?.[key] ?? "") !== (draft.instructions?.[key] ?? ""))
+      diffs.push(`instruções.${key}`);
   }
   const capKeys = ["extended_thinking", "structured_output", "vision"] as const;
-  for (const k of capKeys) {
-    if ((a.capabilities?.[k] ?? false) !== (b.capabilities?.[k] ?? false)) {
-      diffs.push(`capabilities.${k}`);
+  for (const key of capKeys) {
+    if ((current.capabilities?.[key] ?? false) !== (draft.capabilities?.[key] ?? false)) {
+      diffs.push(`capabilities.${key}`);
     }
   }
   // controle do run e schema (ADR-0027): mudar o schema muda o contrato de quem integra
-  const runA: Partial<NonNullable<ConfigPayload["run"]>> = a.run ?? {};
-  const runB: Partial<NonNullable<ConfigPayload["run"]>> = b.run ?? {};
+  const runA: Partial<NonNullable<ConfigPayload["run"]>> = current.run ?? {};
+  const runB: Partial<NonNullable<ConfigPayload["run"]>> = draft.run ?? {};
   if ((runA.tool_call_limit ?? null) !== (runB.tool_call_limit ?? null))
     diffs.push(
       `limite de tools: ${runA.tool_call_limit ?? "sem"} → ${runB.tool_call_limit ?? "sem"}`,
@@ -122,8 +125,8 @@ function diffPayload(a: ConfigPayload, b: ConfigPayload): string[] {
     diffs.push(
       `teto de custo por resposta: ${runA.max_cost_usd ?? "sem"} → ${runB.max_cost_usd ?? "sem"}`,
     );
-  const schemaA = a.output_schema ? JSON.stringify(a.output_schema) : null;
-  const schemaB = b.output_schema ? JSON.stringify(b.output_schema) : null;
+  const schemaA = current.output_schema ? JSON.stringify(current.output_schema) : null;
+  const schemaB = draft.output_schema ? JSON.stringify(draft.output_schema) : null;
   if (schemaA !== schemaB)
     diffs.push(
       schemaA === null
@@ -159,27 +162,27 @@ export function VersionsPanel({
   } = useQuery<AgentConfigVersionDetail[]>({
     queryKey: ["versions", agentId],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/configs/{config_id}/versions", {
+      const response = await client.GET("/api/v1/configs/{config_id}/versions", {
         params: { path: { config_id: agentId } },
       });
-      if (res.error) throw new Error("Falha ao carregar versões");
-      return res.data!;
+      if (response.error) throw new Error("Falha ao carregar versões");
+      return response.data!;
     },
   });
 
   const publishMutation = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/configs/{config_id}/publish", {
+      const response = await client.POST("/api/v1/configs/{config_id}/publish", {
         params: { path: { config_id: agentId } },
       });
       // o 409 do gate explica por que não publicou
-      if (res.error)
-        throw new Error(apiErrorMessage(res.error, "Erro ao publicar. Tente novamente."));
-      return res.data!;
+      if (response.error)
+        throw new Error(apiErrorMessage(response.error, "Erro ao publicar. Tente novamente."));
+      return response.data!;
     },
     onError: (error) => toast.error(error.message),
-    onSuccess: (v) => {
-      toast.success(`v${v.version_number} publicada`);
+    onSuccess: (version) => {
+      toast.success(`v${version.version_number} publicada`);
       void queryClient.invalidateQueries({ queryKey: ["versions", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["config", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
@@ -191,16 +194,16 @@ export function VersionsPanel({
 
   const rollbackMutation = useMutation({
     mutationFn: async (versionId: string) => {
-      const res = await client.POST("/api/v1/configs/{config_id}/rollback", {
+      const response = await client.POST("/api/v1/configs/{config_id}/rollback", {
         params: { path: { config_id: agentId } },
         body: { version_id: versionId },
       });
-      if (res.error) throw new Error("Falha ao reverter");
-      return res.data!;
+      if (response.error) throw new Error("Falha ao reverter");
+      return response.data!;
     },
     onError: () => toast.error("Erro ao reverter. Tente novamente."),
-    onSuccess: (v) => {
-      toast.success(`v${v.version_number} ativa de novo`);
+    onSuccess: (version) => {
+      toast.success(`v${version.version_number} ativa de novo`);
       void queryClient.invalidateQueries({ queryKey: ["versions", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["config", agentId] });
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
@@ -211,9 +214,9 @@ export function VersionsPanel({
 
   const draft =
     draftVersionId === undefined
-      ? versions?.find((v) => v.status === "draft")
-      : versions?.find((v) => v.id === draftVersionId);
-  const current = versions?.find((v) => v.id === currentVersionId);
+      ? versions?.find((version) => version.status === "draft")
+      : versions?.find((version) => version.id === draftVersionId);
+  const current = versions?.find((version) => version.id === currentVersionId);
   const busy = publishMutation.isPending || rollbackMutation.isPending;
 
   function confirm() {
@@ -292,45 +295,47 @@ export function VersionsPanel({
 
       {!isPending && !isError && versions && versions.length > 0 && (
         <ul className="flex flex-col gap-1">
-          {versions.map((v) => {
+          {versions.map((version) => {
             const diffs =
-              v.status === "draft" && current ? diffPayload(current.payload, v.payload) : [];
+              version.status === "draft" && current
+                ? diffPayload(current.payload, version.payload)
+                : [];
 
             return (
               <li
-                key={v.id}
+                key={version.id}
                 className="border-border bg-card flex flex-col gap-1 rounded border px-3 py-2"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-foreground text-[13px] font-medium">
-                      v{v.version_number}
+                      v{version.version_number}
                     </span>
                     <span
-                      className={`text-[11px] font-medium ${STATUS_CLS[v.status] ?? "text-muted-foreground"}`}
+                      className={`text-[11px] font-medium ${STATUS_CLS[version.status] ?? "text-muted-foreground"}`}
                     >
-                      {STATUS_LABELS[v.status] ?? v.status}
+                      {STATUS_LABELS[version.status] ?? version.status}
                     </span>
-                    <span className="text-muted-foreground text-[11px]">{v.author}</span>
+                    <span className="text-muted-foreground text-[11px]">{version.author}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground text-[11px]">
-                      {new Date(v.created_at).toLocaleDateString("pt-BR")}
+                      {new Date(version.created_at).toLocaleDateString("pt-BR")}
                     </span>
-                    {v.id === currentVersionId && <Badge tone="active">Ativa</Badge>}
-                    {v.id === canaryVersionId && (
+                    {version.id === currentVersionId && <Badge tone="active">Ativa</Badge>}
+                    {version.id === canaryVersionId && (
                       <Badge tone="pending">Canário {canaryState?.percent}%</Badge>
                     )}
-                    {v.status === "published" &&
-                      v.id !== currentVersionId &&
-                      v.id !== canaryVersionId && (
+                    {version.status === "published" &&
+                      version.id !== currentVersionId &&
+                      version.id !== canaryVersionId && (
                         <Button
                           size="xs"
                           onClick={() =>
                             setPending({
                               kind: "rollback",
-                              versionId: v.id,
-                              versionNumber: v.version_number,
+                              versionId: version.id,
+                              versionNumber: version.version_number,
                             })
                           }
                           disabled={busy || pending !== null}

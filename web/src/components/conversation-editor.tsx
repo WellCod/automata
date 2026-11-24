@@ -31,9 +31,9 @@ function useModelIds() {
   return useQuery({
     queryKey: ["models:capabilities"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/models/capabilities");
-      if (res.error) throw new Error("Falha ao carregar modelos");
-      return res.data as Record<string, unknown>;
+      const response = await client.GET("/api/v1/models/capabilities");
+      if (response.error) throw new Error("Falha ao carregar modelos");
+      return response.data as Record<string, unknown>;
     },
     select: (models) => Object.keys(models),
   });
@@ -111,9 +111,9 @@ export function ConversationEditor({
               className={inputCls}
             >
               <option value="">O mesmo do agente</option>
-              {models.map((m) => (
-                <option key={m} value={m}>
-                  {m}
+              {models.map((modelId) => (
+                <option key={modelId} value={modelId}>
+                  {modelId}
                 </option>
               ))}
             </select>

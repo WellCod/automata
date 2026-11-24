@@ -31,9 +31,9 @@ export function useCrossEncoders() {
   return useQuery({
     queryKey: ["knowledge-bases", "cross-encoders"],
     queryFn: async (): Promise<CrossEncoderInfo[]> => {
-      const res = await client.GET("/api/v1/knowledge-bases/cross-encoders");
-      if (res.error) throw new Error("Falha ao carregar os cross-encoders");
-      return res.data;
+      const response = await client.GET("/api/v1/knowledge-bases/cross-encoders");
+      if (response.error) throw new Error("Falha ao carregar os cross-encoders");
+      return response.data;
     },
   });
 }
@@ -56,7 +56,7 @@ export function CrossEncoderFields({
 }) {
   const { data: providers = [] } = useCrossEncoders();
   const current = value.cross_encoder ?? null;
-  const info = providers.find((p) => p.provider === current?.provider);
+  const info = providers.find((option) => option.provider === current?.provider);
   return (
     <div className="flex flex-col gap-1">
       <label className="text-foreground flex items-center gap-2 text-[13px]">
@@ -66,7 +66,7 @@ export function CrossEncoderFields({
           value={current?.provider ?? ""}
           onChange={(e) => {
             const provider = e.target.value as CrossEncoder["provider"] | "";
-            const found = providers.find((p) => p.provider === provider);
+            const found = providers.find((option) => option.provider === provider);
             onChange({
               ...value,
               cross_encoder: provider && found ? { provider, model: found.models[0] ?? "" } : null,
@@ -75,10 +75,10 @@ export function CrossEncoderFields({
           className={`${inputCls} w-auto`}
         >
           <option value="">Desligado</option>
-          {providers.map((p) => (
-            <option key={p.provider} value={p.provider} disabled={!p.configured}>
-              {PROVIDER_LABELS[p.provider]}
-              {p.configured ? "" : " (não configurado)"}
+          {providers.map((option) => (
+            <option key={option.provider} value={option.provider} disabled={!option.configured}>
+              {PROVIDER_LABELS[option.provider]}
+              {option.configured ? "" : " (não configurado)"}
             </option>
           ))}
         </select>
@@ -93,9 +93,9 @@ export function CrossEncoderFields({
             }
             className={`${inputCls} w-auto self-start`}
           >
-            {info.models.map((m) => (
-              <option key={m} value={m}>
-                {m} · {usd(info.price_per_search[m] ?? 0)} por busca
+            {info.models.map((modelId) => (
+              <option key={modelId} value={modelId}>
+                {modelId} · {usd(info.price_per_search[modelId] ?? 0)} por busca
               </option>
             ))}
           </select>
@@ -128,9 +128,9 @@ function useModels() {
   return useQuery({
     queryKey: ["models:capabilities"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/models/capabilities");
-      if (res.error) throw new Error("Falha ao carregar modelos");
-      return res.data as Record<string, unknown>;
+      const response = await client.GET("/api/v1/models/capabilities");
+      if (response.error) throw new Error("Falha ao carregar modelos");
+      return response.data as Record<string, unknown>;
     },
     select: (models) => Object.keys(models),
   });
@@ -144,7 +144,7 @@ export function RetrievalFields({
   onChange: (v: RetrievalSettings) => void;
 }) {
   const { data: models = [] } = useModels();
-  const current = RERANKERS.find((r) => r.value === value.reranker);
+  const current = RERANKERS.find((reranker) => reranker.value === value.reranker);
   return (
     <fieldset className="flex flex-col gap-2">
       <legend className="text-foreground mb-1 text-[13px] font-medium">Estratégia de busca</legend>
@@ -156,9 +156,9 @@ export function RetrievalFields({
         }
         className={`${inputCls} w-auto self-start`}
       >
-        {RERANKERS.map((r) => (
-          <option key={r.value} value={r.value}>
-            {r.label}
+        {RERANKERS.map((reranker) => (
+          <option key={reranker.value} value={reranker.value}>
+            {reranker.label}
           </option>
         ))}
       </select>
@@ -243,9 +243,9 @@ export function RetrievalFields({
             className={`${inputCls} w-auto self-start`}
           >
             <option value="">Modelo</option>
-            {models.map((m) => (
-              <option key={m} value={m}>
-                {m}
+            {models.map((modelId) => (
+              <option key={modelId} value={modelId}>
+                {modelId}
               </option>
             ))}
           </select>

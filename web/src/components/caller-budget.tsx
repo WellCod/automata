@@ -23,9 +23,9 @@ export function useCallerBudgets() {
   return useQuery({
     queryKey: KEY,
     queryFn: async (): Promise<Record<string, CallerBudget>> => {
-      const res = await client.GET("/api/v1/caller-budgets");
-      if (res.error) throw new Error("Falha ao carregar os orçamentos");
-      return Object.fromEntries(res.data.map((b) => [b.subject, b]));
+      const response = await client.GET("/api/v1/caller-budgets");
+      if (response.error) throw new Error("Falha ao carregar os orçamentos");
+      return Object.fromEntries(response.data.map((budget) => [budget.subject, budget]));
     },
   });
 }
@@ -49,11 +49,12 @@ export function CallerBudgetEditor({ subject, label }: { subject: string; label:
 
   const save = useMutation({
     mutationFn: async () => {
-      const res = await client.PUT("/api/v1/caller-budgets/{subject}", {
+      const response = await client.PUT("/api/v1/caller-budgets/{subject}", {
         params: { path: { subject } },
         body: { monthly_usd: Number(limit), warn_percent: warn, hard_stop: hardStop },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar o orçamento"));
+      if (response.error)
+        throw new Error(apiErrorMessage(response.error, "Falha ao salvar o orçamento"));
     },
     onSuccess: () => {
       toast.success(`Orçamento de ${label} salvo`);
@@ -65,10 +66,11 @@ export function CallerBudgetEditor({ subject, label }: { subject: string; label:
 
   const remove = useMutation({
     mutationFn: async () => {
-      const res = await client.DELETE("/api/v1/caller-budgets/{subject}", {
+      const response = await client.DELETE("/api/v1/caller-budgets/{subject}", {
         params: { path: { subject } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao remover o orçamento"));
+      if (response.error)
+        throw new Error(apiErrorMessage(response.error, "Falha ao remover o orçamento"));
     },
     onSuccess: () => {
       toast.success(`Orçamento de ${label} removido`);

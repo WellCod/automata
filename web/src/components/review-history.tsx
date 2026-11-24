@@ -37,7 +37,7 @@ function Entry({ entry }: { entry: ReviewEntry }) {
           <button
             type="button"
             aria-expanded={open}
-            onClick={() => setOpen((o) => !o)}
+            onClick={() => setOpen((wasOpen) => !wasOpen)}
             className="text-accent w-fit text-[12px] underline"
           >
             {open ? "Esconder a edição" : "Ver a edição"}
@@ -54,12 +54,12 @@ export function ReviewHistory({ runId }: { runId: string }) {
   const { data } = useQuery({
     queryKey: ["run-reviews", runId],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/runs/{run_id}/reviews", {
+      const response = await client.GET("/api/v1/runs/{run_id}/reviews", {
         params: { path: { run_id: runId } },
       });
       // run de agente, ou de outro usuário: sem histórico para mostrar
-      if (res.error) return [];
-      return res.data ?? [];
+      if (response.error) return [];
+      return response.data ?? [];
     },
   });
   if (!data || data.length === 0) return null;
@@ -67,8 +67,8 @@ export function ReviewHistory({ runId }: { runId: string }) {
     <section aria-label="Decisões humanas" className="flex flex-col gap-1.5">
       <h3 className="text-muted-foreground text-[11px] font-medium">Decisões humanas</h3>
       <ol className="flex flex-col gap-1.5">
-        {data.map((e, i) => (
-          <Entry key={`${e.step_id}-${i}`} entry={e} />
+        {data.map((entry, i) => (
+          <Entry key={`${entry.step_id}-${i}`} entry={entry} />
         ))}
       </ol>
     </section>

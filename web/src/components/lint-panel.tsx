@@ -18,9 +18,9 @@ export function LintPanel({ getPayload }: Props) {
     mutationFn: async () => {
       const payload = getPayload();
       if (!payload) throw new Error("Sem payload para verificar");
-      const res = await client.POST("/api/v1/linter", { body: payload });
-      if (res.error) throw new Error("Falha ao executar linter");
-      return res.data!;
+      const response = await client.POST("/api/v1/linter", { body: payload });
+      if (response.error) throw new Error("Falha ao executar linter");
+      return response.data!;
     },
   });
 
@@ -49,17 +49,17 @@ export function LintPanel({ getPayload }: Props) {
             </div>
           ) : (
             <ul className="flex flex-col gap-2">
-              {warnings.map((w, i) => (
+              {warnings.map((warning, i) => (
                 <li
                   key={i}
                   className="border-border bg-card flex items-start gap-2 rounded border px-3 py-2 text-[13px]"
                 >
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
                   <div>
-                    <span className="text-foreground font-medium">{w.section}</span>
+                    <span className="text-foreground font-medium">{warning.section}</span>
                     <span className="text-muted-foreground mx-1">·</span>
-                    <span className="text-muted-foreground font-mono">{w.code}</span>
-                    <p className="text-muted-foreground mt-0.5">{w.message}</p>
+                    <span className="text-muted-foreground font-mono">{warning.code}</span>
+                    <p className="text-muted-foreground mt-0.5">{warning.message}</p>
                   </div>
                 </li>
               ))}

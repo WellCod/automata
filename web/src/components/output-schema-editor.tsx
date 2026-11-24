@@ -46,9 +46,9 @@ export function OutputSchemaEditor({
   const { data: models } = useQuery({
     queryKey: ["models:capabilities"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/models/capabilities");
-      if (res.error) throw new Error("Falha ao carregar modelos");
-      return res.data as Record<string, CapabilityFlags>;
+      const response = await client.GET("/api/v1/models/capabilities");
+      if (response.error) throw new Error("Falha ao carregar modelos");
+      return response.data as Record<string, CapabilityFlags>;
     },
   });
   const supported = models?.[modelId]?.structured_output ?? false;

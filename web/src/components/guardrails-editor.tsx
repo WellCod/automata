@@ -50,28 +50,29 @@ export const DEFAULT_CLASSIFIER: ClassifierRule = {
 };
 
 // mesmas regras de ClassifierRule e do serviço na API (ADR-0030)
-export function guardrailProblems(g: Guardrails): string[] {
+export function guardrailProblems(guardrails: Guardrails): string[] {
   const problems: string[] = [];
-  const c = g.classifier;
-  if (c) {
-    if (!c.model_id) problems.push("Escolha o modelo do classificador.");
-    if (c.checks.length === 0) problems.push("Marque ao menos uma checagem do classificador.");
-    if (c.checks.includes("off_topic") && !c.scope?.trim())
+  const classifier = guardrails.classifier;
+  if (classifier) {
+    if (!classifier.model_id) problems.push("Escolha o modelo do classificador.");
+    if (classifier.checks.length === 0)
+      problems.push("Marque ao menos uma checagem do classificador.");
+    if (classifier.checks.includes("off_topic") && !classifier.scope?.trim())
       problems.push("Descreva o que o agente atende para a checagem de assunto.");
   }
-  problems.push(...customPatternProblems(g.pii?.custom ?? []));
-  const oc = g.output?.classifier;
-  if (oc) {
-    if (!oc.model_id) problems.push("Escolha o modelo do classificador da resposta.");
-    if (oc.checks.length === 0)
+  problems.push(...customPatternProblems(guardrails.pii?.custom ?? []));
+  const outputClassifier = guardrails.output?.classifier;
+  if (outputClassifier) {
+    if (!outputClassifier.model_id) problems.push("Escolha o modelo do classificador da resposta.");
+    if (outputClassifier.checks.length === 0)
       problems.push("Marque ao menos uma checagem do classificador da resposta.");
-    if (oc.checks.includes("off_topic") && !oc.scope?.trim())
+    if (outputClassifier.checks.includes("off_topic") && !outputClassifier.scope?.trim())
       problems.push("Descreva o que o agente atende para a checagem de assunto da resposta.");
   }
-  const t = g.tool_results;
-  if (t?.classifier && !c)
+  const toolResults = guardrails.tool_results;
+  if (toolResults?.classifier && !classifier)
     problems.push("O exame de tool pelo classificador exige o classificador.");
-  if (t && !t.terms && !t.classifier)
+  if (toolResults && !toolResults.terms && !toolResults.classifier)
     problems.push("O exame de tool precisa de termos ou classificador.");
   return problems;
 }
@@ -79,20 +80,20 @@ export function guardrailProblems(g: Guardrails): string[] {
 export function customPatternProblems(patterns: CustomPiiPattern[]): string[] {
   const problems: string[] = [];
   const labels = new Set<string>();
-  patterns.forEach((p, i) => {
-    const n = i + 1;
-    const label = p.label.trim();
+  patterns.forEach((pattern, i) => {
+    const position = i + 1;
+    const label = pattern.label.trim();
     if (!label || !/^[\p{L}\p{N}_ ]{1,30}$/u.test(label))
-      problems.push(`Padrão ${n}: o rótulo precisa de 1 a 30 letras, dígitos ou espaços.`);
-    else if (labels.has(label.toLowerCase())) problems.push(`Padrão ${n}: rótulo repetido.`);
+      problems.push(`Padrão ${position}: o rótulo precisa de 1 a 30 letras, dígitos ou espaços.`);
+    else if (labels.has(label.toLowerCase())) problems.push(`Padrão ${position}: rótulo repetido.`);
     labels.add(label.toLowerCase());
-    if (!/^[A-Za-z0-9-]{0,10}$/.test(p.prefix ?? ""))
-      problems.push(`Padrão ${n}: o prefixo aceita até 10 letras, dígitos ou hífen.`);
-    const inRange = (d: number) => Number.isInteger(d) && d >= 4 && d <= 20;
-    if (!inRange(p.min_digits) || !inRange(p.max_digits))
-      problems.push(`Padrão ${n}: os dígitos vão de 4 a 20.`);
-    else if (p.min_digits > p.max_digits)
-      problems.push(`Padrão ${n}: o mínimo de dígitos passa do máximo.`);
+    if (!/^[A-Za-z0-9-]{0,10}$/.test(pattern.prefix ?? ""))
+      problems.push(`Padrão ${position}: o prefixo aceita até 10 letras, dígitos ou hífen.`);
+    const inRange = (digits: number) => Number.isInteger(digits) && digits >= 4 && digits <= 20;
+    if (!inRange(pattern.min_digits) || !inRange(pattern.max_digits))
+      problems.push(`Padrão ${position}: os dígitos vão de 4 a 20.`);
+    else if (pattern.min_digits > pattern.max_digits)
+      problems.push(`Padrão ${position}: o mínimo de dígitos passa do máximo.`);
   });
   return problems;
 }
@@ -128,12 +129,12 @@ export const SAFE_NEW_GUARDRAILS: Guardrails = {
 };
 
 // o payload salvo pode vir sem alguma seção (versões anteriores aos guardrails)
-export function withDefaults(g: Partial<Guardrails> | null | undefined): Guardrails {
+export function withDefaults(saved: Partial<Guardrails> | null | undefined): Guardrails {
   return {
     ...DEFAULT_GUARDRAILS,
-    ...g,
-    pii: { ...DEFAULT_PII, ...g?.pii },
-    output: { ...DEFAULT_OUTPUT, ...g?.output },
+    ...saved,
+    pii: { ...DEFAULT_PII, ...saved?.pii },
+    output: { ...DEFAULT_OUTPUT, ...saved?.output },
   };
 }
 
@@ -145,7 +146,7 @@ const checkCls = "h-3.5 w-3.5 accent-[var(--accent)]";
 function lines(value: string): string[] {
   return value
     .split("\n")
-    .map((l) => l.trim())
+    .map((line) => line.trim())
     .filter(Boolean);
 }
 
@@ -160,13 +161,14 @@ function TermsField({
   label: string;
   hint: string;
   value: string[];
-  onChange: (v: string[]) => void;
+  onChange: (terms: string[]) => void;
 }) {
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor={id} className="text-foreground text-[13px]">
         {label}
       </label>
+      {/* não controlado e lido no blur: controlado, a linha vazia sumiria enquanto se digita */}
       <textarea
         id={id}
         rows={3}
@@ -186,22 +188,26 @@ function PiiTypes({
   label,
 }: {
   value: PiiType[];
-  onChange: (v: PiiType[]) => void;
+  onChange: (types: PiiType[]) => void;
   label: string;
 }) {
   return (
     <div role="group" aria-label={label} className="flex flex-wrap gap-x-4 gap-y-1">
-      {PII_TYPES.map((t) => (
-        <label key={t} className="text-foreground flex items-center gap-1.5 text-[13px]">
+      {PII_TYPES.map((piiType) => (
+        <label key={piiType} className="text-foreground flex items-center gap-1.5 text-[13px]">
           <input
             type="checkbox"
             className={checkCls}
-            checked={value.includes(t)}
+            checked={value.includes(piiType)}
             onChange={(e) =>
-              onChange(e.target.checked ? [...value, t] : value.filter((x) => x !== t))
+              onChange(
+                e.target.checked
+                  ? [...value, piiType]
+                  : value.filter((selected) => selected !== piiType),
+              )
             }
           />
-          {PII_LABELS[t]}
+          {PII_LABELS[piiType]}
         </label>
       ))}
     </div>
@@ -212,14 +218,15 @@ function useModelIds() {
   return useQuery({
     queryKey: ["models:capabilities"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/models/capabilities");
-      if (res.error) throw new Error("Falha ao carregar modelos");
-      return res.data as Record<string, unknown>;
+      const response = await client.GET("/api/v1/models/capabilities");
+      if (response.error) throw new Error("Falha ao carregar modelos");
+      return response.data as Record<string, unknown>;
     },
     select: (models) => Object.keys(models),
   });
 }
 
+// forma comum ao classificador da entrada e ao da resposta, que diferem só nas checagens
 type AnyClassifier = {
   model_id: string;
   checks: string[];
@@ -234,7 +241,7 @@ function ClassifierFields<R extends AnyClassifier>({
   subject = "mensagem",
 }: {
   value: R;
-  onChange: (v: R) => void;
+  onChange: (classifier: R) => void;
   labels: Record<R["checks"][number], string>;
   subject?: "mensagem" | "resposta";
 }) {
@@ -254,9 +261,9 @@ function ClassifierFields<R extends AnyClassifier>({
         className={inputCls}
       >
         <option value="">Escolha um modelo</option>
-        {models.map((m) => (
-          <option key={m} value={m}>
-            {m}
+        {models.map((modelId) => (
+          <option key={modelId} value={modelId}>
+            {modelId}
           </option>
         ))}
       </select>
@@ -265,20 +272,22 @@ function ClassifierFields<R extends AnyClassifier>({
         aria-label={subject === "resposta" ? "Checagens da resposta" : "Checagens do classificador"}
         className="flex flex-col gap-1"
       >
-        {options.map((c) => (
-          <label key={c} className="text-foreground flex items-center gap-1.5 text-[13px]">
+        {options.map((check) => (
+          <label key={check} className="text-foreground flex items-center gap-1.5 text-[13px]">
             <input
               type="checkbox"
               className={checkCls}
-              checked={checks.includes(c)}
+              checked={checks.includes(check)}
               onChange={(e) =>
                 onChange({
                   ...value,
-                  checks: e.target.checked ? [...checks, c] : checks.filter((x) => x !== c),
+                  checks: e.target.checked
+                    ? [...checks, check]
+                    : checks.filter((selected) => selected !== check),
                 })
               }
             />
-            {labels[c]}
+            {labels[check]}
           </label>
         ))}
       </div>
@@ -319,11 +328,11 @@ function CustomPatterns({
   onChange,
 }: {
   value: CustomPiiPattern[];
-  onChange: (v: CustomPiiPattern[]) => void;
+  onChange: (patterns: CustomPiiPattern[]) => void;
 }) {
   const id = useId();
   const update = (i: number, patch: Partial<CustomPiiPattern>) =>
-    onChange(value.map((p, j) => (j === i ? { ...p, ...patch } : p)));
+    onChange(value.map((pattern, j) => (j === i ? { ...pattern, ...patch } : pattern)));
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-foreground text-[13px]">Padrões próprios</span>
@@ -333,7 +342,7 @@ function CustomPatterns({
         está ligada, na memória do usuário e na resposta. Sem prefixo, qualquer número com essa
         quantidade de dígitos é mascarado.
       </span>
-      {value.map((p, i) => (
+      {value.map((pattern, i) => (
         <div
           key={i}
           role="group"
@@ -345,7 +354,7 @@ function CustomPatterns({
             <input
               id={`${id}-label-${i}`}
               className={inputCls}
-              value={p.label}
+              value={pattern.label}
               maxLength={30}
               placeholder="matrícula"
               onChange={(e) => update(i, { label: e.target.value })}
@@ -355,7 +364,7 @@ function CustomPatterns({
             <span className="text-muted-foreground">Prefixo</span>
             <input
               className={inputCls}
-              value={p.prefix ?? ""}
+              value={pattern.prefix ?? ""}
               maxLength={10}
               placeholder="MAT"
               onChange={(e) => update(i, { prefix: e.target.value })}
@@ -368,7 +377,7 @@ function CustomPatterns({
               min={4}
               max={20}
               className={inputCls}
-              value={p.min_digits}
+              value={pattern.min_digits}
               onChange={(e) => update(i, { min_digits: Number(e.target.value) })}
             />
           </label>
@@ -379,7 +388,7 @@ function CustomPatterns({
               min={4}
               max={20}
               className={inputCls}
-              value={p.max_digits}
+              value={pattern.max_digits}
               onChange={(e) => update(i, { max_digits: Number(e.target.value) })}
             />
           </label>
@@ -412,29 +421,32 @@ function CustomPatterns({
 }
 
 /** O que o piso da instância (ADR-0034) impõe, em frases curtas para o editor do agente. */
-export function floorSummary(f: Guardrails | null | undefined): string[] {
-  if (!f) return [];
-  const g = withDefaults(f);
+export function floorSummary(floor: Guardrails | null | undefined): string[] {
+  if (!floor) return [];
+  const settings = withDefaults(floor);
   const items: string[] = [];
-  if (g.pii?.mode && g.pii.mode !== "off") {
-    const types = (g.pii.types ?? []).map((t) => PII_LABELS[t]).join(", ");
+  if (settings.pii?.mode && settings.pii.mode !== "off") {
+    const types = (settings.pii.types ?? []).map((piiType) => PII_LABELS[piiType]).join(", ");
     items.push(
-      `${g.pii.mode === "block" ? "Bloquear" : "Mascarar"} dados pessoais${types ? ` (${types})` : ""}`,
+      `${settings.pii.mode === "block" ? "Bloquear" : "Mascarar"} dados pessoais${types ? ` (${types})` : ""}`,
     );
   }
-  if (g.pii?.custom?.length)
-    items.push(`Padrões próprios: ${g.pii.custom.map((c) => c.label).join(", ")}`);
-  if (g.prompt_injection) items.push("Bloquear injeção de prompt");
-  if (g.blocked_topics?.length) items.push(`Tópicos proibidos: ${g.blocked_topics.join(", ")}`);
-  if (g.max_input_chars)
-    items.push(`Mensagem de até ${g.max_input_chars.toLocaleString("pt-BR")} caracteres`);
-  if (g.moderation) items.push("Moderação da OpenAI");
-  if (g.classifier) items.push(`Classificador da entrada (${g.classifier.model_id})`);
-  if (g.tool_results) items.push("Exame do resultado de tool");
-  if (g.output?.pii) items.push("Barrar dado pessoal na resposta");
-  if (g.output?.blocked_terms?.length) items.push("Termos proibidos na resposta");
-  if (g.output?.classifier)
-    items.push(`Classificador da resposta (${g.output.classifier.model_id})`);
+  if (settings.pii?.custom?.length)
+    items.push(
+      `Padrões próprios: ${settings.pii.custom.map((pattern) => pattern.label).join(", ")}`,
+    );
+  if (settings.prompt_injection) items.push("Bloquear injeção de prompt");
+  if (settings.blocked_topics?.length)
+    items.push(`Tópicos proibidos: ${settings.blocked_topics.join(", ")}`);
+  if (settings.max_input_chars)
+    items.push(`Mensagem de até ${settings.max_input_chars.toLocaleString("pt-BR")} caracteres`);
+  if (settings.moderation) items.push("Moderação da OpenAI");
+  if (settings.classifier) items.push(`Classificador da entrada (${settings.classifier.model_id})`);
+  if (settings.tool_results) items.push("Exame do resultado de tool");
+  if (settings.output?.pii) items.push("Barrar dado pessoal na resposta");
+  if (settings.output?.blocked_terms?.length) items.push("Termos proibidos na resposta");
+  if (settings.output?.classifier)
+    items.push(`Classificador da resposta (${settings.output.classifier.model_id})`);
   return items;
 }
 
@@ -445,7 +457,7 @@ export function GuardrailsEditor({
   instance = false,
 }: {
   value: Guardrails;
-  onChange: (v: Guardrails) => void;
+  onChange: (guardrails: Guardrails) => void;
   /** piso da instância que este agente herda; o editor só mostra */
   floor?: Guardrails | null;
   /** editando o próprio piso: muda o texto de quando passa a valer */
@@ -453,11 +465,11 @@ export function GuardrailsEditor({
 }) {
   const inherited = floorSummary(floor);
   const id = useId();
-  const g = withDefaults(value);
-  const pii = g.pii!;
-  const output = g.output!;
-  const set = (patch: Partial<Guardrails>) => onChange({ ...g, ...patch });
-  const problems = guardrailProblems(g);
+  const current = withDefaults(value);
+  const pii = current.pii!;
+  const output = current.output!;
+  const setGuardrails = (patch: Partial<Guardrails>) => onChange({ ...current, ...patch });
+  const problems = guardrailProblems(current);
 
   return (
     <fieldset className="border-border flex flex-col gap-4 rounded border px-4 pt-3 pb-4">
@@ -491,7 +503,9 @@ export function GuardrailsEditor({
         <select
           id={`${id}-pii`}
           value={pii.mode}
-          onChange={(e) => set({ pii: { ...pii, mode: e.target.value as typeof pii.mode } })}
+          onChange={(e) =>
+            setGuardrails({ pii: { ...pii, mode: e.target.value as typeof pii.mode } })
+          }
           className={inputCls}
         >
           <option value="off">Não verificar</option>
@@ -502,7 +516,7 @@ export function GuardrailsEditor({
           <PiiTypes
             label="Tipos de dado na entrada"
             value={pii.types ?? []}
-            onChange={(types) => set({ pii: { ...pii, types } })}
+            onChange={(types) => setGuardrails({ pii: { ...pii, types } })}
           />
         )}
         <span className={hintCls}>
@@ -513,25 +527,25 @@ export function GuardrailsEditor({
 
       <CustomPatterns
         value={pii.custom ?? []}
-        onChange={(custom) => set({ pii: { ...pii, custom } })}
+        onChange={(custom) => setGuardrails({ pii: { ...pii, custom } })}
       />
 
       <label className="text-foreground flex items-center gap-2 text-[13px]">
         <input
           type="checkbox"
           className={checkCls}
-          checked={g.prompt_injection}
-          onChange={(e) => set({ prompt_injection: e.target.checked })}
+          checked={current.prompt_injection}
+          onChange={(e) => setGuardrails({ prompt_injection: e.target.checked })}
         />
         Bloquear tentativa de injeção de prompt (português e inglês)
       </label>
-      {g.prompt_injection && (
+      {current.prompt_injection && (
         <TermsField
           id={`${id}-inj`}
           label="Termos extras de injeção"
           hint="Somam à lista padrão. De 3 a 100 caracteres cada."
-          value={g.injection_extra_terms ?? []}
-          onChange={(injection_extra_terms) => set({ injection_extra_terms })}
+          value={current.injection_extra_terms ?? []}
+          onChange={(injection_extra_terms) => setGuardrails({ injection_extra_terms })}
         />
       )}
 
@@ -539,8 +553,8 @@ export function GuardrailsEditor({
         id={`${id}-topics`}
         label="Tópicos proibidos"
         hint="A mensagem que contiver um destes termos é bloqueada (sem acento e sem maiúscula)."
-        value={g.blocked_topics ?? []}
-        onChange={(blocked_topics) => set({ blocked_topics })}
+        value={current.blocked_topics ?? []}
+        onChange={(blocked_topics) => setGuardrails({ blocked_topics })}
       />
 
       <div className="flex flex-col gap-1">
@@ -552,10 +566,12 @@ export function GuardrailsEditor({
           type="number"
           min={50}
           max={100000}
-          value={g.max_input_chars ?? ""}
+          value={current.max_input_chars ?? ""}
           placeholder="sem limite"
           onChange={(e) =>
-            set({ max_input_chars: e.target.value === "" ? null : Number(e.target.value) })
+            setGuardrails({
+              max_input_chars: e.target.value === "" ? null : Number(e.target.value),
+            })
           }
           className={inputCls}
         />
@@ -565,8 +581,8 @@ export function GuardrailsEditor({
         <input
           type="checkbox"
           className={`${checkCls} mt-0.5`}
-          checked={g.moderation}
-          onChange={(e) => set({ moderation: e.target.checked })}
+          checked={current.moderation}
+          onChange={(e) => setGuardrails({ moderation: e.target.checked })}
         />
         <span className="flex flex-col gap-0.5">
           Moderação da OpenAI
@@ -580,15 +596,15 @@ export function GuardrailsEditor({
         <input
           type="checkbox"
           className={`${checkCls} mt-0.5`}
-          checked={g.classifier != null}
+          checked={current.classifier != null}
           onChange={(e) =>
-            set({
+            setGuardrails({
               classifier: e.target.checked ? { ...DEFAULT_CLASSIFIER } : null,
               // sem classificador, o exame de tool fica só com os termos
               tool_results:
-                e.target.checked || !g.tool_results
-                  ? g.tool_results
-                  : { ...g.tool_results, classifier: false, terms: true },
+                e.target.checked || !current.tool_results
+                  ? current.tool_results
+                  : { ...current.tool_results, classifier: false, terms: true },
             })
           }
         />
@@ -600,11 +616,11 @@ export function GuardrailsEditor({
           </span>
         </span>
       </label>
-      {g.classifier && (
+      {current.classifier && (
         <ClassifierFields
-          value={g.classifier}
+          value={current.classifier}
           labels={CHECK_LABELS}
-          onChange={(classifier) => set({ classifier })}
+          onChange={(classifier) => setGuardrails({ classifier })}
         />
       )}
 
@@ -614,22 +630,26 @@ export function GuardrailsEditor({
           <input
             type="checkbox"
             className={checkCls}
-            checked={g.tool_results != null}
+            checked={current.tool_results != null}
             onChange={(e) =>
-              set({ tool_results: e.target.checked ? { terms: true, classifier: false } : null })
+              setGuardrails({
+                tool_results: e.target.checked ? { terms: true, classifier: false } : null,
+              })
             }
           />
           Examinar o que as tools devolvem antes de o modelo ler
         </label>
-        {g.tool_results && (
+        {current.tool_results && (
           <div className="flex flex-col gap-1 pl-6">
             <label className="text-foreground flex items-center gap-1.5 text-[13px]">
               <input
                 type="checkbox"
                 className={checkCls}
-                checked={g.tool_results.terms ?? true}
+                checked={current.tool_results.terms ?? true}
                 onChange={(e) =>
-                  set({ tool_results: { ...g.tool_results!, terms: e.target.checked } })
+                  setGuardrails({
+                    tool_results: { ...current.tool_results!, terms: e.target.checked },
+                  })
                 }
               />
               Pelos termos de injeção e de instrução dirigida ao assistente
@@ -638,14 +658,16 @@ export function GuardrailsEditor({
               <input
                 type="checkbox"
                 className={checkCls}
-                disabled={!g.classifier}
-                checked={g.tool_results.classifier ?? false}
+                disabled={!current.classifier}
+                checked={current.tool_results.classifier ?? false}
                 onChange={(e) =>
-                  set({ tool_results: { ...g.tool_results!, classifier: e.target.checked } })
+                  setGuardrails({
+                    tool_results: { ...current.tool_results!, classifier: e.target.checked },
+                  })
                 }
               />
               Também pelo classificador{" "}
-              {g.classifier ? "(uma chamada por tool)" : "(ligue o classificador)"}
+              {current.classifier ? "(uma chamada por tool)" : "(ligue o classificador)"}
             </label>
           </div>
         )}
@@ -663,7 +685,7 @@ export function GuardrailsEditor({
             type="checkbox"
             className={checkCls}
             checked={output.pii ?? false}
-            onChange={(e) => set({ output: { ...output, pii: e.target.checked } })}
+            onChange={(e) => setGuardrails({ output: { ...output, pii: e.target.checked } })}
           />
           Barrar resposta com dado pessoal
         </label>
@@ -671,7 +693,7 @@ export function GuardrailsEditor({
           <PiiTypes
             label="Tipos de dado na resposta"
             value={output.pii_types ?? []}
-            onChange={(pii_types) => set({ output: { ...output, pii_types } })}
+            onChange={(pii_types) => setGuardrails({ output: { ...output, pii_types } })}
           />
         )}
         <TermsField
@@ -679,7 +701,7 @@ export function GuardrailsEditor({
           label="Termos proibidos na resposta"
           hint="De 3 a 100 caracteres cada."
           value={output.blocked_terms ?? []}
-          onChange={(blocked_terms) => set({ output: { ...output, blocked_terms } })}
+          onChange={(blocked_terms) => setGuardrails({ output: { ...output, blocked_terms } })}
         />
         <label className="text-foreground flex items-center gap-2 text-[13px]">
           <input
@@ -687,7 +709,7 @@ export function GuardrailsEditor({
             className={checkCls}
             checked={output.classifier != null}
             onChange={(e) =>
-              set({
+              setGuardrails({
                 output: {
                   ...output,
                   classifier: e.target.checked ? { ...DEFAULT_OUTPUT_CLASSIFIER } : null,
@@ -702,7 +724,7 @@ export function GuardrailsEditor({
             value={output.classifier}
             labels={OUTPUT_CHECK_LABELS}
             subject="resposta"
-            onChange={(classifier) => set({ output: { ...output, classifier } })}
+            onChange={(classifier) => setGuardrails({ output: { ...output, classifier } })}
           />
         )}
         {output.classifier && (
@@ -723,17 +745,17 @@ export function GuardrailsEditor({
         </label>
         <input
           id={`${id}-msg`}
-          value={g.blocked_message}
+          value={current.blocked_message}
           maxLength={500}
-          onChange={(e) => set({ blocked_message: e.target.value })}
+          onChange={(e) => setGuardrails({ blocked_message: e.target.value })}
           className={inputCls}
         />
         <span className={hintCls}>O que a pessoa vê quando uma regra barra a mensagem.</span>
       </div>
       {problems.length > 0 && (
         <ul role="alert" className="text-destructive list-disc pl-5 text-[12px]">
-          {problems.map((p) => (
-            <li key={p}>{p}</li>
+          {problems.map((problem) => (
+            <li key={problem}>{problem}</li>
           ))}
         </ul>
       )}

@@ -20,19 +20,19 @@ export function TextDiff({ before, after }: { before: string; after: string }) {
       aria-label="Diferença da edição"
       className="border-border bg-muted max-h-48 overflow-auto rounded border p-2 text-[12px] whitespace-pre-wrap"
     >
-      {lines.map((l, i) => (
+      {lines.map((line, i) => (
         <div
           key={i}
           className={
-            l.kind === "added"
+            line.kind === "added"
               ? "text-emerald-700 dark:text-emerald-400"
-              : l.kind === "removed"
+              : line.kind === "removed"
                 ? "text-destructive line-through"
                 : "text-muted-foreground"
           }
         >
-          {l.kind === "added" ? "+ " : l.kind === "removed" ? "− " : "  "}
-          {l.text}
+          {line.kind === "added" ? "+ " : line.kind === "removed" ? "− " : "  "}
+          {line.text}
         </div>
       ))}
     </pre>

@@ -63,7 +63,7 @@ export function ChunkingFields({
   onChange: (v: ChunkingSettings) => void;
   chunkSize: number;
 }) {
-  const current = STRATEGIES.find((s) => s.value === value.strategy);
+  const current = STRATEGIES.find((strategy) => strategy.value === value.strategy);
   const problem = overlapProblem(chunkSize, value);
   return (
     <div className="flex flex-col gap-2">
@@ -77,9 +77,9 @@ export function ChunkingFields({
           }
           className={inputCls}
         >
-          {STRATEGIES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
+          {STRATEGIES.map((strategy) => (
+            <option key={strategy.value} value={strategy.value}>
+              {strategy.label}
             </option>
           ))}
         </select>
@@ -140,12 +140,12 @@ export function ChunkPreviewPanel({
   const [text, setText] = useState("");
   const preview = useMutation({
     mutationFn: async (): Promise<ChunkPreview> => {
-      const res = await client.POST("/api/v1/knowledge-bases/{base_id}/chunk-preview", {
+      const response = await client.POST("/api/v1/knowledge-bases/{base_id}/chunk-preview", {
         params: { path: { base_id: baseId } },
         body: { text, chunk_size: chunkSize, chunking },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha na prévia"));
-      return res.data;
+      if (response.error) throw new Error(apiErrorMessage(response.error, "Falha na prévia"));
+      return response.data;
     },
   });
   const blocked = overlapProblem(chunkSize, chunking) !== null;
@@ -208,11 +208,11 @@ export function ReprocessBase({ baseId, dirty }: { baseId: string; dirty: boolea
   const [confirm, setConfirm] = useState(false);
   const run = useMutation({
     mutationFn: async (): Promise<ReprocessResult> => {
-      const res = await client.POST("/api/v1/knowledge-bases/{base_id}/reprocess", {
+      const response = await client.POST("/api/v1/knowledge-bases/{base_id}/reprocess", {
         params: { path: { base_id: baseId } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao reprocessar"));
-      return res.data;
+      if (response.error) throw new Error(apiErrorMessage(response.error, "Falha ao reprocessar"));
+      return response.data;
     },
     onSuccess: (result) => {
       setConfirm(false);
@@ -260,8 +260,8 @@ export function ReprocessBase({ baseId, dirty }: { baseId: string; dirty: boolea
             corte novo:
           </p>
           <ul className="text-muted-foreground list-disc pl-5">
-            {result.needs_upload.map((c) => (
-              <li key={c.id}>{c.name}</li>
+            {result.needs_upload.map((content) => (
+              <li key={content.id}>{content.name}</li>
             ))}
           </ul>
         </div>

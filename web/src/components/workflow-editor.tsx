@@ -56,18 +56,24 @@ const INPUT_LABELS: Record<NonNullable<StepNode["input"]>, string> = {
   template: "Recebe um texto montado",
 };
 
+// `key` é "agent:<id>" ou "team:<id>", o valor do select de quem executa a etapa
 type Executor = { key: string; name: string; kind: "agent" | "team" };
 
+/** Agentes e times publicados que podem executar uma etapa (até 100 de cada). */
 export function usePublishedExecutors() {
   return useQuery({
     queryKey: ["configs", "published-executors"],
     queryFn: async (): Promise<Executor[]> => {
       const load = async (kind: "agent" | "team") => {
-        const res = await client.GET("/api/v1/configs", {
+        const response = await client.GET("/api/v1/configs", {
           params: { query: { kind, status: "published", page_size: 100 } },
         });
-        if (res.error) throw new Error("Falha ao carregar agentes e times");
-        return res.data!.items.map((c) => ({ key: `${kind}:${c.id}`, name: c.name, kind }));
+        if (response.error) throw new Error("Falha ao carregar agentes e times");
+        return response.data!.items.map((config) => ({
+          key: `${kind}:${config.id}`,
+          name: config.name,
+          kind,
+        }));
       };
       const [agents, teams] = await Promise.all([load("agent"), load("team")]);
       return [...agents, ...teams];
@@ -75,7 +81,8 @@ export function usePublishedExecutors() {
   });
 }
 
-interface Ctx {
+// repassado a cada nível da árvore; os contêineres trocam `reviewable` ao descer
+interface TreeContext {
   executors: Executor[];
   // nomes na árvore inteira: nó novo nunca repete nome
   taken: Set<string>;
@@ -89,6 +96,7 @@ function executorKey(step: StepNode): string {
   return "";
 }
 
+// sem versão fixada a etapa roda a versão vigente do agente ou time
 function StepVersion({
   configId,
   value,
@@ -103,16 +111,17 @@ function StepVersion({
   const { data: versions } = useQuery({
     queryKey: ["versions", configId],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/configs/{config_id}/versions", {
+      const response = await client.GET("/api/v1/configs/{config_id}/versions", {
         params: { path: { config_id: configId } },
       });
-      if (res.error) throw new Error("Falha ao carregar versões");
-      return res.data!;
+      if (response.error) throw new Error("Falha ao carregar versões");
+      return response.data!;
     },
   });
-  const published = (versions ?? []).filter((v) => v.status === "published");
+  const published = (versions ?? []).filter((version) => version.status === "published");
   // fixada numa versão que deixou de ser publicada: a API recusa ao salvar
-  const stale = value != null && versions != null && !published.some((v) => v.id === value);
+  const stale =
+    value != null && versions != null && !published.some((version) => version.id === value);
   return (
     <select
       aria-label={`Versão de ${label}`}
@@ -122,9 +131,9 @@ function StepVersion({
     >
       <option value="">Versão vigente</option>
       {stale && <option value={value}>Versão fixada indisponível</option>}
-      {published.map((v) => (
-        <option key={v.id} value={v.id}>
-          Fixar v{v.version_number}
+      {published.map((version) => (
+        <option key={version.id} value={version.id}>
+          Fixar v{version.version_number}
         </option>
       ))}
     </select>
@@ -137,11 +146,13 @@ function StepFields({
   ctx,
 }: {
   node: StepNode;
-  onChange: (n: StepNode) => void;
-  ctx: Ctx;
+  onChange: (node: StepNode) => void;
+  ctx: TreeContext;
 }) {
   const key = executorKey(node);
-  const missing = key !== "" && !ctx.executors.some((e) => e.key === key);
+  // executor gravado que saiu da lista (despublicado ou apagado) ganha opção própria
+  // para o select não mostrar outro no lugar
+  const missing = key !== "" && !ctx.executors.some((executor) => executor.key === key);
   return (
     <div className="flex flex-wrap items-center gap-2">
       <select
@@ -163,19 +174,19 @@ function StepFields({
         {missing && <option value={key}>Não publicado ou removido</option>}
         <optgroup label="Agentes">
           {ctx.executors
-            .filter((e) => e.kind === "agent")
-            .map((e) => (
-              <option key={e.key} value={e.key}>
-                {e.name}
+            .filter((executor) => executor.kind === "agent")
+            .map((executor) => (
+              <option key={executor.key} value={executor.key}>
+                {executor.name}
               </option>
             ))}
         </optgroup>
         <optgroup label="Times">
           {ctx.executors
-            .filter((e) => e.kind === "team")
-            .map((e) => (
-              <option key={e.key} value={e.key}>
-                {e.name}
+            .filter((executor) => executor.kind === "team")
+            .map((executor) => (
+              <option key={executor.key} value={executor.key}>
+                {executor.name}
               </option>
             ))}
         </optgroup>
@@ -257,10 +268,11 @@ function RouterFields({
   ctx,
 }: {
   node: RouterNode;
-  onChange: (n: RouterNode) => void;
-  ctx: Ctx;
+  onChange: (node: RouterNode) => void;
+  ctx: TreeContext;
 }) {
-  const inner = { ...ctx, reviewable: false };
+  // etapa dentro de caminho do roteador não pausa para revisão
+  const routeCtx = { ...ctx, reviewable: false };
   const setRoute = (i: number, route: RouterNode["routes"][number]) =>
     onChange({ ...node, routes: replaceAt(node.routes, i, route) });
   return (
@@ -305,7 +317,7 @@ function RouterFields({
             <StepFields
               node={route.step}
               onChange={(step) => setRoute(i, { ...route, step })}
-              ctx={inner}
+              ctx={routeCtx}
             />
           </li>
         ))}
@@ -358,7 +370,7 @@ function RouterFields({
           <StepFields
             node={node.default}
             onChange={(step) => onChange({ ...node, default: step })}
-            ctx={inner}
+            ctx={routeCtx}
           />
         </div>
       )}
@@ -374,11 +386,12 @@ function LoopReviewFields({
   reviewable,
 }: {
   node: LoopNode;
-  onChange: (n: LoopNode) => void;
+  onChange: (node: LoopNode) => void;
   reviewable: boolean;
 }) {
-  const single = node.steps.length === 1 && node.steps[0].type === "step";
-  const allowed = reviewable && single;
+  const singleStep = node.steps.length === 1 && node.steps[0].type === "step";
+  const allowed = reviewable && singleStep;
+  // revisão já ligada continua editável mesmo fora das condições, para poder desligar
   const on = node.review != null;
   return (
     <div className="flex flex-col gap-1.5 text-[12px]">
@@ -432,11 +445,11 @@ function ReviewFields({
   reviewable,
 }: {
   node: StepNode;
-  onChange: (n: StepNode) => void;
+  onChange: (node: StepNode) => void;
   reviewable: boolean;
 }) {
   const review = node.review ?? null;
-  const set = (next: Partial<StepReview>) =>
+  const setReview = (next: Partial<StepReview>) =>
     onChange({ ...node, review: { ...(review ?? NEW_REVIEW), ...next } });
   return (
     <div className="flex w-full flex-col gap-1.5">
@@ -461,7 +474,7 @@ function ReviewFields({
             onChange={(e) => {
               const when = e.target.value as StepReview["when"];
               // refazer só existe depois da saída: antes de rodar não há o que refazer
-              set({
+              setReview({
                 when,
                 on_reject:
                   when === "before" && review.on_reject === "retry" ? "cancel" : review.on_reject,
@@ -475,7 +488,7 @@ function ReviewFields({
           <select
             aria-label={`Se recusarem ${node.name}`}
             value={review.on_reject}
-            onChange={(e) => set({ on_reject: e.target.value as StepReview["on_reject"] })}
+            onChange={(e) => setReview({ on_reject: e.target.value as StepReview["on_reject"] })}
             className={inputCls}
           >
             <option value="cancel">Se recusarem, encerra o fluxo</option>
@@ -493,7 +506,7 @@ function ReviewFields({
               placeholder="sem"
               value={review.timeout_hours ?? ""}
               onChange={(e) =>
-                set({
+                setReview({
                   timeout_hours: e.target.value
                     ? Math.min(168, Math.max(1, Number(e.target.value)))
                     : null,
@@ -508,7 +521,7 @@ function ReviewFields({
             value={review.message ?? ""}
             maxLength={300}
             placeholder="O que o revisor precisa conferir"
-            onChange={(e) => set({ message: e.target.value })}
+            onChange={(e) => setReview({ message: e.target.value })}
             className={`${inputCls} min-w-56 flex-1`}
           />
         </div>
@@ -524,7 +537,7 @@ function RuleFields({
   withSource,
 }: {
   rule: WorkflowRule;
-  onChange: (r: WorkflowRule) => void;
+  onChange: (rule: WorkflowRule) => void;
   label: string;
   withSource: boolean;
 }) {
@@ -549,9 +562,9 @@ function RuleFields({
         onChange={(e) => onChange({ ...rule, kind: e.target.value as WorkflowRule["kind"] })}
         className={inputCls}
       >
-        {RULE_KINDS.map((k) => (
-          <option key={k.value} value={k.value}>
-            {k.label}
+        {RULE_KINDS.map((ruleKind) => (
+          <option key={ruleKind.value} value={ruleKind.value}>
+            {ruleKind.label}
           </option>
         ))}
       </select>
@@ -581,14 +594,14 @@ function NodeCard({
   ctx,
 }: {
   node: WorkflowNode;
-  onChange: (n: WorkflowNode) => void;
+  onChange: (node: WorkflowNode) => void;
   onMove: (delta: number) => void;
   onRemove: () => void;
   canUp: boolean;
   canDown: boolean;
   canRemove: boolean;
   depth: number;
-  ctx: Ctx;
+  ctx: TreeContext;
 }) {
   const meta = TYPE_META[node.type];
   const Icon = meta.icon;
@@ -760,7 +773,7 @@ function NodeList({
   nodes: WorkflowNode[];
   onChange: (nodes: WorkflowNode[]) => void;
   depth: number;
-  ctx: Ctx;
+  ctx: TreeContext;
   types?: NodeType[];
   min?: number;
   max?: number;
@@ -781,7 +794,7 @@ function NodeList({
             canUp={i > 0}
             canDown={i < nodes.length - 1}
             canRemove={nodes.length > min}
-            onChange={(n) => onChange(replaceAt(nodes, i, n))}
+            onChange={(updated) => onChange(replaceAt(nodes, i, updated))}
             onMove={(delta) => onChange(move(nodes, i, delta))}
             onRemove={() => onChange(removeAt(nodes, i))}
           />
@@ -819,7 +832,7 @@ interface Props {
 
 export function WorkflowEditor({ value, onChange }: Props) {
   const { data: executors = [], isError } = usePublishedExecutors();
-  const ctx: Ctx = { executors, taken: namesOf(value), reviewable: true };
+  const ctx: TreeContext = { executors, taken: namesOf(value), reviewable: true };
   const errors = structureErrors(value);
   return (
     <fieldset className="border-border flex flex-col gap-3 rounded border px-4 pt-3 pb-4">
@@ -836,8 +849,8 @@ export function WorkflowEditor({ value, onChange }: Props) {
       <NodeList nodes={value} onChange={onChange} depth={1} ctx={ctx} />
       {errors.length > 0 && value.length > 0 && (
         <ul className="text-muted-foreground list-disc pl-5 text-[11px]" aria-label="Pendências">
-          {errors.map((e) => (
-            <li key={e}>{e}</li>
+          {errors.map((error) => (
+            <li key={error}>{error}</li>
           ))}
         </ul>
       )}

@@ -13,9 +13,9 @@ interface Props {
 
 function currentPeriod(): string {
   const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  return `${y}${m}`;
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  return `${year}${month}`;
 }
 
 function formatTokens(n: number): string {
@@ -31,11 +31,11 @@ export function CostPanel({ agentId }: Props) {
   const { data, isPending, isError } = useQuery<RollupItem | null>({
     queryKey: ["usage:rollup", agentId, period],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/usage/rollup", {
+      const response = await client.GET("/api/v1/usage/rollup", {
         params: { query: { agent_id: agentId, period } },
       });
-      if (res.error) throw new Error("Falha ao carregar uso");
-      return res.data?.[0] ?? null;
+      if (response.error) throw new Error("Falha ao carregar uso");
+      return response.data?.[0] ?? null;
     },
   });
 

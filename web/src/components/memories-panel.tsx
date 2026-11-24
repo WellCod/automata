@@ -19,9 +19,9 @@ function when(iso: string | null | undefined): string {
 
 export function groupByUser(items: MemoryItem[]): [string, MemoryItem[]][] {
   const groups = new Map<string, MemoryItem[]>();
-  for (const m of items) {
-    const key = m.user_id ?? "?";
-    groups.set(key, [...(groups.get(key) ?? []), m]);
+  for (const memory of items) {
+    const key = memory.user_id ?? "?";
+    groups.set(key, [...(groups.get(key) ?? []), memory]);
   }
   return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
@@ -34,30 +34,31 @@ export function MemoriesPanel({ agentId }: { agentId: string }) {
   const { data, isPending, isError } = useQuery({
     queryKey: key,
     queryFn: async () => {
-      const res = await client.GET("/api/v1/configs/{config_id}/memories", {
+      const response = await client.GET("/api/v1/configs/{config_id}/memories", {
         params: { path: { config_id: agentId }, query: user ? { user_id: user } : {} },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao carregar memórias"));
-      return res.data!;
+      if (response.error)
+        throw new Error(apiErrorMessage(response.error, "Falha ao carregar memórias"));
+      return response.data!;
     },
   });
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["memories", agentId] });
   const removeOne = useMutation({
     mutationFn: async (memoryId: string) => {
-      const res = await client.DELETE("/api/v1/configs/{config_id}/memories/{memory_id}", {
+      const response = await client.DELETE("/api/v1/configs/{config_id}/memories/{memory_id}", {
         params: { path: { config_id: agentId, memory_id: memoryId } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao apagar"));
+      if (response.error) throw new Error(apiErrorMessage(response.error, "Falha ao apagar"));
     },
     onSuccess: refresh,
     onError: (e) => toast.error(e.message),
   });
   const forget = useMutation({
     mutationFn: async (userId: string) => {
-      const res = await client.DELETE("/api/v1/configs/{config_id}/memories", {
+      const response = await client.DELETE("/api/v1/configs/{config_id}/memories", {
         params: { path: { config_id: agentId }, query: { user_id: userId } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao apagar"));
+      if (response.error) throw new Error(apiErrorMessage(response.error, "Falha ao apagar"));
     },
     onSuccess: (_, userId) => {
       toast.success(`Memórias de ${userId} apagadas`);
@@ -110,23 +111,23 @@ export function MemoriesPanel({ agentId }: { agentId: string }) {
               </Button>
             </div>
             <ul className="flex flex-col gap-1">
-              {items.map((m) => (
+              {items.map((memory) => (
                 <li
-                  key={m.memory_id}
+                  key={memory.memory_id}
                   className="flex items-start justify-between gap-2 text-[13px]"
                 >
                   <span className="text-foreground">
-                    {m.memory}
+                    {memory.memory}
                     <span className="text-muted-foreground text-[11px]">
                       {" "}
-                      · {when(m.updated_at)}
+                      · {when(memory.updated_at)}
                     </span>
                   </span>
                   <Button
                     size="xs"
                     variant="ghost"
-                    aria-label={`Apagar memória: ${m.memory}`}
-                    onClick={() => removeOne.mutate(m.memory_id)}
+                    aria-label={`Apagar memória: ${memory.memory}`}
+                    onClick={() => removeOne.mutate(memory.memory_id)}
                   >
                     Apagar
                   </Button>

@@ -31,12 +31,13 @@ export function EvalWebhook({ configId, schedule }: { configId: string; schedule
 
   const save = useMutation({
     mutationFn: async () => {
-      const res = await client.PUT("/api/v1/configs/{config_id}/eval-schedule/webhook", {
+      const response = await client.PUT("/api/v1/configs/{config_id}/eval-schedule/webhook", {
         ...path,
         body: { url: url.trim() },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar o webhook"));
-      return res.data!;
+      if (response.error)
+        throw new Error(apiErrorMessage(response.error, "Falha ao salvar o webhook"));
+      return response.data!;
     },
     onSuccess: (issued) => {
       setSecret(issued.secret);
@@ -46,16 +47,24 @@ export function EvalWebhook({ configId, schedule }: { configId: string; schedule
   });
   const test = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/configs/{config_id}/eval-schedule/webhook/test", path);
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao testar o webhook"));
-      return res.data!;
+      const response = await client.POST(
+        "/api/v1/configs/{config_id}/eval-schedule/webhook/test",
+        path,
+      );
+      if (response.error)
+        throw new Error(apiErrorMessage(response.error, "Falha ao testar o webhook"));
+      return response.data!;
     },
     onSuccess: refresh,
   });
   const remove = useMutation({
     mutationFn: async () => {
-      const res = await client.DELETE("/api/v1/configs/{config_id}/eval-schedule/webhook", path);
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao remover o webhook"));
+      const response = await client.DELETE(
+        "/api/v1/configs/{config_id}/eval-schedule/webhook",
+        path,
+      );
+      if (response.error)
+        throw new Error(apiErrorMessage(response.error, "Falha ao remover o webhook"));
     },
     onSuccess: () => {
       setSecret(null);

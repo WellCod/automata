@@ -100,7 +100,9 @@ function checkSummary(check: EvalResult["checks"][number]): string {
   const type = String(check.type) as keyof typeof CHECK_LABEL;
   if (type === "text") {
     const rules = (check.rules as { kind: string; value: string; passed?: boolean }[]) ?? [];
-    return rules.map((r) => `${r.passed === false ? "✗" : "✓"} ${r.kind} "${r.value}"`).join(" · ");
+    return rules
+      .map((rule) => `${rule.passed === false ? "✗" : "✓"} ${rule.kind} "${rule.value}"`)
+      .join(" · ");
   }
   if (type === "tools") return `esperadas: ${((check.expected as string[]) ?? []).join(", ")}`;
   if (type === "steps") {
@@ -136,7 +138,7 @@ function ResultItem({ result }: { result: EvalResult }) {
     >
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen((wasOpen) => !wasOpen)}
         aria-expanded={open}
         className="flex min-h-8 items-center gap-2 text-left text-[13px]"
       >
@@ -206,7 +208,7 @@ function CaseItem({
         <span className="text-foreground text-[13px] font-medium">{item.name}</span>
         <span className="text-muted-foreground truncate text-[12px]">{item.input}</span>
         <span className="text-muted-foreground text-[11px]">
-          {item.checks.map((c) => CHECK_LABEL[c.type]).join(" · ")}
+          {item.checks.map((check) => CHECK_LABEL[check.type]).join(" · ")}
         </span>
       </div>
       <Button size="icon" variant="ghost" aria-label={`Editar ${item.name}`} onClick={onEdit}>
@@ -229,9 +231,9 @@ function useJudgeModels() {
   return useQuery({
     queryKey: ["models:capabilities"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/models/capabilities");
-      if (res.error) throw new Error("Falha ao carregar modelos");
-      return res.data as Record<string, { structured_output: boolean }>;
+      const response = await client.GET("/api/v1/models/capabilities");
+      if (response.error) throw new Error("Falha ao carregar modelos");
+      return response.data as Record<string, { structured_output: boolean }>;
     },
     // o juiz responde num schema: só modelos com saída estruturada
     select: (models) =>
@@ -308,6 +310,7 @@ function BatchSuggestions({
 }) {
   const queryClient = useQueryClient();
   const key = ["eval-suggestions", configId];
+  // source_run_id da sugestão aberta no formulário; uma por vez
   const [open, setOpen] = useState<string | null>(null);
   const {
     data = [],
@@ -316,11 +319,12 @@ function BatchSuggestions({
   } = useQuery({
     queryKey: key,
     queryFn: async (): Promise<Suggestion[]> => {
-      const res = await client.GET("/api/v1/configs/{config_id}/eval-cases/suggestions", {
+      const response = await client.GET("/api/v1/configs/{config_id}/eval-cases/suggestions", {
         params: { path: { config_id: configId }, query: { limit: 10 } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao sugerir casos"));
-      return res.data;
+      if (response.error)
+        throw new Error(apiErrorMessage(response.error, "Falha ao sugerir casos"));
+      return response.data;
     },
   });
   return (
@@ -413,13 +417,14 @@ export function EvalSuitePanel({
       ? chosenTarget
       : (draftVersion?.id ?? currentVersion?.id ?? "");
 
+  // sem escolha explícita mostra a execução mais recente (a lista vem da mais nova para a mais velha)
   const viewing = selected ?? runs[0]?.id ?? null;
   const { data: detail } = useEvalRun(configId, viewing);
 
   // comparação padrão: última execução da vigente contra a última do rascunho
   const defaults = useMemo(() => {
-    const onCurrent = runs.find((r) => r.version_id === currentVersion?.id && !runActive(r));
-    const onDraft = runs.find((r) => r.version_id === draftVersion?.id && !runActive(r));
+    const onCurrent = runs.find((run) => run.version_id === currentVersion?.id && !runActive(run));
+    const onDraft = runs.find((run) => run.version_id === draftVersion?.id && !runActive(run));
     return { base: onCurrent?.id ?? null, target: onDraft?.id ?? null };
   }, [runs, currentVersion?.id, draftVersion?.id]);
   const [base, setBase] = useState<string | null>(null);
@@ -432,7 +437,7 @@ export function EvalSuitePanel({
 
   const needsJudge = hasJudge(cases);
   const busy = runs.some(runActive);
-  const editingCase = cases.find((c) => c.id === editing);
+  const editingCase = cases.find((evalCase) => evalCase.id === editing);
 
   return (
     <div className="flex flex-col gap-6">
@@ -575,9 +580,9 @@ export function EvalSuitePanel({
               className={selectCls}
             >
               <option value="">Modelo do juiz</option>
-              {judgeModels.map((m) => (
-                <option key={m} value={m}>
-                  {m}
+              {judgeModels.map((modelId) => (
+                <option key={modelId} value={modelId}>
+                  {modelId}
                 </option>
               ))}
             </select>
@@ -617,7 +622,7 @@ export function EvalSuitePanel({
         configId={configId}
         needsJudge={needsJudge}
         judgeModels={judgeModels}
-        lastRun={runs.find((r) => !runActive(r))}
+        lastRun={runs.find((run) => !runActive(run))}
       />
 
       {runs.length > 0 && (
@@ -630,9 +635,9 @@ export function EvalSuitePanel({
               onChange={(e) => setSelected(e.target.value)}
               className={selectCls}
             >
-              {runs.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {runLabel(r)}
+              {runs.map((run) => (
+                <option key={run.id} value={run.id}>
+                  {runLabel(run)}
                 </option>
               ))}
             </select>
@@ -650,8 +655,8 @@ export function EvalSuitePanel({
                       ` · ${usageLine(detail)}`}
               </p>
               <ul className="flex flex-col gap-1.5">
-                {detail.results.map((r) => (
-                  <ResultItem key={r.id} result={r} />
+                {detail.results.map((result) => (
+                  <ResultItem key={result.id} result={result} />
                 ))}
               </ul>
             </>
@@ -659,7 +664,7 @@ export function EvalSuitePanel({
         </section>
       )}
 
-      {runs.filter((r) => !runActive(r)).length > 1 && (
+      {runs.filter((run) => !runActive(run)).length > 1 && (
         <section aria-label="Comparar execuções" className="flex flex-col gap-2">
           <h3 className="text-foreground text-[13px] font-medium">Comparar</h3>
           <div className="flex flex-wrap items-center gap-2 text-[12px]">
@@ -670,9 +675,9 @@ export function EvalSuitePanel({
               className={selectCls}
             >
               <option value="">Base</option>
-              {runs.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {runLabel(r)}
+              {runs.map((run) => (
+                <option key={run.id} value={run.id}>
+                  {runLabel(run)}
                 </option>
               ))}
             </select>
@@ -684,9 +689,9 @@ export function EvalSuitePanel({
               className={selectCls}
             >
               <option value="">Comparada</option>
-              {runs.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {runLabel(r)}
+              {runs.map((run) => (
+                <option key={run.id} value={run.id}>
+                  {runLabel(run)}
                 </option>
               ))}
             </select>
@@ -700,23 +705,26 @@ export function EvalSuitePanel({
                 {comparison.regressions} regressão(ões) · {comparison.fixes} corrigido(s)
               </p>
               <ul aria-label="Casos comparados" className="flex flex-col gap-1 text-[12px]">
-                {comparison.cases.map((c) => (
-                  <li key={`${c.case_id}-${c.case_name}`} className="flex items-center gap-2">
-                    <span className="text-foreground">{c.case_name}</span>
+                {comparison.cases.map((compared) => (
+                  <li
+                    key={`${compared.case_id}-${compared.case_name}`}
+                    className="flex items-center gap-2"
+                  >
+                    <span className="text-foreground">{compared.case_name}</span>
                     <span className="text-muted-foreground">
-                      {c.base_status ? RESULT_LABEL[c.base_status] : "—"} →{" "}
-                      {c.target_status ? RESULT_LABEL[c.target_status] : "—"}
+                      {compared.base_status ? RESULT_LABEL[compared.base_status] : "—"} →{" "}
+                      {compared.target_status ? RESULT_LABEL[compared.target_status] : "—"}
                     </span>
                     <Badge
                       tone={
-                        c.change === "regression"
+                        compared.change === "regression"
                           ? "danger"
-                          : c.change === "fix"
+                          : compared.change === "fix"
                             ? "active"
                             : "neutral"
                       }
                     >
-                      {CHANGE_LABEL[c.change]}
+                      {CHANGE_LABEL[compared.change]}
                     </Badge>
                   </li>
                 ))}

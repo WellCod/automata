@@ -65,13 +65,16 @@ export function useDataSubjectRequests() {
   return useQuery({
     queryKey: REQUESTS,
     queryFn: async () => {
-      const res = await client.GET("/api/v1/data-subject-requests");
-      if (res.error) throw new Error("Falha ao carregar os pedidos. Apenas owners têm acesso.");
-      return res.data;
+      const response = await client.GET("/api/v1/data-subject-requests");
+      if (response.error)
+        throw new Error("Falha ao carregar os pedidos. Apenas owners têm acesso.");
+      return response.data;
     },
     // pedido em background: atualiza até terminar
     refetchInterval: (query) =>
-      query.state.data?.some((r) => r.status === "pending" || r.status === "running")
+      query.state.data?.some(
+        (request) => request.status === "pending" || request.status === "running",
+      )
         ? 2000
         : false,
   });
@@ -111,10 +114,11 @@ export function SubjectActions({
 
   const exportData = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/data-subjects/{user_id}/export", {
+      const response = await client.POST("/api/v1/data-subjects/{user_id}/export", {
         params: { path: { user_id: userId } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao pedir a exportação"));
+      if (response.error)
+        throw new Error(apiErrorMessage(response.error, "Falha ao pedir a exportação"));
     },
     onSuccess: () => {
       toast.success("Exportação pedida. O arquivo aparece nos pedidos abaixo.");
@@ -125,12 +129,13 @@ export function SubjectActions({
 
   const erase = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/data-subjects/{user_id}/erase", {
+      const response = await client.POST("/api/v1/data-subjects/{user_id}/erase", {
         params: { path: { user_id: userId } },
         body: { confirm: typed },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao pedir a exclusão"));
-      return res.data.id;
+      if (response.error)
+        throw new Error(apiErrorMessage(response.error, "Falha ao pedir a exclusão"));
+      return response.data.id;
     },
     onSuccess: (requestId) => {
       toast.success("Exclusão pedida.");
@@ -234,51 +239,55 @@ export function RequestsTable({
           </tr>
         </thead>
         <tbody>
-          {requests.map((r) => (
-            <tr key={r.id} className="border-border border-t align-top">
-              <td className="py-1.5 pr-3">{r.kind === "erase" ? "Exclusão" : "Exportação"}</td>
+          {requests.map((request) => (
+            <tr key={request.id} className="border-border border-t align-top">
               <td className="py-1.5 pr-3">
-                {r.subject ?? (
+                {request.kind === "erase" ? "Exclusão" : "Exportação"}
+              </td>
+              <td className="py-1.5 pr-3">
+                {request.subject ?? (
                   <span
                     className="text-muted-foreground font-mono text-[12px]"
-                    title={r.subject_hash}
+                    title={request.subject_hash}
                   >
-                    hash {r.subject_hash.slice(0, 12)}
+                    hash {request.subject_hash.slice(0, 12)}
                   </span>
                 )}
               </td>
               <td className="py-1.5 pr-3">
-                {STATUS_LABELS[r.status] ?? r.status}
-                {r.status === "done" && r.counts && (
+                {STATUS_LABELS[request.status] ?? request.status}
+                {request.status === "done" && request.counts && (
                   <span className="text-muted-foreground">
                     {" "}
-                    · {requestTotal(r).toLocaleString("pt-BR")}{" "}
-                    {requestTotal(r) === 1 ? "linha" : "linhas"}
+                    · {requestTotal(request).toLocaleString("pt-BR")}{" "}
+                    {requestTotal(request) === 1 ? "linha" : "linhas"}
                   </span>
                 )}
-                {r.error && <span className="text-destructive block text-[12px]">{r.error}</span>}
+                {request.error && (
+                  <span className="text-destructive block text-[12px]">{request.error}</span>
+                )}
               </td>
               {showRequester && (
                 <td className="hidden py-1.5 pr-3 break-all sm:table-cell">
-                  {r.requested_by}
+                  {request.requested_by}
                   <span className="text-muted-foreground block text-[11px]">
-                    {SOURCE_LABELS[r.source] ?? r.source}
+                    {SOURCE_LABELS[request.source] ?? request.source}
                   </span>
                 </td>
               )}
-              <td className="py-1.5 pr-3">{when(r.created_at)}</td>
+              <td className="py-1.5 pr-3">{when(request.created_at)}</td>
               <td
-                className={`hidden py-1.5 pr-3 md:table-cell ${isOverdue(r) ? "text-destructive font-medium" : ""}`}
+                className={`hidden py-1.5 pr-3 md:table-cell ${isOverdue(request) ? "text-destructive font-medium" : ""}`}
               >
-                {r.due_at ? new Date(r.due_at).toLocaleDateString("pt-BR") : "—"}
-                {isOverdue(r) && <span className="block text-[11px]">vencido</span>}
+                {request.due_at ? new Date(request.due_at).toLocaleDateString("pt-BR") : "—"}
+                {isOverdue(request) && <span className="block text-[11px]">vencido</span>}
               </td>
               <td className="py-1.5">
-                {r.kind === "export" && r.status === "done" && (
+                {request.kind === "export" && request.status === "done" && (
                   <a
                     className="text-accent underline"
-                    href={downloadHref(r.id)}
-                    title={`Vale até ${when(r.expires_at)}`}
+                    href={downloadHref(request.id)}
+                    title={`Vale até ${when(request.expires_at)}`}
                   >
                     Baixar
                   </a>
@@ -300,18 +309,20 @@ export function DataSubjectsPanel() {
     queryKey: ["data-subject", userId],
     enabled: userId !== null,
     queryFn: async () => {
-      const res = await client.GET("/api/v1/data-subjects/{user_id}", {
+      const response = await client.GET("/api/v1/data-subjects/{user_id}", {
         params: { path: { user_id: userId ?? "" } },
       });
-      if (res.error) throw new Error("Falha ao consultar o titular. Apenas owners têm acesso.");
-      return res.data;
+      if (response.error)
+        throw new Error("Falha ao consultar o titular. Apenas owners têm acesso.");
+      return response.data;
     },
   });
   const requests = useDataSubjectRequests();
   // a exclusão roda em background: a contagem só muda quando o pedido termina
   const [erasing, setErasing] = useState<string | null>(null);
   const finished = requests.data?.find(
-    (r) => r.id === erasing && (r.status === "done" || r.status === "failed"),
+    (request) =>
+      request.id === erasing && (request.status === "done" || request.status === "failed"),
   );
   const { refetch } = inventory;
   useEffect(() => {

@@ -20,10 +20,10 @@ export function useKeyRotation() {
   return useQuery({
     queryKey: ["key-rotation"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/key-rotation");
-      if (res.error)
+      const response = await client.GET("/api/v1/key-rotation");
+      if (response.error)
         throw new Error("Falha ao carregar o estado das chaves. Apenas owners têm acesso.");
-      return res.data!;
+      return response.data!;
     },
   });
 }
@@ -42,7 +42,7 @@ function Row({ label, value, warn }: { label: string; value: string; warn?: bool
 export function KeyRotationView({ status }: { status: KeyRotationStatus }) {
   const { jwt, secrets } = status;
   const outside = jwt.tokens_on_previous + jwt.tokens_without_kid;
-  const pending = Object.values(secrets.pending).some((n) => n > 0);
+  const pending = Object.values(secrets.pending).some((count) => count > 0);
   const previousSet = jwt.previous_kid !== null || secrets.previous_configured;
 
   return (
@@ -103,13 +103,13 @@ export function KeyRotationView({ status }: { status: KeyRotationStatus }) {
                 value={secrets.previous_configured ? "configurada" : "nenhuma configurada"}
               />
               {Object.entries(SECRET_TABLES).map(([table, label]) => {
-                const n = secrets.pending[table] ?? 0;
+                const pendingCount = secrets.pending[table] ?? 0;
                 return (
                   <Row
                     key={table}
                     label={`${label} na chave anterior`}
-                    value={String(n)}
-                    warn={n > 0}
+                    value={String(pendingCount)}
+                    warn={pendingCount > 0}
                   />
                 );
               })}

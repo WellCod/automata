@@ -11,11 +11,11 @@ export function ReconciliationPanel() {
   const { data } = useQuery({
     queryKey: ["metrics", "reconciliation"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/metrics/reconciliation", {
+      const response = await client.GET("/api/v1/metrics/reconciliation", {
         params: { query: { days: 14 } },
       });
-      if (res.error) throw new Error("Falha ao carregar a conciliação");
-      return res.data;
+      if (response.error) throw new Error("Falha ao carregar a conciliação");
+      return response.data;
     },
   });
   // sem chave admin de nenhum provedor, a seção não aparece
@@ -49,28 +49,30 @@ export function ReconciliationPanel() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {rows.map((row) => {
                 const off =
-                  r.closed &&
-                  r.diff_percent != null &&
-                  Math.abs(r.diff_percent) >= data.alert_percent;
+                  row.closed &&
+                  row.diff_percent != null &&
+                  Math.abs(row.diff_percent) >= data.alert_percent;
                 return (
-                  <tr key={`${r.provider}-${r.day}`} className="border-border border-t">
+                  <tr key={`${row.provider}-${row.day}`} className="border-border border-t">
                     <td className="py-1.5 pr-3">
-                      {new Date(`${r.day}T12:00:00Z`).toLocaleDateString("pt-BR")}
-                      {!r.closed && (
+                      {new Date(`${row.day}T12:00:00Z`).toLocaleDateString("pt-BR")}
+                      {!row.closed && (
                         <span className="text-muted-foreground block text-[11px]">em aberto</span>
                       )}
                     </td>
-                    <td className="py-1.5 pr-3">{PROVIDER_LABELS[r.provider] ?? r.provider}</td>
-                    <td className="py-1.5 pr-3 tabular-nums">{formatTotalUsd(r.reported_usd)}</td>
-                    <td className="py-1.5 pr-3 tabular-nums">{formatTotalUsd(r.estimated_usd)}</td>
+                    <td className="py-1.5 pr-3">{PROVIDER_LABELS[row.provider] ?? row.provider}</td>
+                    <td className="py-1.5 pr-3 tabular-nums">{formatTotalUsd(row.reported_usd)}</td>
+                    <td className="py-1.5 pr-3 tabular-nums">
+                      {formatTotalUsd(row.estimated_usd)}
+                    </td>
                     <td
                       className={`py-1.5 tabular-nums ${off ? "text-destructive font-medium" : ""}`}
                     >
-                      {r.diff_percent == null
+                      {row.diff_percent == null
                         ? "—"
-                        : `${r.diff_percent > 0 ? "+" : ""}${r.diff_percent.toLocaleString("pt-BR")}%`}
+                        : `${row.diff_percent > 0 ? "+" : ""}${row.diff_percent.toLocaleString("pt-BR")}%`}
                     </td>
                   </tr>
                 );
