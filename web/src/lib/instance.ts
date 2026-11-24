@@ -8,7 +8,8 @@ export type InstanceInfo = {
   brl_per_usd: number | null;
 };
 
-const DEFAULT: InstanceInfo = { app_name: "automata", app_logo: null, brl_per_usd: null };
+// marca padrão enquanto a consulta não volta ou quando ela falha
+const DEFAULT_INSTANCE: InstanceInfo = { app_name: "automata", app_logo: null, brl_per_usd: null };
 
 export function useInstance(): InstanceInfo {
   const { data } = useQuery({
@@ -16,7 +17,7 @@ export function useInstance(): InstanceInfo {
     queryFn: async (): Promise<InstanceInfo> => (await fetch("/api/auth/instance")).json(),
     staleTime: 10 * 60_000,
   });
-  return data ?? DEFAULT;
+  return data ?? DEFAULT_INSTANCE;
 }
 
 // custo em dólar com o equivalente em reais quando a instância tem cotação (UX-08)

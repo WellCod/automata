@@ -30,6 +30,7 @@ function when(iso: string): string {
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+// autor da mensagem na conversa; o atendente aparece pelo nome gravado, quando há
 function who(author: string, label: string | null | undefined): string {
   if (author === "customer") return "Cliente";
   if (author === "agent") return "Agente";
@@ -69,20 +70,22 @@ function Conversation({ conversation }: { conversation: ConversationDetail }) {
         </p>
       )}
       <ol className="border-border flex max-h-[60vh] flex-col gap-2 overflow-y-auto rounded border p-3">
-        {conversation.messages.map((m) => (
+        {conversation.messages.map((message) => (
           <li
-            key={m.id}
+            key={message.id}
             className={cn(
               "flex max-w-[85%] flex-col gap-0.5 rounded px-3 py-2 text-[13px]",
-              m.direction === "in" ? "bg-muted self-start" : "bg-accent/10 self-end",
+              message.direction === "in" ? "bg-muted self-start" : "bg-accent/10 self-end",
             )}
           >
             <span className="text-muted-foreground text-[11px]">
-              {who(m.author, m.author_label)} · {when(m.created_at)}
+              {who(message.author, message.author_label)} · {when(message.created_at)}
             </span>
-            <span className="text-foreground whitespace-pre-wrap">{m.text || "(sem texto)"}</span>
-            {(m.status === "failed" || m.status === "ignored") && m.error && (
-              <span className="text-destructive text-[11px]">Não enviada: {m.error}</span>
+            <span className="text-foreground whitespace-pre-wrap">
+              {message.text || "(sem texto)"}
+            </span>
+            {(message.status === "failed" || message.status === "ignored") && message.error && (
+              <span className="text-destructive text-[11px]">Não enviada: {message.error}</span>
             )}
           </li>
         ))}
@@ -111,8 +114,8 @@ function Conversation({ conversation }: { conversation: ConversationDetail }) {
       {human && (
         <form
           className="flex flex-col gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
+          onSubmit={(event) => {
+            event.preventDefault();
             if (text.trim()) run({ action: "reply", text });
           }}
         >
@@ -159,19 +162,19 @@ export default function ConversationsPage() {
           atendente&quot;: o agente não responde até alguém devolver a conversa.
         </p>
         <div role="tablist" aria-label="Situação" className="flex flex-wrap gap-2">
-          {TABS.map((t) => (
+          {TABS.map((tabOption) => (
             <Button
-              key={t.value}
+              key={tabOption.value}
               role="tab"
-              aria-selected={tab === t.value}
+              aria-selected={tab === tabOption.value}
               size="sm"
-              variant={tab === t.value ? "accent" : "muted"}
+              variant={tab === tabOption.value ? "accent" : "muted"}
               onClick={() => {
-                setTab(t.value);
+                setTab(tabOption.value);
                 setSelected(null);
               }}
             >
-              {t.label}
+              {tabOption.label}
             </Button>
           ))}
         </div>
@@ -182,22 +185,22 @@ export default function ConversationsPage() {
             {!isLoading && !error && list.length === 0 && (
               <li className="text-muted-foreground text-[13px]">Nenhuma conversa aqui.</li>
             )}
-            {list.map((c) => (
-              <li key={c.id}>
+            {list.map((conversation) => (
+              <li key={conversation.id}>
                 <button
                   type="button"
-                  onClick={() => setSelected(c.id)}
+                  onClick={() => setSelected(conversation.id)}
                   className={cn(
                     "border-border flex w-full flex-col gap-0.5 border-t px-2 py-2 text-left text-[13px]",
-                    selected === c.id ? "bg-muted" : "hover:bg-muted/50",
+                    selected === conversation.id ? "bg-muted" : "hover:bg-muted/50",
                   )}
                 >
-                  <span className="text-foreground font-medium">{c.user_id}</span>
+                  <span className="text-foreground font-medium">{conversation.user_id}</span>
                   <span className="text-muted-foreground truncate text-[12px]">
-                    {c.last_message ?? "—"}
+                    {conversation.last_message ?? "—"}
                   </span>
                   <span className="text-muted-foreground text-[11px]">
-                    {c.channel_name} · {when(c.last_message_at)}
+                    {conversation.channel_name} · {when(conversation.last_message_at)}
                   </span>
                 </button>
               </li>

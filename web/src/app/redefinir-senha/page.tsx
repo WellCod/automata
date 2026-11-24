@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { toast } from "sonner";
 import { detailOf, PasswordForm } from "@/components/password-form";
 
+// useSearchParams pede Suspense na renderização estática
 export default function ResetPasswordPage() {
   return (
     <Suspense>
@@ -19,12 +20,12 @@ function ResetPassword() {
   const token = useSearchParams().get("token") ?? "";
 
   async function submit(values: { new_password: string }) {
-    const res = await fetch("/api/auth/password/reset", {
+    const response = await fetch("/api/auth/password/reset", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token, new_password: values.new_password }),
     });
-    if (!res.ok) return detailOf(res, "Link inválido ou vencido. Peça outro.");
+    if (!response.ok) return detailOf(response, "Link inválido ou vencido. Peça outro.");
     toast.success("Senha nova salva.");
     router.push("/");
     router.refresh();

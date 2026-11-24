@@ -23,9 +23,9 @@ export function useMe() {
   return useQuery({
     queryKey: ["me"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/me");
-      if (!res.data) throw new Error("Falha ao carregar o usuário");
-      return res.data;
+      const result = await client.GET("/api/v1/me");
+      if (!result.data) throw new Error("Falha ao carregar o usuário");
+      return result.data;
     },
     staleTime: 5 * 60_000,
   });
@@ -35,15 +35,15 @@ export function useUsers() {
   return useQuery({
     queryKey: ["users"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/users");
-      if (!res.data) {
+      const result = await client.GET("/api/v1/users");
+      if (!result.data) {
         throw new Error(
-          res.response.status === 403
+          result.response.status === 403
             ? "Só owners gerenciam usuários."
             : "Falha ao carregar usuários",
         );
       }
-      return res.data;
+      return result.data;
     },
   });
 }
@@ -53,7 +53,8 @@ export function temporaryPassword(): string {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
   const bytes = new Uint32Array(14);
   crypto.getRandomValues(bytes);
-  const body = Array.from(bytes, (n) => alphabet[n % alphabet.length]).join("");
+  const body = Array.from(bytes, (randomValue) => alphabet[randomValue % alphabet.length]).join("");
+  // maiúscula no começo e dígito no fim: o sorteio sozinho podia sair sem um dos dois
   return `A${body}7`;
 }
 

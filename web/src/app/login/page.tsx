@@ -63,20 +63,22 @@ function LoginForm() {
   async function onSubmit(values: FormValues) {
     setServerError("");
     try {
-      const res = await fetch("/api/auth/login", {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       });
 
-      if (!res.ok) {
+      if (!response.ok) {
         // 429 é limite de tentativas, não senha errada (UX-09)
         setServerError(
-          res.status === 429 ? "Muitas tentativas. Aguarde um minuto." : "Credenciais inválidas",
+          response.status === 429
+            ? "Muitas tentativas. Aguarde um minuto."
+            : "Credenciais inválidas",
         );
         return;
       }
-      const body = (await res.json().catch(() => ({}))) as { must_change_password?: boolean };
+      const body = (await response.json().catch(() => ({}))) as { must_change_password?: boolean };
       if (body.must_change_password) {
         router.push("/trocar-senha?obrigatoria=1");
         return;

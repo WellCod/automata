@@ -14,16 +14,18 @@ import { type EmbedderInfo, useEmbedders, useKnowledgeBases } from "@/lib/api/kn
 const inputCls =
   "w-full rounded border border-border bg-[var(--input)] px-3 py-1.5 text-[13px] text-foreground placeholder:text-muted-foreground transition-colors focus:border-accent focus:outline-none";
 
+// sugere o slug a partir do nome: sem acento, minúsculo e com _ no lugar do resto
 function slugify(name: string): string {
-  const s = name
+  const slug = name
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .slice(0, 31);
-  if (!s) return "";
-  return /^[a-z]/.test(s) ? s : `kb_${s}`.slice(0, 31);
+  if (!slug) return "";
+  // mesmo padrão do slug na API: começa por letra e tem até 31 caracteres
+  return /^[a-z]/.test(slug) ? slug : `kb_${slug}`.slice(0, 31);
 }
 
 function NewBaseForm({ embedders, onDone }: { embedders: EmbedderInfo[]; onDone: () => void }) {
@@ -39,7 +41,7 @@ function NewBaseForm({ embedders, onDone }: { embedders: EmbedderInfo[]; onDone:
 
   const create = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/knowledge-bases", {
+      const result = await client.POST("/api/v1/knowledge-bases", {
         body: {
           name,
           slug: slugTouched ? slug : slugify(name),
@@ -48,8 +50,8 @@ function NewBaseForm({ embedders, onDone }: { embedders: EmbedderInfo[]; onDone:
           embedder: embedder as EmbedderInfo["name"],
         },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao criar a base"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao criar a base"));
+      return result.data!;
     },
     onSuccess: (base) => {
       void queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
@@ -60,8 +62,8 @@ function NewBaseForm({ embedders, onDone }: { embedders: EmbedderInfo[]; onDone:
 
   return (
     <form
-      onSubmit={(e) => {
-        e.preventDefault();
+      onSubmit={(event) => {
+        event.preventDefault();
         create.mutate();
       }}
       className="border-border bg-card flex flex-col gap-4 rounded border p-4"
@@ -83,9 +85,9 @@ function NewBaseForm({ embedders, onDone }: { embedders: EmbedderInfo[]; onDone:
           <input
             id="kb-slug"
             value={slugTouched ? slug : slugify(name)}
-            onChange={(e) => {
+            onChange={(event) => {
               setSlugTouched(true);
-              setSlug(e.target.value);
+              setSlug(event.target.value);
             }}
             className={inputCls}
           />
@@ -116,10 +118,10 @@ function NewBaseForm({ embedders, onDone }: { embedders: EmbedderInfo[]; onDone:
             onChange={(e) => setEmbedder(e.target.value as EmbedderInfo["name"])}
             className={inputCls}
           >
-            {embedders.map((e) => (
-              <option key={e.name} value={e.name} disabled={!e.configured}>
-                {e.name} · {e.model}
-                {e.configured ? "" : " (sem chave na API)"}
+            {embedders.map((embedder) => (
+              <option key={embedder.name} value={embedder.name} disabled={!embedder.configured}>
+                {embedder.name} · {embedder.model}
+                {embedder.configured ? "" : " (sem chave na API)"}
               </option>
             ))}
           </select>

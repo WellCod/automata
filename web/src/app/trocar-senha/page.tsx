@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { toast } from "sonner";
 import { detailOf, PasswordForm } from "@/components/password-form";
 
+// useSearchParams pede Suspense na renderização estática
 export default function ChangePasswordPage() {
   return (
     <Suspense>
@@ -20,12 +21,12 @@ function ChangePassword() {
   const forced = useSearchParams().get("obrigatoria") === "1";
 
   async function submit(values: { current_password: string; new_password: string }) {
-    const res = await fetch("/api/auth/password", {
+    const response = await fetch("/api/auth/password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(values),
     });
-    if (!res.ok) return detailOf(res, "Não foi possível trocar a senha.");
+    if (!response.ok) return detailOf(response, "Não foi possível trocar a senha.");
     toast.success("Senha trocada. As outras sessões foram encerradas.");
     router.push("/");
     router.refresh();

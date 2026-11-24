@@ -80,39 +80,44 @@ export function patternsOf(value: unknown): string[] {
 export function parsePatterns(text: string): string[] {
   return text
     .split("\n")
-    .map((l) => l.trim())
+    .map((line) => line.trim())
     .filter(Boolean);
 }
 
-export function filterText(c: Pick<Connector, "settings">): string {
-  const s = c.settings as Record<string, unknown>;
-  const include = patternsOf(s.include);
-  const exclude = patternsOf(s.exclude);
+// resumo do filtro por nome para a lista de conectores
+export function filterText(connector: Pick<Connector, "settings">): string {
+  const settings = connector.settings as Record<string, unknown>;
+  const include = patternsOf(settings.include);
+  const exclude = patternsOf(settings.exclude);
   const parts: string[] = [];
   if (include.length) parts.push(`só ${include.join(", ")}`);
   if (exclude.length) parts.push(`fora ${exclude.join(", ")}`);
   return parts.join(" · ");
 }
 
-export function origin(c: Pick<Connector, "kind" | "settings">): string {
-  const s = c.settings as Record<string, string | null | undefined>;
-  if (c.kind === "github") return `${s.repo}@${s.branch || "main"}${s.path ? `/${s.path}` : ""}`;
-  if (c.kind === "s3" || c.kind === "gcs") return `${s.bucket}${s.prefix ? `/${s.prefix}` : ""}`;
-  if (c.kind === "gdrive") return `pasta ${s.folder_id}`;
-  return `${s.hostname}${s.site_path ?? ""}${s.folder_path ? `/${s.folder_path}` : ""}`;
+// de onde o conector lê, numa linha: repositório, bucket, pasta do Drive ou site do SharePoint
+export function origin(connector: Pick<Connector, "kind" | "settings">): string {
+  const settings = connector.settings as Record<string, string | null | undefined>;
+  if (connector.kind === "github")
+    return `${settings.repo}@${settings.branch || "main"}${settings.path ? `/${settings.path}` : ""}`;
+  if (connector.kind === "s3" || connector.kind === "gcs")
+    return `${settings.bucket}${settings.prefix ? `/${settings.prefix}` : ""}`;
+  if (connector.kind === "gdrive") return `pasta ${settings.folder_id}`;
+  return `${settings.hostname}${settings.site_path ?? ""}${settings.folder_path ? `/${settings.folder_path}` : ""}`;
 }
 
+// contagens da última sincronização; falha e arquivo pulado só aparecem quando houve
 export function summaryText(summary: Connector["last_summary"]): string {
   if (!summary) return "";
-  const n = (k: string) => Number((summary as Record<string, unknown>)[k] ?? 0);
+  const count = (key: string) => Number((summary as Record<string, unknown>)[key] ?? 0);
   const parts = [
-    `${n("added")} novo(s)`,
-    `${n("updated")} atualizado(s)`,
-    `${n("removed")} removido(s)`,
-    `${n("unchanged")} sem mudança`,
+    `${count("added")} novo(s)`,
+    `${count("updated")} atualizado(s)`,
+    `${count("removed")} removido(s)`,
+    `${count("unchanged")} sem mudança`,
   ];
-  if (n("failed")) parts.push(`${n("failed")} com falha`);
-  if (n("skipped")) parts.push(`${n("skipped")} fora (tipo ou tamanho)`);
+  if (count("failed")) parts.push(`${count("failed")} com falha`);
+  if (count("skipped")) parts.push(`${count("skipped")} fora (tipo ou tamanho)`);
   return parts.join(" · ");
 }
 
@@ -121,13 +126,14 @@ export function useConnectors(baseId: string) {
   return useQuery({
     queryKey: ["knowledge-bases", baseId, "connectors"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/knowledge-bases/{base_id}/connectors", {
+      const result = await client.GET("/api/v1/knowledge-bases/{base_id}/connectors", {
         params: { path: { base_id: baseId } },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao carregar conectores"));
-      return res.data!;
+      if (result.error)
+        throw new Error(apiErrorMessage(result.error, "Falha ao carregar conectores"));
+      return result.data!;
     },
     refetchInterval: (query) =>
-      query.state.data?.some((c) => c.last_status === "running") ? 3_000 : false,
+      query.state.data?.some((connector) => connector.last_status === "running") ? 3_000 : false,
   });
 }

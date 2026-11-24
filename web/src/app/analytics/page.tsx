@@ -85,15 +85,15 @@ function PeriodSelector({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <div className="flex gap-1">
-        {PERIODS.map((p) => (
+        {PERIODS.map((period) => (
           <Button
-            key={p.value}
+            key={period.value}
             size="sm"
-            variant={!isCustomActive && filter.period === p.value ? "accent" : "muted"}
-            aria-pressed={!isCustomActive && filter.period === p.value}
-            onClick={() => handlePeriod(p.value)}
+            variant={!isCustomActive && filter.period === period.value ? "accent" : "muted"}
+            aria-pressed={!isCustomActive && filter.period === period.value}
+            onClick={() => handlePeriod(period.value)}
           >
-            {p.label}
+            {period.label}
           </Button>
         ))}
       </div>
@@ -135,12 +135,13 @@ function PeriodSelector({
   );
 }
 
+// rótulo do período escolhido, para o título do uso por agente
 function periodLabel(filter: FilterState): string {
   if (filter.custom && filter.custom.start) {
     if (filter.custom.end) return `${filter.custom.start} → ${filter.custom.end}`;
     return `desde ${filter.custom.start}`;
   }
-  return PERIODS.find((p) => p.value === filter.period)?.label ?? filter.period;
+  return PERIODS.find((period) => period.value === filter.period)?.label ?? filter.period;
 }
 
 export default function AnalyticsPage() {
@@ -162,11 +163,11 @@ export default function AnalyticsPage() {
   } = useQuery<GlobalMetricsSummary>({
     queryKey: ["analytics:summary", queryKey],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/metrics/summary", {
+      const result = await client.GET("/api/v1/metrics/summary", {
         params: { query: summaryQuery },
       });
-      if (res.error) throw new Error("Falha ao carregar sumário");
-      return res.data!;
+      if (result.error) throw new Error("Falha ao carregar sumário");
+      return result.data!;
     },
   });
 
@@ -178,11 +179,11 @@ export default function AnalyticsPage() {
   } = useQuery<AgentBreakdownItem[]>({
     queryKey: ["analytics:by-agent", queryKey],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/metrics/by-agent", {
+      const result = await client.GET("/api/v1/metrics/by-agent", {
         params: { query: byAgentQuery },
       });
-      if (res.error) throw new Error("Falha ao carregar breakdown");
-      return res.data!;
+      if (result.error) throw new Error("Falha ao carregar breakdown");
+      return result.data!;
     },
   });
 

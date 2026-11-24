@@ -60,7 +60,8 @@ const CONTAINERS: Record<string, ProgressKind> = {
   Loop: "loop",
 };
 
-const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+// campos do evento chegam como unknown; só texto interessa ao progresso
+const str = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
 
 // última entrada com o nome: numa repetição a mesma etapa aparece uma vez por volta
 function lastIndex(steps: StepProgress[], name: string): number {
@@ -68,36 +69,45 @@ function lastIndex(steps: StepProgress[], name: string): number {
   return -1;
 }
 
-function patch(p: WorkflowProgress, name: string, change: Partial<StepProgress>): WorkflowProgress {
-  const i = lastIndex(p.steps, name);
-  if (i === -1) return p;
-  const steps = [...p.steps];
-  steps[i] = { ...steps[i], ...change };
-  return { ...p, steps };
+// muda a entrada mais recente da etapa sem mexer no estado recebido
+function patch(
+  progress: WorkflowProgress,
+  name: string,
+  change: Partial<StepProgress>,
+): WorkflowProgress {
+  const index = lastIndex(progress.steps, name);
+  if (index === -1) return progress;
+  const steps = [...progress.steps];
+  steps[index] = { ...steps[index], ...change };
+  return { ...progress, steps };
 }
 
+// entrada nova em execução, indentada pelos contêineres ainda abertos
 function push(
-  p: WorkflowProgress,
+  progress: WorkflowProgress,
   name: string,
   kind: ProgressKind,
   detail?: string,
 ): WorkflowProgress {
   const step: StepProgress = {
-    id: p.nextId,
+    id: progress.nextId,
     name,
     kind,
     status: "running",
-    depth: p.open.length,
+    depth: progress.open.length,
     detail,
   };
-  return { ...p, steps: [...p.steps, step], nextId: p.nextId + 1 };
+  return { ...progress, steps: [...progress.steps, step], nextId: progress.nextId + 1 };
 }
 
-function failRunning(p: WorkflowProgress, detail: string): WorkflowProgress {
+// o workflow parou: o que ainda estava rodando não vai terminar, e vira erro
+function failRunning(progress: WorkflowProgress, detail: string): WorkflowProgress {
   return {
-    ...p,
-    steps: p.steps.map((s) =>
-      s.status === "running" ? { ...s, status: "error", detail: s.detail ?? detail } : s,
+    ...progress,
+    steps: progress.steps.map((step) =>
+      step.status === "running"
+        ? { ...step, status: "error", detail: step.detail ?? detail }
+        : step,
     ),
   };
 }
@@ -120,27 +130,35 @@ export function pendingFrom(requirements: unknown): PendingReview | null {
 
 // resposta do continue sem stream: as etapas depois da revisão não têm progresso próprio
 export function applyContinue(
-  p: WorkflowProgress,
+  progress: WorkflowProgress,
   output: Record<string, unknown>,
 ): WorkflowProgress {
   const status = str(output.status)?.toUpperCase();
   if (status === "PAUSED") {
-    return { ...p, status: "paused", pending: pendingFrom(output.step_requirements) };
+    return { ...progress, status: "paused", pending: pendingFrom(output.step_requirements) };
   }
   if (status === "COMPLETED") {
-    return { ...p, status: "done", pending: null, final: str(output.content) ?? "" };
+    return { ...progress, status: "done", pending: null, final: str(output.content) ?? "" };
   }
   const error =
     status === "CANCELLED"
       ? "Revisão recusada: workflow encerrado."
       : (str(output.content) ?? "O workflow falhou.");
-  return { ...p, status: "error", pending: null, error };
+  return { ...progress, status: "error", pending: null, error };
 }
 
-export function applyEvent(p: WorkflowProgress, { event, data }: SseEvent): WorkflowProgress {
+// Reducer do stream: cada evento devolve o progresso novo. Eventos sem step_name (fora
+// os do workflow) não mexem nas etapas.
+export function applyEvent(
+  progress: WorkflowProgress,
+  { event, data }: SseEvent,
+): WorkflowProgress {
   const name = str(data.step_name);
+  // a sessão vem no primeiro evento que a traz; o continue e a próxima mensagem usam ela
   const next =
-    p.sessionId === null && str(data.session_id) ? { ...p, sessionId: str(data.session_id)! } : p;
+    progress.sessionId === null && str(data.session_id)
+      ? { ...progress, sessionId: str(data.session_id)! }
+      : progress;
 
   if (event === "WorkflowStarted") {
     return { ...next, status: "running", runId: str(data.run_id) ?? next.runId };
@@ -177,6 +195,7 @@ export function applyEvent(p: WorkflowProgress, { event, data }: SseEvent): Work
               ? "regra verdadeira"
               : "regra falsa"
             : undefined;
+      // o contêiner aberto indenta o que vier até o Completed correspondente
       const pushed = push(next, name, kind, detail);
       return { ...pushed, open: [...pushed.open, pushed.nextId - 1] };
     }
@@ -195,14 +214,14 @@ export function applyEvent(p: WorkflowProgress, { event, data }: SseEvent): Work
   }
 
   if (event === "LoopIterationStarted") {
-    const max = data.max_iterations ? ` de ${Number(data.max_iterations)}` : "";
-    return patch(next, name, { detail: `volta ${Number(data.iteration ?? 0)}${max}` });
+    const maxText = data.max_iterations ? ` de ${Number(data.max_iterations)}` : "";
+    return patch(next, name, { detail: `volta ${Number(data.iteration ?? 0)}${maxText}` });
   }
   if (event === "StepStarted") return push(next, name, "step");
   if (event === "StepCompleted") {
-    const i = lastIndex(next.steps, name);
+    const index = lastIndex(next.steps, name);
     // etapa que falhou com "seguir" também fecha com StepCompleted: mantém o erro
-    if (i !== -1 && next.steps[i].status !== "running") return next;
+    if (index !== -1 && next.steps[index].status !== "running") return next;
     return patch(next, name, { status: "done", output: str(data.content) });
   }
   if (event === "StepError") {
@@ -210,14 +229,15 @@ export function applyEvent(p: WorkflowProgress, { event, data }: SseEvent): Work
   }
   if (event === "RunStarted" || event === "TeamRunStarted") {
     const who = str(data.agent_name) ?? str(data.team_name);
-    const i = lastIndex(next.steps, name);
+    const index = lastIndex(next.steps, name);
     // membros de um time também carregam step_name: vale o primeiro, que é o executor
-    if (i === -1 || next.steps[i].who) return next;
+    if (index === -1 || next.steps[index].who) return next;
     return patch(next, name, { who });
   }
   if (event === "RunError" || event === "TeamRunError") {
-    const type = str(data.error_type);
-    if (type && CHECK_ERROR_TYPES.has(type)) {
+    // erro de guardrail é bloqueio, não falha da etapa
+    const errorType = str(data.error_type);
+    if (errorType && CHECK_ERROR_TYPES.has(errorType)) {
       const extra = (data.additional_data ?? {}) as { rule?: unknown };
       return patch(next, name, {
         status: "blocked",

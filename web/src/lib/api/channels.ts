@@ -32,9 +32,9 @@ export function useChannels() {
   return useQuery({
     queryKey: ["channels"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/channels");
-      if (res.error) throw new Error("Falha ao carregar os canais. Apenas owners têm acesso.");
-      return res.data!;
+      const result = await client.GET("/api/v1/channels");
+      if (result.error) throw new Error("Falha ao carregar os canais. Apenas owners têm acesso.");
+      return result.data!;
     },
   });
 }
@@ -45,15 +45,15 @@ export function useSaveChannel() {
     mutationFn: async (
       args: { id: null; body: ChannelInput } | { id: string; body: ChannelUpdate },
     ) => {
-      const res =
+      const result =
         args.id === null
           ? await client.POST("/api/v1/channels", { body: args.body })
           : await client.PUT("/api/v1/channels/{channel_id}", {
               params: { path: { channel_id: args.id } },
               body: args.body,
             });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao salvar o canal"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao salvar o canal"));
+      return result.data!;
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["channels"] }),
   });
@@ -63,9 +63,9 @@ export function useConversations(status: ConversationStatus) {
   return useQuery({
     queryKey: ["conversations", status],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/conversations", { params: { query: { status } } });
-      if (res.error) throw new Error("Falha ao carregar as conversas");
-      return res.data!;
+      const result = await client.GET("/api/v1/conversations", { params: { query: { status } } });
+      if (result.error) throw new Error("Falha ao carregar as conversas");
+      return result.data!;
     },
     refetchInterval: 5000,
   });
@@ -76,11 +76,11 @@ export function useConversation(id: string | null) {
     queryKey: ["conversation", id],
     enabled: id !== null,
     queryFn: async () => {
-      const res = await client.GET("/api/v1/conversations/{conversation_id}", {
+      const result = await client.GET("/api/v1/conversations/{conversation_id}", {
         params: { path: { conversation_id: id! } },
       });
-      if (res.error) throw new Error("Falha ao carregar a conversa");
-      return res.data!;
+      if (result.error) throw new Error("Falha ao carregar a conversa");
+      return result.data!;
     },
     refetchInterval: 5000,
   });
@@ -93,7 +93,7 @@ export function useConversationAction(id: string) {
   return useMutation({
     mutationFn: async (args: { action: Action } | { action: "reply"; text: string }) => {
       const params = { params: { path: { conversation_id: id } } };
-      const res =
+      const result =
         args.action === "reply"
           ? await client.POST("/api/v1/conversations/{conversation_id}/reply", {
               ...params,
@@ -104,8 +104,8 @@ export function useConversationAction(id: string) {
             : args.action === "release"
               ? await client.POST("/api/v1/conversations/{conversation_id}/release", params)
               : await client.POST("/api/v1/conversations/{conversation_id}/close", params);
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha na conversa"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha na conversa"));
+      return result.data!;
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["conversation", id] });

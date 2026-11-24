@@ -16,8 +16,9 @@ type StatusFilter = components["schemas"]["ConfigPayloadStatus"] | "";
 
 const PAGE_SIZE = 20;
 
+// busca e filtro vazios ficam fora da query
 async function fetchConfigs(page: number, q: string, status: StatusFilter) {
-  const res = await client.GET("/api/v1/configs", {
+  const result = await client.GET("/api/v1/configs", {
     params: {
       query: {
         page,
@@ -28,8 +29,8 @@ async function fetchConfigs(page: number, q: string, status: StatusFilter) {
       },
     },
   });
-  if (res.error) throw new Error("Falha ao carregar agentes");
-  return res.data!;
+  if (result.error) throw new Error("Falha ao carregar agentes");
+  return result.data!;
 }
 
 function NewAgentInline({ onCancel }: { onCancel: () => void }) {
@@ -39,11 +40,11 @@ function NewAgentInline({ onCancel }: { onCancel: () => void }) {
 
   const mutation = useMutation({
     mutationFn: async (name: string) => {
-      const res = await client.POST("/api/v1/configs", {
+      const result = await client.POST("/api/v1/configs", {
         body: { name, description: name, kind: "agent" },
       });
-      if (res.error) throw new Error("Falha ao criar agente");
-      return res.data!;
+      if (result.error) throw new Error("Falha ao criar agente");
+      return result.data!;
     },
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
@@ -137,8 +138,8 @@ export default function AgentsPage() {
             aria-label="Buscar agente"
             placeholder="Buscar por nome ou ID…"
             value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
+            onChange={(event) => {
+              setQ(event.target.value);
               setPage(1);
             }}
             className="border-border text-foreground placeholder:text-muted-foreground focus:border-accent w-full rounded border bg-[var(--input)] py-1.5 pr-3 pl-9 text-[13px] focus:outline-none"
@@ -147,8 +148,8 @@ export default function AgentsPage() {
         <select
           aria-label="Filtrar por versão"
           value={status}
-          onChange={(e) => {
-            setStatus(e.target.value as StatusFilter);
+          onChange={(event) => {
+            setStatus(event.target.value as StatusFilter);
             setPage(1);
           }}
           className="border-border text-foreground focus:border-accent rounded border bg-[var(--input)] px-3 py-1.5 text-[13px] focus:outline-none"
@@ -194,7 +195,7 @@ export default function AgentsPage() {
       {totalPages > 1 && (
         <div className="text-muted-foreground mt-4 flex items-center justify-end gap-2 text-[13px]">
           <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
             disabled={page === 1}
             className="hover:border-border hover:text-foreground rounded border border-transparent p-1 transition-colors disabled:opacity-40"
             aria-label="Página anterior"
@@ -205,7 +206,7 @@ export default function AgentsPage() {
             {page} / {totalPages}
           </span>
           <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
             disabled={page === totalPages}
             className="hover:border-border hover:text-foreground rounded border border-transparent p-1 transition-colors disabled:opacity-40"
             aria-label="Próxima página"

@@ -11,6 +11,7 @@ export const BROWSER_COOKIE = "automata_oidc_browser";
 // o que a tela de login sabe explicar; texto livre na URL vira mensagem no domínio oficial
 export type SsoError = "cancelado" | "expirado" | "sem_acesso" | "indisponivel";
 
+// cabeçalhos das chamadas do SSO à API, com o IP do cliente para o rate limit
 export function forwardHeaders(req: NextRequest): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const ip = clientIp(req);

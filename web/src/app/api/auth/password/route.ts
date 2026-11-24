@@ -14,14 +14,14 @@ export async function POST(req: NextRequest) {
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(await req.json()),
   });
-  const data = (await upstream.json().catch(() => ({}))) as {
+  const passwordBody = (await upstream.json().catch(() => ({}))) as {
     access_token?: string;
     detail?: unknown;
   };
-  if (!upstream.ok || !data.access_token) {
-    return NextResponse.json({ detail: data.detail }, { status: upstream.status });
+  if (!upstream.ok || !passwordBody.access_token) {
+    return NextResponse.json({ detail: passwordBody.detail }, { status: upstream.status });
   }
-  const res = NextResponse.json({ ok: true });
-  setSessionCookie(res, data.access_token);
-  return res;
+  const response = NextResponse.json({ ok: true });
+  setSessionCookie(response, passwordBody.access_token);
+  return response;
 }

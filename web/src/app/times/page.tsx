@@ -25,11 +25,11 @@ function NewTeamForm({ onCancel }: { onCancel: () => void }) {
 
   const create = useMutation({
     mutationFn: async () => {
-      const res = await client.POST("/api/v1/configs", {
+      const result = await client.POST("/api/v1/configs", {
         body: { name: name.trim(), description: description.trim(), kind: "team" },
       });
-      if (res.error) throw new Error(apiErrorMessage(res.error, "Falha ao criar time"));
-      return res.data!;
+      if (result.error) throw new Error(apiErrorMessage(result.error, "Falha ao criar time"));
+      return result.data!;
     },
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ["configs"] });
@@ -39,8 +39,8 @@ function NewTeamForm({ onCancel }: { onCancel: () => void }) {
 
   return (
     <form
-      onSubmit={(e) => {
-        e.preventDefault();
+      onSubmit={(event) => {
+        event.preventDefault();
         if (name.trim() && description.trim()) create.mutate();
       }}
       className="border-border bg-card flex flex-col gap-3 rounded border p-4"
@@ -98,11 +98,11 @@ export default function TeamsPage() {
   const { data, isPending, isError } = useQuery({
     queryKey: ["configs", "teams"],
     queryFn: async () => {
-      const res = await client.GET("/api/v1/configs", {
+      const result = await client.GET("/api/v1/configs", {
         params: { query: { kind: "team", page_size: 100 } },
       });
-      if (res.error) throw new Error("Falha ao carregar times");
-      return res.data!;
+      if (result.error) throw new Error("Falha ao carregar times");
+      return result.data!;
     },
   });
 
