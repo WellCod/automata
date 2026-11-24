@@ -24,6 +24,7 @@ def masked(text: str, custom: Sequence[CustomPattern] = ()) -> str:
 
 
 def _input_of(run: Any) -> str:
+    """Mensagem do usuário que abriu o run, ou vazio."""
     raw = getattr(getattr(run, "input", None), "input_content", None)
     return "" if raw is None else str(raw)
 
@@ -31,15 +32,18 @@ def _input_of(run: Any) -> str:
 def tools_called(run: Any) -> list[str]:
     """Tools que o run executou sem erro, na ordem, sem repetir."""
     names: list[str] = []
-    for t in getattr(run, "tools", None) or []:
-        name = getattr(t, "tool_name", None)
-        if name and not getattr(t, "tool_call_error", False) and name not in names:
+    for tool_execution in getattr(run, "tools", None) or []:
+        name = getattr(tool_execution, "tool_name", None)
+        failed = getattr(tool_execution, "tool_call_error", False)
+        if name and not failed and name not in names:
             names.append(name)
     return names
 
 
 @dataclass
 class Suggestion:
+    """Caso sugerido para o formulário; o editor revisa antes de salvar."""
+
     name: str
     input: str
     context: list[str]
@@ -53,7 +57,11 @@ class Suggestion:
 def suggest(run: Any, previous: list[Any], custom: Sequence[CustomPattern] = ()) -> Suggestion:
     """`previous` são os runs anteriores da mesma sessão, do mais antigo ao mais recente."""
     message = masked(_input_of(run), custom)
-    context = [masked(_input_of(r), custom) for r in previous if _input_of(r)][-MAX_CONTEXT:]
+    context = [
+        masked(_input_of(previous_run), custom)
+        for previous_run in previous
+        if _input_of(previous_run)
+    ][-MAX_CONTEXT:]
     checks: list[dict[str, Any]] = [{"type": "text", "kind": "not_empty"}]
     tools = tools_called(run)
     if tools:
@@ -68,10 +76,11 @@ def suggest(run: Any, previous: list[Any], custom: Sequence[CustomPattern] = ())
             f"referência, sem inventar informação: {reference}"
         )
     notes: list[str] = []
-    asked = [_input_of(r) for r in previous if _input_of(r)]
+    asked = [_input_of(previous_run) for previous_run in previous if _input_of(previous_run)]
     if len(asked) > MAX_CONTEXT:
         notes.append(f"Só as últimas {MAX_CONTEXT} mensagens anteriores entraram como contexto.")
-    if any(find_pii(t, PII_TYPES) for t in [_input_of(run), *asked[-MAX_CONTEXT:]]):
+    # o aviso confere só os tipos padrão: padrão próprio mascara, mas não entra na nota
+    if any(find_pii(text, PII_TYPES) for text in [_input_of(run), *asked[-MAX_CONTEXT:]]):
         notes.append("Dados pessoais foram mascarados.")
     first_line = message.strip().splitlines()[0] if message.strip() else "caso da conversa"
     return Suggestion(

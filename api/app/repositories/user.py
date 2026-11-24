@@ -8,6 +8,8 @@ from app.models.user import User, UserRole
 
 
 class UserRepository:
+    """Contas do painel."""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -48,11 +50,12 @@ class UserRepository:
 
 def emails_by_id(session: Session, ids: set[str]) -> dict[str, str]:
     """E-mail de quem é usuário do painel; id que não é usuário fica de fora."""
-    uuids = []
+    # ids de token de integração, agendamento e afins não são UUID e ficam de fora
+    user_ids = []
     for value in ids:
         with contextlib.suppress(TypeError, ValueError):
-            uuids.append(UUID(value))
-    if not uuids:
+            user_ids.append(UUID(value))
+    if not user_ids:
         return {}
-    rows = session.execute(select(User.id, User.email).where(User.id.in_(uuids)))
+    rows = session.execute(select(User.id, User.email).where(User.id.in_(user_ids)))
     return {str(user_id): email for user_id, email in rows}

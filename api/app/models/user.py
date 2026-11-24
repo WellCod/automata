@@ -26,6 +26,8 @@ class UserRole(enum.StrEnum):
 
 
 class User(Base):
+    """Conta do painel, por senha ou por SSO."""
+
     __tablename__ = "user_account"
     __table_args__ = (
         UniqueConstraint("sso_issuer", "sso_subject", name="uq_user_account_sso"),

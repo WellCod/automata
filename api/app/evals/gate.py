@@ -16,12 +16,15 @@ from app.models.eval import EvalRun
 
 @dataclass
 class GateVerdict:
+    """Se o rascunho pode ser publicado, o motivo da recusa e a execução que decidiu."""
+
     ok: bool
     reason: str | None
     run: EvalRun | None
 
 
 def latest_run(session: Session, config: AgentConfig) -> EvalRun | None:
+    """Execução mais recente sobre o rascunho atual, de qualquer origem."""
     if config.draft_version_id is None:
         return None
     stmt = (
@@ -34,6 +37,7 @@ def latest_run(session: Session, config: AgentConfig) -> EvalRun | None:
 
 
 def draft_verdict(session: Session, config: AgentConfig) -> GateVerdict:
+    """Libera a publicação só com todos os casos aprovados; não avaliado também barra."""
     if config.draft_version_id is None:
         return GateVerdict(False, "não há rascunho para publicar", None)
     run = latest_run(session, config)

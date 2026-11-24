@@ -98,6 +98,8 @@ class EvalRun(Base):
 
 
 class EvalResult(Base):
+    """Resultado de um caso numa execução da suíte, gravado assim que o caso termina."""
+
     __tablename__ = "eval_result"
     __table_args__ = (Index("ix_eval_result_run", "eval_run_id", "position"),)
 

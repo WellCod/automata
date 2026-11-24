@@ -77,7 +77,8 @@ STEP_REF = re.compile(r"\{etapa:([^{}]{1,60})\}")
 
 
 def template_refs(template: str | None) -> list[str]:
-    return [m.strip() for m in STEP_REF.findall(template or "")]
+    """Nomes das etapas citadas como `{etapa:Nome}` no texto de entrada."""
+    return [name.strip() for name in STEP_REF.findall(template or "")]
 
 
 class ParallelNode(BaseModel):
@@ -135,6 +136,7 @@ WorkflowNode = Annotated[
 
 
 def _children(node: WorkflowNode) -> list[WorkflowNode]:
+    """Nós diretamente dentro do contêiner; etapa simples não tem filhos."""
     if isinstance(node, ParallelNode):
         return list(node.branches)
     if isinstance(node, ConditionNode):
@@ -142,21 +144,23 @@ def _children(node: WorkflowNode) -> list[WorkflowNode]:
     if isinstance(node, LoopNode):
         return list(node.steps)
     if isinstance(node, RouterNode):
-        steps: list[WorkflowNode] = [r.step for r in node.routes]
+        steps: list[WorkflowNode] = [route.step for route in node.routes]
         return [*steps, node.default] if node.default else steps
     return []
 
 
 def walk(nodes: list[WorkflowNode], depth: int = 1) -> list[tuple[WorkflowNode, int]]:
-    out: list[tuple[WorkflowNode, int]] = []
+    """Todos os nós da árvore em pré-ordem, com o nível (1 é o principal)."""
+    visited: list[tuple[WorkflowNode, int]] = []
     for node in nodes:
-        out.append((node, depth))
-        out += walk(_children(node), depth + 1)
-    return out
+        visited.append((node, depth))
+        visited += walk(_children(node), depth + 1)
+    return visited
 
 
 def step_nodes(nodes: list[WorkflowNode]) -> list[StepNode]:
-    return [n for n, _ in walk(nodes) if isinstance(n, StepNode)]
+    """Só as etapas que rodam agente ou time, em qualquer nível."""
+    return [node for node, _ in walk(nodes) if isinstance(node, StepNode)]
 
 
 def _reviews_inside_containers(nodes: list[WorkflowNode]) -> list[str]:
@@ -166,9 +170,9 @@ def _reviews_inside_containers(nodes: list[WorkflowNode]) -> list[str]:
     a pausa deixaria o contêiner num estado que o painel não mostra (ADR-0023).
     """
     return [
-        n.name
-        for n, depth in walk(nodes)
-        if depth > 1 and isinstance(n, StepNode) and n.review is not None
+        node.name
+        for node, depth in walk(nodes)
+        if depth > 1 and isinstance(node, StepNode) and node.review is not None
     ]
 
 
@@ -198,30 +202,32 @@ class WorkflowSettings(BaseModel):
 
     @model_validator(mode="after")
     def estrutura_valida(self) -> WorkflowSettings:
+        """Nomes únicos, profundidade e tamanho limitados, revisão onde o Agno pausa e
+        referências do texto de entrada a etapas que existem."""
         nodes = walk(self.steps)
-        names = [n.name for n, _ in nodes]
-        repetidos = sorted({n for n in names if names.count(n) > 1})
-        if repetidos:
+        names = [node.name for node, _ in nodes]
+        repeated = sorted({name for name in names if names.count(name) > 1})
+        if repeated:
             # o Agno indexa saídas e métricas pelo nome da etapa
-            raise ValueError(f"nomes de etapa repetidos: {repetidos}")
-        if max(d for _, d in nodes) > MAX_DEPTH:
+            raise ValueError(f"nomes de etapa repetidos: {repeated}")
+        if max(depth for _, depth in nodes) > MAX_DEPTH:
             raise ValueError(f"aninhamento de no máximo {MAX_DEPTH} níveis")
         if len(step_nodes(self.steps)) > MAX_STEPS:
             raise ValueError(f"no máximo {MAX_STEPS} etapas")
-        revisadas = sorted(_reviews_inside_containers(self.steps))
-        if revisadas:
+        nested_reviews = sorted(_reviews_inside_containers(self.steps))
+        if nested_reviews:
             raise ValueError(
-                f"revisão humana só em etapa do nível principal do workflow: {revisadas}"
+                f"revisão humana só em etapa do nível principal do workflow: {nested_reviews}"
             )
         problems = _loop_review_problems(self.steps)
         if problems:
             raise ValueError("; ".join(problems))
         known = set(names)
-        faltando = sorted(
+        unknown_refs = sorted(
             {ref for step in step_nodes(self.steps) for ref in template_refs(step.template)} - known
         )
-        if faltando:
-            raise ValueError(f"o texto de entrada cita etapas que não existem: {faltando}")
+        if unknown_refs:
+            raise ValueError(f"o texto de entrada cita etapas que não existem: {unknown_refs}")
         if isinstance(self.steps[-1], ParallelNode):
             # a saída final seria só a do último ramo
             raise ValueError("o workflow não pode terminar num paralelo: adicione uma etapa depois")

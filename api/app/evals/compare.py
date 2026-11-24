@@ -15,6 +15,7 @@ from app.repositories.eval import EvalRunRepository
 
 
 def change(base: str | None, target: str | None) -> str:
+    """Classifica a mudança de status de um caso entre a execução base e a alvo."""
     if base is None:
         return "new"
     if target is None:
@@ -28,6 +29,8 @@ def change(base: str | None, target: str | None) -> str:
 
 @dataclass(frozen=True)
 class CaseChange:
+    """Status de um caso nas duas execuções comparadas e a mudança entre eles."""
+
     case_id: UUID | None
     case_name: str
     base_status: str | None
@@ -36,24 +39,28 @@ class CaseChange:
 
 
 def compare(repo: EvalRunRepository, base: EvalRun, target: EvalRun) -> list[CaseChange]:
+    """Caso a caso, na ordem da execução alvo e depois os que só existiam na base."""
+
     def keyed(run: EvalRun) -> dict[str, EvalResult]:
         # pelo id do caso; caso apagado depois da execução cai para o nome
-        return {str(r.case_id or r.case_name): r for r in repo.results(run.id)}
+        return {str(result.case_id or result.case_name): result for result in repo.results(run.id)}
 
     before, after = keyed(base), keyed(target)
-    order = list(after) + [k for k in before if k not in after]
+    order = list(after) + [key for key in before if key not in after]
     cases = []
     for key in order:
-        b, a = before.get(key), after.get(key)
-        ref = a or b
-        assert ref is not None
+        base_result, target_result = before.get(key), after.get(key)
+        reference = target_result or base_result
+        assert reference is not None
+        base_status = base_result.status if base_result else None
+        target_status = target_result.status if target_result else None
         cases.append(
             CaseChange(
-                case_id=ref.case_id,
-                case_name=ref.case_name,
-                base_status=b.status if b else None,
-                target_status=a.status if a else None,
-                change=change(b.status if b else None, a.status if a else None),
+                case_id=reference.case_id,
+                case_name=reference.case_name,
+                base_status=base_status,
+                target_status=target_status,
+                change=change(base_status, target_status),
             )
         )
     return cases
@@ -61,6 +68,8 @@ def compare(repo: EvalRunRepository, base: EvalRun, target: EvalRun) -> list[Cas
 
 @dataclass(frozen=True)
 class SuiteState:
+    """Estado da suíte de um config, pela execução mais recente."""
+
     config_id: UUID
     # running | passing | failing | regressed
     state: str
@@ -71,6 +80,7 @@ class SuiteState:
 
 
 def _latest_per_config(session: Session, config_ids: list[UUID] | None) -> list[EvalRun]:
+    """Execução mais recente de cada config, com `DISTINCT ON` do Postgres."""
     stmt = (
         select(EvalRun)
         .distinct(EvalRun.agent_config_id)
@@ -82,6 +92,7 @@ def _latest_per_config(session: Session, config_ids: list[UUID] | None) -> list[
 
 
 def _previous_scheduled(session: Session, run: EvalRun) -> EvalRun | None:
+    """Agendada completa anterior; a que falhou no meio não serve de base para regressão."""
     stmt = (
         select(EvalRun)
         .where(
@@ -114,7 +125,9 @@ def suite_states(session: Session, config_ids: list[UUID] | None = None) -> list
                 previous = _previous_scheduled(session, run)
                 if previous is not None:
                     regressions = sum(
-                        1 for c in compare(repo, previous, run) if c.change == "regression"
+                        1
+                        for case_change in compare(repo, previous, run)
+                        if case_change.change == "regression"
                     )
                     if regressions:
                         state = "regressed"

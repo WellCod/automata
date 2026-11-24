@@ -58,6 +58,7 @@ JUDGE_WITHOUT_MODEL = "execução sem modelo de juiz"
 
 
 def _text(content: Any) -> str:
+    """Saída do run como texto, para as regras de texto da suíte."""
     if isinstance(content, dict | list):
         # saída estruturada: as regras de texto valem sobre o JSON
         return json.dumps(content, ensure_ascii=False)
@@ -65,6 +66,7 @@ def _text(content: Any) -> str:
 
 
 def steps_verdict(check: StepsCheck, ran: list[str]) -> dict[str, Any]:
+    """Confere as etapas esperadas contra as que rodaram; `exclusive` reprova etapa a mais."""
     missing = [name for name in check.steps if name not in ran]
     extra = sorted({name for name in ran if name not in check.steps}) if check.exclusive else []
     return {"ran": ran, "missing": missing, "extra": extra, "passed": not missing and not extra}
@@ -88,51 +90,54 @@ class TextScorer:
         self, content: str, step_contents: dict[str, str] | None = None
     ) -> list[dict[str, Any]]:
         """Com `step`, a regra olha a saída daquela etapa; etapa que não rodou falha (ADR-0038)."""
-        out = []
-        for c in self._checks:
-            verdict: dict[str, Any] = {"kind": c.kind, "value": c.value}
-            if c.step:
-                verdict["step"] = c.step
-                text = (step_contents or {}).get(c.step)
-                verdict["passed"] = text is not None and rule_matches(c.rule(), text)
+        verdicts = []
+        for check in self._checks:
+            verdict: dict[str, Any] = {"kind": check.kind, "value": check.value}
+            if check.step:
+                verdict["step"] = check.step
+                text = (step_contents or {}).get(check.step)
+                verdict["passed"] = text is not None and rule_matches(check.rule(), text)
             else:
-                verdict["passed"] = rule_matches(c.rule(), content)
-            out.append(verdict)
-        return out
+                verdict["passed"] = rule_matches(check.rule(), content)
+            verdicts.append(verdict)
+        return verdicts
 
     async def ascore(self, run: Any, expected: Any = None) -> Score:
+        """Nota é a fração de checagens que passaram; o caso só passa com todas."""
         metadata = getattr(run, "metadata", None) or {}
         verdicts = self.verdicts(
             _text(getattr(run, "content", None)), metadata.get("step_contents")
         )
-        ok = sum(1 for v in verdicts if v["passed"])
+        passed_count = sum(1 for verdict in verdicts if verdict["passed"])
         total = len(verdicts)
         failed = [
-            (f"{v['step']}: " if v.get("step") else "") + f"{v['kind']} {v['value']!r}".strip()
-            for v in verdicts
-            if not v["passed"]
+            (f"{verdict['step']}: " if verdict.get("step") else "")
+            + f"{verdict['kind']} {verdict['value']!r}".strip()
+            for verdict in verdicts
+            if not verdict["passed"]
         ]
         detail: dict[str, Any] = {"checks": verdicts}
         if self._steps is not None:
+            # o adaptador do workflow põe as etapas que rodaram em `metadata`
             ran = list((getattr(run, "metadata", None) or {}).get("steps", []))
             steps = steps_verdict(self._steps, ran)
             detail["steps"] = steps
             total += 1
-            ok += steps["passed"]
+            passed_count += steps["passed"]
             if steps["missing"]:
                 failed.append("não rodou " + ", ".join(steps["missing"]))
             if steps["extra"]:
                 failed.append("rodou fora da lista " + ", ".join(steps["extra"]))
         if self._schema is not None:
-            verdict = await aschema_verdict(self._schema, getattr(run, "content", None))
-            detail["schema"] = verdict
+            schema_verdict = await aschema_verdict(self._schema, getattr(run, "content", None))
+            detail["schema"] = schema_verdict
             total += 1
-            ok += verdict["passed"]
-            if not verdict["passed"]:
-                failed.append("fora do schema: " + "; ".join(verdict["errors"]))
+            passed_count += schema_verdict["passed"]
+            if not schema_verdict["passed"]:
+                failed.append("fora do schema: " + "; ".join(schema_verdict["errors"]))
         return Score(
-            value=ok / total,
-            passed=ok == total,
+            value=passed_count / total,
+            passed=passed_count == total,
             reason=("falhou: " + "; ".join(failed)) if failed else None,
             detail=detail,
         )
@@ -161,22 +166,23 @@ class PlannedCase:
 
 
 def _split(spec: EvalCaseInput) -> tuple[list[TextCheck], ToolsCheck | None, JudgeCheck | None]:
-    text = [c for c in spec.checks if isinstance(c, TextCheck)]
-    tools = next((c for c in spec.checks if isinstance(c, ToolsCheck)), None)
-    judge = next((c for c in spec.checks if isinstance(c, JudgeCheck)), None)
+    """Checagens de texto, de tools e do juiz do caso; tools e juiz valem uma por caso."""
+    text = [check for check in spec.checks if isinstance(check, TextCheck)]
+    tools = next((check for check in spec.checks if isinstance(check, ToolsCheck)), None)
+    judge = next((check for check in spec.checks if isinstance(check, JudgeCheck)), None)
     return text, tools, judge
 
 
 def _blocked(spec: EvalCaseInput) -> BlockedCheck | None:
-    return next((c for c in spec.checks if isinstance(c, BlockedCheck)), None)
+    return next((check for check in spec.checks if isinstance(check, BlockedCheck)), None)
 
 
 def _steps(spec: EvalCaseInput) -> StepsCheck | None:
-    return next((c for c in spec.checks if isinstance(c, StepsCheck)), None)
+    return next((check for check in spec.checks if isinstance(check, StepsCheck)), None)
 
 
 def _schema_check(spec: EvalCaseInput) -> SchemaCheck | None:
-    return next((c for c in spec.checks if isinstance(c, SchemaCheck)), None)
+    return next((check for check in spec.checks if isinstance(check, SchemaCheck)), None)
 
 
 NO_SCHEMA = "a versão testada não tem saída estruturada"
@@ -210,7 +216,10 @@ def plan_case(
     judge_unavailable: str | None = JUDGE_WITHOUT_MODEL,
     actor: str = "eval",
 ) -> PlannedCase:
-    """`judge_unavailable` é o motivo de o juiz não rodar; None quando há juiz."""
+    """Monta o `Case` do Agno a partir do caso gravado; sem nada que rode, fica sem `Case`.
+
+    `judge_unavailable` é o motivo de o juiz não rodar; None quando há juiz.
+    """
     spec = EvalCaseInput.model_validate(snapshot)
     text, tools, judge = _split(spec)
     blocked = _blocked(spec)
@@ -232,6 +241,7 @@ def plan_case(
         schema = None
         if nothing:
             return PlannedCase(position, case_id, spec.name, spec, None, skipped)
+    # `agent=` ou `team=` do Case, conforme o que `_runner_for` montou
     target = {field: runner}
     session_args = _context_args(runner, spec.context, actor)
     agno_case = Case(
@@ -252,6 +262,7 @@ def plan_case(
         **session_args,
         **target,
     )
+    # registro de bloqueios do agente montado, lido depois para a checagem `blocked`
     blocks = getattr(runner, "automata_blocks", None)
     return PlannedCase(position, case_id, spec.name, spec, agno_case, skipped, blocks)
 
@@ -294,8 +305,8 @@ def result_from(planned: PlannedCase, result: CaseResult | None) -> EvalResult:
             {
                 "type": "text",
                 # o scorer também confere as etapas no workflow: o texto passa pelas regras
-                "passed": all(r["passed"] for r in rules) if rules else None,
-                "rules": rules or [{"kind": c.kind, "value": c.value} for c in text],
+                "passed": all(rule["passed"] for rule in rules) if rules else None,
+                "rules": rules or [{"kind": check.kind, "value": check.value} for check in text],
             }
         )
     if tools is not None:
@@ -374,8 +385,9 @@ def _blocked_result(
     planned: PlannedCase, check: BlockedCheck, result: CaseResult | None
 ) -> EvalResult:
     """O bloqueio chega ao Agno como run com erro; o veredito vem do registro de bloqueios."""
-    last = planned.blocks.last if planned.blocks is not None else None
-    rule = last.rule if last is not None and last.rule != RULE_BUDGET else None
+    last_block = planned.blocks.last if planned.blocks is not None else None
+    # bloqueio por orçamento não é guardrail: o caso não passa por ter batido no teto
+    rule = last_block.rule if last_block is not None and last_block.rule != RULE_BUDGET else None
     error: str | None = None
     if rule is not None:
         passed: bool | None = check.rule is None or rule == check.rule
@@ -403,12 +415,14 @@ def _blocked_result(
 
 
 def _set(run_id: UUID, **values: Any) -> None:
+    """Atualiza colunas da execução numa sessão curta própria."""
     with Session(get_engine()) as session:
         session.execute(update(EvalRun).where(EvalRun.id == run_id).values(**values))
         session.commit()
 
 
 def _save_result(run_id: UUID, row: EvalResult) -> None:
+    """Grava o resultado do caso e renova o batimento que `fail_stale` confere."""
     with Session(get_engine()) as session:
         row.eval_run_id = run_id
         session.add(row)
@@ -421,6 +435,7 @@ def _save_result(run_id: UUID, row: EvalResult) -> None:
 def _record_judge(
     run_id: UUID, config_id: UUID, actor: str, model_id: str, usage: JudgeUsage
 ) -> None:
+    """Grava o consumo do juiz como evento de uso da execução, com custo estimado se faltar."""
     if not usage.total_tokens:
         return
     with Session(get_engine()) as session:
@@ -449,6 +464,7 @@ def _consumption(run_id: UUID) -> tuple[int, float | None]:
 
 
 def _load(run_id: UUID) -> tuple[UUID, str, UUID, str, list[dict[str, Any]], str | None]:
+    """Config, tipo, versão, autor, casos congelados e modelo do juiz da execução."""
     from app.models.config import AgentConfig
 
     with Session(get_engine()) as session:
@@ -487,8 +503,8 @@ async def execute(run_id: UUID) -> None:
             judge, usage = metered(models_map.resolve_model(judge_model))
         planned = await asyncio.to_thread(
             lambda: [
-                plan_case(i, snap, config_id, kind, version_id, unavailable, actor)
-                for i, snap in enumerate(snapshots)
+                plan_case(position, snapshot, config_id, kind, version_id, unavailable, actor)
+                for position, snapshot in enumerate(snapshots)
             ]
         )
     except Exception as exc:
@@ -500,22 +516,30 @@ async def execute(run_id: UUID) -> None:
 
     # só o status: a linha gravada expira no commit e não dá para relê-la fora da sessão
     statuses: list[str] = []
-    by_name = {p.name: p for p in planned if p.agno_case is not None}
+    by_name = {
+        planned_case.name: planned_case
+        for planned_case in planned
+        if planned_case.agno_case is not None
+    }
 
     def on_case_end(case: Case, result: CaseResult) -> None:
         row = result_from(by_name[case.name], result)
         statuses.append(row.status)
-        # gravação curta e síncrona: o painel vê o caso assim que ele termina
+        # o Agno só aceita hook síncrono aqui (corrotina vira erro do caso), então a
+        # gravação é curta e direta: o painel vê o caso assim que ele termina
         _save_result(run_id, row)
 
     token = current_eval_run.set(EvalContext(eval_run_id=run_id, actor=actor))
     try:
-        for p in planned:
-            if p.agno_case is None:
-                row = result_from(p, None)
+        # casos sem nada que rode entram já gravados como não avaliados
+        for planned_case in planned:
+            if planned_case.agno_case is None:
+                row = result_from(planned_case, None)
                 statuses.append(row.status)
                 await asyncio.to_thread(_save_result, run_id, row)
-        runnable = [p.agno_case for p in planned if p.agno_case is not None]
+        runnable = [
+            planned_case.agno_case for planned_case in planned if planned_case.agno_case is not None
+        ]
         if runnable:
             await arun_cases(
                 runnable,
@@ -531,6 +555,7 @@ async def execute(run_id: UUID) -> None:
         return
     finally:
         current_eval_run.reset(token)
+        # o juiz gasta mesmo quando a suíte cai no meio
         if judge_model is not None:
             await asyncio.to_thread(_record_judge, run_id, config_id, actor, judge_model, usage)
 

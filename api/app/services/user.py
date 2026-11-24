@@ -11,6 +11,7 @@ from sqlalchemy import select, update
 from app.models.user import PasswordReset, User, UserRole
 from app.repositories.user import UserRepository
 
+# hasher argon2 do módulo; o nome curto fica porque o teste de enumeração o troca por monkeypatch
 _ph = PasswordHasher()
 
 # link de recuperação por e-mail (ADR-0045)
@@ -18,11 +19,12 @@ RESET_TTL = timedelta(minutes=30)
 
 
 def _token_hash(token: str) -> str:
+    """O banco guarda só o hash do token de recuperação: vazamento da tabela não dá o link."""
     return hashlib.sha256(token.encode()).hexdigest()
 
 
 class ConflictError(ValueError):
-    pass
+    """Ação que deixaria a instância inconsistente; o router responde 409."""
 
 
 # Login com e-mail inexistente verifica contra este hash para gastar o mesmo
@@ -31,6 +33,8 @@ _DUMMY_HASH = _ph.hash("automata-dummy-password")
 
 
 class UserService:
+    """Contas do painel: criação, papel, senha, recuperação, login por senha e por SSO."""
+
     def __init__(self, repo: UserRepository) -> None:
         self._repo = repo
 
@@ -46,6 +50,7 @@ class UserService:
         return user
 
     def _check_seats(self) -> None:
+        """Recusa conta nova acima do limite de usuários do plano."""
         from app.settings import get_settings
 
         limit = get_settings().plan_max_users
@@ -60,12 +65,14 @@ class UserService:
         return user
 
     def _keeps_an_owner(self, user: User, *, role: UserRole, active: bool) -> None:
-        losing = user.role == UserRole.owner and user.is_active
-        stays = role == UserRole.owner and active
-        if losing and not stays and self._repo.count_active_owners() <= 1:
+        """Recusa a mudança que tiraria o último owner ativo da instância."""
+        is_active_owner = user.role == UserRole.owner and user.is_active
+        stays_active_owner = role == UserRole.owner and active
+        if is_active_owner and not stays_active_owner and self._repo.count_active_owners() <= 1:
             raise ConflictError("A instância precisa de ao menos um owner ativo")
 
     def _cut_sessions(self, user: User) -> datetime:
+        """Invalida os tokens emitidos até agora: o JWT anterior ao corte é recusado."""
         now = datetime.now(UTC)
         user.tokens_valid_after = now
         return now
@@ -82,18 +89,18 @@ class UserService:
         self._keeps_an_owner(user, role=new_role, active=new_active)
         user.role = new_role
         user.is_active = new_active
-        cut = self._cut_sessions(user)
+        session_cutoff = self._cut_sessions(user)
         self._repo._session.flush()
-        return user, cut
+        return user, session_cutoff
 
     def reset_password(self, user_id: UUID, password: str) -> tuple[User, datetime]:
         """Senha definida pelo owner: provisória, a pessoa troca no próximo login."""
         user = self._get(user_id)
         user.hashed_password = _ph.hash(password)
         user.must_change_password = True
-        cut = self._cut_sessions(user)
+        session_cutoff = self._cut_sessions(user)
         self._repo._session.flush()
-        return user, cut
+        return user, session_cutoff
 
     def change_own_password(self, user_id: UUID, current: str, new: str) -> tuple[User, datetime]:
         """Troca pela própria pessoa, com a senha atual. Corta as outras sessões."""
@@ -102,18 +109,19 @@ class UserService:
             raise ConflictError("Conta do SSO: a senha é a do provedor")
         try:
             _ph.verify(user.hashed_password, current)
-        except VerifyMismatchError as e:
-            raise ValueError("Senha atual incorreta") from e
+        except VerifyMismatchError as exc:
+            raise ValueError("Senha atual incorreta") from exc
         if current == new:
             raise ValueError("A nova senha precisa ser diferente da atual")
         return user, self._set_password(user, new)
 
     def _set_password(self, user: User, password: str) -> datetime:
+        """Senha escolhida pela própria pessoa: deixa de ser provisória e corta as sessões."""
         user.hashed_password = _ph.hash(password)
         user.must_change_password = False
-        cut = self._cut_sessions(user)
+        session_cutoff = self._cut_sessions(user)
         self._repo._session.flush()
-        return cut
+        return session_cutoff
 
     def request_reset(self, email: str, now: datetime) -> tuple[User, str] | None:
         """Token de recuperação para conta ativa com senha; None para qualquer outra."""
@@ -137,7 +145,9 @@ class UserService:
         return user, token
 
     def reset_with_token(self, token: str, password: str, now: datetime) -> tuple[User, datetime]:
+        """Troca a senha pelo link de recuperação, que vale uma vez só."""
         session = self._repo._session
+        # trava a linha: dois envios do mesmo link ao mesmo tempo não usam o token duas vezes
         reset = session.scalar(
             select(PasswordReset)
             .where(PasswordReset.token_hash == _token_hash(token))
@@ -147,11 +157,13 @@ class UserService:
             raise ValueError("Link inválido ou vencido. Peça outro.")
         user = self._get(reset.user_id)
         if not user.is_active:
+            # mesma mensagem do link vencido: não revela que a conta foi desativada
             raise ValueError("Link inválido ou vencido. Peça outro.")
         reset.used_at = now
         return user, self._set_password(user, password)
 
     def delete(self, user_id: UUID, *, actor_id: str | None) -> None:
+        """Remove conta já desativada; ninguém remove a própria."""
         user = self._get(user_id)
         if actor_id is not None and str(user.id) == actor_id:
             raise ConflictError("Você não pode remover a própria conta")
@@ -161,6 +173,7 @@ class UserService:
         self._repo.delete(user)
 
     def authenticate(self, email: str, password: str) -> User:
+        """Login por senha; toda recusa custa o mesmo argon2 e dá a mesma mensagem."""
         user = self._repo.get_by_email(email)
         if user is None or not user.is_active:
             with suppress(VerifyMismatchError):
@@ -173,9 +186,10 @@ class UserService:
             raise ValueError("Credenciais inválidas")
         try:
             _ph.verify(user.hashed_password, password)
-        except VerifyMismatchError as e:
-            raise ValueError("Credenciais inválidas") from e
+        except VerifyMismatchError as exc:
+            raise ValueError("Credenciais inválidas") from exc
         user.last_login_at = datetime.now(UTC)
+        # parâmetros do argon2 mudaram desde o hash: regrava com a senha que acabou de chegar
         if _ph.check_needs_rehash(user.hashed_password):
             user.hashed_password = _ph.hash(password)
             self._repo._session.flush()
@@ -223,13 +237,14 @@ class UserService:
             session.flush()
         if not user.is_active:
             raise PermissionError("Conta desativada")
-        cut: datetime | None = None
+        # o papel segue o grupo do provedor a cada login
+        session_cutoff: datetime | None = None
         if user.role != role:
             try:
-                user, cut = self.update(user.id, role=role, is_active=None)
+                user, session_cutoff = self.update(user.id, role=role, is_active=None)
             except ConflictError:
                 # último owner ativo: entra com o papel atual
-                cut = None
+                session_cutoff = None
         user.last_login_at = datetime.now(UTC)
         session.flush()
-        return user, cut
+        return user, session_cutoff
