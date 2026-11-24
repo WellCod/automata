@@ -54,6 +54,9 @@ SECRET = "segredo-do-prompt-7781"
         ("GET", "/api/v1/conversations/c1", True),
         ("GET", "/api/v1/conversations", False),
         ("GET", "/sessions/s1", True),
+        # Agno 3.2.1: os resumos da compactação também são a conversa
+        ("GET", "/sessions/s1/compactions", True),
+        ("GET", "/sessions/s1/runs", True),
         ("GET", "/api/v1/memories", True),
         ("GET", "/api/v1/audit", False),
         ("GET", "/api/v1/audit/export", True),

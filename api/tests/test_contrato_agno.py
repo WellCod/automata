@@ -55,6 +55,18 @@ def test_internos_do_agno_usados_pelo_app() -> None:
     assert isinstance(STEP_TYPE_MAPPING, dict)
     assert callable(getattr(CohereReranker, "_rerank", None))
     assert callable(getattr(MCPTools, "_connect", None))
+    # `app/mcp/client.py` fecha a sessão parcial por ele quando a conexão falha
+    assert callable(getattr(MCPTools, "_safe_cleanup", None))
+
+
+def test_rota_nativa_de_compactacoes_pede_leitura_de_sessao() -> None:
+    """Sem scope no mapa, a rota do AgentOS fica aberta a qualquer token válido; a das
+    compactações (Agno 3.2.1) devolve o resumo da conversa, que o viewer não pode ler."""
+    from agno.os.scopes import get_default_scope_mappings, get_required_scopes_for_route
+
+    mappings = get_default_scope_mappings()
+    for path in ("/sessions/s1", "/sessions/s1/runs", "/sessions/s1/compactions"):
+        assert get_required_scopes_for_route(mappings, "GET", path) == ["sessions:read"]
 
 
 def test_tabelas_do_agno_com_user_id_estao_no_mapa_da_exclusao() -> None:

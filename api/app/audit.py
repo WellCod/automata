@@ -54,7 +54,7 @@ DEFAULT_RETENTION_DAYS = 365
 _SENSITIVE_READ = re.compile(
     r"^(/api/v1/data-subjects(/.*)?|/api/v1/me/data/.+|/api/v1/memories(/.*)?"
     r"|/memories(/.*)?|/api/v1/traces/.+|/traces/.+|/api/v1/conversations/[^/]+"
-    r"|/sessions/[^/]+(/runs)?|/api/v1/audit/export)$"
+    r"|/sessions/[^/]+(/runs|/compactions)?|/api/v1/audit/export)$"
 )
 # o painel consulta a mesma conversa a cada 5 s: uma linha por pessoa, rota e janela
 READ_DEDUPE_S = 600.0
