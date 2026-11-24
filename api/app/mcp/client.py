@@ -47,9 +47,10 @@ def build_mcp_tools(
 async def connect_strict(tools: MCPTools, label: str) -> None:
     """Conecta e falha alto.
 
-    `MCPTools.connect()` engole a exceção e só loga, e o Agent roda sem as
-    tools. Aqui chamamos o `_connect` interno (agno==3.1.8, fixado) para
-    propagar o motivo — 401, timeout, tool inexistente no include.
+    `MCPTools.connect()` engole a exceção e devolve `False` (desde o Agno 3.2.1),
+    e o Agent roda sem as tools. Aqui chamamos o `_connect` interno, que o
+    `tests/test_contrato_agno.py` mantém conferido, para propagar o motivo — 401,
+    timeout, tool inexistente no include.
     """
     if tools.initialized:
         return
@@ -73,6 +74,9 @@ async def connect_strict(tools: MCPTools, label: str) -> None:
         logger.warning("servidor MCP indisponível", extra={"server": label, "error": str(exc)})
         raise McpUnavailable(f"servidor MCP '{label}' indisponível") from exc
     if not tools.initialized:
+        # o `initialize()` do Agno engole o erro do handshake e da descoberta de tools:
+        # o `_connect` volta sem exceção, mas com a sessão aberta, que precisa fechar
+        await _cleanup(tools)
         raise McpUnavailable(f"servidor MCP '{label}' indisponível")
 
 
