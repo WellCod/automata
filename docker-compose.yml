@@ -87,7 +87,7 @@ services:
       KNOWLEDGE_DEFAULT_EMBEDDER: ${KNOWLEDGE_DEFAULT_EMBEDDER:-voyage}
       KNOWLEDGE_MAX_UPLOAD_MB: ${KNOWLEDGE_MAX_UPLOAD_MB:-20}
       # a API só enfileira a ingestão e o ingest-worker processa (ADR-0039): o leitor de
-      # documento grande não divide os 512 MB com os runs (OPS-08)
+      # documento grande não divide a memória com os runs (OPS-08)
       INGEST_WORKER: ${INGEST_WORKER:-true}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-20}
@@ -107,7 +107,10 @@ services:
         limits:
           # com meia CPU, só importar o app levava 47 s no boot; com uma, 19 s (Fase 44)
           cpus: "1.0"
-          memory: 512M  # embedder e leitores de documento do RAG (ADR-0012)
+          # parada, a API ocupa de 440 a 490 MB (Agno 3.2, SDKs novos, Python 3.14); o
+          # seed do owner por `exec` no mesmo container soma 270 MB de pico (o argon2 usa
+          # 64 MB por hash). Com 512 MB o kernel matava o seed e qualquer pico derrubava a API
+          memory: 1G
 
   # worker de ingestão separado (ADR-0039), ligado por padrão em produção (OPS-08)
   ingest-worker:
