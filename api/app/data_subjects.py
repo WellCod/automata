@@ -52,6 +52,7 @@ def subject_hash(user_id: str) -> str:
 
 @lru_cache(maxsize=1)
 def agno_table_names() -> dict[str, str]:
+    """Nome de cada tabela do Agno, lido do próprio `PostgresDb` para seguir a versão instalada."""
     from agno.db.postgres import PostgresDb
 
     # o construtor não conecta: serve só para ler os nomes que o Agno usa
@@ -64,6 +65,7 @@ def agno_table_names() -> dict[str, str]:
 
 
 def agno_table(conn: Connection, key: str) -> Table | None:
+    """Tabela do Agno refletida do banco; None quando o Agno ainda não a criou."""
     name = agno_table_names()[key]
     if not inspect(conn).has_table(name, schema=AGNO_SCHEMA):
         return None
@@ -71,6 +73,7 @@ def agno_table(conn: Connection, key: str) -> Table | None:
 
 
 def _count(conn: Connection, table: Table | None, column: str, value: Any) -> int:
+    """Linhas com `column` igual a `value`; tabela ou coluna ausente conta zero."""
     if table is None or column not in table.c:
         return 0
     return int(conn.scalar(select(func.count()).where(table.c[column] == value)) or 0)
@@ -99,6 +102,7 @@ def inventory(user_id: str) -> dict[str, int]:
 def _rows(
     conn: Connection, table: Table | None, column: str, values: list[Any]
 ) -> list[dict[str, Any]]:
+    """Linhas inteiras com `column` em `values`, como dicionário."""
     if table is None or column not in table.c or not values:
         return []
     return [
@@ -109,34 +113,37 @@ def _rows(
 def build_export(user_id: str) -> dict[str, Any]:
     """Tudo o que a instância guarda do titular, no formato das tabelas."""
     engine = get_engine()
-    data: dict[str, Any] = {
+    export_data: dict[str, Any] = {
         "user_id": user_id,
         "generated_at": datetime.now(UTC).isoformat(),
         "agno": {},
     }
     with engine.connect() as conn:
         for key in AGNO_BY_USER:
-            data["agno"][key] = _rows(conn, agno_table(conn, key), "user_id", [user_id])
-        trace_ids = [t["trace_id"] for t in data["agno"]["traces"] if t.get("trace_id")]
-        data["agno"]["spans"] = _rows(conn, agno_table(conn, "spans"), "trace_id", trace_ids)
-    with Session(engine) as session:
-        data["agent_runs"] = [
-            {
-                "run_id": r.run_id,
-                "agent_config_id": str(r.agent_config_id),
-                "session_id": r.session_id,
-                "status": r.status,
-                "created_at": r.created_at.isoformat(),
-                "review_log": r.review_log,
-                "screened_tools": r.screened_tools,
-                "block_detail": r.block_detail,
-                "pending_tools": r.pending_tools,
-                "pending_steps": r.pending_steps,
-                "error": r.error,
-            }
-            for r in session.scalars(select(AgentRun).where(AgentRun.user_id == user_id))
+            export_data["agno"][key] = _rows(conn, agno_table(conn, key), "user_id", [user_id])
+        # span não tem user_id: vem pelos traces do titular
+        trace_ids = [
+            trace["trace_id"] for trace in export_data["agno"]["traces"] if trace.get("trace_id")
         ]
-        data["usage"] = [
+        export_data["agno"]["spans"] = _rows(conn, agno_table(conn, "spans"), "trace_id", trace_ids)
+    with Session(engine) as session:
+        export_data["agent_runs"] = [
+            {
+                "run_id": run.run_id,
+                "agent_config_id": str(run.agent_config_id),
+                "session_id": run.session_id,
+                "status": run.status,
+                "created_at": run.created_at.isoformat(),
+                "review_log": run.review_log,
+                "screened_tools": run.screened_tools,
+                "block_detail": run.block_detail,
+                "pending_tools": run.pending_tools,
+                "pending_steps": run.pending_steps,
+                "error": run.error,
+            }
+            for run in session.scalars(select(AgentRun).where(AgentRun.user_id == user_id))
+        ]
+        export_data["usage"] = [
             {"period": period, "events": events, "total_tokens": int(tokens or 0), "cost": cost}
             for period, events, tokens, cost in session.execute(
                 select(
@@ -153,11 +160,12 @@ def build_export(user_id: str) -> dict[str, Any]:
         from app.channels import subject as channel_subject
 
         # conversas do WhatsApp e do Slack (ADR-0044)
-        data["channel_conversations"] = channel_subject.export(session, user_id)
-    return data
+        export_data["channel_conversations"] = channel_subject.export(session, user_id)
+    return export_data
 
 
 def _finish(request_id: UUID, **values: Any) -> None:
+    """Grava os campos dados no pedido e a hora do fim; pedido já apagado é ignorado."""
     with Session(get_engine()) as session:
         request = session.get(DataSubjectRequest, request_id)
         if request is None:
@@ -184,14 +192,14 @@ def run_export(request_id: UUID) -> None:
         request.status = "running"
         session.commit()
     try:
-        data = build_export(user_id)
-        payload = json.dumps(data, ensure_ascii=False, default=str).encode()
-        counts = {key: len(rows) for key, rows in data["agno"].items()}
-        counts["agent_runs"] = len(data["agent_runs"])
-        counts["usage_periods"] = len(data["usage"])
+        export_data = build_export(user_id)
+        payload = json.dumps(export_data, ensure_ascii=False, default=str).encode()
+        counts = {key: len(rows) for key, rows in export_data["agno"].items()}
+        counts["agent_runs"] = len(export_data["agent_runs"])
+        counts["usage_periods"] = len(export_data["usage"])
         with Session(get_engine()) as session:
             # só grava se a exclusão não zerou o pedido enquanto o arquivo era montado
-            done = session.execute(
+            stored = session.execute(
                 update(DataSubjectRequest)
                 .where(
                     DataSubjectRequest.id == request_id,
@@ -206,7 +214,7 @@ def run_export(request_id: UUID) -> None:
                 )
             )
             session.commit()
-        if _affected(done):
+        if _affected(stored):
             logger.info("exportação do titular pronta", extra={"request_id": str(request_id)})
         else:
             _finish(request_id, status="expired")
@@ -239,10 +247,12 @@ def pseudonym(user_id: str) -> str:
 
 
 def _affected(result: Any) -> int:
+    """Linhas atingidas por um UPDATE ou DELETE."""
     return int(getattr(result, "rowcount", 0) or 0)
 
 
 def _delete(conn: Connection, table: Table | None, column: str, values: list[Any]) -> int:
+    """Apaga as linhas com `column` em `values`; tabela ou coluna ausente conta zero."""
     if table is None or column not in table.c or not values:
         return 0
     return int(conn.execute(table.delete().where(table.c[column].in_(values))).rowcount or 0)
@@ -287,9 +297,11 @@ def erase(user_id: str) -> dict[str, int]:
     alias = pseudonym(user_id)
     with Session(engine) as session:
         run_ids = [
-            r
-            for r in session.scalars(select(AgentRun.run_id).where(AgentRun.user_id == user_id))
-            if r
+            run_id
+            for run_id in session.scalars(
+                select(AgentRun.run_id).where(AgentRun.user_id == user_id)
+            )
+            if run_id
         ]
         counts["agent_runs"] = _affected(
             session.execute(
@@ -312,6 +324,7 @@ def erase(user_id: str) -> dict[str, int]:
                 update(UsageEvent).where(UsageEvent.user_id == user_id).values(user_id=alias)
             )
         )
+        # caso de teste criado a partir de conversa do titular perde o vínculo com o run
         counts["eval_cases_unlinked"] = (
             _affected(
                 session.execute(
@@ -352,7 +365,7 @@ def new_erase_request(session: Session, user_id: str, actor: str, source: str) -
 
     Quem chama roda `run_erase(id, user_id)` em seguida, com o id só no argumento.
     """
-    row = DataSubjectRequest(
+    erase_request = DataSubjectRequest(
         kind="erase",
         subject=None,
         subject_hash=subject_hash(user_id),
@@ -361,20 +374,20 @@ def new_erase_request(session: Session, user_id: str, actor: str, source: str) -
         source=source,
         due_at=due_date(),
     )
-    session.add(row)
-    for pending in session.scalars(
+    session.add(erase_request)
+    for export_request in session.scalars(
         select(DataSubjectRequest).where(
             DataSubjectRequest.kind == "export",
-            DataSubjectRequest.subject_hash == row.subject_hash,
+            DataSubjectRequest.subject_hash == erase_request.subject_hash,
         )
     ):
-        pending.result = None
-        pending.subject = None
-        pending.expires_at = None
-        if pending.status == "done":
-            pending.status = "expired"
+        export_request.result = None
+        export_request.subject = None
+        export_request.expires_at = None
+        if export_request.status == "done":
+            export_request.status = "expired"
     session.commit()
-    return row.id
+    return erase_request.id
 
 
 def run_erase(request_id: UUID, user_id: str) -> None:
@@ -401,6 +414,7 @@ DUE_NOTICE = timedelta(days=2)
 
 
 def due_date(now: datetime | None = None) -> datetime:
+    """Prazo de resposta do pedido, `DATA_SUBJECT_DEADLINE_DAYS` depois de `now`."""
     return (now or datetime.now(UTC)) + timedelta(days=get_settings().data_subject_deadline_days)
 
 
@@ -443,12 +457,13 @@ def check_requests(session: Session, now: datetime) -> list[tuple[UUID, str]]:
             if not _claim(session, row.id, "failed_alerted_at", now):
                 continue
             # a exclusão não guarda o id: o aviso pede para refazer o pedido
-            again = "Refaça o pedido com o id do titular." if row.kind == "erase" else ""
+            retry_hint = "Refaça o pedido com o id do titular." if row.kind == "erase" else ""
             broadcast(
                 session,
                 DATA_SUBJECT_FAILED,
                 {"request_id": str(row.id), "kind": row.kind, "source": row.source},
-                f"Pedido de {_KIND[row.kind]} do titular {row.subject_hash[:12]} falhou. {again}",
+                f"Pedido de {_KIND[row.kind]} do titular {row.subject_hash[:12]} falhou. "
+                f"{retry_hint}",
             )
             sent.append((row.id, DATA_SUBJECT_FAILED))
     if destinations_for(session, DATA_SUBJECT_DUE):
@@ -478,4 +493,5 @@ def check_requests(session: Session, now: datetime) -> list[tuple[UUID, str]]:
     return sent
 
 
+# nome do tipo de pedido no texto dos avisos
 _KIND = {"export": "exportação", "erase": "exclusão"}

@@ -29,6 +29,7 @@ MISMATCH = "A tool enviada não é a que estava pendente de aprovação neste ru
 
 
 def _pending(run_id: str) -> list[dict[str, Any]] | None:
+    """Tools pendentes gravadas no run; None quando o run não existe ou não tem pendência."""
     with Session(get_engine()) as session:
         rows = session.scalars(
             select(AgentRun.pending_tools).where(AgentRun.run_id == run_id).limit(1)
@@ -38,11 +39,11 @@ def _pending(run_id: str) -> list[dict[str, Any]] | None:
 
 def mismatch(pending: list[dict[str, Any]], sent: list[Any]) -> bool:
     """Alguma tool enviada difere da pendente de mesmo `tool_call_id`, ou não existia."""
-    by_id = {p.get("tool_call_id"): p for p in pending}
+    pending_by_call_id = {tool.get("tool_call_id"): tool for tool in pending}
     for tool in sent:
         if not isinstance(tool, dict):
             return True
-        original = by_id.get(tool.get("tool_call_id"))
+        original = pending_by_call_id.get(tool.get("tool_call_id"))
         if original is None:
             return True
         if tool.get("tool_name") != original.get("tool_name"):
@@ -53,6 +54,8 @@ def mismatch(pending: list[dict[str, Any]], sent: list[Any]) -> bool:
 
 
 class ContinueGuardMiddleware(BaseHTTPMiddleware):
+    """Recusa com 409 o continue cuja tool não bate com a pendente gravada no run."""
+
     async def dispatch(self, request: Request, call_next: object) -> Response:
         match = _CONTINUE.match(request.url.path) if request.method == "POST" else None
         if match is not None:
@@ -63,11 +66,16 @@ class ContinueGuardMiddleware(BaseHTTPMiddleware):
         return response
 
     async def _check(self, request: Request, run_id: str) -> Response | None:
+        """Resposta de recusa, ou None para o continue seguir até a rota do Agno.
+
+        Só o campo `tools` do form é conferido: é por ele que o cliente troca a tool
+        gravada. Form ilegível, sem `tools` ou run sem pendência gravada segue adiante.
+        """
         content_type = request.headers.get("content-type", "")
         if not content_type.startswith(_FORMS):
             return None
-        length = request.headers.get("content-length", "")
-        if not length.isdigit() or int(length) > MAX_BODY:
+        content_length = request.headers.get("content-length", "")
+        if not content_length.isdigit() or int(content_length) > MAX_BODY:
             return JSONResponse({"detail": "Corpo do continue grande demais"}, status_code=413)
         # o corpo fica em cache e a rota do Agno lê de novo; o form é lido de uma cópia
         body = await request.body()
@@ -75,19 +83,19 @@ class ContinueGuardMiddleware(BaseHTTPMiddleware):
         async def receive() -> Message:
             return {"type": "http.request", "body": body, "more_body": False}
 
-        copy = StarletteRequest(request.scope, receive)
+        form_request = StarletteRequest(request.scope, receive)
         try:
-            form = await copy.form()
+            form = await form_request.form()
         except Exception:
             return None
         try:
-            raw = form.get("tools")
+            tools_field = form.get("tools")
         finally:
             await form.close()
-        if not isinstance(raw, str) or not raw.strip():
+        if not isinstance(tools_field, str) or not tools_field.strip():
             return None
         try:
-            sent = json.loads(raw)
+            sent = json.loads(tools_field)
         except json.JSONDecodeError:
             return None
         if not isinstance(sent, list):

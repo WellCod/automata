@@ -36,48 +36,53 @@ def durable() -> bool:
 
 
 def _when(epoch: Any) -> datetime | None:
+    """Época em segundos, como o Agno grava os jobs, em datetime UTC."""
     return datetime.fromtimestamp(int(epoch), UTC) if epoch else None
 
 
 def config_names(session: Session, ids: set[str]) -> dict[str, str]:
-    valid = []
+    """Nome de cada config pelo id; id que não é UUID fica de fora."""
+    config_uuids = []
     for value in ids:
         try:
-            valid.append(UUID(value))
+            config_uuids.append(UUID(value))
         except ValueError:
             continue
-    if not valid:
+    if not config_uuids:
         return {}
     rows = session.execute(
-        select(AgentConfig.id, AgentConfig.name).where(AgentConfig.id.in_(valid))
+        select(AgentConfig.id, AgentConfig.name).where(AgentConfig.id.in_(config_uuids))
     )
-    return {str(r.id): r.name for r in rows}
+    return {str(row.id): row.name for row in rows}
 
 
 def summary(session: Session, limit: int = 50) -> dict[str, Any]:
-    db = jobs_db()
-    counts = {status: db.list_jobs(status=status, limit=1)[1] for status in JOB_STATUSES}
-    queued, _ = db.list_jobs(status="queued", limit=1, sort_by="created_at", sort_order="asc")
-    recent, _ = db.list_jobs(limit=limit, sort_by="created_at", sort_order="desc")
-    names = config_names(session, {str(j.get("component_id")) for j in recent})
+    """Contagem por status, o job mais antigo na fila e os mais recentes, para o painel."""
+    queue_db = jobs_db()
+    counts = {status: queue_db.list_jobs(status=status, limit=1)[1] for status in JOB_STATUSES}
+    oldest_queued, _ = queue_db.list_jobs(
+        status="queued", limit=1, sort_by="created_at", sort_order="asc"
+    )
+    recent, _ = queue_db.list_jobs(limit=limit, sort_by="created_at", sort_order="desc")
+    names = config_names(session, {str(job.get("component_id")) for job in recent})
     return {
         "counts": counts,
-        "oldest_queued_at": _when(queued[0]["created_at"]) if queued else None,
+        "oldest_queued_at": _when(oldest_queued[0]["created_at"]) if oldest_queued else None,
         "jobs": [
             {
-                "id": str(j["id"]),
-                "component_type": j.get("component_type"),
-                "component_id": j.get("component_id"),
-                "component_name": names.get(str(j.get("component_id"))),
-                "status": j.get("status"),
-                "attempt": int(j.get("attempt") or 0),
-                "max_attempts": int(j.get("max_attempts") or 0),
-                "error": (j.get("error") or None) and str(j["error"])[:500],
-                "user_id": j.get("user_id"),
-                "created_at": _when(j.get("created_at")),
-                "completed_at": _when(j.get("completed_at")),
+                "id": str(job["id"]),
+                "component_type": job.get("component_type"),
+                "component_id": job.get("component_id"),
+                "component_name": names.get(str(job.get("component_id"))),
+                "status": job.get("status"),
+                "attempt": int(job.get("attempt") or 0),
+                "max_attempts": int(job.get("max_attempts") or 0),
+                "error": (job.get("error") or None) and str(job["error"])[:500],
+                "user_id": job.get("user_id"),
+                "created_at": _when(job.get("created_at")),
+                "completed_at": _when(job.get("completed_at")),
             }
-            for j in recent
+            for job in recent
         ],
     }
 
@@ -88,26 +93,27 @@ def requeue(job_id: str) -> bool:
 
 def retries_by_config(session: Session, ids: set[str]) -> dict[str, int]:
     """`run.background_retries` da versão vigente de cada config (ADR-0037)."""
-    valid = []
+    config_uuids = []
     for value in ids:
         try:
-            valid.append(UUID(value))
+            config_uuids.append(UUID(value))
         except ValueError:
             continue
-    if not valid:
+    if not config_uuids:
         return {}
     rows = session.execute(
         select(AgentConfig.id, AgentConfigVersion.payload)
         .join(AgentConfigVersion, AgentConfigVersion.id == AgentConfig.current_version_id)
-        .where(AgentConfig.id.in_(valid))
+        .where(AgentConfig.id.in_(config_uuids))
     ).all()
-    out: dict[str, int] = {}
+    retries: dict[str, int] = {}
     for config_id, payload in rows:
         try:
-            out[str(config_id)] = ConfigPayload.model_validate(payload).run.background_retries
+            retries[str(config_id)] = ConfigPayload.model_validate(payload).run.background_retries
         except ValueError:
-            out[str(config_id)] = 0
-    return out
+            # payload que não valida mais (versão antiga) fica sem retry
+            retries[str(config_id)] = 0
+    return retries
 
 
 def check_jobs(session: Session, now: datetime) -> list[tuple[str, str]]:
@@ -118,21 +124,26 @@ def check_jobs(session: Session, now: datetime) -> list[tuple[str, str]]:
         return []
     failed, _ = jobs_db().list_jobs(status="failed", limit=100, sort_by="updated_at")
     cutoff = (now - RECENT).timestamp()
-    recent = [j for j in failed if int(j.get("completed_at") or j.get("updated_at") or 0) >= cutoff]
+    recent = [
+        job
+        for job in failed
+        if int(job.get("completed_at") or job.get("updated_at") or 0) >= cutoff
+    ]
     if not recent:
         return []
-    retries = retries_by_config(session, {str(j.get("component_id")) for j in recent})
+    retries = retries_by_config(session, {str(job.get("component_id")) for job in recent})
     names = config_names(session, set(retries))
-    done: list[tuple[str, str]] = []
+    handled: list[tuple[str, str]] = []
     for job in recent:
         job_id, config_id = str(job["id"]), str(job.get("component_id"))
+        # o requeue do Agno sobe max_attempts; attempt conta as execuções já feitas
         allowed = retries.get(config_id, 0)
         if allowed and int(job.get("attempt") or 1) <= allowed and requeue(job_id):
             logger.info(
                 "job repetido pelo retry do agente",
                 extra={"job_id": job_id, "config_id": config_id, "attempt": job.get("attempt")},
             )
-            done.append((job_id, "requeued"))
+            handled.append((job_id, "requeued"))
             continue
         if config_id not in names or not destinations_for(session, JOB_FAILED):
             continue
@@ -146,5 +157,5 @@ def check_jobs(session: Session, now: datetime) -> list[tuple[str, str]]:
             f"Run em background de {names[config_id]} falhou"
             f"{' depois dos retries' if allowed else ''}: {str(job.get('error') or '')[:200]}",
         )
-        done.append((job_id, JOB_FAILED))
-    return done
+        handled.append((job_id, JOB_FAILED))
+    return handled

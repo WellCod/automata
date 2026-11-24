@@ -40,6 +40,7 @@ def current_period(now: datetime | None = None) -> str:
 
 
 def month_spend(session: Session, config_id: UUID, period: str | None = None) -> float:
+    """Gasto do config no período (`AAAAMM`, o corrente por padrão)."""
     total = session.scalar(
         select(func.coalesce(func.sum(UsageEvent.cost), 0)).where(
             UsageEvent.agent_config_id == config_id,
@@ -63,9 +64,9 @@ def month_spends(session: Session, config_ids: list[UUID], period: str) -> dict[
 
 def cached_spend(config_id: UUID) -> float:
     # um run por mensagem consultaria o banco a cada turno; 30 s bastam para barrar
-    hit = _cache.get(config_id)
-    if hit is not None and monotonic() - hit[0] < CACHE_S:
-        return hit[1]
+    cached = _cache.get(config_id)
+    if cached is not None and monotonic() - cached[0] < CACHE_S:
+        return cached[1]
     with Session(get_engine()) as session:
         spent = month_spend(session, config_id)
     _cache[config_id] = (monotonic(), spent)
@@ -89,11 +90,15 @@ class BudgetState:
 
 
 def state_for(config: AgentConfig, spent: float) -> BudgetState:
-    limit = float(config.budget_monthly_usd) if config.budget_monthly_usd is not None else None
+    """Nível do orçamento: aviso a partir do percentual do config, estouro em 100%.
+
+    Limite zero conta como estourado.
+    """
+    limit_usd = float(config.budget_monthly_usd) if config.budget_monthly_usd is not None else None
     percent: float | None = None
     level: Level | None = None
-    if limit is not None:
-        percent = spent / limit * 100 if limit > 0 else 100.0
+    if limit_usd is not None:
+        percent = spent / limit_usd * 100 if limit_usd > 0 else 100.0
         if percent >= 100:
             level = "exceeded"
         elif percent >= config.budget_alert_percent:
@@ -101,7 +106,7 @@ def state_for(config: AgentConfig, spent: float) -> BudgetState:
         else:
             level = "ok"
     return BudgetState(
-        limit_usd=limit,
+        limit_usd=limit_usd,
         spent_usd=spent,
         alert_percent=config.budget_alert_percent,
         hard_stop=config.budget_hard_stop,
@@ -118,6 +123,8 @@ def hard_limit(config: AgentConfig) -> float | None:
 
 
 class BudgetGuardrail(_Guardrail):
+    """Pre-hook que barra o run quando o gasto do mês do config chegou ao limite."""
+
     def __init__(self, config_id: UUID, limit_usd: float, log: BlockLog | None = None) -> None:
         super().__init__(BUDGET_MESSAGE, log)
         self.config_id = config_id

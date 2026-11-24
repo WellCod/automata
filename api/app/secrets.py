@@ -16,6 +16,7 @@ class SecretsKeyMissing(RuntimeError):
 
 
 def _current() -> Fernet:
+    """Fernet da chave atual, a única que cifra."""
     key = get_settings().mcp_secrets_key
     if not key:
         raise SecretsKeyMissing("MCP_SECRETS_KEY não configurada")
@@ -23,6 +24,7 @@ def _current() -> Fernet:
 
 
 def _fernet() -> MultiFernet:
+    """Chave atual primeiro, para cifrar; a anterior, quando existe, só ajuda a decifrar."""
     keys = [_current()]
     previous = get_settings().mcp_secrets_previous_key
     if previous:
@@ -36,14 +38,15 @@ def encrypt_json(data: dict[str, str]) -> str:
 
 def decrypt_json(token: str) -> dict[str, str]:
     try:
-        raw = _fernet().decrypt(token.encode())
+        plaintext = _fernet().decrypt(token.encode())
     except InvalidToken as exc:
         raise SecretsKeyMissing("MCP_SECRETS_KEY não decifra os segredos salvos") from exc
-    result: dict[str, str] = json.loads(raw)
-    return result
+    decrypted: dict[str, str] = json.loads(plaintext)
+    return decrypted
 
 
 def on_current_key(token: str) -> bool:
+    """Se o segredo já abre com a chave atual, ou seja, se a rotação não precisa dele."""
     try:
         _current().decrypt(token.encode())
     except InvalidToken:

@@ -27,17 +27,19 @@ class EgressDenied(ValueError):
 
 
 def _allowed_hosts() -> set[str]:
+    """Hosts de `MCP_ALLOWED_HOSTS`, liberados da checagem de rede interna."""
     raw = get_settings().mcp_allowed_hosts
-    return {h.strip().lower() for h in raw.split(",") if h.strip()}
+    return {host.strip().lower() for host in raw.split(",") if host.strip()}
 
 
 def _is_internal(ip: str) -> bool:
-    addr = ipaddress.ip_address(ip)
-    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped is not None:
-        addr = addr.ipv4_mapped
+    """Endereço fora da internet pública; IPv6 que embute IPv4 é julgado pelo IPv4."""
+    address = ipaddress.ip_address(ip)
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        address = address.ipv4_mapped
     # só endereço roteável na internet: fora ficam privada, loopback, link-local,
     # CGNAT (100.64.0.0/10, onde mora o metadata da Alibaba), reservada e afins
-    return not addr.is_global or addr.is_multicast
+    return not address.is_global or address.is_multicast
 
 
 def resolve_public(host: str, port: int) -> str:
@@ -46,10 +48,12 @@ def resolve_public(host: str, port: int) -> str:
     if host in _allowed_hosts():
         return host
     try:
-        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+        address_infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
     except socket.gaierror as exc:
         raise EgressDenied(f"host {host} não resolve") from exc
-    ips = [str(info[4][0]) for info in infos]
+    # sockaddr é o quinto item de cada resposta, e o IP é o primeiro do sockaddr
+    ips = [str(address_info[4][0]) for address_info in address_infos]
+    # todos os IPs precisam ser públicos: o cliente poderia conectar em qualquer um
     for ip in ips:
         if _is_internal(ip):
             raise EgressDenied(f"host {host} resolve para endereço interno ({ip})")
@@ -57,6 +61,8 @@ def resolve_public(host: str, port: int) -> str:
 
 
 class _PinnedBackend(httpcore.SyncBackend):
+    """Resolve e confere o host na hora de abrir o TCP e conecta no IP conferido."""
+
     def connect_tcp(
         self,
         host: str,
@@ -84,6 +90,7 @@ def guarded_client(**kwargs: Any) -> httpx.Client:
 
 
 def check_url(url: str) -> None:
+    """Conferência ao salvar: http ou https, http só em host liberado, e host com IP público."""
     parts = urlsplit(url)
     if parts.scheme not in ("http", "https"):
         raise EgressDenied("URL precisa ser http ou https")

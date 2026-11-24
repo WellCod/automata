@@ -21,6 +21,8 @@ _FORMS = ("application/x-www-form-urlencoded", "multipart/form-data")
 
 
 class SessionIdMiddleware(BaseHTTPMiddleware):
+    """Gera o `session_id` da conversa nova antes de a rota de run do Agno montar o agente."""
+
     async def dispatch(self, request: Request, call_next: object) -> Response:
         if request.method == "POST" and _RUN.match(request.url.path):
             await self._ensure_session(request)
@@ -28,11 +30,16 @@ class SessionIdMiddleware(BaseHTTPMiddleware):
         return response
 
     async def _ensure_session(self, request: Request) -> None:
+        """Põe um `session_id` novo em `request.state` quando o form não traz um.
+
+        Corpo que não é form, sem tamanho declarado ou maior que MAX_BODY segue sem
+        sessão gerada, e o Agno gera a dele como antes.
+        """
         content_type = request.headers.get("content-type", "")
-        length = request.headers.get("content-length", "")
-        if not content_type.startswith(_FORMS) or not length.isdigit():
+        content_length = request.headers.get("content-length", "")
+        if not content_type.startswith(_FORMS) or not content_length.isdigit():
             return
-        if int(length) > MAX_BODY:
+        if int(content_length) > MAX_BODY:
             return
         # o corpo fica em cache e a rota do Agno lê de novo; o form é lido de uma cópia
         body = await request.body()
@@ -40,9 +47,9 @@ class SessionIdMiddleware(BaseHTTPMiddleware):
         async def receive() -> Message:
             return {"type": "http.request", "body": body, "more_body": False}
 
-        copy = StarletteRequest(request.scope, receive)
+        form_request = StarletteRequest(request.scope, receive)
         try:
-            form = await copy.form()
+            form = await form_request.form()
         except Exception:
             return
         try:

@@ -94,12 +94,13 @@ def note(request: Request, **detail: Any) -> None:
 
 
 def _jsonable(value: Any) -> Any:
+    """Detalhe no formato que o JSONB aceita; tipo que não conhece vira texto."""
     if isinstance(value, UUID):
         return str(value)
     if isinstance(value, dict):
-        return {str(k): _jsonable(v) for k, v in value.items()}
+        return {str(key): _jsonable(item) for key, item in value.items()}
     if isinstance(value, list | tuple):
-        return [_jsonable(v) for v in value]
+        return [_jsonable(item) for item in value]
     if isinstance(value, datetime):
         return value.isoformat()
     if value is None or isinstance(value, str | int | float | bool):
@@ -117,13 +118,18 @@ def record(
     request_id: str | None,
     detail: dict[str, Any] | None,
 ) -> None:
+    """Grava uma linha da trilha.
+
+    O `config_id` do path vai para a coluna própria, que o filtro da trilha usa; o que não
+    é UUID volta para os parâmetros. Id de titular no path entra como pseudônimo.
+    """
     config_id: UUID | None = None
-    raw = params.pop("config_id", None)
-    if raw:
+    raw_config_id = params.pop("config_id", None)
+    if raw_config_id:
         try:
-            config_id = UUID(raw)
+            config_id = UUID(raw_config_id)
         except ValueError:
-            params["config_id"] = raw
+            params["config_id"] = raw_config_id
     if _SUBJECT_ROUTE in action and "user_id" in params:
         from app.data_subjects import pseudonym
 
@@ -167,17 +173,21 @@ def _route_words(app: Any) -> frozenset[str]:
 
 
 def masked_path(app: Any, path: str) -> str:
+    """Path com todo segmento que não é palavra fixa de rota trocado por `*`."""
     words = _route_words(app)
-    parts = [p if p in words else "*" for p in path.split("/")[1:]]
-    return "/" + "/".join(parts)
+    segments = [segment if segment in words else "*" for segment in path.split("/")[1:]]
+    return "/" + "/".join(segments)
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
+    """Grava a trilha depois da resposta e devolve 404 nas rotas de service accounts do AgentOS."""
+
     def __init__(self, app: Any) -> None:
         super().__init__(app)
         self._seen: dict[tuple[str, str], float] = {}
 
     def _repeated_read(self, request: Request, path: str) -> bool:
+        """Leitura sensível da mesma pessoa e rota há menos de READ_DEDUPE_S: não grava de novo."""
         if not sensitive_read(request.method, path):
             return False
         actor = str(getattr(request.state, "user_id", None) or "")
@@ -186,6 +196,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         last = self._seen.get(key)
         if last is not None and now - last < READ_DEDUPE_S:
             return True
+        # teto de memória do mapa; esvaziar só faz algumas leituras repetidas entrarem de novo
         if len(self._seen) > 10_000:
             self._seen.clear()
         self._seen[key] = now
@@ -275,7 +286,9 @@ def forget_subject(session: Session, user_id: str, alias: str) -> int:
         .where(AuditEvent.params["user_id"].astext == user_id)
         .values(params=AuditEvent.params.op("||")(func.jsonb_build_object("user_id", alias)))
     )
-    return sum(int(getattr(r, "rowcount", 0) or 0) for r in (by_actor, as_target, as_subject))
+    return sum(
+        int(getattr(result, "rowcount", 0) or 0) for result in (by_actor, as_target, as_subject)
+    )
 
 
 def page(
@@ -289,6 +302,11 @@ def page(
     before: tuple[datetime, UUID] | None,
     limit: int,
 ) -> list[AuditEvent]:
+    """Página da trilha, da ação mais nova para a mais velha.
+
+    `before` é o cursor `(created_at, id)` da última linha da página anterior; o id
+    desempata ações gravadas no mesmo instante.
+    """
     query = select(AuditEvent)
     if actor:
         query = query.where(AuditEvent.actor == actor)
@@ -301,16 +319,17 @@ def page(
     if until:
         query = query.where(AuditEvent.created_at < until)
     if before:
-        at, event_id = before
+        cursor_at, cursor_id = before
         query = query.where(
-            (AuditEvent.created_at < at)
-            | ((AuditEvent.created_at == at) & (AuditEvent.id < event_id))
+            (AuditEvent.created_at < cursor_at)
+            | ((AuditEvent.created_at == cursor_at) & (AuditEvent.id < cursor_id))
         )
     query = query.order_by(AuditEvent.created_at.desc(), AuditEvent.id.desc()).limit(limit)
     return list(session.scalars(query))
 
 
 def _escape(text: str) -> str:
+    """Escapa os curingas do LIKE: o filtro por ação procura o texto literal."""
     return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 

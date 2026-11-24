@@ -53,7 +53,7 @@ def _is_content(key: str) -> bool:
 
 
 def _without_content(attributes: Mapping[str, Any] | None) -> dict[str, Any]:
-    kept = {k: v for k, v in (attributes or {}).items() if not _is_content(k)}
+    kept = {key: value for key, value in (attributes or {}).items() if not _is_content(key)}
     # muita integração usa telefone ou e-mail como sessão: sai em hash, que ainda junta os
     # spans da mesma conversa no fornecedor (Fase 49)
     if isinstance(kept.get("session.id"), str):
@@ -65,12 +65,12 @@ def _events_without_content(events: Sequence[Event]) -> list[Event]:
     # exceção fica com o tipo; a mensagem pode trazer o texto que falhou
     kept: list[Event] = []
     for event in events:
-        attrs = event.attributes or {}
+        event_attributes = event.attributes or {}
         if event.name == "exception":
             kept.append(
                 Event(
                     "exception",
-                    {"exception.type": str(attrs.get("exception.type", ""))},
+                    {"exception.type": str(event_attributes.get("exception.type", ""))},
                     event.timestamp,
                 )
             )
@@ -86,6 +86,7 @@ class FilteringExporter(SpanExporter):
         self._include_content = include_content
 
     def _rewrite(self, span: ReadableSpan) -> ReadableSpan:
+        """Cópia do span com o recurso da instância e, sem conteúdo ligado, sem a conversa."""
         attributes = dict(span.attributes or {}) if self._include_content else None
         return ReadableSpan(
             name=span.name,
@@ -106,7 +107,7 @@ class FilteringExporter(SpanExporter):
         )
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
-        return self._inner.export([self._rewrite(s) for s in spans])
+        return self._inner.export([self._rewrite(span) for span in spans])
 
     def shutdown(self) -> None:
         self._inner.shutdown()
